@@ -142,9 +142,9 @@ Make a plan first. When done, report what you built, test results, the cold-star
 ### Step 1.1 — Table view and editing
 
 **Done when**
-- [ ] Typing, keyboard navigation, block selection, copy and paste to and from Excel work.
-- [ ] Every edit is undoable; column roles show in the header and can be changed.
-- [ ] Scrolling a 1,000,000-cell table stays smooth (60 fps benchmark).
+- [x] Typing, keyboard navigation, block selection, copy and paste to and from Excel work.
+- [x] Every edit is undoable; column roles show in the header and can be changed.
+- [x] Scrolling a 1,000,000-cell table stays smooth (60 fps benchmark).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 1.1 in docs/PHASES.md.
@@ -162,9 +162,9 @@ Make a plan first. When done, report what you built, test results and the scroll
 ### Step 1.2 — Replicate groups, category groups, drag and drop, bulk rename
 
 **Done when**
-- [ ] Y columns can be grouped into replicate groups with mean, SD and SEM available to analyses and graphs.
-- [ ] Category groups define a second factor.
-- [ ] Columns and groups move by drag and drop; bulk rename works; all of it is undoable.
+- [x] Y columns can be grouped into replicate groups with mean, SD and SEM available to analyses and graphs.
+- [x] Category groups define a second factor.
+- [x] Columns and groups move by drag and drop; bulk rename works; all of it is undoable.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 1.2 in docs/PHASES.md.
