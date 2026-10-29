@@ -73,9 +73,9 @@ Make a plan first. When done, report what you built and the test results.
 ### Step 0.3 — `.cvp` project file format
 
 **Done when**
-- [ ] Save then open returns an identical document (tested with hypothesis).
-- [ ] An interrupted save never corrupts an existing file.
-- [ ] A 10 MB project opens in under 1 s (benchmark).
+- [x] Save then open returns an identical document (tested with hypothesis).
+- [x] An interrupted save never corrupts an existing file.
+- [x] A 10 MB project opens in under 1 s (benchmark).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 0.3 in docs/PHASES.md.
