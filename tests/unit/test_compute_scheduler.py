@@ -17,7 +17,6 @@ from curvis.compute import Job, JobError, Scheduler, check_cancelled, is_cancell
 from curvis.compute import shared as shared_mod
 from tests.unit import compute_jobs as jobs
 
-
 # Timer checks use perf_counter (monotonic ticks every ~16 ms on Windows) and allow
 # a few ms for the difference between Qt's clock and Python's.
 CLOCK_SLACK = 0.01
