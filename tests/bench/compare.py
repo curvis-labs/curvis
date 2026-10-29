@@ -8,8 +8,11 @@ Usage (CI runs the benchmarks three times)::
 
 Each benchmark is compared on its **minimum** time over all rounds of all given runs,
 the statistic least affected by other load on a shared machine. Timings are first
-divided by the calibration benchmark (tests/bench/test_calibration.py), so a baseline
-recorded on one machine can be checked on another. A benchmark that is in the
+divided by the calibration benchmark (tests/bench/test_calibration.py). That corrects
+modest speed drift between CI runners, not the gap between unlike machines: one CPU
+workload cannot stand in for I/O, process start-up and thread wake-up costs. So the
+stored baseline must come from the CI runner (the ``benchmarks`` artifact); locally,
+compare against a baseline of your own with ``--baseline``. A benchmark that is in the
 baseline but missing from the run fails the check; a new benchmark is only reported.
 """
 
@@ -17,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -94,8 +98,13 @@ def report(scale: float, rows: list[Row], threshold: float) -> str:
         lines.append(
             f"{short:<60} {_ms(r.baseline):>10} {_ms(r.current):>10} {change:>8}  {r.status}"
         )
-    if not 0.5 <= scale <= 2:
-        lines += ["", "Warning: this machine is very different from the baseline machine."]
+    if not 0.75 <= scale <= 1.33:
+        warning = (
+            f"This machine runs the calibration {scale:.2f}x as long as the baseline "
+            "machine; the comparison is unreliable. Record the baseline on this kind of machine."
+        )
+        prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "Warning: "
+        lines += ["", prefix + warning]
     return "\n".join(lines)
 
 

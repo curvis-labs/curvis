@@ -1,31 +1,31 @@
 {
   "machine_info": {
-    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cpu": "GitHub Actions ubuntu-latest (CI run 40911624628)",
     "system": "Linux",
     "python": "3.12.3"
   },
-  "commit": "7d62aefb1c9af76218b83623788589f17cfc21b4",
-  "datetime": "2026-10-29T16:21:28.618437+00:00",
+  "commit": "7606efe30612b0f65c01e024d0345fc9c619415c",
+  "datetime": "2026-10-29T16:27:34+00:00",
   "runs": 3,
   "benchmarks": [
     {
       "name": "test_calibration",
       "fullname": "tests/bench/test_calibration.py::test_calibration",
       "stats": {
-        "min": 0.008881365999968693
+        "min": 0.018438298
       },
       "runs": [
         {
-          "min": 0.008881365999968693,
-          "median": 0.009305922000066857
+          "min": 0.018544947,
+          "median": 0.019497539
         },
         {
-          "min": 0.009019748000127947,
-          "median": 0.009184622500015394
+          "min": 0.018575486000000002,
+          "median": 0.0187782175
         },
         {
-          "min": 0.009129241999971782,
-          "median": 0.009765625999989425
+          "min": 0.018438298,
+          "median": 0.018671376
         }
       ]
     },
@@ -33,20 +33,20 @@
       "name": "test_1000_debounced_submits",
       "fullname": "tests/bench/test_compute.py::test_1000_debounced_submits",
       "stats": {
-        "min": 0.0015865160000885226
+        "min": 0.002377806
       },
       "runs": [
         {
-          "min": 0.0015865160000885226,
-          "median": 0.0017299930000262975
+          "min": 0.00238132,
+          "median": 0.002445353
         },
         {
-          "min": 0.0016184079997856315,
-          "median": 0.001807596999924499
+          "min": 0.002377806,
+          "median": 0.002483388
         },
         {
-          "min": 0.0016039489999002399,
-          "median": 0.0017896555000334047
+          "min": 0.002410964,
+          "median": 0.002469548
         }
       ]
     },
@@ -54,20 +54,20 @@
       "name": "test_100_light_job_round_trips",
       "fullname": "tests/bench/test_compute.py::test_100_light_job_round_trips",
       "stats": {
-        "min": 0.0027874769998561533
+        "min": 0.005643917
       },
       "runs": [
         {
-          "min": 0.002945017000001826,
-          "median": 0.0030887684999925114
+          "min": 0.005881623,
+          "median": 0.007453709
         },
         {
-          "min": 0.0027874769998561533,
-          "median": 0.003565850999848408
+          "min": 0.005848847,
+          "median": 0.006049784
         },
         {
-          "min": 0.0028931220001595648,
-          "median": 0.00320817600004375
+          "min": 0.005643917,
+          "median": 0.005847558
         }
       ]
     },
@@ -75,20 +75,20 @@
       "name": "test_heavy_job_round_trip_8mb",
       "fullname": "tests/bench/test_compute.py::test_heavy_job_round_trip_8mb",
       "stats": {
-        "min": 0.008801182999832236
+        "min": 0.007108751
       },
       "runs": [
         {
-          "min": 0.008801182999832236,
-          "median": 0.0107459185001062
+          "min": 0.007108751,
+          "median": 0.007778514
         },
         {
-          "min": 0.009096568999893861,
-          "median": 0.010359536500004651
+          "min": 0.007318776,
+          "median": 0.008042529999999999
         },
         {
-          "min": 0.008926850000079867,
-          "median": 0.01077841799997259
+          "min": 0.007805437,
+          "median": 0.008605674499999999
         }
       ]
     },
@@ -96,20 +96,20 @@
       "name": "test_recalc_50_nodes",
       "fullname": "tests/bench/test_compute.py::test_recalc_50_nodes",
       "stats": {
-        "min": 0.0041901570000391075
+        "min": 0.0028858910000000002
       },
       "runs": [
         {
-          "min": 0.004806580999911603,
-          "median": 0.00585894100004225
+          "min": 0.002932223,
+          "median": 0.00342466
         },
         {
-          "min": 0.0041901570000391075,
-          "median": 0.005483264499957841
+          "min": 0.003198255,
+          "median": 0.003367509
         },
         {
-          "min": 0.004434915000047113,
-          "median": 0.005788069999880463
+          "min": 0.0028858910000000002,
+          "median": 0.0038414499999999997
         }
       ]
     },
@@ -117,20 +117,20 @@
       "name": "test_open_10mb_project",
       "fullname": "tests/bench/test_project_io.py::test_open_10mb_project",
       "stats": {
-        "min": 0.010404878999906941
+        "min": 0.009269742000000001
       },
       "runs": [
         {
-          "min": 0.010413517999950272,
-          "median": 0.014523158499969213
+          "min": 0.009364044,
+          "median": 0.0095654
         },
         {
-          "min": 0.0105058829999507,
-          "median": 0.013402774500036685
+          "min": 0.012506646000000001,
+          "median": 0.012848176
         },
         {
-          "min": 0.010404878999906941,
-          "median": 0.014196169000001646
+          "min": 0.009269742000000001,
+          "median": 0.009676196
         }
       ]
     },
@@ -138,20 +138,20 @@
       "name": "test_save_10mb_project",
       "fullname": "tests/bench/test_project_io.py::test_save_10mb_project",
       "stats": {
-        "min": 0.029008186000055503
+        "min": 0.013725595
       },
       "runs": [
         {
-          "min": 0.030286687999932838,
-          "median": 0.03328209899996182
+          "min": 0.013725595,
+          "median": 0.047633469
         },
         {
-          "min": 0.029008186000055503,
-          "median": 0.033792494500062276
+          "min": 0.014684901,
+          "median": 0.047546281
         },
         {
-          "min": 0.03097624400015775,
-          "median": 0.0346315259999983
+          "min": 0.014000019,
+          "median": 0.047666611
         }
       ]
     },
@@ -159,20 +159,20 @@
       "name": "test_create_main_window",
       "fullname": "tests/bench/test_startup.py::test_create_main_window",
       "stats": {
-        "min": 1.440899995941436e-05
+        "min": 1.9967e-05
       },
       "runs": [
         {
-          "min": 1.440899995941436e-05,
-          "median": 1.513699999122764e-05
+          "min": 2.0089e-05,
+          "median": 2.0579e-05
         },
         {
-          "min": 1.4542999906552723e-05,
-          "median": 1.5535999864368932e-05
+          "min": 2.0382999999999998e-05,
+          "median": 2.0783e-05
         },
         {
-          "min": 1.4523000118060736e-05,
-          "median": 2.333299994461413e-05
+          "min": 1.9967e-05,
+          "median": 2.0357e-05
         }
       ]
     }

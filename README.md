@@ -20,20 +20,19 @@ Install the pre-commit hooks once with `uv run pre-commit install`.
 
 ### Benchmarks
 
-CI runs the benchmarks in `tests/bench` three times and fails if any is more than 15% slower than the stored baseline, `tests/bench/baseline.json`. Timings are compared on their minimum and scaled by a calibration benchmark, so the baseline can come from a different machine. To check locally:
-
-```bash
-uv run pytest tests/bench --benchmark-only --benchmark-json=bench.json
-uv run python -m tests.bench.compare bench.json
-```
-
-To update the baseline after an intended change, download the `benchmarks` artifact from a CI run (or make three runs locally) and store it:
+CI runs the benchmarks in `tests/bench` three times and fails if any is more than 15% slower than the stored baseline, `tests/bench/baseline.json`. Timings are compared on their minimum and scaled by a calibration benchmark, which only corrects small speed differences between CI runners. The baseline must therefore be recorded on a CI runner. After an intended change, download the `benchmarks` artifact of a CI run on the branch and store it:
 
 ```bash
 uv run python -m tests.bench.compare bench-1.json bench-2.json bench-3.json --update
 ```
 
-See `docs/SPEC.md` for the product spec and `docs/PHASES.md` for the build plan.
+Locally, compare against a baseline of your own:
+
+```bash
+uv run pytest tests/bench --benchmark-only --benchmark-json=before.json   # on main
+uv run pytest tests/bench --benchmark-only --benchmark-json=after.json    # on your branch
+uv run python -m tests.bench.compare after.json --baseline before.json
+```
 
 ## License
 
