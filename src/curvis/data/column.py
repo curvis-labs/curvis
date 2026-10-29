@@ -147,7 +147,12 @@ def _values_equal(a: npt.NDArray[Any], b: npt.NDArray[Any]) -> bool:
 
 @dataclass(eq=False)
 class Column:
-    """A named column of values with a role, an optional unit and replicate group."""
+    """A named column of values with a role, an optional unit and replicate group.
+
+    A Y column that is not in a replicate group is a series of its own; it can sit in
+    a category directly (``category_id``). A grouped column leaves ``category_id``
+    unset: its group carries the category.
+    """
 
     name: str
     role: ColumnRole
@@ -155,6 +160,7 @@ class Column:
     unit: str = ""
     group_id: str | None = None
     id: str = field(default_factory=new_id)
+    category_id: str | None = None
 
     def __post_init__(self) -> None:
         self.role = ColumnRole(self.role)
@@ -170,10 +176,12 @@ class Column:
         unit: str = "",
         group_id: str | None = None,
         id: str | None = None,
+        category_id: str | None = None,
     ) -> "Column":
         """A column from any values (lists, ranges, arrays), coerced for ``role``."""
         role = ColumnRole(role)
-        return cls(name, role, coerce_values(values, role), unit, group_id, id if id else new_id())
+        values = coerce_values(values, role)
+        return cls(name, role, values, unit, group_id, id if id else new_id(), category_id)
 
     def __len__(self) -> int:
         return len(self.values)
@@ -187,6 +195,7 @@ class Column:
             and self.role == other.role
             and self.unit == other.unit
             and self.group_id == other.group_id
+            and self.category_id == other.category_id
             and _values_equal(self.values, other.values)
         )
 

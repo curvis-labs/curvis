@@ -25,21 +25,23 @@ def make_table(spec: str) -> Table:
     """A table from a compact spec: "x a1 a2 | b1" style tokens.
 
     Each token is a column; ``name.group.category`` puts it in a group (and category);
-    ``x`` columns are X columns.
+    ``name..category`` puts it in a category without a group; ``x`` columns are X columns.
     """
     groups: dict[str, ReplicateGroup] = {}
     categories: dict[str, CategoryGroup] = {}
     columns = []
     for token in spec.split():
         name, *rest = token.split(".")
-        group_id = None
-        if rest:
-            category_id = None
-            if len(rest) > 1:
-                category_id = categories.setdefault(rest[1], CategoryGroup(rest[1])).id
+        group_id = category_id = None
+        if len(rest) > 1:
+            category_id = categories.setdefault(rest[1], CategoryGroup(rest[1])).id
+        if rest and rest[0]:
             group_id = groups.setdefault(rest[0], ReplicateGroup(rest[0], category_id)).id
+            category_id = None
         role = ColumnRole.X if name.startswith("x") else ColumnRole.Y
-        columns.append(Column.new(name, role, [1.0], group_id=group_id, id=name))
+        columns.append(
+            Column.new(name, role, [1.0], group_id=group_id, id=name, category_id=category_id)
+        )
     return Table("T", columns, list(groups.values()), list(categories.values()))
 
 
@@ -79,7 +81,7 @@ def test_no_empty_groups_or_missing_references() -> None:
     assert "has no columns" in str(layout_error(table))
     table = make_table("a.A.K")
     table.category_groups.append(CategoryGroup("Empty"))
-    assert "has no replicate groups" in str(layout_error(table))
+    assert "has no series" in str(layout_error(table))
     table = make_table("a.A")
     table.columns[0].group_id = "missing"
     assert "missing replicate group" in str(layout_error(table))
@@ -243,3 +245,33 @@ def test_renamed() -> None:
     assert renamed(["a1", "a2"], find="a", replace="b") == ["b1", "b2"]
     assert renamed(["a1", "a2"], pattern="C#", start=0) == ["C0", "C1"]
     assert renamed(["a1"]) == ["a1"]
+
+
+# --- columns directly in a category -------------------------------------------------
+
+
+def test_columns_directly_in_a_category() -> None:
+    table = make_table("x a.A.K b..K c..K d")
+    assert layout_error(table) is None
+    (category,) = [n for n in layout_tree(table) if n.kind is K]
+    assert [(n.kind, n.id, n.start, n.end) for n in category.children] == [
+        (G, group_id(table, "A"), 1, 2),
+        (C, "b", 2, 3),
+        (C, "c", 3, 4),
+    ]
+    # A column series moves among the category's series, and stays inside it.
+    assert snap_boundary(table, C, "c", 0) == 1
+    assert moved_order(table, C, "c", 1) == ["x", "c", "a", "b", "d"]
+    assert "next to each other" in str(layout_error(make_table("b..K x c..K")))
+    assert " ".join(c.id for c in normalized_order(make_table("b..K x c..K d.A.K"))) == ("b c d x")
+
+
+def test_column_category_rules() -> None:
+    table = make_table("x..K")
+    assert "categories hold only Y columns" in str(layout_error(table))
+    table = make_table("a..K")
+    table.columns[0].category_id = "missing"
+    assert "missing category" in str(layout_error(table))
+    table = make_table("a.A.K")
+    table.columns[0].category_id = table.category_groups[0].id
+    assert "in a replicate group and set a category" in str(layout_error(table))

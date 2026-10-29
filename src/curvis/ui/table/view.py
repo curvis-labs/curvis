@@ -518,12 +518,7 @@ class TableView(QTableView):
             return False
         table = model.table
         existing = [c.name for c in table.category_groups]
-        current = ""
-        group_ids = model.group_ids_at(cols)
-        if group_ids:
-            category_id = table.replicate_group(group_ids[0]).category_id
-            if category_id is not None:
-                current = table.category_group(category_id).name
+        current = model.category_at(cols) or ""
         name = self._ask_category(current, existing)
         if name is None or not name.strip():
             return False
@@ -648,12 +643,8 @@ class TableView(QTableView):
         menu.addAction("Set &category…", self.set_category_of_selected).setEnabled(
             any(c.role is ColumnRole.Y for c in columns)
         )
-        table = model.table
-        in_category = any(
-            table.replicate_group(g).category_id is not None for g in model.group_ids_at(cols)
-        )
         menu.addAction("Remove from categor&y", self.remove_category_of_selected).setEnabled(
-            in_category
+            model.category_at(cols) is not None
         )
         menu.addSeparator()
         menu.addAction("Move &left", self.move_selected_left).setEnabled(has_columns)

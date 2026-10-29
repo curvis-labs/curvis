@@ -37,7 +37,7 @@ class ReplicateStats:
 
 @dataclass(frozen=True)
 class Series:
-    """One replicate group, or one Y column without a group."""
+    """One replicate group, or one Y column without a group (which can be in a category)."""
 
     name: str
     column_ids: tuple[str, ...]
@@ -97,7 +97,7 @@ def series(table: Table) -> list[Series]:
     for column in table.columns:
         if column.group_id is None:
             if column.role is ColumnRole.Y:
-                found.append(Series(column.name, (column.id,), None, None))
+                found.append(Series(column.name, (column.id,), None, column.category_id))
             continue
         if column.group_id in seen:
             continue

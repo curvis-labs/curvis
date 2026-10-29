@@ -3,8 +3,9 @@
 A table's columns form a tree, read left to right:
 
 - the top level holds category groups, replicate groups without a category, and
-  columns without a group;
-- a category group holds replicate groups;
+  columns that are in neither;
+- a category group holds replicate groups and Y columns without a group (a series
+  of one column);
 - a replicate group holds Y columns.
 
 Every node covers a contiguous run of columns, so the header can draw a group as one
@@ -47,6 +48,13 @@ class Node:
     children: tuple[Node, ...] = ()
 
 
+def column_category(table: Table, column: Column) -> str | None:
+    """The category a column is in: its group's, or its own if it has no group."""
+    if column.group_id is None:
+        return column.category_id
+    return table.replicate_group(column.group_id).category_id
+
+
 def layout_error(table: Table) -> str | None:
     """Why the groups of ``table`` break the layout rules, or None if they are fine."""
     groups = {g.id: g for g in table.replicate_groups}
@@ -56,15 +64,24 @@ def layout_error(table: Table) -> str | None:
     if len(categories) != len(table.category_groups):
         return "duplicate category group ids"
     for column in table.columns:
-        if column.group_id is None:
-            continue
-        if column.group_id not in groups:
-            return f"column '{column.name}' refers to a missing replicate group"
-        if column.role is not ColumnRole.Y:
-            return (
-                f"column '{column.name}' has the role {column.role.value}; "
-                "replicate groups hold only Y columns"
-            )
+        if column.group_id is not None:
+            if column.group_id not in groups:
+                return f"column '{column.name}' refers to a missing replicate group"
+            if column.category_id is not None:
+                return f"column '{column.name}' is in a replicate group and set a category"
+            if column.role is not ColumnRole.Y:
+                return (
+                    f"column '{column.name}' has the role {column.role.value}; "
+                    "replicate groups hold only Y columns"
+                )
+        elif column.category_id is not None:
+            if column.category_id not in categories:
+                return f"column '{column.name}' refers to a missing category group"
+            if column.role is not ColumnRole.Y:
+                return (
+                    f"column '{column.name}' has the role {column.role.value}; "
+                    "categories hold only Y columns"
+                )
     for group in table.replicate_groups:
         if group.category_id is not None and group.category_id not in categories:
             return f"replicate group '{group.name}' refers to a missing category group"
@@ -72,10 +89,9 @@ def layout_error(table: Table) -> str | None:
     group_cols: dict[str, list[int]] = {g: [] for g in groups}
     category_cols: dict[str, list[int]] = {c: [] for c in categories}
     for i, column in enumerate(table.columns):
-        if column.group_id is None:
-            continue
-        group_cols[column.group_id].append(i)
-        category_id = groups[column.group_id].category_id
+        if column.group_id is not None:
+            group_cols[column.group_id].append(i)
+        category_id = column_category(table, column)
         if category_id is not None:
             category_cols[category_id].append(i)
     for group_id, cols in group_cols.items():
@@ -87,9 +103,9 @@ def layout_error(table: Table) -> str | None:
     for category_id, cols in category_cols.items():
         name = categories[category_id].name
         if not cols:
-            return f"category group '{name}' has no replicate groups"
+            return f"category group '{name}' has no series"
         if cols[-1] - cols[0] + 1 != len(cols):
-            return f"the groups of category '{name}' are not next to each other"
+            return f"the series of category '{name}' are not next to each other"
     return name_error(table)
 
 
@@ -101,10 +117,11 @@ def name_error(
 ) -> str | None:
     """Why the names of ``table`` (with the given names replaced, by id) are not valid.
 
-    Column names are unique in the table. Replicate group names are unique among the
-    groups of one category (and among the groups without a category), so the same
-    series, e.g. "Control", can appear in every category. Category names are unique.
-    Names are compared ignoring case and cannot be blank.
+    Column names are unique in the table. Series names (replicate groups, and columns
+    that sit in a category directly) are unique within one category, and replicate
+    group names among the groups without a category, so the same series, e.g.
+    "Control", can appear in every category. Category names are unique. Names are
+    compared ignoring case and cannot be blank.
     """
     column_names = column_names or {}
     group_names = group_names or {}
@@ -134,6 +151,15 @@ def name_error(
         error = check(names, "replicate group", where)
         if error:
             return error
+    # A column in a category is a series too: its name must not repeat a group's there.
+    for column in table.columns:
+        if column.group_id is not None or column.category_id is None:
+            continue
+        name = column_names.get(column.id, column.name)
+        groups_here = by_category.get(column.category_id, [])
+        if name_key(name) in {name_key(n) for n in groups_here}:
+            where = categories.get(column.category_id, "")
+            return f"There is already a series called '{name}' in category '{where}'."
     error = check(list(categories.values()), "category")
     if error:
         return error
@@ -144,52 +170,71 @@ def name_error(
 
 def _top_key(table: Table, column: Column) -> tuple[NodeKind, str]:
     """The top-level node a column belongs to."""
-    if column.group_id is None:
-        return NodeKind.COLUMN, column.id
-    category_id = table.replicate_group(column.group_id).category_id
-    if category_id is None:
+    category_id = column_category(table, column)
+    if category_id is not None:
+        return NodeKind.CATEGORY, category_id
+    if column.group_id is not None:
         return NodeKind.GROUP, column.group_id
-    return NodeKind.CATEGORY, category_id
+    return NodeKind.COLUMN, column.id
+
+
+def _member_key(column: Column) -> tuple[NodeKind, str]:
+    """The node a column belongs to inside a category: its group, or itself."""
+    if column.group_id is not None:
+        return NodeKind.GROUP, column.group_id
+    return NodeKind.COLUMN, column.id
 
 
 def normalized_order(table: Table) -> list[Column]:
     """The columns reordered so every group and category is contiguous.
 
     Each group gathers its columns where its first column is, and each category its
-    groups where its first group is; everything else keeps its order. A table whose
-    layout is already valid keeps its order.
+    series where its first series is; everything else keeps its order. A table whose
+    layout is already valid keeps its order. Columns that refer to missing groups or
+    categories stay where they are (:func:`layout_error` reports them).
     """
-    groups = {g.id: g for g in table.replicate_groups}
-    group_columns: dict[str, list[Column]] = {}
-    category_groups: dict[str, list[str]] = {}
+    groups = {g.id for g in table.replicate_groups}
+    categories = {c.id for c in table.category_groups}
+
+    def broken(column: Column) -> bool:
+        if column.group_id is not None:
+            if column.group_id not in groups:
+                return True
+            category_id = table.replicate_group(column.group_id).category_id
+        else:
+            category_id = column.category_id
+        return category_id is not None and category_id not in categories
+
+    # Columns of each node, in order: groups hold columns, categories hold members.
+    members: dict[tuple[NodeKind, str], list[Column]] = {}
     for column in table.columns:
-        if column.group_id is None or column.group_id not in groups:
+        if not broken(column):
+            members.setdefault(_member_key(column), []).append(column)
+    category_members: dict[str, list[tuple[NodeKind, str]]] = {}
+    for column in table.columns:
+        if broken(column):
             continue
-        if column.group_id not in group_columns:
-            group_columns[column.group_id] = []
-            category_id = groups[column.group_id].category_id
-            if category_id is not None:
-                category_groups.setdefault(category_id, []).append(column.group_id)
-        group_columns[column.group_id].append(column)
+        category_id = column_category(table, column)
+        if category_id is not None:
+            keys = category_members.setdefault(category_id, [])
+            if _member_key(column) not in keys:
+                keys.append(_member_key(column))
 
     order: list[Column] = []
     emitted: set[tuple[NodeKind, str]] = set()
     for column in table.columns:
-        if column.group_id is not None and column.group_id not in groups:
+        if broken(column):
             order.append(column)
             continue
         key = _top_key(table, column)
         if key in emitted:
             continue
         emitted.add(key)
-        kind, node_id = key
-        if kind is NodeKind.COLUMN:
-            order.append(column)
-        elif kind is NodeKind.GROUP:
-            order += group_columns[node_id]
+        if key[0] is NodeKind.CATEGORY:
+            for member in category_members[key[1]]:
+                order += members[member]
         else:
-            for group_id in category_groups[node_id]:
-                order += group_columns[group_id]
+            order += members[_member_key(column)]
     return order
 
 
@@ -219,8 +264,11 @@ def layout_tree(table: Table) -> list[Node]:
         elif kind is NodeKind.GROUP:
             top.append(group_node(node_id, start, end))
         else:
-            group_ids = [str(c.group_id) for c in columns[start:end]]
-            children = tuple(group_node(g, s, e) for g, s, e in _runs(group_ids, start))
+            keys = [_member_key(c) for c in columns[start:end]]
+            children = tuple(
+                group_node(k, s, e) if kind_ is NodeKind.GROUP else Node(kind_, k, s, e)
+                for (kind_, k), s, e in _runs(keys, start)
+            )
             top.append(Node(kind, node_id, start, end, children))
     return top
 

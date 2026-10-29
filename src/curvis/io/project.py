@@ -106,7 +106,8 @@ def migrate(data: dict[str, Any]) -> dict[str, Any]:
 
 @register_migration(1)
 def _add_category_factor(data: dict[str, Any]) -> dict[str, Any]:
-    """Format 2 names the second factor of each table (its category groups)."""
+    """Format 2 names the second factor of each table (its category groups) and lets a
+    column without a replicate group sit in a category (``category_id``, absent here)."""
     document = data.get("document")
     tables = document.get("tables") if isinstance(document, dict) else None
     for table in tables if isinstance(tables, list) else []:
@@ -224,6 +225,7 @@ def _table_dict(table: Table, file: str) -> dict[str, Any]:
                 "role": c.role.value,
                 "unit": c.unit,
                 "group_id": c.group_id,
+                "category_id": c.category_id,
             }
             for c in table.columns
         ],
@@ -374,6 +376,7 @@ def _read_column_def(value: Any, where: str) -> Column:
         role=role,
         unit=_str(obj.get("unit"), f"{where} unit"),
         group_id=_opt_str(obj.get("group_id"), f"{where} group_id"),
+        category_id=_opt_str(obj.get("category_id"), f"{where} category_id"),
         id=_str(obj.get("id"), f"{where} id"),
     )
 
