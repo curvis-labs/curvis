@@ -18,6 +18,11 @@ from curvis.compute import shared as shared_mod
 from tests.unit import compute_jobs as jobs
 
 
+# Timer checks use perf_counter (monotonic ticks every ~16 ms on Windows) and allow
+# a few ms for the difference between Qt's clock and Python's.
+CLOCK_SLACK = 0.01
+
+
 class Recorder:
     """Collects everything a scheduler emits, with the thread each signal arrived on."""
 
@@ -98,13 +103,13 @@ def test_job_object_and_plain_callable(qtbot: QtBot, scheduler: Scheduler, rec: 
 def test_debounce_runs_only_the_last_of_rapid_submits(
     qtbot: QtBot, scheduler: Scheduler, rec: Recorder
 ) -> None:
-    t0 = time.monotonic()
+    t0 = time.perf_counter()
     for i in range(5):
         scheduler.submit("n", Job(jobs.add, (i, 0)))
     assert scheduler.is_busy("n")
     assert rec.started == []  # nothing starts before the debounce delay
     qtbot.waitUntil(lambda: bool(rec.finished))
-    assert time.monotonic() - t0 >= 0.15
+    assert time.perf_counter() - t0 >= 0.15 - CLOCK_SLACK
     assert rec.results == [4]
     assert rec.started == ["n"]
 
@@ -125,12 +130,12 @@ def test_custom_debounce(qtbot: QtBot) -> None:
     s = Scheduler(debounce_ms=400)
     try:
         r = Recorder(s)
-        t0 = time.monotonic()
+        t0 = time.perf_counter()
         s.submit("n", Job(jobs.add, (1, 1)))
         qtbot.wait(200)
         assert r.started == []
         qtbot.waitUntil(lambda: bool(r.finished), timeout=2000)
-        assert time.monotonic() - t0 >= 0.4
+        assert time.perf_counter() - t0 >= 0.4 - CLOCK_SLACK
         s.debounce_ms = 0
         s.submit("n", Job(jobs.add, (2, 2)))
         assert r.started == ["n", "n"]  # started at once
