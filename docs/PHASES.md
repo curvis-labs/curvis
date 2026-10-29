@@ -142,9 +142,9 @@ Make a plan first. When done, report what you built, test results, the cold-star
 ### Step 1.1 — Table view and editing
 
 **Done when**
-- [ ] Typing, keyboard navigation, block selection, copy and paste to and from Excel work.
-- [ ] Every edit is undoable; column roles show in the header and can be changed.
-- [ ] Scrolling a 1,000,000-cell table stays smooth (60 fps benchmark).
+- [x] Typing, keyboard navigation, block selection, copy and paste to and from Excel work.
+- [x] Every edit is undoable; column roles show in the header and can be changed.
+- [x] Scrolling a 1,000,000-cell table stays smooth (60 fps benchmark).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 1.1 in docs/PHASES.md.
