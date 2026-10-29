@@ -74,7 +74,8 @@ def scroll_by_wheel_steps(benchmark: Any, view: TableView) -> None:
     assert view.model().n_data_rows * view.model().n_data_columns == 1_000_000
     vbar = view.verticalScrollBar()
     steps = list(range(0, min(vbar.maximum(), 900), 3))
-    positions = cycle(steps + steps[::-1])
+    # Down and back up without repeating the turning points: every frame scrolls.
+    positions = cycle(steps + steps[-2:0:-1])
     app = QApplication.instance()
     assert app is not None
 
