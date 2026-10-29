@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import os
+from collections.abc import Callable
 from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,6 +14,7 @@ from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QStackedWidget,
     QTabWidget,
@@ -20,16 +22,33 @@ from PySide6.QtWidgets import (
 )
 
 from curvis.core import Document, UndoEvent
+from curvis.data import ColumnRole, Table
 from curvis.settings import Settings
 from curvis.ui.actions import ActionRegistry
 from curvis.ui.document_tab import DocumentTab
 from curvis.ui.launcher import LauncherWidget
+from curvis.ui.table import TableView
 
 if TYPE_CHECKING:
     from curvis.compute import JobError, Scheduler
 
 PROJECT_SUFFIX = ".cvp"
 PROJECT_FILTER = "Curvis projects (*.cvp)"
+
+STATUS_MESSAGE_MS = 6000
+"""How long a note such as a refused edit stays in the status bar."""
+
+TABLE_ACTIONS = (
+    "edit.copy",
+    "edit.paste",
+    "edit.clear",
+    "table.insert_column_left",
+    "table.insert_column_right",
+    "table.rename_column",
+    "table.delete_columns",
+    *(f"table.role.{role.name.lower()}" for role in ColumnRole),
+)
+"""Actions that need a table view in the current tab."""
 
 
 class SaveChoice(Enum):
@@ -57,6 +76,7 @@ class MainWindow(QMainWindow):
         self._scheduler: Scheduler | None = None
         self._pending_opens: dict[str, Path] = {}  # scheduler node -> file
         self._untitled_count = 0
+        self._table_actions_created = False
 
         self.launcher = LauncherWidget(self)
         self.tabs = QTabWidget(self)
@@ -135,9 +155,95 @@ class MainWindow(QMainWindow):
         edit_menu = self.menuBar().addMenu("&Edit")
         edit_menu.addActions([a("edit.undo"), a("edit.redo")])
         edit_menu.addSeparator()
+        self._edit_menu = edit_menu
+        self._settings_separator = edit_menu.addSeparator()
         edit_menu.addAction(a("edit.settings"))
         view_menu = self.menuBar().addMenu("&View")
         view_menu.addAction(a("view.command_palette"))
+        self._view_menu = view_menu
+
+    def _create_table_actions(self) -> None:
+        """Actions and menus for tables, made when the first document opens.
+
+        The launcher does not need them, so the window shell stays quick to build.
+        """
+        if self._table_actions_created:
+            return
+        self._table_actions_created = True
+        r = self.registry
+        k = QKeySequence.StandardKey
+        r.register(
+            "edit.copy",
+            "&Copy",
+            self._table_call(TableView.copy_selection),
+            category="Edit",
+            shortcut=k.Copy,
+        )
+        r.register(
+            "edit.paste",
+            "&Paste",
+            self._table_call(TableView.paste),
+            category="Edit",
+            shortcut=k.Paste,
+        )
+        r.register(
+            "edit.clear",
+            "C&lear cells",
+            self._table_call(TableView.clear_selected_cells),
+            category="Edit",
+            shortcut=k.Delete,
+        )
+        r.register(
+            "table.insert_column_left",
+            "Insert column &left",
+            self._table_call(TableView.insert_column_left),
+            category="Table",
+        )
+        r.register(
+            "table.insert_column_right",
+            "Insert column &right",
+            self._table_call(TableView.insert_column_right),
+            category="Table",
+            shortcut="Ctrl+Shift+=",
+        )
+        r.register(
+            "table.rename_column",
+            "Re&name column…",
+            self._table_call(TableView.rename_current_column),
+            category="Table",
+            shortcut="Ctrl+Shift+R",
+        )
+        r.register(
+            "table.delete_columns",
+            "&Delete column",
+            self._table_call(TableView.delete_selected_columns),
+            category="Table",
+            shortcut="Ctrl+-",
+        )
+        for role in ColumnRole:
+            r.register(
+                f"table.role.{role.name.lower()}",
+                f"Set column role to {role.value}",
+                self._table_call(TableView.set_role_of_selected, role),
+                category="Table",
+            )
+        a = self.registry.action
+        self._edit_menu.insertActions(
+            self._settings_separator, [a("edit.copy"), a("edit.paste"), a("edit.clear")]
+        )
+        table_menu = QMenu("&Table", self)
+        self.menuBar().insertMenu(self._view_menu.menuAction(), table_menu)
+        table_menu.addActions(
+            [
+                a("table.insert_column_left"),
+                a("table.insert_column_right"),
+                a("table.rename_column"),
+                a("table.delete_columns"),
+            ]
+        )
+        role_menu = table_menu.addMenu("Column &role")
+        for role in ColumnRole:
+            role_menu.addAction(a(f"table.role.{role.name.lower()}"))
 
     # --- documents --------------------------------------------------------------------
 
@@ -154,7 +260,7 @@ class MainWindow(QMainWindow):
         """Open a blank project in a new tab."""
         self._untitled_count += 1
         name = "Untitled" if self._untitled_count == 1 else f"Untitled {self._untitled_count}"
-        return self._add_tab(Document(name=name), None)
+        return self._add_tab(Document(name=name, tables=[Table.blank()]), None)
 
     def open_document(self) -> None:
         """Ask for a project file and open it."""
@@ -207,7 +313,9 @@ class MainWindow(QMainWindow):
         )
 
     def _add_tab(self, document: Document, path: Path | None) -> DocumentTab:
-        tab = DocumentTab(document, path, self.tabs)
+        self._create_table_actions()
+        tab = DocumentTab(document, path, self.tabs, decimal_places=self.settings.decimal_places)
+        tab.message.connect(self._show_status)
         index = self.tabs.addTab(tab, tab.title)
         self.tabs.setTabToolTip(index, str(path) if path else tab.title)
         document.undo_stack.subscribe(functools.partial(self._on_undo_event, tab))
@@ -302,6 +410,19 @@ class MainWindow(QMainWindow):
         if (tab := self.current_tab) is not None:
             tab.document.redo()
 
+    def _table_call(self, method: Callable[..., object], *args: object) -> Callable[[], None]:
+        """A callback that runs ``method`` on the current tab's table view, if any."""
+
+        def call() -> None:
+            tab = self.current_tab
+            if tab is not None and tab.table_view is not None:
+                method(tab.table_view, *args)
+
+        return call
+
+    def _show_status(self, message: str) -> None:
+        self.statusBar().showMessage(message, STATUS_MESSAGE_MS)
+
     def show_settings(self) -> None:
         from curvis.ui.settings_dialog import SettingsDialog
 
@@ -328,6 +449,9 @@ class MainWindow(QMainWindow):
     def _on_setting_changed(self, key: str) -> None:
         if key == Settings.RECENT:
             self._refresh_recent()
+        elif key == Settings.DECIMAL_PLACES:
+            for tab in self.document_tabs():
+                tab.set_decimal_places(self.settings.decimal_places)
 
     def _refresh_recent(self) -> None:
         self.launcher.set_recent_projects(self.settings.recent_projects)
@@ -346,6 +470,10 @@ class MainWindow(QMainWindow):
         tab = self.current_tab
         for action_id in ("file.save", "file.save_as", "file.close"):
             a(action_id).setEnabled(tab is not None)
+        has_table = tab is not None and tab.table_view is not None
+        if self._table_actions_created:
+            for action_id in TABLE_ACTIONS:
+                a(action_id).setEnabled(has_table)
         stack = tab.document.undo_stack if tab is not None else None
         undo, redo = a("edit.undo"), a("edit.redo")
         undo.setEnabled(stack is not None and stack.can_undo)

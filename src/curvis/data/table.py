@@ -6,6 +6,7 @@ from curvis.data.column import Column, resized
 from curvis.data.groups import CategoryGroup, ReplicateGroup
 from curvis.data.ids import new_id
 from curvis.data.names import name_key
+from curvis.data.roles import ColumnRole
 
 
 @dataclass
@@ -17,6 +18,11 @@ class Table:
     replicate_groups: list[ReplicateGroup] = field(default_factory=list)
     category_groups: list[CategoryGroup] = field(default_factory=list)
     id: str = field(default_factory=new_id)
+
+    @classmethod
+    def blank(cls, name: str = "Data 1") -> "Table":
+        """An empty table for a new project: an X column and one Y column."""
+        return cls(name, [Column.new("X", ColumnRole.X), Column.new("A", ColumnRole.Y)])
 
     @property
     def n_rows(self) -> int:
