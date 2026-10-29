@@ -33,10 +33,17 @@ from curvis import __version__
 from curvis.core.change_log import ChangeLog, ChangeLogEntry
 from curvis.core.constants import JsonValue, ProjectConstant
 from curvis.core.document import Document
-from curvis.data import CategoryGroup, Column, ColumnRole, ReplicateGroup, Table
+from curvis.data import (
+    DEFAULT_CATEGORY_FACTOR,
+    CategoryGroup,
+    Column,
+    ColumnRole,
+    ReplicateGroup,
+    Table,
+)
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -94,6 +101,17 @@ def migrate(data: dict[str, Any]) -> dict[str, Any]:
         data = migration(data)
         version += 1
         data["schema_version"] = version
+    return data
+
+
+@register_migration(1)
+def _add_category_factor(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 2 names the second factor of each table (its category groups)."""
+    document = data.get("document")
+    tables = document.get("tables") if isinstance(document, dict) else None
+    for table in tables if isinstance(tables, list) else []:
+        if isinstance(table, dict):
+            table.setdefault("category_factor", DEFAULT_CATEGORY_FACTOR)
     return data
 
 
@@ -214,6 +232,7 @@ def _table_dict(table: Table, file: str) -> dict[str, Any]:
             for g in table.replicate_groups
         ],
         "category_groups": [{"id": g.id, "name": g.name} for g in table.category_groups],
+        "category_factor": table.category_factor,
     }
 
 
@@ -333,6 +352,7 @@ def _read_table(zf: zipfile.ZipFile, value: Any, where: str) -> Table:
         replicate_groups=replicate_groups,
         category_groups=category_groups,
         id=_str(obj.get("id"), f"{where} id"),
+        category_factor=_str(obj.get("category_factor"), f"{where} category_factor"),
     )
     _read_arrays(zf, file, table, n_rows)
     try:

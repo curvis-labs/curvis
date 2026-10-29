@@ -17,7 +17,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from curvis.core import ChangeLogEntry, Document, JsonValue, ProjectConstant, RenameTable
-from curvis.data import CategoryGroup, Column, ColumnRole, ReplicateGroup, Table
+from curvis.data import CategoryGroup, Column, ColumnRole, ReplicateGroup, Table, normalized_order
 from curvis.io import project
 from curvis.io.project import (
     SCHEMA_VERSION,
@@ -82,7 +82,21 @@ def project_tables(draw: st.DrawFn) -> Table:
     # Names are unique ignoring case (as commands guarantee); ids come from new_id().
     for i, column in enumerate(columns):
         column.name = f"{column.name}#{i}"
-    return Table(draw(TEXT), columns, groups, categories)
+        if column.role is not ColumnRole.Y:
+            column.group_id = None
+    for i, group in enumerate(groups):
+        group.name = f"{group.name}#{i}"
+    for i, category in enumerate(categories):
+        category.name = f"{category.name}#{i}"
+    # Groups hold only Y columns, none is empty, and each is contiguous (as commands
+    # guarantee).
+    used = {c.group_id for c in columns}
+    groups = [g for g in groups if g.id in used]
+    used_categories = {g.category_id for g in groups}
+    categories = [c for c in categories if c.id in used_categories]
+    table = Table(draw(TEXT), columns, groups, categories, category_factor=draw(TEXT) + "F")
+    table.columns = normalized_order(table)
+    return table
 
 
 @st.composite
@@ -201,7 +215,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 1
+    assert data["schema_version"] == SCHEMA_VERSION == 2
     assert set(data["document"]) == {"id", "name", "tables", "constants", "settings"}
     assert data["change_log"] == []
 
@@ -361,9 +375,9 @@ def test_newer_version(tmp_path: Path) -> None:
 # --- migrations ----------------------------------------------------------------------------
 
 
-def test_migration_registry_is_empty_at_version_1() -> None:
-    assert SCHEMA_VERSION == 1
-    assert project.MIGRATIONS == {}
+def test_migrations_cover_every_older_version() -> None:
+    assert SCHEMA_VERSION == 2
+    assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
 def test_adding_a_migration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -373,6 +387,7 @@ def test_adding_a_migration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     reads "title". A version 1 file must still open.
     """
     path = tmp_path / "old.cvp"
+    monkeypatch.setattr(project, "SCHEMA_VERSION", 1)
     save(Document(name="Kinetics"), path)  # written as version 1
 
     monkeypatch.setattr(project, "SCHEMA_VERSION", 2)

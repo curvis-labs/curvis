@@ -1,12 +1,19 @@
-"""Tables: an ordered list of equal-length columns plus their groups."""
+"""Tables: an ordered list of equal-length columns plus their groups.
+
+Groups follow the rules in :mod:`curvis.data.layout`: a replicate group's columns sit
+next to each other, and so do the groups of a category.
+"""
 
 from dataclasses import dataclass, field
 
 from curvis.data.column import Column, resized
 from curvis.data.groups import CategoryGroup, ReplicateGroup
 from curvis.data.ids import new_id
+from curvis.data.layout import layout_error
 from curvis.data.names import name_key
 from curvis.data.roles import ColumnRole
+
+DEFAULT_CATEGORY_FACTOR = "Category"
 
 
 @dataclass
@@ -18,6 +25,8 @@ class Table:
     replicate_groups: list[ReplicateGroup] = field(default_factory=list)
     category_groups: list[CategoryGroup] = field(default_factory=list)
     id: str = field(default_factory=new_id)
+    category_factor: str = DEFAULT_CATEGORY_FACTOR
+    """Name of the second factor, whose levels are the category groups (e.g. "Sex")."""
 
     @classmethod
     def blank(cls, name: str = "Data 1") -> "Table":
@@ -39,6 +48,24 @@ class Table:
             if column.id == column_id:
                 return i
         raise KeyError(column_id)
+
+    def replicate_group(self, group_id: str) -> ReplicateGroup:
+        """The replicate group with ``group_id``; raises ``KeyError`` if there is none."""
+        for group in self.replicate_groups:
+            if group.id == group_id:
+                return group
+        raise KeyError(group_id)
+
+    def category_group(self, category_id: str) -> CategoryGroup:
+        """The category group with ``category_id``; raises ``KeyError`` if there is none."""
+        for category in self.category_groups:
+            if category.id == category_id:
+                return category
+        raise KeyError(category_id)
+
+    def group_columns(self, group_id: str) -> list[Column]:
+        """The columns of a replicate group, left to right."""
+        return [c for c in self.columns if c.group_id == group_id]
 
     def column_by_name(self, name: str) -> Column | None:
         """The column called ``name`` (ignoring case), or ``None``."""
@@ -63,3 +90,6 @@ class Table:
             column.check()
             if len(column) != self.n_rows:
                 raise ValueError(f"columns in table '{self.name}' have different lengths")
+        error = layout_error(self)
+        if error is not None:
+            raise ValueError(f"table '{self.name}': {error}")
