@@ -47,6 +47,14 @@ TABLE_ACTIONS = (
     "table.rename_column",
     "table.delete_columns",
     *(f"table.role.{role.name.lower()}" for role in ColumnRole),
+    "table.group",
+    "table.ungroup",
+    "table.set_category",
+    "table.remove_category",
+    "table.rename_category_factor",
+    "table.bulk_rename",
+    "table.move_left",
+    "table.move_right",
 )
 """Actions that need a table view in the current tab."""
 
@@ -227,6 +235,58 @@ class MainWindow(QMainWindow):
                 self._table_call(TableView.set_role_of_selected, role),
                 category="Table",
             )
+        r.register(
+            "table.group",
+            "&Group as replicates…",
+            self._table_call(TableView.group_selected),
+            category="Table",
+            shortcut="Ctrl+G",
+        )
+        r.register(
+            "table.ungroup",
+            "&Ungroup",
+            self._table_call(TableView.ungroup_selected),
+            category="Table",
+            shortcut="Ctrl+Shift+G",
+        )
+        r.register(
+            "table.set_category",
+            "Set &category…",
+            self._table_call(TableView.set_category_of_selected),
+            category="Table",
+        )
+        r.register(
+            "table.remove_category",
+            "Remove from categor&y",
+            self._table_call(TableView.remove_category_of_selected),
+            category="Table",
+        )
+        r.register(
+            "table.rename_category_factor",
+            "Rename category &factor…",
+            self._table_call(TableView.rename_category_factor),
+            category="Table",
+        )
+        r.register(
+            "table.move_left",
+            "Move column or group &left",
+            self._table_call(TableView.move_selected_left),
+            category="Table",
+            shortcut="Alt+Shift+Left",
+        )
+        r.register(
+            "table.move_right",
+            "Move column or group righ&t",
+            self._table_call(TableView.move_selected_right),
+            category="Table",
+            shortcut="Alt+Shift+Right",
+        )
+        r.register(
+            "table.bulk_rename",
+            "&Bulk rename…",
+            self._table_call(TableView.bulk_rename),
+            category="Table",
+        )
         a = self.registry.action
         self._edit_menu.insertActions(
             self._settings_separator, [a("edit.copy"), a("edit.paste"), a("edit.clear")]
@@ -244,6 +304,19 @@ class MainWindow(QMainWindow):
         role_menu = table_menu.addMenu("Column &role")
         for role in ColumnRole:
             role_menu.addAction(a(f"table.role.{role.name.lower()}"))
+        table_menu.addSeparator()
+        table_menu.addActions(
+            [
+                a("table.group"),
+                a("table.ungroup"),
+                a("table.set_category"),
+                a("table.remove_category"),
+                a("table.rename_category_factor"),
+            ]
+        )
+        table_menu.addSeparator()
+        table_menu.addActions([a("table.move_left"), a("table.move_right")])
+        table_menu.addAction(a("table.bulk_rename"))
 
     # --- documents --------------------------------------------------------------------
 

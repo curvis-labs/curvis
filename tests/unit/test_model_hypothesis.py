@@ -11,20 +11,26 @@ from curvis.core import (
     UNDO_LIMIT,
     AddColumn,
     AddTable,
+    BulkRename,
     Command,
     CommandError,
     CycleError,
     DependencyGraph,
     Document,
+    GroupColumns,
     MoveColumn,
     RemoveColumn,
     RemoveTable,
+    RenameCategoryFactor,
     RenameColumn,
     RenameTable,
+    ReorderColumns,
+    SetCategory,
     SetCellBlock,
     SetCellValue,
     SetColumnRole,
     UndoStack,
+    UngroupColumns,
 )
 from curvis.data import CellValue, Column, ColumnRole, Table
 
@@ -74,6 +80,7 @@ def draw_command(data: st.DataObject, doc: Document) -> Command:
     tables_with_columns = [t for t in doc.tables if t.columns]
     if tables_with_columns:
         kinds += ["remove_column", "move_column", "rename_column", "cell", "block", "role"] * 2
+        kinds += ["group", "group", "ungroup", "category", "reorder", "bulk_rename", "factor"]
     kind = data.draw(st.sampled_from(kinds))
     if kind == "add_table":
         n = len(doc.tables)
@@ -90,6 +97,29 @@ def draw_command(data: st.DataObject, doc: Document) -> Command:
     table = data.draw(st.sampled_from(tables_with_columns))
     column = data.draw(st.sampled_from(table.columns))
     n_cols, n_rows = len(table.columns), table.n_rows
+    some_columns = data.draw(st.lists(st.sampled_from([c.id for c in table.columns]), max_size=4))
+    group_ids = [g.id for g in table.replicate_groups]
+    if kind == "group":
+        return GroupColumns(table.id, some_columns, data.draw(NAMES))
+    if kind == "ungroup":
+        return UngroupColumns(table.id, some_columns)
+    if kind == "category":
+        some_groups = (
+            data.draw(st.lists(st.sampled_from(group_ids), max_size=3)) if group_ids else []
+        )
+        return SetCategory(table.id, some_groups, data.draw(st.none() | NAMES))
+    if kind == "reorder":
+        return ReorderColumns(table.id, data.draw(st.permutations([c.id for c in table.columns])))
+    if kind == "factor":
+        return RenameCategoryFactor(table.id, data.draw(NAMES))
+    if kind == "bulk_rename":
+        return BulkRename(
+            table.id,
+            {c: data.draw(NAMES) for c in some_columns},
+            {g: data.draw(NAMES) for g in data.draw(st.lists(st.sampled_from(group_ids)))}
+            if group_ids
+            else {},
+        )
     if kind == "remove_column":
         return RemoveColumn(table.id, column.id)
     if kind == "move_column":
