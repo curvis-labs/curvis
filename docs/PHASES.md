@@ -52,9 +52,9 @@ Make a plan first. When done, report what you built and the test results.
 ### Step 0.2 — Document model, commands, undo and change log
 
 **Done when**
-- [ ] A document with tables and columns can be created and changed only through commands.
-- [ ] Undo/redo works up to 50 steps; the change log records every command.
-- [ ] Dependency graph returns the correct stale set and recompute order (tested, including cycles being rejected).
+- [x] A document with tables and columns can be created and changed only through commands.
+- [x] Undo/redo works up to 50 steps; the change log records every command.
+- [x] Dependency graph returns the correct stale set and recompute order (tested, including cycles being rejected).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 0.2 in docs/PHASES.md.
