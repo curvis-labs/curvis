@@ -6,6 +6,6 @@ Comment=Analyze and plot scientific data
 Exec=curvis %F
 Icon=curvis
 Terminal=false
-Categories=Science;Education;DataVisualization;
+Categories=Science;DataVisualization;
 MimeType=application/x-curvis-project;
 StartupWMClass=curvis
