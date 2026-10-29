@@ -11,6 +11,7 @@ from curvis.core import (
     AddTable,
     Command,
     CommandError,
+    CommandGroup,
     Document,
     MoveColumn,
     RemoveColumn,
@@ -427,3 +428,52 @@ def test_touched_nodes_of_cell_commands(doc: Document) -> None:
     # Writing past the last row pads every column.
     check_touched(doc, SetCellValue(t, dose, 10, 1), {t, dose, resp, label})
     check_touched(doc, SetCellBlock(t, 20, 1, [[1]]), {t, dose, resp, label})
+
+
+# --- command groups ----------------------------------------------------------------
+
+
+def test_command_group_is_one_undo_step(doc: Document) -> None:
+    t = table(doc)
+    group = CommandGroup(
+        "Paste 2 cells from row 1",
+        [
+            AddColumn(t.id, Column.new("New", ColumnRole.Y)),
+            SetCellBlock(t.id, 0, 2, [["x", 5]]),
+        ],
+    )
+    check_round_trip(doc, group)
+    assert doc.undo_stack.count == 1
+    assert col(doc, "New").values[0] == 5
+    assert col(doc, "Label").values[0] == "x"
+
+
+def test_command_group_undoes_done_commands_when_one_is_rejected(doc: Document) -> None:
+    t = table(doc)
+    before = copy.deepcopy(doc.tables)
+    group = CommandGroup(
+        "Bad",
+        [
+            AddColumn(t.id, Column.new("New", ColumnRole.Y)),
+            SetCellBlock(t.id, 0, 1, [["not a number"]]),
+        ],
+    )
+    with pytest.raises(CommandError, match="not a number"):
+        doc.execute(group)
+    assert doc.tables == before
+    assert doc.undo_stack.count == 0
+
+
+def test_command_group_touched_nodes_are_the_union(doc: Document) -> None:
+    t = table(doc)
+    resp = col(doc, "Resp")
+    new = Column.new("New", ColumnRole.Y)
+    group = CommandGroup("Two", [AddColumn(t.id, new), SetCellValue(t.id, resp.id, 0, 1.0)])
+    doc.execute(group)
+    assert group.touched_nodes == (t.id, new.id, resp.id)
+    assert group.summary == "Two"
+
+
+def test_command_group_needs_commands() -> None:
+    with pytest.raises(ValueError):
+        CommandGroup("Nothing", [])

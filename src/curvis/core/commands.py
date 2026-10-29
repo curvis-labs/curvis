@@ -488,3 +488,44 @@ class SetCellValue(Command):
         if self._block is None:
             return (self.table_id, self.column_id)
         return self._block.touched_nodes
+
+
+# --- groups ------------------------------------------------------------------------
+
+
+class CommandGroup(Command):
+    """Several commands run as one undo step (e.g. a paste that also adds columns).
+
+    The commands run in order and are undone in reverse order. If one is rejected, the
+    ones already done are undone again, so the document is left unchanged.
+    """
+
+    def __init__(self, summary: str, commands: Sequence[Command]) -> None:
+        if not commands:
+            raise ValueError("a command group needs at least one command")
+        self.commands = list(commands)
+        self._summary = summary
+
+    def do(self, doc: Document) -> None:
+        done: list[Command] = []
+        try:
+            for command in self.commands:
+                command.do(doc)
+                done.append(command)
+        except CommandError:
+            for command in reversed(done):
+                command.undo(doc)
+            raise
+
+    def undo(self, doc: Document) -> None:
+        for command in reversed(self.commands):
+            command.undo(doc)
+
+    @property
+    def summary(self) -> str:
+        return self._summary
+
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        nodes = (node for command in self.commands for node in command.touched_nodes)
+        return tuple(dict.fromkeys(nodes))
