@@ -6,6 +6,7 @@ from curvis.core.change_log import ChangeLog
 from curvis.core.commands import Command
 from curvis.core.undo_stack import UndoStack
 from curvis.data import Table, new_id
+from curvis.data.names import name_key
 
 
 @dataclass
@@ -43,5 +44,6 @@ class Document:
         raise KeyError(table_id)
 
     def table_by_name(self, name: str) -> Table | None:
-        """The table called ``name``, or ``None``."""
-        return next((t for t in self.tables if t.name == name), None)
+        """The table called ``name`` (ignoring case), or ``None``."""
+        key = name_key(name)
+        return next((t for t in self.tables if name_key(t.name) == key), None)

@@ -353,3 +353,29 @@ def test_numeric_role_change_then_cell_edits_and_resize_undo_exactly(doc: Docume
     for _ in range(3):
         doc.undo()
     assert doc.tables == start
+
+
+# --- case-insensitive names
+
+
+def test_table_names_are_unique_ignoring_case(doc: Document) -> None:
+    check_rejected(doc, AddTable(Table("DATA")), "already a table called 'Data'")
+    check_rejected(doc, RenameTable(doc.tables[1].id, "data"), "already a table called 'Data'")
+
+
+def test_column_names_are_unique_ignoring_case(doc: Document) -> None:
+    tid = table(doc).id
+    check_rejected(doc, AddColumn(tid, Column.new("dose", ColumnRole.Y)), "called 'Dose'")
+    check_rejected(doc, RenameColumn(tid, col(doc, "Resp").id, "DOSE"), "called 'Dose'")
+
+
+def test_changing_only_the_case_of_a_name_is_allowed(doc: Document) -> None:
+    check_round_trip(doc, RenameTable(table(doc).id, "DATA"))
+    assert table(doc).name == "DATA"
+    check_round_trip(doc, RenameColumn(table(doc).id, col(doc, "Dose").id, "dose"))
+    assert [c.name for c in table(doc).columns] == ["dose", "Resp", "Label"]
+
+
+def test_lookups_by_name_ignore_case(doc: Document) -> None:
+    assert doc.table_by_name("data") is table(doc)
+    assert table(doc).column_by_name("RESP") is col(doc, "Resp")

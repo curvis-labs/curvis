@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from curvis.data.column import Column, resized
 from curvis.data.groups import CategoryGroup, ReplicateGroup
 from curvis.data.ids import new_id
+from curvis.data.names import name_key
 
 
 @dataclass
@@ -34,8 +35,9 @@ class Table:
         raise KeyError(column_id)
 
     def column_by_name(self, name: str) -> Column | None:
-        """The column called ``name``, or ``None``."""
-        return next((c for c in self.columns if c.name == name), None)
+        """The column called ``name`` (ignoring case), or ``None``."""
+        key = name_key(name)
+        return next((c for c in self.columns if name_key(c.name) == key), None)
 
     def resize(self, n_rows: int) -> None:
         """Truncate or pad every column to ``n_rows`` (for use inside commands)."""
@@ -45,7 +47,7 @@ class Table:
 
     def check(self) -> None:
         """Raise ``ValueError`` if the table is inconsistent."""
-        names = [c.name for c in self.columns]
+        names = [name_key(c.name) for c in self.columns]
         if len(set(names)) != len(names):
             raise ValueError(f"table '{self.name}' has duplicate column names")
         ids = [c.id for c in self.columns]

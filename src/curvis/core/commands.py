@@ -16,6 +16,7 @@ import numpy.typing as npt
 
 from curvis.data import CellValue, Column, ColumnRole, Table
 from curvis.data.column import coerce_cell, convert_values, writable
+from curvis.data.names import name_key
 
 if TYPE_CHECKING:
     from curvis.core.document import Document
@@ -65,10 +66,13 @@ def _get_column(table: Table, column_id: str) -> Column:
 
 
 def _check_name(name: str, taken: Sequence[str], kind: str) -> None:
+    """Names must not be blank and must be unique, ignoring case."""
     if not name.strip():
         raise CommandError(f"A {kind} name cannot be blank.")
-    if name in taken:
-        raise CommandError(f"There is already a {kind} called '{name}'.")
+    key = name_key(name)
+    existing = next((t for t in taken if name_key(t) == key), None)
+    if existing is not None:
+        raise CommandError(f"There is already a {kind} called '{existing}'.")
 
 
 def _check_insert_index(index: int | None, length: int) -> int:

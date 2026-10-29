@@ -28,7 +28,9 @@ from curvis.core import (
 )
 from curvis.data import CellValue, Column, ColumnRole, Table
 
-NAMES = st.sampled_from(["A", "B", "Dose", "Resp", "T0", "C1", "", " "]) | st.text(max_size=4)
+NAMES = st.sampled_from(
+    ["A", "a", "B", "Dose", "dOSE", "Resp", "T0", "t0", "C1", "c1", "", " "]
+) | st.text(max_size=4)
 ROLES = st.sampled_from(list(ColumnRole))
 NUMBERS = st.floats(allow_nan=True, allow_infinity=True) | st.integers(-1000, 1000)
 CELLS: st.SearchStrategy[CellValue] = (

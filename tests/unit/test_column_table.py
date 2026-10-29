@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from curvis.data import Column, ColumnRole, Table
+from curvis.data import Column, ColumnRole, Table, name_key
 from curvis.data.column import coerce_cell, convert_values, resized, writable
 
 
@@ -128,3 +128,13 @@ def test_table_check_detects_problems() -> None:
         Table(
             "T", [Column.new("A", ColumnRole.Y, id="x"), Column.new("B", ColumnRole.Y, id="x")]
         ).check()
+
+
+def test_table_check_detects_names_differing_only_in_case() -> None:
+    with pytest.raises(ValueError, match="duplicate column names"):
+        Table("T", [Column.new("Dose", ColumnRole.Y), Column.new("dose", ColumnRole.Y)]).check()
+
+
+def test_name_key_ignores_case() -> None:
+    assert name_key("Straße") == name_key("STRASSE")
+    assert name_key("A") != name_key("A ")
