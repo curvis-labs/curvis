@@ -15,6 +15,7 @@ from curvis.core.commands import (
     SetCellValue,
     SetColumnRole,
 )
+from curvis.core.constants import JsonValue, ProjectConstant
 from curvis.core.dependency_graph import CycleError, DependencyGraph
 from curvis.core.document import Document
 from curvis.core.undo_stack import UNDO_LIMIT, UndoEvent, UndoStack
@@ -30,7 +31,9 @@ __all__ = [
     "CycleError",
     "DependencyGraph",
     "Document",
+    "JsonValue",
     "MoveColumn",
+    "ProjectConstant",
     "RemoveColumn",
     "RemoveTable",
     "RenameColumn",

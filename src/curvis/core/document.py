@@ -1,9 +1,10 @@
-"""The document: all tables of a project plus its change log and undo stack."""
+"""The document: tables, constants and settings of a project, its change log and undo stack."""
 
 from dataclasses import dataclass, field
 
 from curvis.core.change_log import ChangeLog
 from curvis.core.commands import Command
+from curvis.core.constants import JsonValue, ProjectConstant
 from curvis.core.undo_stack import UndoStack
 from curvis.data import Table, new_id
 from curvis.data.names import name_key
@@ -15,6 +16,8 @@ class Document:
 
     name: str = "Untitled"
     tables: list[Table] = field(default_factory=list)
+    constants: list[ProjectConstant] = field(default_factory=list)
+    settings: dict[str, JsonValue] = field(default_factory=dict)
     change_log: ChangeLog = field(default_factory=ChangeLog)
     id: str = field(default_factory=new_id)
     undo_stack: UndoStack = field(init=False, repr=False, compare=False)
