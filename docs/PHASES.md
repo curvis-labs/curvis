@@ -115,10 +115,10 @@ Make a plan first. When done, report what you built and test and benchmark resul
 **Gate for phase 0:** installers from CI start the app on all three operating systems.
 
 **Done when**
-- [ ] Launcher shows New project, Open and recent projects with relative timestamps.
-- [ ] Documents open as tabs; save/open/close with unsaved-changes prompts; undo/redo in the Edit menu.
-- [ ] Theme setting (light, dark, system) works; cold start to launcher < 1.5 s.
-- [ ] CI builds installers for Windows, macOS and Linux as artifacts.
+- [x] Launcher shows New project, Open and recent projects with relative timestamps.
+- [x] Documents open as tabs; save/open/close with unsaved-changes prompts; undo/redo in the Edit menu.
+- [x] Theme setting (light, dark, system) works; cold start to launcher < 1.5 s.
+- [x] CI builds installers for Windows, macOS and Linux as artifacts.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 0.5 in docs/PHASES.md.
