@@ -246,12 +246,14 @@ class MainWindow(QMainWindow):
         try:
             project.save(tab.document, path)
         except OSError as exc:
+            error = exc.strerror or str(exc)
+        else:
+            error = ""
+        finally:
             QGuiApplication.restoreOverrideCursor()
-            self._show_error(
-                "Cannot save project", f"'{path}' could not be saved.\n\n{exc.strerror or exc}"
-            )
+        if error:
+            self._show_error("Cannot save project", f"'{path}' could not be saved.\n\n{error}")
             return False
-        QGuiApplication.restoreOverrideCursor()
         tab.path = path
         tab.document.undo_stack.set_clean()
         self.settings.add_recent_project(path)
