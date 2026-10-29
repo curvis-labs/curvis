@@ -1,0 +1,178 @@
+name: Installers
+
+# Builds unsigned installers for Windows, macOS and Linux and checks that each one
+# starts the app (signing comes in phase 4). The installers are uploaded as artifacts.
+
+# Run as part of CI (ci.yml calls it, and its concurrency setting covers these jobs),
+# or on its own from the Actions tab.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  # Quit as soon as the launcher has been shown (see curvis.app).
+  CURVIS_EXIT_AFTER_LAUNCHER: "1"
+  QT_QPA_PLATFORM: offscreen
+  APPIMAGETOOL_VERSION: "1.9.0"
+  APPIMAGETOOL_SHA256: 46fdd785094c7f6e545b61afcfb0f3d98d8eab243f644b4b17698c01d06083d1
+
+jobs:
+  linux:
+    name: Linux (.deb, AppImage)
+    # The oldest supported runner, so the bundle runs on older glibc versions too.
+    runs-on: ubuntu-22.04
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: "1"  # no FUSE on runners
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libfontconfig1 \
+            libdbus-1-3 libglib2.0-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 libxcb-xkb1 \
+            desktop-file-utils  # appimagetool validates the .desktop file
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --no-dev --group build
+
+      - name: Read version
+        run: echo "VERSION=$(uv run --no-sync python -c 'import curvis; print(curvis.__version__)')" >> "$GITHUB_ENV"
+
+      - name: Build app bundle
+        run: uv run --no-sync pyinstaller packaging/curvis.spec --noconfirm
+
+      - name: Build .deb
+        run: packaging/linux/build-deb.sh "$VERSION"
+
+      - name: Build AppImage
+        run: |
+          curl -sSfL -o appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage"
+          echo "${APPIMAGETOOL_SHA256}  appimagetool" | sha256sum --check
+          chmod +x appimagetool
+          packaging/linux/build-appimage.sh "$VERSION" "$PWD/appimagetool"
+
+      - name: Smoke test the .deb
+        run: |
+          sudo apt-get install -y ./dist/curvis_*.deb
+          time curvis
+          grep -q 'application/x-curvis-project:\*.cvp' /usr/share/mime/globs2
+          test -f /usr/share/icons/hicolor/scalable/apps/org.curvis.Curvis.svg
+          test -f /usr/share/icons/hicolor/256x256/apps/org.curvis.Curvis.png
+
+      - name: Smoke test the AppImage
+        run: time ./dist/Curvis-*.AppImage
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: curvis-linux
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+          if-no-files-found: error
+
+  macos:
+    name: macOS (.dmg)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --no-dev --group build
+
+      - name: Read version
+        run: echo "VERSION=$(uv run --no-sync python -c 'import curvis; print(curvis.__version__)')" >> "$GITHUB_ENV"
+
+      - name: Build app bundle
+        run: uv run --no-sync pyinstaller packaging/curvis.spec --noconfirm
+
+      - name: Check the bundle id, icon and .cvp file type
+        run: |
+          plist=dist/Curvis.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$plist" | grep -qx org.curvis.Curvis
+          icon="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$plist")"
+          sips -g pixelWidth "dist/Curvis.app/Contents/Resources/$icon"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes:0:LSItemContentTypes:0" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0" "$plist" | grep -qx cvp
+
+      - name: Build .dmg
+        run: |
+          dmg="dist/Curvis-${VERSION}-macos-$(uname -m).dmg"
+          hdiutil create -volname Curvis -srcfolder dist/Curvis.app -ov -format UDZO "$dmg"
+          echo "DMG=$dmg" >> "$GITHUB_ENV"
+
+      - name: Smoke test the .dmg
+        run: |
+          hdiutil attach "$DMG" -mountpoint /Volumes/Curvis -nobrowse
+          time /Volumes/Curvis/Curvis.app/Contents/MacOS/Curvis
+          hdiutil detach /Volumes/Curvis
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: curvis-macos
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  windows:
+    name: Windows (installer .exe)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --no-dev --group build
+
+      - name: Read version
+        run: |
+          $v = uv run --no-sync python -c "import curvis; print(curvis.__version__)"
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build app bundle
+        run: uv run --no-sync pyinstaller packaging/curvis.spec --noconfirm
+
+      - name: Build installer
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+          }
+          & $iscc "/DAppVersion=$env:VERSION" packaging\windows\curvis.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Smoke test the installer
+        run: |
+          $setup = "dist\Curvis-$env:VERSION-setup.exe"
+          $p = Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/CURRENTUSER','/NORESTART' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }
+          $exe = "$env:LOCALAPPDATA\Programs\Curvis\Curvis.exe"
+          if (-not (Test-Path $exe)) { throw "Curvis.exe was not installed at $exe" }
+          $clock = [Diagnostics.Stopwatch]::StartNew()
+          $app = Start-Process $exe -Wait -PassThru
+          "Started and quit in $($clock.Elapsed.TotalSeconds) s"
+          if ($app.ExitCode -ne 0) { throw "Curvis exited with $($app.ExitCode)" }
+          $assoc = (Get-ItemProperty 'HKCU:\Software\Classes\.cvp').'(default)'
+          if ($assoc -ne 'Curvis.Project') { throw ".cvp is not associated with Curvis ($assoc)" }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: curvis-windows
+          path: dist/*-setup.exe
+          if-no-files-found: error

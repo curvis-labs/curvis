@@ -119,6 +119,13 @@ jobs:
       - name: Compare with the stored baseline (report only)
         run: uv run python -m tests.bench.compare head-*.json --normalize || true
 
+      # What tests/bench/baseline.json would hold if this run were stored as the baseline.
+      - name: Candidate baseline
+        if: always()
+        run: |
+          uv run python -m tests.bench.compare head-*.json --update --baseline candidate-baseline.json
+          cat candidate-baseline.json
+
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -126,3 +133,8 @@ jobs:
           path: |
             head-*.json
             base-*.json
+            candidate-baseline.json
+
+  installers:
+    name: installers
+    uses: ./.github/workflows/installers.yml

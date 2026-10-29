@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Curvis
+GenericName=Data analysis and plotting
+Comment=Analyze and plot scientific data
+Exec=curvis %F
+Icon=org.curvis.Curvis
+Terminal=false
+Categories=Science;DataVisualization;
+MimeType=application/x-curvis-project;

@@ -32,6 +32,20 @@ uv run python -m tests.bench.compare head-1.json --baseline-runs base-1.json
 
 `tests/bench/baseline.json` records absolute timings on a CI runner. CI reports against it without failing. To refresh it, download the `benchmarks` artifact of a CI run and run `uv run python -m tests.bench.compare head-*.json --update`.
 
+### Installers
+
+CI builds unsigned installers on every pull request (the `installers` jobs, defined in `.github/workflows/installers.yml`): an Inno Setup installer for Windows, a `.dmg` for macOS (Apple silicon) and a `.deb` plus an AppImage for Linux. Each one is installed and started on the runner, and the files are uploaded as build artifacts. The Windows installer, the macOS app and the `.deb` register the `.cvp` file type; the AppImage does not.
+
+The app icon is `src/curvis/ui/icons/curvis_dark.svg`; `packaging/make_icons.py` renders the Windows, macOS and Linux icon files from it during the build. The macOS bundle id is `org.curvis.Curvis`.
+
+To build the app bundle locally:
+
+```bash
+uv sync --group build
+uv run pyinstaller packaging/curvis.spec --noconfirm   # dist/Curvis or dist/Curvis.app
+packaging/linux/build-deb.sh 0.1.0                     # Linux: dist/curvis_0.1.0_<arch>.deb
+```
+
 ## License
 
 Curvis is licensed under the GNU General Public License v3.0. See `LICENSE`.

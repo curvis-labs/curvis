@@ -16,6 +16,9 @@ dependencies = [
 curvis = "curvis.app:main"
 
 [dependency-groups]
+build = [
+    "pyinstaller>=6.22.3",
+]
 dev = [
     "hypothesis>=6.100",
     "mypy>=1.13",
@@ -39,7 +42,11 @@ target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RUF"]
+select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RUF", "TID253"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Heavy libraries are imported inside functions so start-up stays fast (CLAUDE.md rule 9).
+banned-module-level-imports = ["matplotlib", "statsmodels", "lifelines", "lmfit"]
 
 [tool.mypy]
 python_version = "3.12"
