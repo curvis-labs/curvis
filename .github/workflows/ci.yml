@@ -134,3 +134,7 @@ jobs:
             head-*.json
             base-*.json
             candidate-baseline.json
+
+  installers:
+    name: installers
+    uses: ./.github/workflows/installers.yml

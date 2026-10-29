@@ -3,15 +3,11 @@ name: Installers
 # Builds unsigned installers for Windows, macOS and Linux and checks that each one
 # starts the app (signing comes in phase 4). The installers are uploaded as artifacts.
 
+# Run as part of CI (ci.yml calls it, and its concurrency setting covers these jobs),
+# or on its own from the Actions tab.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_call:
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   # Quit as soon as the launcher has been shown (see curvis.app).

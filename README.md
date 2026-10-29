@@ -34,7 +34,7 @@ uv run python -m tests.bench.compare head-1.json --baseline-runs base-1.json
 
 ### Installers
 
-CI builds unsigned installers on every pull request (workflow `Installers`): an Inno Setup installer for Windows, a `.dmg` for macOS (Apple silicon) and a `.deb` plus an AppImage for Linux. Each one is installed and started on the runner, and the files are uploaded as build artifacts. The Windows installer, the macOS app and the `.deb` register the `.cvp` file type; the AppImage does not.
+CI builds unsigned installers on every pull request (the `installers` jobs, defined in `.github/workflows/installers.yml`): an Inno Setup installer for Windows, a `.dmg` for macOS (Apple silicon) and a `.deb` plus an AppImage for Linux. Each one is installed and started on the runner, and the files are uploaded as build artifacts. The Windows installer, the macOS app and the `.deb` register the `.cvp` file type; the AppImage does not.
 
 To build the app bundle locally:
 
