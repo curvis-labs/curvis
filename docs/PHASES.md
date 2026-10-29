@@ -93,9 +93,9 @@ Make a plan first. When done, report what you built, test results and the benchm
 ### Step 0.4 — Job scheduler and benchmark harness
 
 **Done when**
-- [ ] Jobs run off the UI thread; newer jobs for the same node cancel older ones; edits are debounced.
-- [ ] Heavy jobs run in a process pool with arrays passed through shared memory.
-- [ ] `tests/bench` exists and CI fails on a >15% regression against a stored baseline.
+- [x] Jobs run off the UI thread; newer jobs for the same node cancel older ones; edits are debounced.
+- [x] Heavy jobs run in a process pool with arrays passed through shared memory.
+- [x] `tests/bench` exists and CI fails on a >15% regression against a stored baseline.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 0.4 in docs/PHASES.md.

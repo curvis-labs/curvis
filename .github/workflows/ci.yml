@@ -49,3 +49,80 @@ jobs:
 
       - name: Tests
         run: uv run pytest
+
+  bench:
+    name: benchmarks
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      # The commit to compare with: the PR base, the previous main, or main.
+      BASE_SHA: ${{ github.event.pull_request.base.sha || (github.event_name == 'push' && github.event.before) || '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libfontconfig1 \
+            libdbus-1-3 libglib2.0-0
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (this commit and the base commit)
+        run: |
+          uv sync --locked
+          base="${BASE_SHA:-$(git rev-parse origin/${{ github.event.repository.default_branch }})}"
+          echo "Comparing with base commit $base"
+          git worktree add ../base "$base"
+          (cd ../base && uv sync --locked)
+
+      # Base and head run in turn on the same runner, so runner speed cancels out.
+      - name: Run benchmarks
+        run: |
+          bench() {  # bench <dir> <output>
+            if [ -d "$1/tests/bench" ]; then
+              (cd "$1" && uv run pytest tests/bench --benchmark-only -q --benchmark-json="$2")
+            fi
+          }
+          for i in 1 2 3; do
+            bench ../base "$PWD/base-$i.json"
+            bench . "$PWD/head-$i.json"
+          done
+
+      # Fails on a slowdown over 15% against the base commit. A failure is confirmed
+      # with three more pairs of runs first, so one noisy run cannot fail the build.
+      - name: Compare with the base commit
+        run: |
+          compare() {
+            if ls base-*.json >/dev/null 2>&1; then
+              uv run python -m tests.bench.compare head-*.json --baseline-runs base-*.json
+            else
+              echo "The base commit has no benchmarks; nothing to compare."
+            fi
+          }
+          if ! compare; then
+            echo "::warning::Slower than the base commit; running three more pairs to confirm."
+            for i in 4 5 6; do
+              (cd ../base && uv run pytest tests/bench --benchmark-only -q --benchmark-json="$GITHUB_WORKSPACE/base-$i.json")
+              uv run pytest tests/bench --benchmark-only -q --benchmark-json="head-$i.json"
+            done
+            compare
+          fi
+
+      # For the record only: absolute timings against tests/bench/baseline.json, which
+      # was recorded on another runner and so cannot gate (see compare.py).
+      - name: Compare with the stored baseline (report only)
+        run: uv run python -m tests.bench.compare head-*.json --normalize || true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: benchmarks
+          path: |
+            head-*.json
+            base-*.json
