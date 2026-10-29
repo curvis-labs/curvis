@@ -71,12 +71,12 @@ def test_save_new_document_asks_for_path_and_adds_suffix(
     assert not tab.is_modified
     assert window.tabs.tabText(0) == "experiment"
     assert settings.recent_projects[0].path == target
-    assert [t.name for t in project.load(target).tables] == ["Data 1"]
+    assert [t.name for t in project.load(target).tables] == ["Data 1", "Data 2"]
 
     # Save again: no dialog, same file.
-    add_table(tab, "Data 2")
+    add_table(tab, "Data 3")
     window.registry.action("file.save").trigger()
-    assert [t.name for t in project.load(target).tables] == ["Data 1", "Data 2"]
+    assert [t.name for t in project.load(target).tables] == ["Data 1", "Data 2", "Data 3"]
 
 
 def test_save_as_cancelled_keeps_document_unsaved(window: MainWindow, prompts: Prompts) -> None:

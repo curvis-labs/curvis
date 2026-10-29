@@ -34,16 +34,16 @@ def test_undo_and_redo_follow_the_stack(window: MainWindow) -> None:
 
     add_table(tab)
     assert undo.isEnabled() and not redo.isEnabled()
-    assert undo.text() == "&Undo Add table 'Data 1'"
+    assert undo.text() == "&Undo Add table 'Data 2'"
 
     undo.trigger()
-    assert tab.document.tables == []
+    assert [t.name for t in tab.document.tables] == ["Data 1"]
     assert not undo.isEnabled() and redo.isEnabled()
-    assert redo.text() == "&Redo Add table 'Data 1'"
+    assert redo.text() == "&Redo Add table 'Data 2'"
     assert undo.text() == "&Undo"
 
     redo.trigger()
-    assert [t.name for t in tab.document.tables] == ["Data 1"]
+    assert [t.name for t in tab.document.tables] == ["Data 1", "Data 2"]
     assert undo.isEnabled() and not redo.isEnabled()
 
 
@@ -57,7 +57,7 @@ def test_undo_acts_on_the_current_tab_only(window: MainWindow) -> None:
     window.tabs.setCurrentWidget(first)
     assert undo.isEnabled()
     undo.trigger()
-    assert first.document.tables == []
+    assert len(first.document.tables) == 1
     assert second.document.undo_stack.index == 0
 
 
@@ -66,7 +66,7 @@ def test_undo_back_to_saved_state_clears_modified_marker(window: MainWindow) -> 
     add_table(tab)
     tab.document.undo_stack.set_clean()
     window._update_tab(tab)
-    add_table(tab, "Data 2")
+    add_table(tab, "Data 3")
     assert window.isWindowModified()
     undo_redo(window)[0].trigger()
     assert not window.isWindowModified()
