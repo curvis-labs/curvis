@@ -28,9 +28,9 @@ Every prompt follows the same pattern: read the rules, confirm open decisions, p
 ### Step 0.1 — Repository scaffold and CI
 
 **Done when**
-- [ ] `uv run curvis` opens an empty Qt window on your machine.
-- [ ] CI runs lint, mypy and pytest on Windows, macOS and Linux and is green.
-- [ ] `LICENSE` file exists with the license you chose.
+- [x] `uv run curvis` opens an empty Qt window on your machine.
+- [x] CI runs lint, mypy and pytest on Windows, macOS and Linux and is green.
+- [x] `LICENSE` file exists with the license you chose.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 0.1 in docs/PHASES.md.
