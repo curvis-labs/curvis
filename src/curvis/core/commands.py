@@ -12,7 +12,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
-import numpy as np
 import numpy.typing as npt
 
 from curvis.data import CellValue, Column, ColumnRole, Table
@@ -288,21 +287,26 @@ class SetColumnRole(Command):
         self.column_id = column_id
         self.role = ColumnRole(role)
         self._old_role = ColumnRole.Y
-        self._old_values: npt.NDArray[Any] = np.empty(0)
+        self._old_values: npt.NDArray[Any] | None = None
         self._name = ""
 
     def do(self, doc: Document) -> None:
         column = _get_column(_get_table(doc, self.table_id), self.column_id)
         self._name = column.name
         self._old_role = column.role
-        self._old_values = column.values
-        column.values = convert_values(column.values, self.role)
+        # Keep the old array only when it is replaced: an array still in the table can
+        # be edited in place by later commands, so a reference to it is not a snapshot.
+        self._old_values = None
+        if self.role.is_numeric != column.role.is_numeric:
+            self._old_values = column.values
+            column.values = convert_values(column.values, self.role)
         column.role = self.role
 
     def undo(self, doc: Document) -> None:
         column = doc.table(self.table_id).column(self.column_id)
         column.role = self._old_role
-        column.values = self._old_values
+        if self._old_values is not None:
+            column.values = self._old_values
 
     @property
     def summary(self) -> str:
