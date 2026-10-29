@@ -14,6 +14,7 @@ from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QStackedWidget,
     QTabWidget,
@@ -75,6 +76,7 @@ class MainWindow(QMainWindow):
         self._scheduler: Scheduler | None = None
         self._pending_opens: dict[str, Path] = {}  # scheduler node -> file
         self._untitled_count = 0
+        self._table_actions_created = False
 
         self.launcher = LauncherWidget(self)
         self.tabs = QTabWidget(self)
@@ -126,6 +128,50 @@ class MainWindow(QMainWindow):
         )
         r.register("edit.undo", "&Undo", self.undo, category="Edit", shortcut=k.Undo)
         r.register("edit.redo", "&Redo", self.redo, category="Edit", shortcut=k.Redo)
+        r.register(
+            "edit.settings",
+            "Se&ttings…",
+            self.show_settings,
+            category="Edit",
+            shortcut="Ctrl+,",
+            menu_role=QAction.MenuRole.PreferencesRole,
+        )
+        r.register(
+            "view.command_palette",
+            "&Command palette…",
+            self.show_command_palette,
+            category="View",
+            shortcut="Ctrl+K",
+        )
+
+    def _create_menus(self) -> None:
+        a = self.registry.action
+        file_menu = self.menuBar().addMenu("&File")
+        file_menu.addActions([a("file.new"), a("file.open")])
+        file_menu.addSeparator()
+        file_menu.addActions([a("file.save"), a("file.save_as")])
+        file_menu.addSeparator()
+        file_menu.addActions([a("file.close"), a("file.quit")])
+        edit_menu = self.menuBar().addMenu("&Edit")
+        edit_menu.addActions([a("edit.undo"), a("edit.redo")])
+        edit_menu.addSeparator()
+        self._edit_menu = edit_menu
+        self._settings_separator = edit_menu.addSeparator()
+        edit_menu.addAction(a("edit.settings"))
+        view_menu = self.menuBar().addMenu("&View")
+        view_menu.addAction(a("view.command_palette"))
+        self._view_menu = view_menu
+
+    def _create_table_actions(self) -> None:
+        """Actions and menus for tables, made when the first document opens.
+
+        The launcher does not need them, so the window shell stays quick to build.
+        """
+        if self._table_actions_created:
+            return
+        self._table_actions_created = True
+        r = self.registry
+        k = QKeySequence.StandardKey
         r.register(
             "edit.copy",
             "&Copy",
@@ -181,37 +227,12 @@ class MainWindow(QMainWindow):
                 self._table_call(TableView.set_role_of_selected, role),
                 category="Table",
             )
-        r.register(
-            "edit.settings",
-            "Se&ttings…",
-            self.show_settings,
-            category="Edit",
-            shortcut="Ctrl+,",
-            menu_role=QAction.MenuRole.PreferencesRole,
-        )
-        r.register(
-            "view.command_palette",
-            "&Command palette…",
-            self.show_command_palette,
-            category="View",
-            shortcut="Ctrl+K",
-        )
-
-    def _create_menus(self) -> None:
         a = self.registry.action
-        file_menu = self.menuBar().addMenu("&File")
-        file_menu.addActions([a("file.new"), a("file.open")])
-        file_menu.addSeparator()
-        file_menu.addActions([a("file.save"), a("file.save_as")])
-        file_menu.addSeparator()
-        file_menu.addActions([a("file.close"), a("file.quit")])
-        edit_menu = self.menuBar().addMenu("&Edit")
-        edit_menu.addActions([a("edit.undo"), a("edit.redo")])
-        edit_menu.addSeparator()
-        edit_menu.addActions([a("edit.copy"), a("edit.paste"), a("edit.clear")])
-        edit_menu.addSeparator()
-        edit_menu.addAction(a("edit.settings"))
-        table_menu = self.menuBar().addMenu("&Table")
+        self._edit_menu.insertActions(
+            self._settings_separator, [a("edit.copy"), a("edit.paste"), a("edit.clear")]
+        )
+        table_menu = QMenu("&Table", self)
+        self.menuBar().insertMenu(self._view_menu.menuAction(), table_menu)
         table_menu.addActions(
             [
                 a("table.insert_column_left"),
@@ -223,8 +244,6 @@ class MainWindow(QMainWindow):
         role_menu = table_menu.addMenu("Column &role")
         for role in ColumnRole:
             role_menu.addAction(a(f"table.role.{role.name.lower()}"))
-        view_menu = self.menuBar().addMenu("&View")
-        view_menu.addAction(a("view.command_palette"))
 
     # --- documents --------------------------------------------------------------------
 
@@ -294,6 +313,7 @@ class MainWindow(QMainWindow):
         )
 
     def _add_tab(self, document: Document, path: Path | None) -> DocumentTab:
+        self._create_table_actions()
         tab = DocumentTab(document, path, self.tabs, decimal_places=self.settings.decimal_places)
         tab.message.connect(self._show_status)
         index = self.tabs.addTab(tab, tab.title)
@@ -451,8 +471,9 @@ class MainWindow(QMainWindow):
         for action_id in ("file.save", "file.save_as", "file.close"):
             a(action_id).setEnabled(tab is not None)
         has_table = tab is not None and tab.table_view is not None
-        for action_id in TABLE_ACTIONS:
-            a(action_id).setEnabled(has_table)
+        if self._table_actions_created:
+            for action_id in TABLE_ACTIONS:
+                a(action_id).setEnabled(has_table)
         stack = tab.document.undo_stack if tab is not None else None
         undo, redo = a("edit.undo"), a("edit.redo")
         undo.setEnabled(stack is not None and stack.can_undo)

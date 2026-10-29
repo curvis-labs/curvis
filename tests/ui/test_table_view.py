@@ -491,12 +491,26 @@ def test_refused_edits_show_in_the_status_bar(window: MainWindow) -> None:
 
 
 def test_table_actions_are_in_the_command_palette(window: MainWindow) -> None:
-    ids = {entry.id for entry in window.registry.entries()}
-    assert {"edit.copy", "edit.paste", "edit.clear", "table.rename_column"} <= ids
-    assert {f"table.role.{role.name.lower()}" for role in ColumnRole} <= ids
-    assert not window.registry.action("edit.copy").isEnabled()  # no document open
+    def ids() -> set[str]:
+        return {entry.id for entry in window.registry.entries()}
+
+    assert "edit.copy" not in ids()  # made with the first document, not for the launcher
     window.new_document()
+    assert {"edit.copy", "edit.paste", "edit.clear", "table.rename_column"} <= ids()
+    assert {f"table.role.{role.name.lower()}" for role in ColumnRole} <= ids()
     assert window.registry.action("edit.copy").isEnabled()
+    window.close_current()
+    assert not window.registry.action("edit.copy").isEnabled()  # no table open
+    window.new_document()  # the actions are made only once
+
+
+def test_table_menu_and_edit_menu_entries(window: MainWindow) -> None:
+    window.new_document()
+    menus = {a.text().replace("&", ""): a.menu() for a in window.menuBar().actions()}
+    assert list(menus) == ["File", "Edit", "Table", "View"]
+    edit = [a.text().replace("&", "") for a in menus["Edit"].actions()]
+    assert edit[edit.index("Copy") : edit.index("Copy") + 3] == ["Copy", "Paste", "Clear cells"]
+    assert edit[-1] == "Settings…"
 
 
 def test_set_role_action_acts_on_the_current_column(window: MainWindow) -> None:
