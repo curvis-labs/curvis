@@ -136,7 +136,7 @@ def test_set_category(doc: Document) -> None:
     # Removing groups from their category; the empty category is removed.
     run_with_undo(doc, SetCategory("t", list(g.values()), None))
     assert t.category_groups == []
-    assert last_summary(doc) == "Remove 3 groups from their category"
+    assert last_summary(doc) == "Remove 3 series from their category"
 
 
 def test_same_series_name_in_two_categories(doc: Document) -> None:
@@ -256,3 +256,56 @@ def test_touched_nodes(doc: Document) -> None:
     assert reorder.touched_nodes == ("t", "b", "a")
     doc.undo()
     assert reorder.touched_nodes == ("t", "b", "a")
+
+
+# --- columns directly in a category ----------------------------------------------------
+
+
+def test_columns_in_a_category(doc: Document) -> None:
+    doc.execute(GroupColumns("t", ["a", "b"], "Control"))
+    gid = table(doc).replicate_groups[0].id
+    run_with_undo(doc, SetCategory("t", [gid], "Female", column_ids=["e"]))
+    t = table(doc)
+    (female,) = t.category_groups
+    assert t.column("e").category_id == female.id
+    assert order(doc) == "x a b e c d f"  # the category's series are gathered
+    assert last_summary(doc) == "Put 2 series in category 'Female'"
+    # Grouping a column that is in the category keeps the category on the group.
+    doc.execute(GroupColumns("t", ["e"], "Treated"))
+    assert t.column("e").category_id is None
+    assert t.replicate_groups[-1].category_id == female.id
+    t.check()
+
+
+def test_column_in_a_category_rules(doc: Document) -> None:
+    doc.execute(GroupColumns("t", ["a", "b"], "Control"))
+    with pytest.raises(CommandError, match="put the group in the category instead"):
+        doc.execute(SetCategory("t", [], "K", column_ids=["a"]))
+    with pytest.raises(CommandError, match="Only Y columns can be put in a category"):
+        doc.execute(SetCategory("t", [], "K", column_ids=["x"]))
+    doc.execute(SetCategory("t", [], "K", column_ids=["c"]))
+    with pytest.raises(CommandError, match="Remove it from the category first"):
+        doc.execute(SetColumnRole("t", "c", ColumnRole.TEXT))
+    # A column series cannot share a name with a group series in the same category.
+    gid = table(doc).replicate_groups[0].id
+    doc.execute(BulkRename("t", {"c": "Control 2"}))
+    doc.execute(SetCategory("t", [gid], "K"))
+    with pytest.raises(CommandError, match="already a series called 'control'"):
+        doc.execute(BulkRename("t", {"c": "control"}))
+    table(doc).check()
+
+
+def test_removing_the_last_column_of_a_category_removes_it(doc: Document) -> None:
+    doc.execute(SetCategory("t", [], "K", column_ids=["c"]))
+    run_with_undo(doc, RemoveColumn("t", "c"))
+    assert table(doc).category_groups == []
+    doc.undo()
+    assert table(doc).column("c").category_id == table(doc).category_groups[0].id
+
+
+def test_column_inserted_into_a_category(doc: Document) -> None:
+    doc.execute(SetCategory("t", [], "K", column_ids=["b", "c"]))
+    kid = table(doc).category_groups[0].id
+    with pytest.raises(CommandError, match="not next to each other"):
+        doc.execute(AddColumn("t", Column.new("N", ColumnRole.Y), 3))  # between b and c
+    run_with_undo(doc, AddColumn("t", Column.new("N", ColumnRole.Y, category_id=kid), 3))

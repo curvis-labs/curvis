@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QDialogButtonBox
 from pytestqt.qtbot import QtBot
 
 from curvis.core import AddTable, Document, GroupColumns, SetCategory
-from curvis.data import Column, ColumnRole, NodeKind, Table
+from curvis.data import Column, ColumnRole, NodeKind, Table, series
 from curvis.ui.main_window import MainWindow
 from curvis.ui.table import TableModel, TableView
 from curvis.ui.table.bulk_rename import BulkRenameDialog
@@ -274,17 +274,30 @@ def test_grouping_an_x_column_is_refused(
     assert group_names(doc) == {}
 
 
-def test_set_category_groups_single_columns(
+def test_columns_join_a_category_directly(
     view: TableView, doc: Document, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Regression: setting a category on plain columns made hidden one-column groups,
+    shown as a duplicate name above each column that a column rename did not follow."""
     monkeypatch.setattr(TableView, "_ask_category", lambda self, current, existing: "Male")
     view.select_columns(5, 6)  # T2 and Z, not in groups
     assert view.set_category_of_selected()
     t = doc.tables[0]
-    assert group_names(doc) == {"T2": ["T2"], "Z": ["Z"]}
-    assert [c.name for c in t.category_groups] == ["Male"]
-    doc.undo()  # one step
-    assert group_names(doc) == {} and t.category_groups == []
+    assert group_names(doc) == {}  # no hidden groups
+    (male,) = t.category_groups
+    assert [t.column(c).category_id for c in ["T2", "Z"]] == [male.id, male.id]
+    # Only the category band: nothing between it and the column names.
+    bands = view.model().bands()
+    assert len(bands) == 1
+    assert [b.name if b else None for b in bands[0][5:7]] == ["Male", "Male"]
+    view.grab()
+    # Renaming the column renames the series; there is no second name to go stale.
+    view.model().rename_column(6, "fish")
+    assert [s.name for s in series(t) if s.category_id == male.id] == ["T2", "fish"]
+    doc.undo()
+    doc.undo()  # one step for the category
+    assert t.category_groups == [] and t.column("Z").category_id is None
+    assert view.model().bands() == []
 
 
 def test_remove_category_and_rename_factor(

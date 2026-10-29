@@ -39,7 +39,7 @@ from curvis.core import (
     UngroupColumns,
 )
 from curvis.data import CellValue, Column, ColumnRole, NodeKind, Table
-from curvis.data.layout import find_node, layout_tree, moved_order, snap_boundary
+from curvis.data.layout import column_category, find_node, layout_tree, moved_order, snap_boundary
 from curvis.data.names import name_key, next_column_names
 from curvis.ui.table.format import cell_text, fitted_number_text
 
@@ -72,7 +72,7 @@ class Band:
 
 def _bands(table: Table) -> list[list[Band | None]]:
     """Header bands, top row first; each row has one entry per column (None: no band)."""
-    if not table.replicate_groups:
+    if not table.replicate_groups and not table.category_groups:
         return []
     n = len(table.columns)
     categories: list[Band | None] = [None] * n
@@ -323,14 +323,17 @@ class TableModel(QAbstractTableModel):
         """Add a new, empty column at ``position`` (named A, B, … as free).
 
         A Y column inserted next to the column at ``beside`` joins its replicate group,
-        so adding a column beside a replicate adds another replicate.
+        so adding a column beside a replicate adds another replicate. Beside a column
+        that sits in a category directly, it joins that category as a new series.
         """
         table = self.table
         position = max(0, min(position, len(table.columns)))
         (name,) = next_column_names([c.name for c in table.columns])
         neighbour = self.column_at(beside) if beside is not None else None
-        group_id = neighbour.group_id if neighbour is not None and role is ColumnRole.Y else None
-        column = Column.new(name, role, group_id=group_id)
+        group_id = category_id = None
+        if neighbour is not None and role is ColumnRole.Y:
+            group_id, category_id = neighbour.group_id, neighbour.category_id
+        column = Column.new(name, role, group_id=group_id, category_id=category_id)
         return self.execute(AddColumn(self.table_id, column, position))
 
     def remove_columns(self, positions: Sequence[int]) -> bool:
@@ -395,26 +398,32 @@ class TableModel(QAbstractTableModel):
     def set_category(self, positions: Sequence[int], category: str | None) -> bool:
         """Put the series at ``positions`` in a category (None: take them out).
 
-        Y columns that are not in a replicate group first become a group of their own,
-        named after the column, in the same undo step.
+        The series are the replicate groups of the selected columns and the selected
+        Y columns that are not in a group (each a series of its own).
         """
         columns = self.columns_at(positions)
-        commands: list[Command] = []
         group_ids = self.group_ids_at(positions)
-        if category is not None:
-            for column in columns:
-                if column.group_id is None and column.role is ColumnRole.Y:
-                    command = GroupColumns(self.table_id, [column.id], column.name)
-                    commands.append(command)
-                    group_ids.append(command.group.id)
-        if not group_ids:
+        column_ids = [
+            c.id
+            for c in columns
+            if c.group_id is None
+            and c.role is ColumnRole.Y
+            and (category is not None or c.category_id is not None)
+        ]
+        if not group_ids and not column_ids:
             self.error.emit("Select Y columns or replicate groups to put in a category.")
             return False
         name = None if category is None else category.strip()
-        commands.append(SetCategory(self.table_id, group_ids, name))
-        if len(commands) == 1:
-            return self.execute(commands[0])
-        return self.execute(CommandGroup(commands[-1].summary, commands))
+        return self.execute(SetCategory(self.table_id, group_ids, name, column_ids=column_ids))
+
+    def category_at(self, positions: Sequence[int]) -> str | None:
+        """Name of the category of the first selected series that has one, or None."""
+        table = self.table
+        for column in self.columns_at(positions):
+            category_id = column_category(table, column)
+            if category_id is not None:
+                return table.category_group(category_id).name
+        return None
 
     def rename_band(self, kind: NodeKind, node_id: str, name: str) -> bool:
         """Rename a replicate group or category group."""

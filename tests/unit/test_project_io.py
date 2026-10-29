@@ -85,6 +85,8 @@ def project_tables(draw: st.DrawFn) -> Table:
         column.name = f"{column.name}#{i}"
         if column.role is not ColumnRole.Y:
             column.group_id = None
+        elif column.group_id is None and categories:
+            column.category_id = draw(st.none() | st.sampled_from([c.id for c in categories]))
     for i, group in enumerate(groups):
         group.name = f"{group.name}#{i}"
     for i, category in enumerate(categories):
@@ -94,6 +96,7 @@ def project_tables(draw: st.DrawFn) -> Table:
     used = {c.group_id for c in columns}
     groups = [g for g in groups if g.id in used]
     used_categories = {g.category_id for g in groups}
+    used_categories |= {c.category_id for c in columns if c.group_id is None}
     categories = [c for c in categories if c.id in used_categories]
     table = Table(draw(TEXT), columns, groups, categories, category_factor=draw(TEXT) + "F")
     table.columns = normalized_order(table)

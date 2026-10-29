@@ -107,7 +107,9 @@ def draw_command(data: st.DataObject, doc: Document) -> Command:
         some_groups = (
             data.draw(st.lists(st.sampled_from(group_ids), max_size=3)) if group_ids else []
         )
-        return SetCategory(table.id, some_groups, data.draw(st.none() | NAMES))
+        return SetCategory(
+            table.id, some_groups, data.draw(st.none() | NAMES), column_ids=some_columns
+        )
     if kind == "reorder":
         return ReorderColumns(table.id, data.draw(st.permutations([c.id for c in table.columns])))
     if kind == "factor":

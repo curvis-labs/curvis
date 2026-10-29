@@ -27,6 +27,7 @@ from curvis.data import (
     normalized_order,
 )
 from curvis.data.column import coerce_cell, convert_values, writable
+from curvis.data.layout import column_category
 from curvis.data.names import name_key
 
 if TYPE_CHECKING:
@@ -117,7 +118,7 @@ class _Layout:
     """
 
     columns: list[Column]
-    column_state: list[tuple[str, str | None]]
+    column_state: list[tuple[str, str | None, str | None]]
     groups: list[ReplicateGroup]
     group_state: list[tuple[str, str | None]]
     categories: list[CategoryGroup]
@@ -128,7 +129,7 @@ class _Layout:
     def capture(cls, table: Table) -> _Layout:
         return cls(
             list(table.columns),
-            [(c.name, c.group_id) for c in table.columns],
+            [(c.name, c.group_id, c.category_id) for c in table.columns],
             list(table.replicate_groups),
             [(g.name, g.category_id) for g in table.replicate_groups],
             list(table.category_groups),
@@ -138,8 +139,8 @@ class _Layout:
 
     def restore(self, table: Table) -> None:
         table.columns = list(self.columns)
-        for column, (name, group_id) in zip(self.columns, self.column_state, strict=True):
-            column.name, column.group_id = name, group_id
+        for column, state in zip(self.columns, self.column_state, strict=True):
+            column.name, column.group_id, column.category_id = state
         table.replicate_groups = list(self.groups)
         for group, (name, category_id) in zip(self.groups, self.group_state, strict=True):
             group.name, group.category_id = name, category_id
@@ -150,10 +151,11 @@ class _Layout:
 
 
 def _drop_empty_groups(table: Table) -> None:
-    """Remove replicate groups without columns, then category groups without groups."""
+    """Remove replicate groups without columns, then category groups without series."""
     used = {c.group_id for c in table.columns}
     table.replicate_groups = [g for g in table.replicate_groups if g.id in used]
     used_categories = {g.category_id for g in table.replicate_groups}
+    used_categories |= {c.category_id for c in table.columns if c.group_id is None}
     table.category_groups = [c for c in table.category_groups if c.id in used_categories]
 
 
@@ -428,6 +430,12 @@ class SetColumnRole(Command):
                 f"'{_group_label(table, column.group_id)}', which holds only Y columns. "
                 "Ungroup it first."
             )
+        if column.category_id is not None and self.role is not ColumnRole.Y:
+            category = table.category_group(column.category_id).name
+            raise CommandError(
+                f"Column '{column.name}' is in category '{category}', which holds only "
+                "Y columns. Remove it from the category first."
+            )
         self._name = column.name
         self._old_role = column.role
         # Keep the old array only when it is replaced: an array still in the table can
@@ -509,7 +517,8 @@ class GroupColumns(_LayoutCommand):
 
     Columns already in a group leave it (a group left empty is removed). The columns
     are moved next to each other, where the first of them is. If all the columns were
-    in groups of the same category, the new group gets that category too.
+    in the same category (directly or through their groups), the new group gets that
+    category too.
     """
 
     def __init__(
@@ -529,14 +538,11 @@ class GroupColumns(_LayoutCommand):
                 )
         if any(g.id == self.group.id for g in table.replicate_groups):
             raise CommandError("This replicate group is already in the table.")
-        categories = {
-            None if c.group_id is None else table.replicate_group(c.group_id).category_id
-            for c in columns
-        }
+        categories = {column_category(table, c) for c in columns}
         self.group.category_id = categories.pop() if len(categories) == 1 else None
         table.replicate_groups.append(self.group)
         for column in columns:
-            column.group_id = self.group.id
+            column.group_id, column.category_id = self.group.id, None
         _normalize(table)
         return [c.id for c in columns]
 
@@ -573,11 +579,13 @@ class UngroupColumns(_LayoutCommand):
 
 
 class SetCategory(_LayoutCommand):
-    """Put replicate groups in a category group (a level of the second factor).
+    """Put series in a category group (a level of the second factor).
 
-    ``category`` is the name of the level: an existing category with that name (ignoring
-    case) is used, otherwise a new one is made. ``None`` takes the groups out of their
-    categories. The groups of a category are moved next to each other.
+    The series are replicate groups (``group_ids``) and Y columns without a group
+    (``column_ids``), which are series of one column. ``category`` is the name of the
+    level: an existing category with that name (ignoring case) is used, otherwise a new
+    one is made. ``None`` takes the series out of their categories. The series of a
+    category are moved next to each other.
     """
 
     def __init__(
@@ -586,9 +594,11 @@ class SetCategory(_LayoutCommand):
         group_ids: Sequence[str],
         category: str | None,
         category_id: str | None = None,
+        column_ids: Sequence[str] = (),
     ) -> None:
         super().__init__(table_id)
         self.group_ids = list(group_ids)
+        self.column_ids = list(column_ids)
         self.category = category
         self._new = (
             None
@@ -599,12 +609,24 @@ class SetCategory(_LayoutCommand):
         )
 
     def apply(self, table: Table) -> Sequence[str]:
-        if not self.group_ids:
-            raise CommandError("No replicate groups were given.")
+        if not self.group_ids and not self.column_ids:
+            raise CommandError("No series were given.")
         try:
             groups = [table.replicate_group(g) for g in dict.fromkeys(self.group_ids)]
         except KeyError as exc:
             raise CommandError(f"Table '{table.name}' has no replicate group {exc}.") from None
+        columns = _get_columns(table, self.column_ids) if self.column_ids else []
+        for column in columns:
+            if column.group_id is not None:
+                raise CommandError(
+                    f"Column '{column.name}' is in a replicate group; "
+                    "put the group in the category instead."
+                )
+            if column.role is not ColumnRole.Y:
+                raise CommandError(
+                    f"Column '{column.name}' has the role {column.role.value}. "
+                    "Only Y columns can be put in a category."
+                )
         category_id: str | None = None
         if self._new is not None:
             key = name_key(self._new.name)
@@ -616,16 +638,18 @@ class SetCategory(_LayoutCommand):
             category_id = existing.id
         for group in groups:
             group.category_id = category_id
+        for column in columns:
+            column.category_id = category_id
         _normalize(table)
-        return [c.id for g in groups for c in table.group_columns(g.id)]
+        return [c.id for g in groups for c in table.group_columns(g.id)] + [c.id for c in columns]
 
     @property
     def summary(self) -> str:
-        n = len(self.group_ids)
-        groups = "1 group" if n == 1 else f"{n} groups"
+        n = len(self.group_ids) + len(self.column_ids)
+        series = "1 series" if n == 1 else f"{n} series"
         if self.category is None:
-            return f"Remove {groups} from their category"
-        return f"Put {groups} in category '{self.category}'"
+            return f"Remove {series} from their category"
+        return f"Put {series} in category '{self.category}'"
 
 
 class ReorderColumns(_LayoutCommand):
