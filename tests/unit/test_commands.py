@@ -379,3 +379,51 @@ def test_changing_only_the_case_of_a_name_is_allowed(doc: Document) -> None:
 def test_lookups_by_name_ignore_case(doc: Document) -> None:
     assert doc.table_by_name("data") is table(doc)
     assert table(doc).column_by_name("RESP") is col(doc, "Resp")
+
+
+# --- touched nodes -----------------------------------------------------------------
+
+
+def _ids(doc: Document) -> tuple[str, str, str, str]:
+    t = table(doc)
+    return t.id, col(doc, "Dose").id, col(doc, "Resp").id, col(doc, "Label").id
+
+
+def check_touched(doc: Document, command: Command, expected: set[str]) -> None:
+    """The touched nodes are the same after do, undo and redo."""
+    doc.execute(command)
+    assert set(command.touched_nodes) == expected
+    doc.undo()
+    assert set(command.touched_nodes) == expected
+    doc.redo()
+    assert set(command.touched_nodes) == expected
+
+
+def test_touched_nodes_of_table_commands(doc: Document) -> None:
+    t, dose, resp, label = _ids(doc)
+    new = Table("New", [Column.new("A", ColumnRole.Y, [1])])
+    check_touched(doc, AddTable(new), {new.id, new.columns[0].id})
+    check_touched(doc, RenameTable(t, "Renamed"), {t})
+    check_touched(doc, RemoveTable(t), {t, dose, resp, label})
+    assert RemoveTable("missing").touched_nodes == ("missing",)
+
+
+def test_touched_nodes_of_column_commands(doc: Document) -> None:
+    t, dose, resp, label = _ids(doc)
+    short = Column.new("Short", ColumnRole.Y, [1])
+    check_touched(doc, AddColumn(t, short), {t, short.id})
+    long = Column.new("Long", ColumnRole.Y, [1, 2, 3, 4, 5])
+    check_touched(doc, AddColumn(t, long), {t, long.id, dose, resp, label, short.id})
+    check_touched(doc, RemoveColumn(t, resp), {t, resp})
+    check_touched(doc, MoveColumn(t, dose, 1), {t, dose})
+    check_touched(doc, RenameColumn(t, dose, "Conc"), {t, dose})
+    check_touched(doc, SetColumnRole(t, label, ColumnRole.Y), {t, label})
+
+
+def test_touched_nodes_of_cell_commands(doc: Document) -> None:
+    t, dose, resp, label = _ids(doc)
+    check_touched(doc, SetCellValue(t, resp, 0, 5), {t, resp})
+    check_touched(doc, SetCellBlock(t, 1, 0, [[1, 2], [3, 4]]), {t, dose, resp})
+    # Writing past the last row pads every column.
+    check_touched(doc, SetCellValue(t, dose, 10, 1), {t, dose, resp, label})
+    check_touched(doc, SetCellBlock(t, 20, 1, [[1]]), {t, dose, resp, label})

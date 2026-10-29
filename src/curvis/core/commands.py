@@ -43,6 +43,16 @@ class Command(ABC):
         """Short, plain-English description, e.g. "Rename column 'A' to 'Dose'"."""
 
     @property
+    @abstractmethod
+    def touched_nodes(self) -> tuple[str, ...]:
+        """Ids of the tables and columns whose content the command changes.
+
+        The same for do, undo and redo; valid after the first ``do()``. Used to find
+        stale nodes in the dependency graph. The table id is always included, so a node
+        that reads a whole table goes stale on any change to it.
+        """
+
+    @property
     def command_type(self) -> str:
         """Name of the command type, used in the change log."""
         return type(self).__name__
@@ -73,6 +83,11 @@ def _check_name(name: str, taken: Sequence[str], kind: str) -> None:
     existing = next((t for t in taken if name_key(t) == key), None)
     if existing is not None:
         raise CommandError(f"There is already a {kind} called '{existing}'.")
+
+
+def _table_nodes(table: Table) -> tuple[str, ...]:
+    """The table id followed by the ids of all its columns."""
+    return (table.id, *(c.id for c in table.columns))
 
 
 def _check_insert_index(index: int | None, length: int) -> int:
@@ -112,6 +127,10 @@ class AddTable(Command):
     def summary(self) -> str:
         return f"Add table '{self.table.name}'"
 
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return _table_nodes(self.table)
+
 
 class RemoveTable(Command):
     """Remove a table."""
@@ -133,6 +152,10 @@ class RemoveTable(Command):
     @property
     def summary(self) -> str:
         return f"Remove table '{self._table.name}'" if self._table else "Remove table"
+
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return _table_nodes(self._table) if self._table else (self.table_id,)
 
 
 class RenameTable(Command):
@@ -157,6 +180,10 @@ class RenameTable(Command):
     def summary(self) -> str:
         return f"Rename table '{self._old_name}' to '{self.name}'"
 
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return (self.table_id,)
+
 
 # --- columns -----------------------------------------------------------------------
 
@@ -174,6 +201,7 @@ class AddColumn(Command):
         self.index = index
         self._at = 0
         self._old_rows = 0
+        self._touched: tuple[str, ...] = (table_id, column.id)
 
     def do(self, doc: Document) -> None:
         table = _get_table(doc, self.table_id)
@@ -188,6 +216,9 @@ class AddColumn(Command):
         self._old_rows = table.n_rows
         table.columns.insert(self._at, self.column)
         table.resize(max(self._old_rows, len(self.column)))
+        # A longer column pads the others, which changes them too.
+        padded = len(self.column) > self._old_rows and len(table.columns) > 1
+        self._touched = _table_nodes(table) if padded else (self.table_id, self.column.id)
 
     def undo(self, doc: Document) -> None:
         table = doc.table(self.table_id)
@@ -197,6 +228,10 @@ class AddColumn(Command):
     @property
     def summary(self) -> str:
         return f"Add column '{self.column.name}'"
+
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return self._touched
 
 
 class RemoveColumn(Command):
@@ -221,6 +256,10 @@ class RemoveColumn(Command):
     @property
     def summary(self) -> str:
         return f"Remove column '{self._column.name}'" if self._column else "Remove column"
+
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return (self.table_id, self.column_id)
 
 
 class MoveColumn(Command):
@@ -252,6 +291,10 @@ class MoveColumn(Command):
     def summary(self) -> str:
         return f"Move column '{self._name}'"
 
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return (self.table_id, self.column_id)
+
 
 class RenameColumn(Command):
     """Rename a column."""
@@ -276,6 +319,10 @@ class RenameColumn(Command):
     @property
     def summary(self) -> str:
         return f"Rename column '{self._old_name}' to '{self.name}'"
+
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return (self.table_id, self.column_id)
 
 
 class SetColumnRole(Command):
@@ -316,6 +363,10 @@ class SetColumnRole(Command):
     def summary(self) -> str:
         return f"Set role of column '{self._name}' to {self.role.value}"
 
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return (self.table_id, self.column_id)
+
 
 # --- cells -------------------------------------------------------------------------
 
@@ -342,6 +393,7 @@ class SetCellBlock(Command):
         self._old_rows = 0
         self._column_ids: list[str] = []
         self._old_values: list[npt.NDArray[Any]] = []
+        self._touched: tuple[str, ...] = (table_id,)
 
     @property
     def _height(self) -> int:
@@ -375,6 +427,9 @@ class SetCellBlock(Command):
         end = self.top_row + height
         table.resize(max(self._old_rows, end))
         self._column_ids = [c.id for c in columns]
+        # Adding rows pads every column, so then every column changes.
+        grown = end > self._old_rows
+        self._touched = _table_nodes(table) if grown else (self.table_id, *self._column_ids)
         self._old_values = []
         for column, new in zip(columns, cells, strict=True):
             self._old_values.append(column.values[self.top_row : end].copy())
@@ -393,6 +448,10 @@ class SetCellBlock(Command):
     def summary(self) -> str:
         cells = self._height * self._width
         return f"Set {cells} cells from row {self.top_row + 1}"
+
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return self._touched
 
 
 class SetCellValue(Command):
@@ -423,3 +482,9 @@ class SetCellValue(Command):
     @property
     def summary(self) -> str:
         return f"Set cell in column '{self._name}', row {self.row + 1}"
+
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        if self._block is None:
+            return (self.table_id, self.column_id)
+        return self._block.touched_nodes
