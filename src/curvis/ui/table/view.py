@@ -1,8 +1,8 @@
 """Spreadsheet-style view of a data table.
 
 - Typing in a cell starts editing it. Enter, Tab and the arrow keys then save the cell
-  and move on. F2 or a double-click edits the text in place: the arrow keys then move
-  the text cursor.
+  and move on. F2 (on every platform) or a double-click edits the text in place: the
+  arrow keys then move the text cursor.
 - Enter moves down, Shift+Enter up, Tab right and Shift+Tab left.
 - Ctrl+C and Ctrl+V copy and paste tab-separated text, which Excel reads and writes.
 - Delete or Backspace clears the selected cells.
@@ -326,6 +326,10 @@ class TableView(QTableView):
             step = _key_step(event)
             if step is not None:
                 self.move_cursor(*step)
+                return
+            if event.key() == Qt.Key.Key_F2 and self.currentIndex().isValid():
+                # Qt's own edit key is Return on macOS, which moves down here.
+                self.edit(self.currentIndex(), QAbstractItemView.EditTrigger.EditKeyPressed, event)
                 return
         super().keyPressEvent(event)
 
