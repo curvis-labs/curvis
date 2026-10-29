@@ -160,6 +160,21 @@ class Column:
         self.role = ColumnRole(self.role)
         self.values = coerce_values(self.values, self.role)
 
+    @classmethod
+    def new(
+        cls,
+        name: str,
+        role: ColumnRole | str,
+        values: Iterable[CellValue] | npt.NDArray[Any] = (),
+        *,
+        unit: str = "",
+        group_id: str | None = None,
+        id: str | None = None,
+    ) -> "Column":
+        """A column from any values (lists, ranges, arrays), coerced for ``role``."""
+        role = ColumnRole(role)
+        return cls(name, role, coerce_values(values, role), unit, group_id, id if id else new_id())
+
     def __len__(self) -> int:
         return len(self.values)
 
