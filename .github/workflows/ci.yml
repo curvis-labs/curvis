@@ -49,3 +49,50 @@ jobs:
 
       - name: Tests
         run: uv run pytest
+
+  bench:
+    name: benchmarks
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libfontconfig1 \
+            libdbus-1-3 libglib2.0-0
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # Three runs, compared on the min over all of them (see tests/bench/compare.py).
+      - name: Run benchmarks
+        run: |
+          for i in 1 2 3; do
+            uv run pytest tests/bench --benchmark-only -q --benchmark-json=bench-$i.json
+          done
+
+      # Fails on a slowdown over 15% against tests/bench/baseline.json. A failure is
+      # confirmed with three more runs first, so one noisy run cannot fail the build.
+      - name: Compare with the baseline
+        run: |
+          if ! uv run python -m tests.bench.compare bench-*.json; then
+            echo "::warning::Slower than the baseline; running three more times to confirm."
+            for i in 4 5 6; do
+              uv run pytest tests/bench --benchmark-only -q --benchmark-json=bench-$i.json
+            done
+            uv run python -m tests.bench.compare bench-*.json
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: benchmarks
+          path: bench-*.json

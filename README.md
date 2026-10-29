@@ -18,6 +18,21 @@ Rscript validation/r/generate_all.R   # regenerate reference fixtures (needs R)
 
 Install the pre-commit hooks once with `uv run pre-commit install`.
 
+### Benchmarks
+
+CI runs the benchmarks in `tests/bench` three times and fails if any is more than 15% slower than the stored baseline, `tests/bench/baseline.json`. Timings are compared on their minimum and scaled by a calibration benchmark, so the baseline can come from a different machine. To check locally:
+
+```bash
+uv run pytest tests/bench --benchmark-only --benchmark-json=bench.json
+uv run python -m tests.bench.compare bench.json
+```
+
+To update the baseline after an intended change, download the `benchmarks` artifact from a CI run (or make three runs locally) and store it:
+
+```bash
+uv run python -m tests.bench.compare bench-1.json bench-2.json bench-3.json --update
+```
+
 See `docs/SPEC.md` for the product spec and `docs/PHASES.md` for the build plan.
 
 ## License
