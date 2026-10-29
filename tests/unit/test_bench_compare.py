@@ -40,11 +40,11 @@ def test_more_than_15_percent_slower_fails() -> None:
 def test_timings_are_scaled_by_the_calibration() -> None:
     baseline = {CAL: 1.0, "a": 1.0}
     slow_machine = {CAL: 2.0, "a": 2.2}  # 10% slower once machine speed is taken out
-    scale, rows = compare.compare(baseline, slow_machine)
+    scale, rows = compare.compare(baseline, slow_machine, normalize=True)
     assert scale == 2.0
     assert rows[0].ratio == pytest.approx(1.1)
     assert compare.failed(rows) == []
-    _, raw = compare.compare(baseline, slow_machine, normalize=False)
+    _, raw = compare.compare(baseline, slow_machine)  # not scaled by default
     assert statuses(raw) == {"a": "slower"}
 
 
@@ -87,7 +87,7 @@ def test_main_check_update_and_exit_codes(
 
 
 def test_stored_baseline_covers_every_benchmark() -> None:
-    """The committed baseline must list each benchmark in tests/bench (else none is gated)."""
+    """The stored record of absolute timings must list every benchmark in tests/bench."""
     names = set(compare.load(compare.BASELINE))
     bench_dir = Path(compare.__file__).parent
     for path in sorted(bench_dir.glob("test_*.py")):
@@ -95,3 +95,21 @@ def test_stored_baseline_covers_every_benchmark() -> None:
             if line.startswith("def test_"):
                 test = line.removeprefix("def ").split("(")[0]
                 assert f"tests/bench/{path.name}::{test}" in names, f"{test} not in baseline"
+
+
+def test_main_with_base_commit_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """The CI gate: this commit's runs against the base commit's runs, min over each."""
+    base = [
+        write_run(tmp_path / "base-1.json", {"t::a": 0.0012, "t::b": 0.002}),
+        write_run(tmp_path / "base-2.json", {"t::a": 0.0010, "t::b": 0.003}),
+    ]
+    head = [
+        write_run(tmp_path / "head-1.json", {"t::a": 0.0011, "t::b": 0.0021}),
+        write_run(tmp_path / "head-2.json", {"t::a": 0.0019, "t::b": 0.0030}),
+    ]
+    args = [*map(str, head), "--baseline-runs", *map(str, base)]
+    assert compare.main(args) == 0  # a: +10%, b: +5%
+    assert "not scaled" in capsys.readouterr().out
+
+    slow = write_run(tmp_path / "head-3.json", {"t::a": 0.0012, "t::b": 0.0024})
+    assert compare.main([str(slow), "--baseline-runs", *map(str, base)]) == 1  # b: +20%

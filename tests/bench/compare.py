@@ -1,19 +1,23 @@
-"""Compare a benchmark run with the stored baseline; fail on a slowdown over 15%.
+"""Compare benchmark runs with a baseline; fail on a slowdown over 15%.
 
-Usage (CI runs the benchmarks three times)::
+The CI gate is an A/B comparison on one runner: the base commit and this commit are
+benchmarked in turn, three times each, and this commit fails if a benchmark is more
+than 15% slower::
 
-    uv run pytest tests/bench --benchmark-only --benchmark-json=bench1.json   # and 2, 3
-    uv run python -m tests.bench.compare bench*.json            # check
-    uv run python -m tests.bench.compare bench*.json --update   # store as new baseline
+    uv run python -m tests.bench.compare head-*.json --baseline-runs base-*.json
 
 Each benchmark is compared on its **minimum** time over all rounds of all given runs,
-the statistic least affected by other load on a shared machine. Timings are first
-divided by the calibration benchmark (tests/bench/test_calibration.py). That corrects
-modest speed drift between CI runners, not the gap between unlike machines: one CPU
-workload cannot stand in for I/O, process start-up and thread wake-up costs. So the
-stored baseline must come from the CI runner (the ``benchmarks`` artifact); locally,
-compare against a baseline of your own with ``--baseline``. A benchmark that is in the
-baseline but missing from the run fails the check; a new benchmark is only reported.
+the statistic least affected by other load on a shared machine. A benchmark that is in
+the baseline but missing from the run fails the check; a new one is only reported.
+
+The stored baseline (tests/bench/baseline.json, recorded on a CI runner) is a record
+of absolute timings, not a gate: two GitHub runners differed by up to 80% on the
+thread and process benchmarks with the same code. ``--normalize`` divides timings by
+the calibration benchmark (tests/bench/test_calibration.py), which corrects plain CPU
+speed but not I/O, process start-up or thread wake-up costs::
+
+    uv run python -m tests.bench.compare head-*.json --normalize          # vs stored
+    uv run python -m tests.bench.compare head-*.json --update             # store
 """
 
 from __future__ import annotations
@@ -56,7 +60,7 @@ def compare(
     baseline: dict[str, float],
     current: dict[str, float],
     threshold: float = THRESHOLD,
-    normalize: bool = True,
+    normalize: bool = False,
 ) -> tuple[float, list[Row]]:
     """The machine-speed scale used and one row per benchmark."""
     scale = 1.0
@@ -87,7 +91,9 @@ def _ms(seconds: float | None) -> str:
 
 def report(scale: float, rows: list[Row], threshold: float) -> str:
     lines = [
-        f"Machine speed vs baseline (calibration): {scale:.2f}x the time",
+        f"Machine speed vs baseline (calibration): {scale:.2f}x the time"
+        if scale != 1.0
+        else "Timings are not scaled (same machine, or --normalize not given).",
         f"Comparing {STAT} times; fail above +{threshold:.0%}.",
         "",
         f"{'benchmark':<60} {'base ms':>10} {'now ms':>10} {'change':>8}  status",
@@ -98,7 +104,7 @@ def report(scale: float, rows: list[Row], threshold: float) -> str:
         lines.append(
             f"{short:<60} {_ms(r.baseline):>10} {_ms(r.current):>10} {change:>8}  {r.status}"
         )
-    if not 0.75 <= scale <= 1.33:
+    if scale != 1.0 and not 0.75 <= scale <= 1.33:
         warning = (
             f"This machine runs the calibration {scale:.2f}x as long as the baseline "
             "machine; the comparison is unreliable. Record the baseline on this kind of machine."
@@ -150,9 +156,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "current", type=Path, nargs="+", help="JSON file(s) from pytest --benchmark-json"
     )
-    parser.add_argument("--baseline", type=Path, default=BASELINE)
+    baseline = parser.add_mutually_exclusive_group()
+    baseline.add_argument("--baseline", type=Path, default=BASELINE, help="stored baseline")
+    baseline.add_argument(
+        "--baseline-runs", type=Path, nargs="+", help="JSON files of the base commit's runs"
+    )
     parser.add_argument("--threshold", type=float, default=THRESHOLD)
-    parser.add_argument("--no-normalize", action="store_true", help="skip calibration")
+    parser.add_argument(
+        "--normalize", action="store_true", help="scale by the calibration benchmark"
+    )
     parser.add_argument("--update", action="store_true", help="store current as baseline")
     args = parser.parse_args(argv)
 
@@ -162,9 +174,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Stored {len(args.current)} run(s) as the baseline in {args.baseline}.")
         return 0
 
-    scale, rows = compare(
-        load(args.baseline), load(*args.current), args.threshold, not args.no_normalize
-    )
+    base = load(*args.baseline_runs) if args.baseline_runs else load(args.baseline)
+    scale, rows = compare(base, load(*args.current), args.threshold, args.normalize)
     print(report(scale, rows, args.threshold))
     bad = failed(rows)
     if bad:
