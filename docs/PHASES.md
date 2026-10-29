@@ -270,7 +270,7 @@ Build the statistics validation harness:
 - validation/r/: an R project (renv) with a helper that writes fixtures as JSON (inputs + expected outputs + R version + package versions), and generate_all.R that runs every fixture script.
 - tests/validation/: a pytest plugin or helper that loads each fixture, runs the matching Curvis function, and compares outputs with the CLAUDE.md tolerances, giving a readable diff on failure.
 - tests/validation/TOLERANCES.md, empty except for a header explaining that exceptions need my approval.
-- One worked example: descriptive statistics (mean, SD, SEM, n, 95% CI of the mean) for replicate groups, R script first, then the Python function.
+- One worked example: descriptive statistics (mean, SD, SEM, n, 95% CI of the mean) for replicate groups, R script first, then the Python function. Mean, SD, SEM and n per row already exist as `curvis.data.replicates.row_stats` (step 1.2, tested only against exact arithmetic so far): validate it against the R fixtures (edge cases: n = 0, 1, 2, NaN, ties, constant data, large offsets, infinities) and add only the 95% CI.
 - A CI job that runs tests/validation (fixtures are committed, so CI does not need R).
 
 Show me the R script before writing the Python side. Make a plan first. When done, report what you built and the test results.
