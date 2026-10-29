@@ -64,6 +64,8 @@ jobs:
           sudo apt-get install -y ./dist/curvis_*.deb
           time curvis
           grep -q 'application/x-curvis-project:\*.cvp' /usr/share/mime/globs2
+          test -f /usr/share/icons/hicolor/scalable/apps/org.curvis.Curvis.svg
+          test -f /usr/share/icons/hicolor/256x256/apps/org.curvis.Curvis.png
 
       - name: Smoke test the AppImage
         run: time ./dist/Curvis-*.AppImage
@@ -95,9 +97,12 @@ jobs:
       - name: Build app bundle
         run: uv run --no-sync pyinstaller packaging/curvis.spec --noconfirm
 
-      - name: Check the .cvp file type
+      - name: Check the bundle id, icon and .cvp file type
         run: |
           plist=dist/Curvis.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$plist" | grep -qx org.curvis.Curvis
+          icon="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$plist")"
+          sips -g pixelWidth "dist/Curvis.app/Contents/Resources/$icon"
           /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes:0:LSItemContentTypes:0" "$plist"
           /usr/libexec/PlistBuddy -c "Print :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0" "$plist" | grep -qx cvp
 

@@ -26,6 +26,7 @@ OutputBaseFilename=Curvis-{#AppVersion}-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\..\build\icons\curvis.ico
 UninstallDisplayIcon={app}\Curvis.exe
 LicenseFile=..\..\LICENSE
 

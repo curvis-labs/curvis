@@ -12,9 +12,13 @@ from PySide6.QtWidgets import QApplication
 
 from curvis import __version__
 from curvis.settings import Settings
-from curvis.settings.store import APPLICATION, ORGANIZATION
+from curvis.settings.store import APPLICATION, ORGANIZATION, ORGANIZATION_DOMAIN
 from curvis.ui.main_window import PROJECT_SUFFIX, MainWindow
+from curvis.ui.resources import app_icon
 from curvis.ui.theme import ThemeManager
+
+DESKTOP_ID = "org.curvis.Curvis"
+"""App id: the macOS bundle id and the name of the Linux .desktop file and icon."""
 
 EXIT_AFTER_LAUNCHER = "CURVIS_EXIT_AFTER_LAUNCHER"
 """If this environment variable is set, the app quits as soon as the launcher has been
@@ -71,9 +75,11 @@ def main(argv: list[str] | None = None) -> int:
     router = FileOpenRouter(app)
     app.installEventFilter(router)
     app.setOrganizationName(ORGANIZATION)
+    app.setOrganizationDomain(ORGANIZATION_DOMAIN)
     app.setApplicationName(APPLICATION)
     app.setApplicationVersion(__version__)
-    app.setDesktopFileName("curvis")
+    app.setDesktopFileName(DESKTOP_ID)  # matches the Linux .desktop file
+    app.setWindowIcon(app_icon())
 
     settings = Settings()
     themes = ThemeManager(app)

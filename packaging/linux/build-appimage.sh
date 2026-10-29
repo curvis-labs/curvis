@@ -9,8 +9,9 @@ appdir="build/Curvis.AppDir"
 rm -rf "$appdir"
 mkdir -p "$appdir/usr"
 cp -a dist/Curvis "$appdir/usr/curvis"
-cp "$here/curvis.desktop" "$appdir/curvis.desktop"
-cp "$here/curvis.svg" "$appdir/curvis.svg"
+cp "$here/org.curvis.Curvis.desktop" "$appdir/"
+cp build/icons/org.curvis.Curvis.svg "$appdir/"
+cp build/icons/hicolor/256x256/apps/org.curvis.Curvis.png "$appdir/.DirIcon"
 cat > "$appdir/AppRun" <<'APPRUN'
 #!/bin/sh
 here="$(dirname "$(readlink -f "$0")")"

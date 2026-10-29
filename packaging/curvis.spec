@@ -11,7 +11,14 @@ ROOT = Path(SPECPATH).parent  # noqa: F821 (defined by PyInstaller)
 VERSION = re.search(
     r'__version__ = "([^"]+)"', (ROOT / "src" / "curvis" / "__init__.py").read_text()
 ).group(1)
-BUNDLE_ID = "io.github.curvis-labs.curvis"
+BUNDLE_ID = "org.curvis.Curvis"
+DOCUMENT_TYPE = "org.curvis.project"  # macOS type identifier of .cvp files
+
+# Icons for every platform, rendered from src/curvis/ui/icons/curvis_dark.svg.
+sys.path.insert(0, str(ROOT / "packaging"))
+from make_icons import make_icons  # noqa: E402
+
+ICONS = make_icons(ROOT / "build" / "icons")
 
 # Qt modules Curvis does not use. PyInstaller only bundles what is imported, but these
 # keep a stray import (or a hook) from pulling in hundreds of MB.
@@ -68,6 +75,7 @@ def keep(entry):
 a = Analysis(  # noqa: F821
     [str(ROOT / "packaging" / "entry.py")],
     pathex=[str(ROOT / "src")],
+    datas=[(str(ROOT / "src" / "curvis" / "ui" / "icons"), "curvis/ui/icons")],
     excludes=EXCLUDES,
     noarchive=False,
 )
@@ -82,6 +90,7 @@ exe = EXE(  # noqa: F821
     exclude_binaries=True,
     name="Curvis" if sys.platform != "linux" else "curvis",
     console=False,
+    icon=str(ICONS["ico"]) if sys.platform == "win32" else None,
     disable_windowed_traceback=False,
     argv_emulation=False,
     upx=False,
@@ -100,6 +109,7 @@ if sys.platform == "darwin":
         coll,
         name="Curvis.app",
         bundle_identifier=BUNDLE_ID,
+        icon=str(ICONS["icns"]),
         version=VERSION,
         info_plist={
             "CFBundleName": "Curvis",
@@ -115,12 +125,14 @@ if sys.platform == "darwin":
                     "CFBundleTypeName": "Curvis project",
                     "CFBundleTypeRole": "Editor",
                     "LSHandlerRank": "Owner",
-                    "LSItemContentTypes": [f"{BUNDLE_ID}.project"],
+                    "CFBundleTypeIconFile": ICONS["icns"].name,
+                    "LSItemContentTypes": [DOCUMENT_TYPE],
                 }
             ],
             "UTExportedTypeDeclarations": [
                 {
-                    "UTTypeIdentifier": f"{BUNDLE_ID}.project",
+                    "UTTypeIdentifier": DOCUMENT_TYPE,
+                    "UTTypeIconFile": ICONS["icns"].name,
                     "UTTypeDescription": "Curvis project",
                     "UTTypeConformsTo": ["public.data", "public.content"],
                     "UTTypeTagSpecification": {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build dist/curvis_<version>_<arch>.deb from the PyInstaller output in dist/Curvis.
-# Installs to /opt/curvis with a /usr/bin/curvis link, a desktop entry and the
+# Installs to /opt/curvis with a /usr/bin/curvis link, a desktop entry, icons and the
 # .cvp MIME type (dpkg triggers refresh the MIME and desktop databases).
 set -euo pipefail
 version="$1"
@@ -11,11 +11,13 @@ rm -rf "$root"
 mkdir -p "$root/DEBIAN" "$root/opt" "$root/usr/bin" \
   "$root/usr/share/applications" "$root/usr/share/mime/packages" \
   "$root/usr/share/icons/hicolor/scalable/apps"
+icons="build/icons"  # written by packaging/make_icons.py during the PyInstaller build
 cp -a dist/Curvis "$root/opt/curvis"
 ln -s /opt/curvis/curvis "$root/usr/bin/curvis"
-cp "$here/curvis.desktop" "$root/usr/share/applications/curvis.desktop"
+cp "$here/org.curvis.Curvis.desktop" "$root/usr/share/applications/"
 cp "$here/curvis-mime.xml" "$root/usr/share/mime/packages/curvis.xml"
-cp "$here/curvis.svg" "$root/usr/share/icons/hicolor/scalable/apps/curvis.svg"
+cp "$icons/org.curvis.Curvis.svg" "$root/usr/share/icons/hicolor/scalable/apps/"
+cp -r "$icons/hicolor" "$root/usr/share/icons/"
 size="$(du -sk "$root" | cut -f1)"
 cat > "$root/DEBIAN/control" <<CONTROL
 Package: curvis

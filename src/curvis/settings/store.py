@@ -17,6 +17,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QSettings, Signal
 
 ORGANIZATION = "Curvis"
+ORGANIZATION_DOMAIN = "curvis.org"
 APPLICATION = "Curvis"
 
 MAX_RECENT = 10
