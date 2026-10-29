@@ -6,30 +6,41 @@ the undo stack, so edits, undo and redo all reach the view the same way.
 
 Below and to the right of the data the model shows spare empty rows and columns.
 Writing into them adds rows, and new Y columns, in the same command as the write.
+
+Above the column names the header shows *bands*: one row of category groups and one
+of replicate groups, each only when the table has any (see :meth:`TableModel.bands`).
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, QPersistentModelIndex, Qt
 from PySide6.QtCore import Signal as QtSignal
 
 from curvis.core import (
     AddColumn,
+    BulkRename,
     Command,
     CommandError,
     CommandGroup,
     Document,
+    GroupColumns,
     RemoveColumn,
+    RenameCategoryFactor,
     RenameColumn,
+    ReorderColumns,
+    SetCategory,
     SetCellBlock,
     SetCellValue,
     SetColumnRole,
     UndoEvent,
+    UngroupColumns,
 )
-from curvis.data import CellValue, Column, ColumnRole, Table
-from curvis.data.names import next_column_names
+from curvis.data import CellValue, Column, ColumnRole, NodeKind, Table
+from curvis.data.layout import find_node, layout_tree, moved_order, snap_boundary
+from curvis.data.names import name_key, next_column_names
 from curvis.ui.table.format import cell_text, fitted_number_text
 
 SPARE_ROWS = 20
@@ -48,10 +59,45 @@ def _never_calculated(_column: Column) -> bool:
     return False
 
 
+@dataclass(frozen=True)
+class Band:
+    """A category or replicate group drawn above columns ``start`` to ``end - 1``."""
+
+    kind: NodeKind
+    id: str
+    name: str
+    start: int
+    end: int
+
+
+def _bands(table: Table) -> list[list[Band | None]]:
+    """Header bands, top row first; each row has one entry per column (None: no band)."""
+    if not table.replicate_groups:
+        return []
+    n = len(table.columns)
+    categories: list[Band | None] = [None] * n
+    groups: list[Band | None] = [None] * n
+    for node in layout_tree(table):
+        if node.kind is NodeKind.CATEGORY:
+            name = table.category_group(node.id).name
+            band = Band(node.kind, node.id, name, node.start, node.end)
+            categories[node.start : node.end] = [band] * (node.end - node.start)
+        children = node.children if node.kind is NodeKind.CATEGORY else (node,)
+        for child in children:
+            if child.kind is NodeKind.GROUP:
+                name = table.replicate_group(child.id).name
+                band = Band(child.kind, child.id, name, child.start, child.end)
+                groups[child.start : child.end] = [band] * (child.end - child.start)
+    rows = [(categories, table.category_groups), (groups, table.replicate_groups)]
+    return [row for row, used in rows if used]
+
+
 class TableModel(QAbstractTableModel):
     """Table model for one table of ``document``. ``error`` sends why a change was refused."""
 
     error = QtSignal(str)
+    bands_changed = QtSignal()
+    """The header bands (groups above columns) changed."""
 
     def __init__(
         self,
@@ -70,6 +116,7 @@ class TableModel(QAbstractTableModel):
         # What the view was last told. Kept so insert/remove signals match the view.
         self._columns: list[Column] = list(self.table.columns)
         self._n_rows = self.table.n_rows
+        self._bands = _bands(self.table)
         self._unsubscribe = document.undo_stack.subscribe(self._on_undo_event)
         self.destroyed.connect(lambda *_: self._unsubscribe())
 
@@ -94,6 +141,19 @@ class TableModel(QAbstractTableModel):
         found = (self.column_at(p) for p in sorted(set(positions)))
         # Not ``if c``: an empty column has length 0.
         return [c for c in found if c is not None]
+
+    def bands(self) -> list[list[Band | None]]:
+        """Header bands above the columns, top row first (empty without groups).
+
+        Each row has one entry per data column: the band drawn above it, or None.
+        """
+        return self._bands
+
+    def band_at(self, row: int, col: int) -> Band | None:
+        """The band in band row ``row`` above column ``col``, or None."""
+        if 0 <= row < len(self._bands) and 0 <= col < len(self._bands[row]):
+            return self._bands[row][col]
+        return None
 
     def detach(self) -> None:
         """Stop following the document (the model shows the last state it had)."""
@@ -185,8 +245,20 @@ class TableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.ToolTipRole and orientation == Qt.Orientation.Horizontal:
             column = self.column_at(section)
             if column is not None:
-                return f"{column.name} ({column.role.value} column)"
+                tip = f"{column.name} ({column.role.value} column)"
+                if column.group_id is not None:
+                    tip += (
+                        f" in replicate group '{self.table.replicate_group(column.group_id).name}'"
+                    )
+                return tip
         return None
+
+    def band_tooltip(self, band: Band) -> str:
+        table = self.table
+        if band.kind is NodeKind.CATEGORY:
+            return f"{table.category_factor}: {band.name}"
+        n = band.end - band.start
+        return f"Replicate group '{band.name}' ({n} column{'' if n == 1 else 's'})"
 
     def flags(self, index: Index) -> Qt.ItemFlag:
         if not index.isValid():
@@ -245,12 +317,20 @@ class TableModel(QAbstractTableModel):
             return False
         return self.execute(CommandGroup(f"Clear {_cells(cells)}", commands))
 
-    def insert_column(self, position: int, role: ColumnRole = ColumnRole.Y) -> bool:
-        """Add a new, empty column at ``position`` (named A, B, … as free)."""
+    def insert_column(
+        self, position: int, role: ColumnRole = ColumnRole.Y, *, beside: int | None = None
+    ) -> bool:
+        """Add a new, empty column at ``position`` (named A, B, … as free).
+
+        A Y column inserted next to the column at ``beside`` joins its replicate group,
+        so adding a column beside a replicate adds another replicate.
+        """
         table = self.table
         position = max(0, min(position, len(table.columns)))
         (name,) = next_column_names([c.name for c in table.columns])
-        column = Column.new(name, role)
+        neighbour = self.column_at(beside) if beside is not None else None
+        group_id = neighbour.group_id if neighbour is not None and role is ColumnRole.Y else None
+        column = Column.new(name, role, group_id=group_id)
         return self.execute(AddColumn(self.table_id, column, position))
 
     def remove_columns(self, positions: Sequence[int]) -> bool:
@@ -283,6 +363,141 @@ class TableModel(QAbstractTableModel):
             CommandGroup(f"Set role of {len(commands)} columns to {role.value}", commands)
         )
 
+    # --- groups ------------------------------------------------------------------------
+
+    def group_ids_at(self, positions: Sequence[int]) -> list[str]:
+        """Replicate groups of the columns at ``positions``, left to right, each once."""
+        ids = [c.group_id for c in self.columns_at(positions) if c.group_id is not None]
+        return list(dict.fromkeys(ids))
+
+    def next_group_name(self) -> str:
+        """A free replicate group name: "Group 1", "Group 2", …"""
+        taken = {name_key(g.name) for g in self.table.replicate_groups}
+        n = 1
+        while name_key(f"Group {n}") in taken:
+            n += 1
+        return f"Group {n}"
+
+    def group_columns(self, positions: Sequence[int], name: str) -> bool:
+        """Combine the columns at ``positions`` into a new replicate group."""
+        columns = self.columns_at(positions)
+        if not columns:
+            return False
+        return self.execute(GroupColumns(self.table_id, [c.id for c in columns], name.strip()))
+
+    def ungroup_columns(self, positions: Sequence[int]) -> bool:
+        """Take the columns at ``positions`` out of their replicate groups."""
+        columns = self.columns_at(positions)
+        if not columns:
+            return False
+        return self.execute(UngroupColumns(self.table_id, [c.id for c in columns]))
+
+    def set_category(self, positions: Sequence[int], category: str | None) -> bool:
+        """Put the series at ``positions`` in a category (None: take them out).
+
+        Y columns that are not in a replicate group first become a group of their own,
+        named after the column, in the same undo step.
+        """
+        columns = self.columns_at(positions)
+        commands: list[Command] = []
+        group_ids = self.group_ids_at(positions)
+        if category is not None:
+            for column in columns:
+                if column.group_id is None and column.role is ColumnRole.Y:
+                    command = GroupColumns(self.table_id, [column.id], column.name)
+                    commands.append(command)
+                    group_ids.append(command.group.id)
+        if not group_ids:
+            self.error.emit("Select Y columns or replicate groups to put in a category.")
+            return False
+        name = None if category is None else category.strip()
+        commands.append(SetCategory(self.table_id, group_ids, name))
+        if len(commands) == 1:
+            return self.execute(commands[0])
+        return self.execute(CommandGroup(commands[-1].summary, commands))
+
+    def rename_band(self, kind: NodeKind, node_id: str, name: str) -> bool:
+        """Rename a replicate group or category group."""
+        name = name.strip()
+        if kind is NodeKind.GROUP:
+            return self.execute(BulkRename(self.table_id, groups={node_id: name}))
+        return self.execute(BulkRename(self.table_id, categories={node_id: name}))
+
+    def rename_category_factor(self, name: str) -> bool:
+        if name.strip() == self.table.category_factor:
+            return False
+        return self.execute(RenameCategoryFactor(self.table_id, name.strip()))
+
+    def bulk_rename(
+        self,
+        columns: Mapping[str, str],
+        groups: Mapping[str, str],
+        categories: Mapping[str, str],
+    ) -> bool:
+        """Rename columns, groups and categories (id to new name) as one undo step."""
+        return self.execute(BulkRename(self.table_id, columns, groups, categories))
+
+    # --- moving ------------------------------------------------------------------------
+
+    def drop_boundary(self, kind: NodeKind, node_id: str, gap: int) -> int | None:
+        """Where a dragged column, group or category lands if dropped at ``gap``."""
+        return snap_boundary(self.table, kind, node_id, gap)
+
+    def node_span(self, kind: NodeKind, node_id: str) -> tuple[int, int] | None:
+        """The columns (start, end) a column, group or category covers."""
+        found = find_node(self.table, kind, node_id)
+        return None if found is None else (found[0].start, found[0].end)
+
+    def node_at(self, positions: Sequence[int]) -> tuple[NodeKind, str] | None:
+        """The category, group or column whose columns are exactly ``positions``."""
+        columns = self.columns_at(positions)
+        if not columns:
+            return None
+        table = self.table
+        span = (table.column_index(columns[0].id), table.column_index(columns[-1].id) + 1)
+        group_id = columns[0].group_id
+        if group_id is not None:
+            category_id = table.replicate_group(group_id).category_id
+            if category_id is not None and self.node_span(NodeKind.CATEGORY, category_id) == span:
+                return NodeKind.CATEGORY, category_id
+            if self.node_span(NodeKind.GROUP, group_id) == span:
+                return NodeKind.GROUP, group_id
+        if len(columns) == 1:
+            return NodeKind.COLUMN, columns[0].id
+        return None
+
+    def move_by(self, positions: Sequence[int], step: int) -> tuple[NodeKind, str] | None:
+        """Move the column, group or category at ``positions`` one place left (-1) or right.
+
+        Returns what moved, or None (with ``error`` sent if the selection cannot move).
+        """
+        node = self.node_at(positions)
+        if node is None:
+            self.error.emit("Select one column, or all the columns of a group, to move it.")
+            return None
+        found = find_node(self.table, *node)
+        assert found is not None
+        current, siblings = found
+        i = siblings.index(current) + step
+        if not 0 <= i < len(siblings):
+            return None
+        boundary = siblings[i].start if step < 0 else siblings[i].end
+        return node if self.move_node(*node, boundary) else None
+
+    def move_node(self, kind: NodeKind, node_id: str, boundary: int) -> bool:
+        """Move a column, group or category to column boundary ``boundary``, as one step."""
+        table = self.table
+        order = moved_order(table, kind, node_id, boundary)
+        if order is None:
+            return False
+        if kind is NodeKind.COLUMN:
+            label = f"column '{table.column(node_id).name}'"
+        elif kind is NodeKind.GROUP:
+            label = f"group '{table.replicate_group(node_id).name}'"
+        else:
+            label = f"category '{table.category_group(node_id).name}'"
+        return self.execute(ReorderColumns(self.table_id, order, f"Move {label}"))
+
     def execute(self, command: Command) -> bool:
         """Run ``command`` on the document; on refusal send ``error`` and return False."""
         try:
@@ -308,6 +523,10 @@ class TableModel(QAbstractTableModel):
         table = table if table is not None else self.table
         self._sync_columns(list(table.columns))
         self._sync_rows(table.n_rows)
+        bands = _bands(table)
+        if bands != self._bands:
+            self._bands = bands
+            self.bands_changed.emit()
         self._all_data_changed()
         last = self.columnCount() - 1
         if last >= 0:

@@ -54,16 +54,22 @@ def row_stats(arrays: Sequence[npt.ArrayLike]) -> ReplicateStats:
     """
     if not arrays:
         raise ValueError("row_stats needs at least one array")
-    data = np.column_stack([np.asarray(a, dtype=np.float64) for a in arrays])
-    valid = ~np.isnan(data)
-    n = valid.sum(axis=1)
+    # One row per replicate: sums over axis 0 add whole contiguous arrays, which is
+    # much faster than reducing many short rows.
+    data = np.vstack([np.asarray(a, dtype=np.float64) for a in arrays])
+    missing = np.isnan(data)
+    n = data.shape[0] - missing.sum(axis=0)
+    filled = np.where(missing, 0.0, data)
     with np.errstate(invalid="ignore", divide="ignore"):
-        mean = np.where(valid, data, 0.0).sum(axis=1) / n
-        deviation = np.where(valid, data - mean[:, None], 0.0)
-        correction = deviation.sum(axis=1) / n
+        mean = filled.sum(axis=0) / n
+        deviation = filled - mean
+        deviation[missing] = 0.0
+        correction = deviation.sum(axis=0) / n
         mean = np.where(np.isfinite(mean), mean + correction, mean)
-        deviation = np.where(valid, data - mean[:, None], 0.0)
-        variance = (deviation * deviation).sum(axis=1) / (n - 1)
+        np.subtract(filled, mean, out=deviation)
+        deviation[missing] = 0.0
+        np.multiply(deviation, deviation, out=deviation)
+        variance = deviation.sum(axis=0) / (n - 1)
         variance[n < 2] = np.nan
         sd = np.sqrt(variance)
         sem = sd / np.sqrt(n)

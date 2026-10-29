@@ -6,7 +6,10 @@
 - Enter moves down, Shift+Enter up, Tab right and Shift+Tab left.
 - Ctrl+C and Ctrl+V copy and paste tab-separated text, which Excel reads and writes.
 - Delete or Backspace clears the selected cells.
-- Right-clicking a column header adds, deletes and renames columns and sets their role.
+- Right-clicking a column header adds, deletes and renames columns, sets their role,
+  groups them as replicates or into categories, and opens bulk rename.
+- Groups are shown above their columns; columns and groups move by drag and drop
+  (see :mod:`curvis.ui.table.header`).
 
 The view only sends commands through its :class:`TableModel`; it computes nothing.
 """
@@ -53,9 +56,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from curvis.data import ColumnRole
+from curvis.data import ColumnRole, NodeKind
+from curvis.ui.table.bulk_rename import BulkRenameDialog
 from curvis.ui.table.clipboard import from_tsv, to_tsv
 from curvis.ui.table.format import cell_text
+from curvis.ui.table.header import GroupedHeader
 from curvis.ui.table.model import TableModel
 
 DEFAULT_COLUMN_WIDTH = 96
@@ -153,6 +158,16 @@ class TableView(QTableView):
         self.cell_delegate.move_requested.connect(self.move_cursor)
         self.setItemDelegate(self.cell_delegate)
 
+        self.grouped_header = GroupedHeader(self)
+        self.setHorizontalHeader(self.grouped_header)
+        self.grouped_header.columns_clicked.connect(
+            lambda start, end: self.select_columns(start, end - 1)
+        )
+        self.grouped_header.move_requested.connect(self._on_move_requested)
+        self.grouped_header.rename_requested.connect(
+            lambda kind, node_id: self.rename_band(NodeKind(kind), node_id)
+        )
+
         rows = self.verticalHeader()
         rows.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)  # needed for fast scrolling
         rows.setDefaultSectionSize(self.fontMetrics().height() + 8)
@@ -166,6 +181,7 @@ class TableView(QTableView):
 
         self.setModel(model)
         model.error.connect(self.error)
+        model.bands_changed.connect(self._on_bands_changed)
         self.setCurrentIndex(model.index(0, 0))
 
     def model(self) -> TableModel:
@@ -424,15 +440,15 @@ class TableView(QTableView):
     def insert_column_left(self) -> bool:
         cols = self.selected_columns()
         position = cols[0] if cols else self.model().n_data_columns
-        return self._insert_column(position)
+        return self._insert_column(position, cols[0] if cols else None)
 
     def insert_column_right(self) -> bool:
         cols = self.selected_columns()
         position = cols[-1] + 1 if cols else self.model().n_data_columns
-        return self._insert_column(position)
+        return self._insert_column(position, cols[-1] if cols else None)
 
-    def _insert_column(self, position: int) -> bool:
-        if not self.model().insert_column(position):
+    def _insert_column(self, position: int, beside: int | None) -> bool:
+        if not self.model().insert_column(position, beside=beside):
             return False
         index = self.model().index(max(self.currentIndex().row(), 0), position)
         self.selectionModel().setCurrentIndex(
@@ -459,10 +475,137 @@ class TableView(QTableView):
 
     def _ask_column_name(self, current: str) -> str | None:
         """Ask for a new column name (tests replace this)."""
-        name, ok = QInputDialog.getText(
-            self, "Rename column", "Column name:", QLineEdit.EchoMode.Normal, current
+        return self._ask_text("Rename column", "Column name:", current)
+
+    def _ask_text(self, title: str, label: str, current: str) -> str | None:
+        """Ask for a line of text (tests replace this)."""
+        text, ok = QInputDialog.getText(self, title, label, QLineEdit.EchoMode.Normal, current)
+        return text if ok else None
+
+    def _ask_category(self, current: str, existing: list[str]) -> str | None:
+        """Ask for a category name, offering the existing ones (tests replace this)."""
+        text, ok = QInputDialog.getItem(
+            self,
+            "Set category",
+            f"{self.model().table.category_factor}:",
+            existing,
+            existing.index(current) if current in existing else 0,
+            True,
         )
-        return name if ok else None
+        return text if ok else None
+
+    # --- groups --------------------------------------------------------------------------
+
+    def group_selected(self) -> bool:
+        """Combine the selected columns into a replicate group (asks for its name)."""
+        cols = self.selected_columns()
+        if not cols:
+            return False
+        name = self._ask_text("Group as replicates", "Group name:", self.model().next_group_name())
+        if name is None or not self.model().group_columns(cols, name):
+            return False
+        self._select_ids([c.id for c in self.model().columns_at(cols)])
+        return True
+
+    def ungroup_selected(self) -> bool:
+        return self.model().ungroup_columns(self.selected_columns())
+
+    def set_category_of_selected(self) -> bool:
+        """Put the selected series in a category (asks which)."""
+        model = self.model()
+        cols = self.selected_columns()
+        if not cols:
+            return False
+        table = model.table
+        existing = [c.name for c in table.category_groups]
+        current = ""
+        group_ids = model.group_ids_at(cols)
+        if group_ids:
+            category_id = table.replicate_group(group_ids[0]).category_id
+            if category_id is not None:
+                current = table.category_group(category_id).name
+        name = self._ask_category(current, existing)
+        if name is None or not name.strip():
+            return False
+        return model.set_category(cols, name)
+
+    def remove_category_of_selected(self) -> bool:
+        return self.model().set_category(self.selected_columns(), None)
+
+    def rename_category_factor(self) -> bool:
+        """Rename the second factor (the one whose levels are the categories)."""
+        model = self.model()
+        name = self._ask_text(
+            "Rename category factor", "Name of the second factor:", model.table.category_factor
+        )
+        return name is not None and model.rename_category_factor(name)
+
+    def rename_band(self, kind: NodeKind, node_id: str) -> bool:
+        """Rename a replicate group or category (asks for the name)."""
+        table = self.model().table
+        if kind is NodeKind.GROUP:
+            title, current = "Rename replicate group", table.replicate_group(node_id).name
+        else:
+            title, current = "Rename category", table.category_group(node_id).name
+        name = self._ask_text(title, "Name:", current)
+        if name is None or name == current:
+            return False
+        return self.model().rename_band(kind, node_id, name)
+
+    def bulk_rename(self) -> bool:
+        """Open the bulk rename dialog; the result is one undoable command."""
+        model = self.model()
+        cols = self.selected_columns()
+        checked = [c.id for c in model.columns_at(cols)] if len(cols) > 1 else []
+        dialog = BulkRenameDialog(model.table, checked, self)
+        if not self._exec_dialog(dialog):
+            return False
+        renames = dialog.renames()
+        if not renames:
+            return False
+        return model.bulk_rename(renames.columns, renames.groups, renames.categories)
+
+    def _exec_dialog(self, dialog: BulkRenameDialog) -> bool:
+        """Run a dialog; True if accepted (tests replace this)."""
+        return dialog.exec() == BulkRenameDialog.DialogCode.Accepted
+
+    def move_selected_left(self) -> bool:
+        return self._move_selected(-1)
+
+    def move_selected_right(self) -> bool:
+        return self._move_selected(1)
+
+    def _move_selected(self, step: int) -> bool:
+        """Move the selected column, or the group or category it covers, by one place."""
+        model = self.model()
+        cols = self.selected_columns()
+        ids = [c.id for c in model.columns_at(cols)]
+        if model.move_by(cols, step) is None:
+            return False
+        self._select_ids(ids)
+        return True
+
+    def _on_move_requested(self, kind: str, node_id: str, boundary: int) -> None:
+        model = self.model()
+        node = NodeKind(kind)
+        if node is NodeKind.COLUMN:
+            moved = [node_id]
+        else:
+            span = model.node_span(node, node_id)
+            moved = [] if span is None else [c.id for c in model.table.columns[span[0] : span[1]]]
+        if model.move_node(node, node_id, boundary):
+            self._select_ids(moved)
+
+    def _select_ids(self, column_ids: list[str]) -> None:
+        """Select the whole columns with ``column_ids`` (they are next to each other)."""
+        ids = set(column_ids)
+        positions = [i for i, c in enumerate(self.model().table.columns) if c.id in ids]
+        if positions:
+            self.select_columns(positions[0], positions[-1])
+
+    def _on_bands_changed(self) -> None:
+        self.updateGeometries()
+        self.grouped_header.viewport().update()
 
     # --- header menu ---------------------------------------------------------------------
 
@@ -496,6 +639,26 @@ class TableView(QTableView):
             action.triggered.connect(lambda _=False, r=role: self.set_role_of_selected(r))
             group.addAction(action)
             roles_menu.addAction(action)
+        menu.addSeparator()
+        columns = model.columns_at(cols)
+        grouped = any(c.group_id is not None for c in columns)
+        group_action = menu.addAction("&Group as replicates…", self.group_selected)
+        group_action.setEnabled(has_columns and all(c.role is ColumnRole.Y for c in columns))
+        menu.addAction("&Ungroup", self.ungroup_selected).setEnabled(grouped)
+        menu.addAction("Set &category…", self.set_category_of_selected).setEnabled(
+            any(c.role is ColumnRole.Y for c in columns)
+        )
+        table = model.table
+        in_category = any(
+            table.replicate_group(g).category_id is not None for g in model.group_ids_at(cols)
+        )
+        menu.addAction("Remove from categor&y", self.remove_category_of_selected).setEnabled(
+            in_category
+        )
+        menu.addSeparator()
+        menu.addAction("Move &left", self.move_selected_left).setEnabled(has_columns)
+        menu.addAction("Move righ&t", self.move_selected_right).setEnabled(has_columns)
+        menu.addAction("&Bulk rename…", self.bulk_rename)
         return menu
 
     def _show_header_menu(self, pos: QPoint) -> None:

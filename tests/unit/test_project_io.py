@@ -20,6 +20,7 @@ from curvis.core import ChangeLogEntry, Document, JsonValue, ProjectConstant, Re
 from curvis.data import CategoryGroup, Column, ColumnRole, ReplicateGroup, Table, normalized_order
 from curvis.io import project
 from curvis.io.project import (
+    PROJECT_JSON,
     SCHEMA_VERSION,
     CorruptProjectError,
     NewerVersionError,
@@ -412,6 +413,23 @@ def test_adding_a_migration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert seen[0]["schema_version"] == 2
     with pytest.raises(ValueError, match="already registered"):
         project.register_migration(1)(rename_name_to_title)
+
+
+def test_version_1_files_get_the_default_category_factor(tmp_path: Path) -> None:
+    """Format 2 added the name of each table's second factor."""
+    path = tmp_path / "v1.cvp"
+    table = Table("T", [Column.new("A", ColumnRole.Y, [1.0])], category_factor="Sex")
+    save(Document(tables=[table]), path)
+    with zipfile.ZipFile(path) as zf:
+        files = {name: zf.read(name) for name in zf.namelist()}
+    data = json.loads(files[PROJECT_JSON])
+    data["schema_version"] = 1
+    del data["document"]["tables"][0]["category_factor"]
+    files[PROJECT_JSON] = json.dumps(data).encode()
+    with zipfile.ZipFile(path, "w") as zf:
+        for name, raw in files.items():
+            zf.writestr(name, raw)
+    assert load(path).tables[0].category_factor == "Category"
 
 
 def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
