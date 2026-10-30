@@ -1,9 +1,11 @@
 """The Import dialog: preview a CSV or TSV file and choose how to read it.
 
-Each change of an option reads the top of the file again as a scheduler job, and the
-preview shows the rows as the import would split them: rows above the header dimmed,
-the header row in bold, and each column's name and role in the column header. The
-dialog only collects options; the main window runs the import.
+Each change of an option reads the file again as a scheduler job, and the preview shows
+the rows as the import would split them: rows above the header dimmed, the header row
+in bold, the first data rows of the row range, and each imported column's name and
+role in the column header (columns outside the column range are dimmed). Rows are
+numbered as in the file. The dialog only collects options; the main window runs the
+import.
 """
 
 from __future__ import annotations
@@ -45,6 +47,8 @@ if TYPE_CHECKING:
 type _Index = QModelIndex | QPersistentModelIndex
 
 HEADER_ROW_MAX = 1_000_000
+ROW_MAX = 100_000_000
+COLUMN_MAX = 100_000
 
 
 class PreviewModel(QAbstractTableModel):
@@ -85,7 +89,8 @@ class PreviewModel(QAbstractTableModel):
             font.setBold(True)
             return font
         skipped = row < preview.data_start and row != preview.header_index
-        if role == Qt.ItemDataRole.ForegroundRole and skipped:
+        in_range = preview.column_start <= col < preview.column_start + len(preview.names)
+        if role == Qt.ItemDataRole.ForegroundRole and (skipped or not in_range):
             return QApplication.palette().brush(QPalette.ColorRole.PlaceholderText)
         return None
 
@@ -95,9 +100,10 @@ class PreviewModel(QAbstractTableModel):
         if role != Qt.ItemDataRole.DisplayRole or self.preview is None:
             return None
         if orientation == Qt.Orientation.Vertical:
-            return str(section + 1)
-        if section < len(self.preview.names):
-            return f"{self.preview.names[section]}\n{self.preview.roles[section].value}"
+            return str(self.preview.row_numbers[section])
+        column = section - self.preview.column_start
+        if 0 <= column < len(self.preview.names):
+            return f"{self.preview.names[column]}\n{self.preview.roles[column].value}"
         return ""
 
 
@@ -137,7 +143,19 @@ class ImportDialog(QDialog):
         header_box.addStretch()
 
         self.first_column_is_x = QCheckBox("&First column is X", self)
-        self.first_column_is_x.setToolTip("The first number column becomes the X column.")
+        self.first_column_is_x.setToolTip(
+            "The first number column in the column range becomes the X column."
+        )
+
+        # 0 is shown as "First" or "Last": the whole file, whatever its size.
+        self.first_row = _spin_box(self, 0, ROW_MAX, "First")
+        self.first_row.setToolTip("The first row to import, numbered as in the file.")
+        self.last_row = _spin_box(self, 0, ROW_MAX, "Last")
+        self.last_row.setToolTip("The last row to import, numbered as in the file.")
+        self.first_column = _spin_box(self, 1, COLUMN_MAX)
+        self.first_column.setToolTip("The first column to import; column 1 is the first.")
+        self.last_column = _spin_box(self, 0, COLUMN_MAX, "Last")
+        self.last_column.setToolTip("The last column to import.")
 
         self.advanced_toggle = QToolButton(self)
         self.advanced_toggle.setText("Advanced")
@@ -159,6 +177,12 @@ class ImportDialog(QDialog):
         header_label = QLabel("&Header row", self)
         header_label.setBuddy(self.header_row)  # a layout row gets no buddy by itself
         form.addRow(header_label, header_box)
+        rows_label = QLabel("&Rows", self)
+        rows_label.setBuddy(self.first_row)
+        form.addRow(rows_label, _range_box(self, self.first_row, self.last_row))
+        columns_label = QLabel("C&olumns", self)
+        columns_label.setBuddy(self.first_column)
+        form.addRow(columns_label, _range_box(self, self.first_column, self.last_column))
         form.addRow("", self.first_column_is_x)
 
         self.model = PreviewModel(self)
@@ -191,6 +215,8 @@ class ImportDialog(QDialog):
         self.header_row.valueChanged.connect(self._refresh)
         self.no_header.toggled.connect(self._on_no_header_toggled)
         self.first_column_is_x.toggled.connect(self._refresh)
+        for spin in (self.first_row, self.last_row, self.first_column, self.last_column):
+            spin.valueChanged.connect(self._refresh)
         self.decimal_comma.clicked.connect(self._on_decimal_comma_clicked)
         self.advanced_toggle.toggled.connect(self._on_advanced_toggled)
         scheduler.finished.connect(self._on_job_finished)
@@ -205,6 +231,10 @@ class ImportDialog(QDialog):
             header_row=None if self.no_header.isChecked() else self.header_row.value(),
             first_column_is_x=self.first_column_is_x.isChecked(),
             decimal_comma=self._decimal_comma,
+            first_row=self.first_row.value() or None,
+            last_row=self.last_row.value() or None,
+            first_column=self.first_column.value(),
+            last_column=self.last_column.value() or None,
         )
 
     def done(self, result: int) -> None:
@@ -264,6 +294,27 @@ class ImportDialog(QDialog):
         self.delimiter.setItemText(0, "Auto-detect")
         self.status.setText(self.error)
         self.ok_button.setEnabled(False)
+
+
+def _spin_box(parent: QWidget, low: int, high: int, special: str = "") -> QSpinBox:
+    """A spin box from ``low`` to ``high``; ``special`` is shown for ``low``."""
+    spin = QSpinBox(parent)
+    spin.setRange(low, high)
+    spin.setSpecialValueText(special)
+    spin.setMinimumWidth(90)
+    return spin
+
+
+def _range_box(parent: QWidget, first: QSpinBox, last: QSpinBox) -> QHBoxLayout:
+    """``first`` "to" ``last`` on one line."""
+    box = QHBoxLayout()
+    box.addWidget(first)
+    to = QLabel("to", parent)
+    to.setBuddy(last)
+    box.addWidget(to)
+    box.addWidget(last)
+    box.addStretch()
+    return box
 
 
 def _describe(preview: CsvPreview) -> str:
