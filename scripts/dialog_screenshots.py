@@ -1,9 +1,11 @@
-"""Save an offscreen screenshot of every dialog in the light and the dark theme.
+"""Save an offscreen screenshot of every dialog, and of the main window with a table,
+in the light and the dark theme.
 
     uv run python scripts/dialog_screenshots.py docs/screenshots/after
 
 Each dialog is shown at its default size, with the sample data of
-tests/ui/dialog_samples.py. Files are named <dialog>-<theme>.png.
+tests/ui/dialog_samples.py. Files are named <dialog>-<theme>.png; the main window is
+main_window-<theme>.png.
 """
 
 from __future__ import annotations
@@ -22,7 +24,36 @@ from tests.ui.dialog_samples import SAMPLES, Context, settle
 
 from curvis.compute import Scheduler
 from curvis.settings import Settings, Theme
+from curvis.ui.main_window import MainWindow, SaveChoice
 from curvis.ui.theme import ThemeManager
+
+SAMPLE_ROWS = [
+    ["0.01", "10.2", "11.4"],
+    ["0.1", "9.9", "18.4"],
+    ["1", "10.1", "52.3"],
+    ["10", "10.8", "82.6"],
+]
+
+
+def main_window(settings: Settings, app: QApplication, path: Path) -> None:
+    """Two document tabs; the second has a few rows of data."""
+    window = MainWindow(settings)
+    window._ask_save = lambda _tab: SaveChoice.DISCARD  # type: ignore[method-assign]
+    window.resize(900, 420)
+    window.show()
+    window.new_document()
+    tab = window.new_document()
+    assert tab.table_view is not None
+    tab.table_view.model().write_block(0, 0, SAMPLE_ROWS)
+    for _ in range(5):
+        app.processEvents()
+    window.grab().save(str(path))
+    print(path, f"{window.width()}x{window.height()}")
+    window.close()
+    if window._scheduler is not None:
+        window._scheduler.shutdown()
+    window.deleteLater()
+    app.processEvents()
 
 
 def main(out: Path) -> None:
@@ -46,6 +77,7 @@ def main(out: Path) -> None:
                     dialog.done(0)
                     dialog.deleteLater()
                     app.processEvents()
+                main_window(ctx.settings, app, out / f"main_window-{theme.value}.png")
         finally:
             ctx.scheduler.shutdown()
 

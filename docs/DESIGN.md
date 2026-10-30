@@ -100,12 +100,15 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
 | **Errors**: the error line, an invalid field's message | `BrightText` | #B3261E | #FF8080 |
 | Outlines of fields, lists, check boxes, radio buttons | `control_border()`: `Text` mixed 60 % into `Base`, ≥ 3 : 1 | #77869A | #98A0A9 |
 | A checked toggle button (*Not paired* / *Paired*) | `Highlight`, filled at 25 % | | |
+| Table grid lines | `grid_line()`: `Text` mixed 22 % into `Base`, ≥ 1.3 : 1 on `Base` and `AlternateBase` | | |
+| Tab close button | a thin × in `PlaceholderText`; `Text` on a soft square when hovered | | |
 
 - The icon's teal is too light for text on white (3.0 : 1), so the light theme uses a darker
   teal. Emerald is never used for text in the light theme.
 - Red is the only colour not taken from the icon; nothing in the icon can say “error”.
 - Fusion draws outlines a shade darker than the window, which vanishes on a dark window, so
-  `CurvisStyle` (in `theme.py`) draws them with `control_border()` instead.
+  `CurvisStyle` (in `theme.py`) draws them with `control_border()` instead, the table grid
+  with `grid_line()`, and the tab close button as a thin cross instead of Fusion's bitmap.
 - **Warnings** are not coloured. They show the standard warning icon in front of normal text.
   **Errors** use the error icon and `BrightText`. Colour is never the only signal, because
   icons and words carry the meaning too.
