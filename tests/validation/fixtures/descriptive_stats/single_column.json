@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "analysis": "descriptive_stats",
+  "case": "single_column",
+  "description": "One replicate column, so n is 0 or 1 in every row.",
+  "generated_by": {
+    "script": "validation/r/scripts/descriptive_stats.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "replicates": [
+      [1.5, "NaN", -2, 0, 1000000, "NaN"]
+    ]
+  },
+  "expected": {
+    "n": [1, 0, 1, 1, 1, 0],
+    "mean": [1.5, "NaN", -2, 0, 1000000, "NaN"],
+    "sd": ["NaN", "NaN", "NaN", "NaN", "NaN", "NaN"],
+    "sem": ["NaN", "NaN", "NaN", "NaN", "NaN", "NaN"],
+    "ci_lower": ["NaN", "NaN", "NaN", "NaN", "NaN", "NaN"],
+    "ci_upper": ["NaN", "NaN", "NaN", "NaN", "NaN", "NaN"]
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "sd": "statistic",
+    "sem": "statistic",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

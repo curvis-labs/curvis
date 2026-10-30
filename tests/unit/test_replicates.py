@@ -15,6 +15,7 @@ from curvis.data import (
     ColumnRole,
     ReplicateGroup,
     Table,
+    mean_ci,
     replicate_stats,
     row_stats,
     series,
@@ -109,6 +110,28 @@ def test_needs_an_array() -> None:
 def test_empty_rows() -> None:
     stats = row_stats([np.empty(0), np.empty(0)])
     assert stats.mean.shape == (0,)
+
+
+def test_mean_ci_known_value() -> None:
+    # n = 2: t(0.975, 1) = 12.706204736174698 and SEM = 1.
+    low, high = mean_ci(row_stats([[5.0], [7.0]]))
+    assert low[0] == pytest.approx(6 - 12.706204736174698, rel=1e-14)
+    assert high[0] == pytest.approx(6 + 12.706204736174698, rel=1e-14)
+
+
+def test_mean_ci_undefined_below_two_values() -> None:
+    low, high = mean_ci(row_stats([[NAN, 4.0], [NAN, NAN]]))
+    assert np.isnan(low).all() and np.isnan(high).all()
+
+
+def test_mean_ci_of_constant_data_is_the_mean() -> None:
+    low, high = mean_ci(row_stats([[2.5]] * 4))
+    assert low[0] == high[0] == 2.5
+
+
+def test_mean_ci_with_infinite_values_is_nan() -> None:
+    low, high = mean_ci(row_stats([[1.0], [math.inf], [3.0]]))
+    assert math.isnan(low[0]) and math.isnan(high[0])
 
 
 FINITE = st.floats(min_value=-1e12, max_value=1e12, allow_nan=False, allow_infinity=False)
