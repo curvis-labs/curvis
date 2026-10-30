@@ -172,15 +172,8 @@ descriptive_fixture(
   })
 )
 
-descriptive_fixture(
-  "overflow", paste(
-    "Values near the largest double, whose sums overflow in double precision.",
-    "R accumulates in long double where the platform has it (x86-64)."
-  ),
-  list(
-    c(1e308, 1e308, NaN),
-    c(1.5e308, 1.7e308, 1.6e308),
-    c(-1e308, -1.2e308, NaN),
-    c(1e308, -1e308, 5)
-  )
-)
+# No case for values near the largest double (about 1e308): R's own results are wrong
+# there and depend on the platform. sd(c(1.5e308, 1.7e308, 1.6e308)) is Inf (true SD
+# 1e307), and mean(c(1e308, -1e308, 5)) is 2.78 (true mean 5/3), because the
+# refinement pass subtracts the mean in double precision. A fixture must hold correct
+# answers, so this range is left untested.
