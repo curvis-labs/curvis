@@ -6,7 +6,14 @@ from curvis.data.ids import new_id
 from curvis.data.layout import Node, NodeKind, layout_error, name_error, normalized_order
 from curvis.data.names import name_key
 from curvis.data.pairing import Pairing, role_name_problem, role_values
-from curvis.data.replicates import ReplicateStats, Series, replicate_stats, row_stats, series
+from curvis.data.replicates import (
+    ReplicateStats,
+    Series,
+    mean_ci,
+    replicate_stats,
+    row_stats,
+    series,
+)
 from curvis.data.roles import ColumnRole
 from curvis.data.table import DEFAULT_CATEGORY_FACTOR, Table
 
@@ -24,6 +31,7 @@ __all__ = [
     "Series",
     "Table",
     "layout_error",
+    "mean_ci",
     "name_error",
     "name_key",
     "new_id",

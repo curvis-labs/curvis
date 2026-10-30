@@ -2,7 +2,7 @@
 
 A *series* is one replicate group, or one Y column that is not in a group. For each
 row, :func:`row_stats` gives the mean, SD, SEM and n of a series' replicates, leaving
-out missing values (NaN).
+out missing values (NaN), and :func:`mean_ci` the 95% confidence interval of the mean.
 """
 
 from __future__ import annotations
@@ -74,6 +74,23 @@ def row_stats(arrays: Sequence[npt.ArrayLike]) -> ReplicateStats:
         sd = np.sqrt(variance)
         sem = sd / np.sqrt(n)
     return ReplicateStats(mean=mean, sd=sd, sem=sem, n=n.astype(np.int64))
+
+
+def mean_ci(stats: ReplicateStats) -> tuple[FloatArray, FloatArray]:
+    """Lower and upper limits of the 95% confidence interval of each row's mean.
+
+    The limits are mean ∓ t·SEM, with t the 97.5% quantile of Student's t
+    distribution with n - 1 degrees of freedom (as R's ``t.test``). They are NaN where
+    n < 2 or the SEM is not finite, and equal to the mean where the SD is 0.
+    """
+    from scipy.special import stdtrit  # imported here: SciPy is slow to import
+
+    df = (stats.n - 1).astype(np.float64)
+    df[stats.n < 2] = np.nan
+    with np.errstate(invalid="ignore"):
+        margin = stdtrit(df, 0.975) * stats.sem
+    margin[~np.isfinite(margin)] = np.nan
+    return stats.mean - margin, stats.mean + margin
 
 
 def replicate_stats(table: Table, group_id: str) -> ReplicateStats:
