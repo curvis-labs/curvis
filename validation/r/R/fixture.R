@@ -15,8 +15,9 @@
 #     "kinds":    {"mean": "statistic", ...} # tolerance class of each output
 #   }
 #
-# Numbers are written with the fewest digits (15 to 17) that read back as the same
-# double, so inputs and results reach Python exactly. JSON has no NaN or infinity:
+# Numbers are written with 17 significant digits, which always identify a double
+# exactly (R's own number parser is not exact on every platform, so it cannot be used
+# to find a shorter form), so inputs and results reach Python exactly. JSON has no NaN or infinity:
 # NaN and NA are written as "NaN" (Curvis has one marker for missing and undefined
 # values), infinities as "Inf" and "-Inf". There is no timestamp, so regenerating with
 # the same R and packages gives identical files.
@@ -45,11 +46,7 @@ format_double <- function(x) {
   vapply(x, function(v) {
     if (is.na(v)) return('"NaN"')  # NA and NaN
     if (is.infinite(v)) return(if (v > 0) '"Inf"' else '"-Inf"')
-    for (digits in 15:17) {
-      s <- sprintf("%.*g", digits, v)
-      if (as.numeric(s) == v) break
-    }
-    s
+    sprintf("%.17g", v)
   }, character(1))
 }
 

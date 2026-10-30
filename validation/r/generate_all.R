@@ -11,9 +11,12 @@ local({
   args <- commandArgs(trailingOnly = FALSE)
   file_arg <- sub("^--file=", "", args[grep("^--file=", args)])
   if (length(file_arg) != 1L) stop("run this file with Rscript")
-  dir <- normalizePath(dirname(file_arg), mustWork = TRUE)
+  dir <- normalizePath(dirname(file_arg), winslash = "/", mustWork = TRUE)
   assign("r_project_dir", function() dir, envir = globalenv())
 })
+
+# English messages in any locale, so logs and errors read the same everywhere.
+Sys.setenv(LANGUAGE = "en")
 
 owd <- setwd(r_project_dir())
 source("renv/activate.R")
@@ -21,14 +24,14 @@ setwd(owd)
 
 source(file.path(r_project_dir(), "R", "fixture.R"))
 
-repo_root <- normalizePath(file.path(r_project_dir(), "..", ".."))
+repo_root <- normalizePath(file.path(r_project_dir(), "..", ".."), winslash = "/")
 scripts <- sort(list.files(file.path(r_project_dir(), "scripts"), pattern = "\\.R$",
                            full.names = TRUE))
 if (length(scripts) == 0L) stop("no scripts in validation/r/scripts")
 
 failed <- character()
 for (script in scripts) {
-  relative <- substring(normalizePath(script), nchar(repo_root) + 2L)
+  relative <- substring(normalizePath(script, winslash = "/"), nchar(repo_root) + 2L)
   .fixture_state$script <- relative
   before <- length(.fixture_state$written)
   # Same seed and RNG for every script, so each one is reproducible on its own.

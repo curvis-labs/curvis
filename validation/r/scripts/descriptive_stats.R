@@ -31,12 +31,10 @@ ci95_of_mean <- function(x, m, sem) {
   if (n < 2L || !is.finite(sem)) return(c(NaN, NaN))
   if (sem == 0) return(c(m, m))
   formula <- m + c(-1, 1) * qt(0.975, df = n - 1) * sem
-  tested <- tryCatch(t.test(x, conf.level = 0.95)$conf.int, error = function(e) {
-    if (!grepl("essentially constant", conditionMessage(e))) stop(e)
-    NULL
-  })
-  if (is.null(tested)) return(formula)
-  tested <- as.numeric(tested)
+  # t.test's own test for refusing the data (its error message is translated, so the
+  # rule is repeated here instead of matching the message).
+  if (sqrt(var(x) / n) < 10 * .Machine$double.eps * abs(m)) return(formula)
+  tested <- as.numeric(t.test(x, conf.level = 0.95)$conf.int)
   # t.test and the formula differ at most by rounding (sqrt(var / n) vs sd / sqrt(n)).
   stopifnot(isTRUE(all.equal(tested, formula, tolerance = 1e-13)))
   tested
