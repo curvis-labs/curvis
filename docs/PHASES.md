@@ -206,9 +206,9 @@ Make a plan first. When done, report what you built, test results and the benchm
 ### Step 1.4 — Formula engine and constants
 
 **Done when**
-- [ ] Formulas with `[column]` references, + − × ÷ ^ %, FIRST, LAST, ROW(n), MIN, MAX, MEAN, SUM, COUNT and constants evaluate correctly.
-- [ ] Fuzzing shows the parser never executes code and never crashes.
-- [ ] A formula over 100,000 rows recalculates in under 50 ms.
+- [x] Formulas with `[column]` references, + − × ÷ ^ %, FIRST, LAST, ROW(n), MIN, MAX, MEAN, SUM, COUNT and constants evaluate correctly.
+- [x] Fuzzing shows the parser never executes code and never crashes.
+- [x] A formula over 100,000 rows recalculates in under 50 ms.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 1.4 in docs/PHASES.md.
@@ -232,9 +232,9 @@ Make a plan first. When done, report what you built, test results and the benchm
 **Gate for phase 1:** spend an hour entering, pasting, importing and calculating real data from your lab. Note anything awkward and fix it before phase 2.
 
 **Done when**
-- [ ] Baseline subtraction, normalize 0–100%, fold change and custom formula create calculated columns.
-- [ ] Calculated columns update automatically when their inputs change and can be edited later.
-- [ ] Constants can be managed in a dialog (project and global).
+- [x] Baseline subtraction, normalize 0–100%, fold change and custom formula create calculated columns.
+- [x] Calculated columns update automatically when their inputs change and can be edited later.
+- [x] Constants can be managed in a dialog (project and global).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 1.5 in docs/PHASES.md.
