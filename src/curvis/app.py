@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QApplication
 from curvis import __version__
 from curvis.settings import Settings
 from curvis.settings.store import APPLICATION, ORGANIZATION, ORGANIZATION_DOMAIN
-from curvis.ui.main_window import PROJECT_SUFFIX, MainWindow
+from curvis.ui.main_window import FORMULA_WARM_UP_DELAY_MS, PROJECT_SUFFIX, MainWindow
 from curvis.ui.resources import app_icon
 from curvis.ui.theme import ThemeManager
 
@@ -93,6 +93,7 @@ def main(argv: list[str] | None = None) -> int:
         probe = _ExitWhenShown(window)
         window.launcher.installEventFilter(probe)
     window.show()
+    QTimer.singleShot(FORMULA_WARM_UP_DELAY_MS, window.warm_up_formulas)
     router.set_window(window)
     for path in project_paths(argv[1:]):
         window.open_path(path)

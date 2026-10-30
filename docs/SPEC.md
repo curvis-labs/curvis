@@ -42,7 +42,7 @@ Columns and column groups are movable by drag and drop.
 - Fold change relative to a reference value
 - Custom formula
 
-Formulas use `[column]` references, the operators + − × ÷ ^ and %, and the column functions FIRST, LAST, ROW(n) (with n the row number), MIN, MAX, MEAN, SUM and COUNT. They are parsed safely. Calculated columns can be edited after they are created.
+Formulas use `[column]` references, the operators + − × ÷ ^ and %, and the column functions FIRST, LAST, ROW(column, n) (the value in row n of a column), MIN, MAX, MEAN, SUM and COUNT. They are parsed safely. Calculated columns can be edited after they are created.
 
 **Constants.** Formulas can use built-in physical constants (Avogadro, gas constant, Boltzmann, Planck, speed of light, elementary charge, Faraday, π and e). They can also use your own constants, saved either in the project or globally on your computer.
 

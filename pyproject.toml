@@ -7,6 +7,7 @@ license = "GPL-3.0-only"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "lark>=1.2",
     "numpy>=2.5.4",
     "polars>=1.30",
     "pyarrow>=26.0.0",
@@ -44,6 +45,9 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RUF", "TID253"]
+
+# The formula language uses − (minus sign) and × (multiplication sign) as operators.
+allowed-confusables = ["−", "×"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 # Heavy libraries are imported inside functions so start-up stays fast (CLAUDE.md rule 9).

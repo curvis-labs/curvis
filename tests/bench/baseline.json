@@ -114,6 +114,48 @@
       ]
     },
     {
+      "name": "test_parse_and_compile_formula",
+      "fullname": "tests/bench/test_formula.py::test_parse_and_compile_formula",
+      "stats": {
+        "min": 0.00045782519089262113
+      },
+      "runs": [
+        {
+          "min": 0.00045782519089262113,
+          "median": 0.0005200748804074583
+        },
+        {
+          "min": 0.0007125863543258073,
+          "median": 0.0008944489387049
+        },
+        {
+          "min": 0.00046014467757138117,
+          "median": 0.0005287592464660239
+        }
+      ]
+    },
+    {
+      "name": "test_recalculate_formula_100k_rows",
+      "fullname": "tests/bench/test_formula.py::test_recalculate_formula_100k_rows",
+      "stats": {
+        "min": 0.0034748179524927867
+      },
+      "runs": [
+        {
+          "min": 0.0034748179524927867,
+          "median": 0.003872835954911029
+        },
+        {
+          "min": 0.0034871786679988087,
+          "median": 0.003901536083810519
+        },
+        {
+          "min": 0.003615492972809165,
+          "median": 0.00418407032259819
+        }
+      ]
+    },
+    {
       "name": "test_import_100k_row_csv_end_to_end",
       "fullname": "tests/bench/test_import.py::test_import_100k_row_csv_end_to_end",
       "stats": {

@@ -63,6 +63,14 @@ TABLE_ACTIONS = (
 """Actions that need a table view in the current tab."""
 
 
+FORMULA_WARM_UP = "formula:warm-up"
+"""Scheduler node that builds the formula parser after start-up. Its result is ignored;
+if it fails, the first formula builds the parser instead and reports the problem."""
+
+FORMULA_WARM_UP_DELAY_MS = 1000
+"""Delay after the window is shown, so the warm-up does not compete with start-up."""
+
+
 class SaveChoice(Enum):
     """Answer to "Save changes to 'X'?"."""
 
@@ -381,6 +389,13 @@ class MainWindow(QMainWindow):
             self._scheduler.finished.connect(self._on_job_finished)
             self._scheduler.failed.connect(self._on_job_failed)
         return self._scheduler
+
+    def warm_up_formulas(self) -> None:
+        """Build the formula parser on a worker thread, ahead of the first formula."""
+        from curvis.compute import Job
+        from curvis.formula import warm_up
+
+        self.scheduler.submit(FORMULA_WARM_UP, Job(warm_up), delay_ms=0)
 
     def _on_job_finished(self, node: str, result: object) -> None:
         if node in self._pending_imports:
