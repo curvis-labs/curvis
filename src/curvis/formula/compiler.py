@@ -17,6 +17,8 @@ Rules for values:
 - ``ROW(column, n)`` is the value of ``column`` in row ``n`` (1 is the first row);
   ``n`` may itself be a column. An ``n`` outside the table or not a whole number gives NaN.
 - A column function gives one number, which is repeated on every row.
+- ``{A}`` and ``{A:mean}`` read arrays the caller passes in ``roles``, by
+  :attr:`~curvis.formula.ast.RoleRef.key`; they behave like columns.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ from curvis.formula.ast import (
     Function,
     Node,
     Number,
+    RoleRef,
     Span,
     Unary,
     UnaryOp,
@@ -54,6 +57,7 @@ type Value = float | FloatArray
 @dataclass(slots=True)
 class _Env:
     columns: tuple[FloatArray, ...]
+    roles: tuple[FloatArray, ...]
     constants: tuple[float, ...]
     n_rows: int
     cache: list[Value | None]
@@ -86,14 +90,17 @@ class CompiledFormula:
         columns: Mapping[str, npt.ArrayLike],
         constants: Mapping[str, float],
         n_rows: int,
+        roles: Mapping[str, npt.ArrayLike] | None = None,
     ) -> FloatArray:
         """Evaluate on ``columns`` (by name, ignoring case), each ``n_rows`` long.
 
+        ``roles`` holds the values of role references by key (``"a"``, ``"a:mean"``).
         Returns a new ``float64`` array of ``n_rows`` values. Raises
-        :class:`FormulaError` for a missing column or constant, or a text column.
+        :class:`FormulaError` for a missing column, constant or role, or a text column.
         """
+        roles = roles if roles is not None else {}
         by_key = {name_key(name): values for name, values in columns.items()}
-        check(self.formula, by_key, constants)
+        check(self.formula, by_key, constants, roles)
         arrays: list[FloatArray] = []
         for name, key in zip(self.formula.columns, self._column_keys, strict=True):
             values = np.asarray(by_key[key])
@@ -103,8 +110,15 @@ class CompiledFormula:
             if values.shape != (n_rows,):
                 raise ValueError(f"column '{name}' has {len(values)} rows, expected {n_rows}")
             arrays.append(values.astype(np.float64, copy=False))
+        role_arrays: list[FloatArray] = []
+        for key in self.formula.roles:
+            values = np.asarray(roles[key], dtype=np.float64)
+            if values.shape != (n_rows,):
+                raise ValueError(f"role '{key}' has {len(values)} rows, expected {n_rows}")
+            role_arrays.append(values)
         env = _Env(
             tuple(arrays),
+            tuple(role_arrays),
             tuple(float(constants[name]) for name in self.formula.constants),
             n_rows,
             [None] * len(self._calls),
@@ -128,6 +142,9 @@ class CompiledFormula:
             case ConstantRef(name):
                 index = self.formula.constants.index(name)
                 return lambda env: env.constants[index]
+            case RoleRef():
+                role_index = self.formula.roles.index(node.key)
+                return lambda env: env.roles[role_index]
             case Unary(op, operand):
                 inner = self._compile(operand)
                 if op is UnaryOp.POS:
@@ -157,15 +174,23 @@ def check(
     formula: Formula | str,
     columns: Iterable[str],
     constants: Iterable[str],
+    roles: Iterable[str] = (),
 ) -> None:
-    """Raise :class:`FormulaError` at the first column or constant that does not exist."""
+    """Raise :class:`FormulaError` at the first column, constant or role that does not exist.
+
+    ``roles`` are role keys (:attr:`~curvis.formula.ast.RoleRef.key`).
+    """
     if isinstance(formula, str):
         formula = parse(formula)
     column_keys = {name_key(c) for c in columns}
     constant_names = set(constants)
+    role_keys = set(roles)
     for node in _walk(formula.root):
         if isinstance(node, ColumnRef) and name_key(node.name) not in column_keys:
             raise FormulaError(f"Unknown column '{node.name}'", node.span.start, node.span.end)
+        if isinstance(node, RoleRef) and node.key not in role_keys:
+            text = "{" + node.role + ("" if node.stat is None else f":{node.stat.value}") + "}"
+            raise FormulaError(f"Unknown role '{text}'", node.span.start, node.span.end)
         if isinstance(node, ConstantRef) and node.name not in constant_names:
             message = _unknown_constant(node.name, column_keys, constant_names)
             raise FormulaError(message, node.span.start, node.span.end)
@@ -324,6 +349,7 @@ def evaluate(
     columns: Mapping[str, npt.ArrayLike],
     constants: Mapping[str, float],
     n_rows: int,
+    roles: Mapping[str, npt.ArrayLike] | None = None,
 ) -> FloatArray:
     """Compile (cached) and evaluate ``formula``; see :meth:`CompiledFormula.__call__`."""
-    return compile_formula(formula)(columns, constants, n_rows)
+    return compile_formula(formula)(columns, constants, n_rows, roles)

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -32,6 +32,7 @@ from curvis.data.layout import column_category
 from curvis.data.names import name_key, unique_name
 
 if TYPE_CHECKING:
+    from curvis.core.calculations import Calculation
     from curvis.core.document import Document
 
 
@@ -168,6 +169,41 @@ def _check_layout(table: Table, before: _Layout) -> None:
         raise CommandError(error[0].upper() + error[1:] + ("" if error.endswith(".") else "."))
 
 
+def _drop_calculated(doc: Document, column_ids: set[str], table_id: str | None = None) -> None:
+    """Take removed columns out of their calculations; drop calculations left without
+    columns, and every calculation of the table ``table_id`` if it is given."""
+    kept: list[Calculation] = []
+    for calculation in doc.calculations:
+        if calculation.table_id == table_id:
+            continue
+        columns = tuple(c for c in calculation.columns if c.column_id not in column_ids)
+        if len(columns) == len(calculation.columns):
+            kept.append(calculation)
+        elif columns:
+            kept.append(replace(calculation, columns=columns))
+    doc.calculations = kept
+
+
+def _rewrite_formulas(doc: Document, table_id: str, renames: Mapping[str, str]) -> None:
+    """Update ``[old]`` to ``[new]`` in the formulas of the table's calculations."""
+    renames = {old: new for old, new in renames.items() if old != new}
+    if not renames:
+        return
+    from curvis.formula.rewrite import rename_columns
+
+    doc.calculations = [
+        replace(c, formula=rename_columns(c.formula, renames)) if c.table_id == table_id else c
+        for c in doc.calculations
+    ]
+
+
+def _check_not_calculated(doc: Document, column: Column) -> None:
+    if doc.is_calculated(column.id):
+        raise CommandError(
+            f"Column '{column.name}' is calculated. Edit its calculation to change it."
+        )
+
+
 def _group_label(table: Table, group_id: str | None) -> str:
     if group_id is None:
         return ""
@@ -215,15 +251,19 @@ class RemoveTable(Command):
         self.table_id = table_id
         self._table: Table | None = None
         self._at = 0
+        self._calculations: list[Calculation] = []
 
     def do(self, doc: Document) -> None:
         self._table = _get_table(doc, self.table_id)
         self._at = doc.table_index(self.table_id)
+        self._calculations = doc.calculations
         del doc.tables[self._at]
+        _drop_calculated(doc, set(), self.table_id)
 
     def undo(self, doc: Document) -> None:
         assert self._table is not None
         doc.tables.insert(self._at, self._table)
+        doc.calculations = self._calculations
 
     @property
     def summary(self) -> str:
@@ -313,24 +353,32 @@ class AddColumn(Command):
 
 
 class RemoveColumn(Command):
-    """Remove a column. A replicate group (or category) left empty is removed too."""
+    """Remove a column. A replicate group (or category) left empty is removed too.
+
+    A calculated column leaves its calculation; a calculation left without columns is
+    removed. Undo puts both back.
+    """
 
     def __init__(self, table_id: str, column_id: str) -> None:
         self.table_id = table_id
         self.column_id = column_id
         self._column: Column | None = None
         self._before: _Layout | None = None
+        self._calculations: list[Calculation] = []
 
     def do(self, doc: Document) -> None:
         table = _get_table(doc, self.table_id)
         self._column = _get_column(table, self.column_id)
         self._before = _Layout.capture(table)
+        self._calculations = doc.calculations
         del table.columns[table.column_index(self.column_id)]
         _drop_empty_groups(table)
+        _drop_calculated(doc, {self.column_id})
 
     def undo(self, doc: Document) -> None:
         assert self._before is not None
         self._before.restore(doc.table(self.table_id))
+        doc.calculations = self._calculations
 
     @property
     def summary(self) -> str:
@@ -378,13 +426,14 @@ class MoveColumn(Command):
 
 
 class RenameColumn(Command):
-    """Rename a column."""
+    """Rename a column. Formulas of the table's calculations follow the new name."""
 
     def __init__(self, table_id: str, column_id: str, name: str) -> None:
         self.table_id = table_id
         self.column_id = column_id
         self.name = name
         self._old_name = ""
+        self._calculations: list[Calculation] = []
 
     def do(self, doc: Document) -> None:
         table = _get_table(doc, self.table_id)
@@ -393,9 +442,12 @@ class RenameColumn(Command):
         _check_name(self.name, taken, "column")
         self._old_name = column.name
         column.name = self.name
+        self._calculations = doc.calculations
+        _rewrite_formulas(doc, self.table_id, {self._old_name: self.name})
 
     def undo(self, doc: Document) -> None:
         doc.table(self.table_id).column(self.column_id).name = self._old_name
+        doc.calculations = self._calculations
 
     @property
     def summary(self) -> str:
@@ -436,6 +488,11 @@ class SetColumnRole(Command):
             raise CommandError(
                 f"Column '{column.name}' is in category '{category}', which holds only "
                 "Y columns. Remove it from the category first."
+            )
+        if not self.role.is_numeric and doc.is_calculated(column.id):
+            raise CommandError(
+                f"Column '{column.name}' is calculated, so it holds numbers. "
+                "It cannot become a Text column."
             )
         self._name = column.name
         self._old_role = column.role
@@ -710,6 +767,19 @@ class BulkRename(_LayoutCommand):
         self.groups = dict(groups or {})
         self.categories = dict(categories or {})
         self._single_old = ""
+        self._old_column_names: dict[str, str] = {}
+        self._calculations: list[Calculation] = []
+
+    def do(self, doc: Document) -> None:
+        self._calculations = doc.calculations
+        super().do(doc)
+        table = doc.table(self.table_id)
+        renames = {self._old_column_names[i]: table.column(i).name for i in self.columns}
+        _rewrite_formulas(doc, self.table_id, renames)
+
+    def undo(self, doc: Document) -> None:
+        super().undo(doc)
+        doc.calculations = self._calculations
 
     def apply(self, table: Table) -> Sequence[str]:
         if not (self.columns or self.groups or self.categories):
@@ -726,6 +796,7 @@ class BulkRename(_LayoutCommand):
         if error is not None:
             raise CommandError(error)
         names = [*self.columns.values(), *self.groups.values(), *self.categories.values()]
+        self._old_column_names = {i: table.column(i).name for i in self.columns}
         if len(items) == 1:
             self._single_old = items[0].name
         for item, name in zip(items, names, strict=True):
@@ -798,6 +869,8 @@ class SetCellBlock(Command):
         if self.left_col + width > len(table.columns):
             raise CommandError("The block runs past the last column.")
         columns = table.columns[self.left_col : self.left_col + width]
+        for column in columns:
+            _check_not_calculated(doc, column)
         try:
             cells = [
                 [coerce_cell(row[j], col.role) for row in self.values]
@@ -916,7 +989,11 @@ class ImportColumns(Command):
         except ValueError as exc:
             raise CommandError(str(exc)) from None
 
-        empty = [i for i, c in enumerate(table.columns) if _is_empty_column(c)]
+        empty = [
+            i
+            for i, c in enumerate(table.columns)
+            if _is_empty_column(c) and not doc.is_calculated(c.id)
+        ]
         if len(empty) < len(table.columns):
             n_rows = max(n_rows, table.n_rows)
         slots = empty[: len(self.columns)]

@@ -42,6 +42,12 @@ class Function(StrEnum):
         return "ROW(column, n)" if self is Function.ROW else f"{self.value}(column)"
 
 
+class RoleStat(StrEnum):
+    """A statistic over all columns of a role, row by row: ``{A:mean}``."""
+
+    MEAN = "mean"
+
+
 @dataclass(frozen=True, slots=True)
 class Span:
     """0-based character offsets ``[start, end)`` in the formula text."""
@@ -72,6 +78,22 @@ class ConstantRef:
 
 
 @dataclass(frozen=True, slots=True)
+class RoleRef:
+    """``{A}`` (the column of role A that goes with the column being calculated) or
+    ``{A:mean}`` (the row-wise mean of all columns of role A). See :mod:`curvis.data.pairing`."""
+
+    role: str
+    stat: RoleStat | None
+    span: Span = field(compare=False)
+
+    @property
+    def key(self) -> str:
+        """Key of the values this reference reads: the role name ignoring case, plus the stat."""
+        key = self.role.casefold()
+        return key if self.stat is None else f"{key}:{self.stat.value}"
+
+
+@dataclass(frozen=True, slots=True)
 class Unary:
     op: UnaryOp
     operand: Node
@@ -93,7 +115,7 @@ class Call:
     span: Span = field(compare=False)
 
 
-type Node = Number | ColumnRef | ConstantRef | Unary | Binary | Call
+type Node = Number | ColumnRef | ConstantRef | RoleRef | Unary | Binary | Call
 
 
 def to_text(node: Node) -> str:
@@ -105,6 +127,8 @@ def to_text(node: Node) -> str:
             return "[" + name.replace("]", "]]") + "]"
         case ConstantRef(name):
             return name
+        case RoleRef(role, stat):
+            return "{" + role + ("" if stat is None else f":{stat.value}") + "}"
         case Unary(op, operand):
             return f"({op.value}{to_text(operand)})"
         case Binary(op, left, right):

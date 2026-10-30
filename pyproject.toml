@@ -47,7 +47,7 @@ src = ["src", "tests"]
 select = ["E", "F", "W", "I", "B", "UP", "N", "SIM", "RUF", "TID253"]
 
 # The formula language uses − (minus sign) and × (multiplication sign) as operators.
-allowed-confusables = ["−", "×"]
+allowed-confusables = ["−", "×", "–"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 # Heavy libraries are imported inside functions so start-up stays fast (CLAUDE.md rule 9).

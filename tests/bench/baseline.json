@@ -156,6 +156,27 @@
       ]
     },
     {
+      "name": "test_recalculate_paired_calculation_100k_rows",
+      "fullname": "tests/bench/test_formula.py::test_recalculate_paired_calculation_100k_rows",
+      "stats": {
+        "min": 0.01282224372800669
+      },
+      "runs": [
+        {
+          "min": 0.013765742098374648,
+          "median": 0.014813393438762708
+        },
+        {
+          "min": 0.01282224372800669,
+          "median": 0.013811690562030913
+        },
+        {
+          "min": 0.013359394157846469,
+          "median": 0.01571296742573143
+        }
+      ]
+    },
+    {
       "name": "test_import_100k_row_csv_end_to_end",
       "fullname": "tests/bench/test_import.py::test_import_100k_row_csv_end_to_end",
       "stats": {

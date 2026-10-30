@@ -30,6 +30,7 @@ import numpy as np
 import pyarrow as pa
 
 from curvis import __version__
+from curvis.core.calculations import CalculatedColumn, Calculation, CalculationKind
 from curvis.core.change_log import ChangeLog, ChangeLogEntry
 from curvis.core.constants import JsonValue, ProjectConstant
 from curvis.core.document import Document
@@ -38,12 +39,13 @@ from curvis.data import (
     CategoryGroup,
     Column,
     ColumnRole,
+    Pairing,
     ReplicateGroup,
     Table,
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -113,6 +115,15 @@ def _add_category_factor(data: dict[str, Any]) -> dict[str, Any]:
     for table in tables if isinstance(tables, list) else []:
         if isinstance(table, dict):
             table.setdefault("category_factor", DEFAULT_CATEGORY_FACTOR)
+    return data
+
+
+@register_migration(2)
+def _add_calculations(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 3 stores calculations (calculated columns and their formulas)."""
+    document = data.get("document")
+    if isinstance(document, dict):
+        document.setdefault("calculations", [])
     return data
 
 
@@ -199,6 +210,7 @@ def _project_dict(document: Document, files: list[str]) -> dict[str, Any]:
                 {"id": c.id, "name": c.name, "value": c.value, "unit": c.unit}
                 for c in document.constants
             ],
+            "calculations": [_calculation_dict(c) for c in document.calculations],
             "settings": document.settings,
         },
         "change_log": [
@@ -208,6 +220,29 @@ def _project_dict(document: Document, files: list[str]) -> dict[str, Any]:
                 "summary": e.summary,
             }
             for e in document.change_log
+        ],
+    }
+
+
+def _calculation_dict(calculation: Calculation) -> dict[str, Any]:
+    pairing = calculation.pairing
+    return {
+        "id": calculation.id,
+        "table_id": calculation.table_id,
+        "kind": calculation.kind.value,
+        "formula": calculation.formula,
+        "params": calculation.params,
+        "suffix": calculation.suffix,
+        "append_at_end": calculation.append_at_end,
+        "pairing": {
+            "paired": pairing.paired,
+            "a_name": pairing.a_name,
+            "b_name": pairing.b_name,
+            "a_columns": list(pairing.a_columns),
+            "b_columns": list(pairing.b_columns),
+        },
+        "columns": [
+            {"column_id": c.column_id, "source_id": c.source_id} for c in calculation.columns
         ],
     }
 
@@ -309,6 +344,12 @@ def _build_document(zf: zipfile.ZipFile, data: dict[str, Any]) -> Document:
         for i, c in enumerate(_list(doc_data.get("constants"), "constants"))
     ]
     _check_unique([c.id for c in constants], "constant ids")
+    calculations = [
+        _read_calculation(c, f"calculation {i + 1}", tables)
+        for i, c in enumerate(_list(doc_data.get("calculations"), "calculations"))
+    ]
+    _check_unique([c.id for c in calculations], "calculation ids")
+    _check_unique([o.column_id for c in calculations for o in c.columns], "calculated columns")
     settings: dict[str, JsonValue] = _obj(doc_data.get("settings"), "settings")
     change_log = ChangeLog()
     for i, e in enumerate(_list(data.get("change_log"), "change_log")):
@@ -317,6 +358,7 @@ def _build_document(zf: zipfile.ZipFile, data: dict[str, Any]) -> Document:
         name=_str(doc_data.get("name"), "document name"),
         tables=tables,
         constants=constants,
+        calculations=calculations,
         settings=settings,
         change_log=change_log,
         id=_str(doc_data.get("id"), "document id"),
@@ -420,6 +462,46 @@ def _read_constant(value: Any, where: str) -> ProjectConstant:
     )
 
 
+def _read_calculation(value: Any, where: str, tables: list[Table]) -> Calculation:
+    obj = _obj(value, where)
+    table_id = _str(obj.get("table_id"), f"{where} table_id")
+    table = next((t for t in tables if t.id == table_id), None)
+    if table is None:
+        raise _ContentError(f"{where} refers to a table that does not exist")
+    try:
+        kind = CalculationKind(_str(obj.get("kind"), f"{where} kind"))
+    except ValueError:
+        raise _ContentError(f"{where} has an unknown kind") from None
+    pairing_obj = _obj(obj.get("pairing"), f"{where} pairing")
+    pairing = Pairing(
+        a_columns=tuple(_str_list(pairing_obj.get("a_columns"), f"{where} role A columns")),
+        b_columns=tuple(_str_list(pairing_obj.get("b_columns"), f"{where} role B columns")),
+        paired=_bool(pairing_obj.get("paired"), f"{where} paired"),
+        a_name=_str(pairing_obj.get("a_name"), f"{where} role A name"),
+        b_name=_str(pairing_obj.get("b_name"), f"{where} role B name"),
+    )
+    column_ids = {c.id for c in table.columns}
+    columns: list[CalculatedColumn] = []
+    for i, item in enumerate(_list(obj.get("columns"), f"{where} columns")):
+        item_obj = _obj(item, f"{where} column {i + 1}")
+        column_id = _str(item_obj.get("column_id"), f"{where} column {i + 1} id")
+        if column_id not in column_ids:
+            raise _ContentError(f"{where} refers to a column that does not exist")
+        source_id = _str(item_obj.get("source_id"), f"{where} column {i + 1} source")
+        columns.append(CalculatedColumn(column_id, source_id))
+    return Calculation(
+        table_id=table_id,
+        formula=_str(obj.get("formula"), f"{where} formula"),
+        pairing=pairing,
+        kind=kind,
+        params=_obj(obj.get("params"), f"{where} params"),
+        suffix=_str(obj.get("suffix"), f"{where} suffix"),
+        append_at_end=_bool(obj.get("append_at_end"), f"{where} append_at_end"),
+        columns=tuple(columns),
+        id=_str(obj.get("id"), f"{where} id"),
+    )
+
+
 def _read_log_entry(value: Any, where: str) -> ChangeLogEntry:
     obj = _obj(value, where)
     return ChangeLogEntry(
@@ -452,6 +534,16 @@ def _str(value: Any, where: str) -> str:
 
 def _opt_str(value: Any, where: str) -> str | None:
     return None if value is None else _str(value, where)
+
+
+def _str_list(value: Any, where: str) -> list[str]:
+    return [_str(v, where) for v in _list(value, where)]
+
+
+def _bool(value: Any, where: str) -> bool:
+    if not isinstance(value, bool):
+        raise _ContentError(f"{where} is missing or not true/false")
+    return value
 
 
 def _int(value: Any, where: str) -> int:

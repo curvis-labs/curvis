@@ -9,6 +9,9 @@ Writing into them adds rows, and new Y columns, in the same command as the write
 
 Above the column names the header shows *bands*: one row of category groups and one
 of replicate groups, each only when the table has any (see :meth:`TableModel.bands`).
+
+Calculated columns are read-only: their cells cannot be edited, and the header marks
+them with ``ƒ`` (and ``⚠`` when their formula fails).
 """
 
 from __future__ import annotations
@@ -55,8 +58,12 @@ _NUMBER_ALIGNMENT = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
 _TEXT_ALIGNMENT = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 
 
-def _never_calculated(_column: Column) -> bool:
-    return False
+CALCULATED_MARK = "ƒ"
+ERROR_MARK = "⚠"
+
+
+def _no_error(_column_id: str) -> str | None:
+    return None
 
 
 @dataclass(frozen=True)
@@ -105,14 +112,15 @@ class TableModel(QAbstractTableModel):
         table_id: str,
         *,
         decimal_places: int = 4,
-        is_calculated: Callable[[Column], bool] = _never_calculated,
+        is_calculated: Callable[[Column], bool] | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self.document = document
         self.table_id = table_id
         self._decimal_places = decimal_places
-        self._is_calculated = is_calculated
+        self._is_calculated = is_calculated or (lambda c: document.is_calculated(c.id))
+        self._calculation_error: Callable[[str], str | None] = _no_error
         # What the view was last told. Kept so insert/remove signals match the view.
         self._columns: list[Column] = list(self.table.columns)
         self._n_rows = self.table.n_rows
@@ -172,9 +180,23 @@ class TableModel(QAbstractTableModel):
             self._all_data_changed()
 
     def set_is_calculated(self, predicate: Callable[[Column], bool]) -> None:
-        """Set how the model tells calculated columns apart (wired up in step 1.5)."""
+        """Set how the model tells calculated columns apart (default: from the document)."""
         self._is_calculated = predicate
         self._all_data_changed()
+
+    # --- calculated columns ------------------------------------------------------------
+
+    def is_calculated_column(self, col: int) -> bool:
+        column = self.column_at(col)
+        return column is not None and self._is_calculated(column)
+
+    def set_calculation_errors(self, errors: Callable[[str], str | None]) -> None:
+        """Set where the model reads why a calculated column (by id) has no values."""
+        self._calculation_error = errors
+
+    def refresh_values(self) -> None:
+        """Calculated values or their errors changed (they change without a command)."""
+        self.sync()
 
     # --- reading -----------------------------------------------------------------------
 
@@ -241,7 +263,14 @@ class TableModel(QAbstractTableModel):
             if orientation == Qt.Orientation.Vertical:
                 return str(section + 1)
             column = self.column_at(section)
-            return f"{column.name}\n{column.role.value}" if column is not None else ""
+            if column is None:
+                return ""
+            role_text = column.role.value
+            if self._is_calculated(column):
+                role_text = f"{CALCULATED_MARK} {role_text}"
+                if self._calculation_error(column.id):
+                    role_text += f" {ERROR_MARK}"
+            return f"{column.name}\n{role_text}"
         if role == Qt.ItemDataRole.ToolTipRole and orientation == Qt.Orientation.Horizontal:
             column = self.column_at(section)
             if column is not None:
@@ -250,6 +279,12 @@ class TableModel(QAbstractTableModel):
                     tip += (
                         f" in replicate group '{self.table.replicate_group(column.group_id).name}'"
                     )
+                calculation = self.document.calculation_of(column.id)
+                if calculation is not None:
+                    tip += f"\nCalculated: {calculation.formula}"
+                    error = self._calculation_error(column.id)
+                    if error:
+                        tip += f"\nError: {error}"
                 return tip
         return None
 
@@ -263,7 +298,10 @@ class TableModel(QAbstractTableModel):
     def flags(self, index: Index) -> Qt.ItemFlag:
         if not index.isValid():
             return Qt.ItemFlag.NoItemFlags
-        return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEditable
+        flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        if not self.is_calculated_column(index.column()):
+            flags |= Qt.ItemFlag.ItemIsEditable
+        return flags
 
     # --- writing -----------------------------------------------------------------------
 
@@ -301,21 +339,34 @@ class TableModel(QAbstractTableModel):
     def clear_ranges(self, ranges: Sequence[tuple[int, int, int, int]]) -> bool:
         """Clear cells in (top, left, bottom, right) ranges (inclusive), as one command.
 
-        The parts of the ranges outside the data are ignored.
+        The parts of the ranges outside the data, and calculated columns, are ignored.
         """
         commands: list[Command] = []
         cells = 0
         n_rows, n_cols = self.table.n_rows, len(self.table.columns)
         for top, left, bottom, right in ranges:
             bottom, right = min(bottom, n_rows - 1), min(right, n_cols - 1)
-            if top > bottom or left > right:
+            if top > bottom:
                 continue
-            blank = [[None] * (right - left + 1) for _ in range(bottom - top + 1)]
-            commands.append(SetCellBlock(self.table_id, top, left, blank))
-            cells += len(blank) * len(blank[0])
+            for start, end in self._editable_runs(left, right):
+                blank = [[None] * (end - start + 1) for _ in range(bottom - top + 1)]
+                commands.append(SetCellBlock(self.table_id, top, start, blank))
+                cells += len(blank) * len(blank[0])
         if not commands:
             return False
         return self.execute(CommandGroup(f"Clear {_cells(cells)}", commands))
+
+    def _editable_runs(self, left: int, right: int) -> list[tuple[int, int]]:
+        """Runs (first, last) of columns from ``left`` to ``right`` that are not calculated."""
+        runs: list[tuple[int, int]] = []
+        for col in range(left, right + 1):
+            if self.is_calculated_column(col):
+                continue
+            if runs and runs[-1][1] == col - 1:
+                runs[-1] = (runs[-1][0], col)
+            else:
+                runs.append((col, col))
+        return runs
 
     def insert_column(
         self, position: int, role: ColumnRole = ColumnRole.Y, *, beside: int | None = None

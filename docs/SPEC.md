@@ -44,6 +44,8 @@ Columns and column groups are movable by drag and drop.
 
 Formulas use `[column]` references, the operators + − × ÷ ^ and %, and the column functions FIRST, LAST, ROW(column, n) (the value in row n of a column), MIN, MAX, MEAN, SUM and COUNT. They are parsed safely. Calculated columns can be edited after they are created.
 
+One calculation can be applied to many columns at once: it makes one calculated column per selected column, named with a suffix. The selected columns can be **paired** with two roles, A and B (the names can be changed, e.g. "Control" and "Treated"). Columns are paired by position: the first B column with the first A column, and so on (index-matched replicates); a single A column goes with every B column. The same pairing is used later by paired analyses. Formulas refer to roles with `{A}` (the matching column), `{B}` (the column being calculated) and `{A:mean}` (the row-wise mean of all columns of the role, ignoring missing values). Baseline subtraction, fold change and custom formulas can use pairing; normalizing works on each column by itself, to its own minimum and maximum or to typed 0% and 100% values.
+
 **Constants.** Formulas can use built-in physical constants (Avogadro, gas constant, Boltzmann, Planck, speed of light, elementary charge, Faraday, π and e). They can also use your own constants, saved either in the project or globally on your computer.
 
 ## Analyses

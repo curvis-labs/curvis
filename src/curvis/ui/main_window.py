@@ -59,6 +59,8 @@ TABLE_ACTIONS = (
     "table.bulk_rename",
     "table.move_left",
     "table.move_right",
+    "table.calculate",
+    "table.edit_calculation",
 )
 """Actions that need a table view in the current tab."""
 
@@ -308,6 +310,26 @@ class MainWindow(QMainWindow):
             self._table_call(TableView.bulk_rename),
             category="Table",
         )
+        r.register(
+            "table.calculate",
+            "Ca&lculate…",
+            self._tab_call(DocumentTab.calculate),
+            category="Table",
+            shortcut="Ctrl+Shift+K",
+        )
+        r.register(
+            "table.edit_calculation",
+            "&Edit calculation…",
+            self._tab_call(DocumentTab.edit_calculation),
+            category="Table",
+            shortcut="Ctrl+Shift+E",
+        )
+        r.register(
+            "table.constants",
+            "C&onstants…",
+            self.show_constants,
+            category="Table",
+        )
         a = self.registry.action
         self._edit_menu.insertActions(
             self._settings_separator, [a("edit.copy"), a("edit.paste"), a("edit.clear")]
@@ -338,6 +360,10 @@ class MainWindow(QMainWindow):
         table_menu.addSeparator()
         table_menu.addActions([a("table.move_left"), a("table.move_right")])
         table_menu.addAction(a("table.bulk_rename"))
+        table_menu.addSeparator()
+        table_menu.addActions(
+            [a("table.calculate"), a("table.edit_calculation"), a("table.constants")]
+        )
 
     # --- documents --------------------------------------------------------------------
 
@@ -424,8 +450,16 @@ class MainWindow(QMainWindow):
 
     def _add_tab(self, document: Document, path: Path | None) -> DocumentTab:
         self._create_table_actions()
-        tab = DocumentTab(document, path, self.tabs, decimal_places=self.settings.decimal_places)
+        tab = DocumentTab(
+            document,
+            path,
+            self.tabs,
+            decimal_places=self.settings.decimal_places,
+            scheduler=self.scheduler,
+            global_constants=lambda: self.settings.global_constants,
+        )
         tab.message.connect(self._show_status)
+        tab.manage_constants_requested.connect(self.show_constants)
         index = self.tabs.addTab(tab, tab.title)
         self.tabs.setTabToolTip(index, str(path) if path else tab.title)
         document.undo_stack.subscribe(functools.partial(self._on_undo_event, tab))
@@ -554,6 +588,7 @@ class MainWindow(QMainWindow):
             if choice is SaveChoice.SAVE and not self.save_tab(tab):
                 return False
         self.tabs.removeTab(self.tabs.indexOf(tab))
+        tab.close_engine()
         tab.deleteLater()
         if self.tabs.count() == 0:
             self.stack.setCurrentWidget(self.launcher)
@@ -592,6 +627,30 @@ class MainWindow(QMainWindow):
 
         return call
 
+    def _tab_call(self, method: Callable[..., object]) -> Callable[[], None]:
+        """A callback that runs ``method`` on the current document tab, if any."""
+
+        def call() -> None:
+            tab = self.current_tab
+            if tab is not None:
+                method(tab)
+
+        return call
+
+    def show_constants(self) -> None:
+        """Show the Constants dialog for the current project and the global constants."""
+        from curvis.ui.constants_dialog import ConstantsDialog
+
+        tab = self.current_tab
+        dialog = ConstantsDialog(tab.document if tab else None, self.settings, self)
+        try:
+            self._exec_constants_dialog(dialog)
+        finally:
+            dialog.deleteLater()
+
+    def _exec_constants_dialog(self, dialog: QDialog) -> None:
+        dialog.exec()
+
     def _show_status(self, message: str) -> None:
         self.statusBar().showMessage(message, STATUS_MESSAGE_MS)
 
@@ -624,6 +683,10 @@ class MainWindow(QMainWindow):
         elif key == Settings.DECIMAL_PLACES:
             for tab in self.document_tabs():
                 tab.set_decimal_places(self.settings.decimal_places)
+        elif key == Settings.GLOBAL_CONSTANTS:
+            for tab in self.document_tabs():
+                if tab.engine is not None:
+                    tab.engine.global_constants_changed()
 
     def _refresh_recent(self) -> None:
         self.launcher.set_recent_projects(self.settings.recent_projects)
