@@ -19,7 +19,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     env:
-      QT_QPA_PLATFORM: offscreen
+      # On Windows the offscreen platform finds no fonts and draws every character as a
+      # box, so the dialog design tests would measure text that no user sees. The native
+      # platform uses the system fonts (Segoe UI); the runner has a desktop session.
+      QT_QPA_PLATFORM: ${{ matrix.os == 'windows-latest' && 'windows' || 'offscreen' }}
     steps:
       - uses: actions/checkout@v7
 
