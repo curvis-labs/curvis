@@ -216,11 +216,21 @@ Mockup: `docs/mockups/toolbars.html`.
   undo”, “Select columns to group”), like a disabled OK button.
 - **Narrow windows.** The toolbars keep one row. Buttons that do not fit move into the overflow
   menu (») at the end, in the same order; text never wraps.
-- **Icons**: 20 × 20 line icons on a 20 px grid, 1.5 px strokes with round caps and joins, no
-  fill except small accents. They are SVG files in `src/curvis/ui/icons/toolbar/`, drawn in
-  `currentColor` and coloured from the palette when the theme changes (`ButtonText`; disabled
-  text when disabled), so one file serves both themes. A table tool's icon matches the mark used
-  in the table where there is one (Calculate uses the ƒ of calculated columns).
+- **Icons**: 20 × 20 line icons on a 20 px grid, round caps and joins, no fills. Files:
+  `src/curvis/ui/icons/toolbar/` (its README lists them). Three tones, each mapped to a
+  palette role when the theme changes, so one file serves both themes:
+  - the **object** (folder, page, table, axes) in navy, 1.5 px → `ButtonText`;
+  - the **action** (plus, open lid, arrow, folded corner, data in a chart) in teal, 1.5 px →
+    `Link` (#007A7A light, #00A6A6 dark; the icon's own teal is too light on a light window);
+  - **detail** (table grid lines) in slate, 1 px → `PlaceholderText`.
+
+  Two tones never meet at a joint. An action part is a closed shape with a gap around it
+  (the save label, the bars) or a separate stroke (the import arrow). Where it shares an edge
+  with the outline, it draws that edge alone (the import fold's diagonal). A project is a
+  folder (New project: folder with a plus; Open project: folder with its lid lifted). A table
+  tool's icon matches the mark used in the table where there is one (Calculate uses the ƒ of
+  calculated columns). Disabled icons use the disabled text colour for all three tones, and
+  an icon on a highlighted menu row uses `HighlightedText` for all three.
 - **States**: hover shows a soft square (`Text` at 14 %), pressed at 25 %, and a menu that is
   open stays pressed, the same as the tab close button. Buttons are 28 px high, with 4 px
   between buttons and a separator between groups (file | undo/redo, and the table toolbar's
