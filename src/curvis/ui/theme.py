@@ -82,6 +82,9 @@ _DARK_DISABLED = {
 # Outlines of fields, check boxes and radio buttons: Text mixed into Base, so they show
 # in both themes with at least BORDER_CONTRAST_MIN (WCAG AA for parts of controls).
 BORDER_MIX = 0.6
+# Table grid lines: quieter than outlines, but visible on Base and AlternateBase.
+GRID_MIX = 0.22
+GRID_CONTRAST_MIN = 1.3
 BORDER_CONTRAST_MIN = 3.0
 
 # Text and background pairs that must reach CONTRAST_MIN in both themes (WCAG AA).
@@ -140,9 +143,18 @@ def contrast(a: QColor, b: QColor) -> float:
 
 def control_border(palette: QPalette) -> QColor:
     """The outline colour of fields, check boxes and radio buttons."""
+    return _mix(palette, BORDER_MIX)
+
+
+def grid_line(palette: QPalette) -> QColor:
+    """The colour of the table's cell borders."""
+    return _mix(palette, GRID_MIX)
+
+
+def _mix(palette: QPalette, mix: float) -> QColor:
+    """Text mixed into Base by ``mix`` (0 is Base, 1 is Text)."""
     base = palette.color(QPalette.ColorRole.Base)
     text = palette.color(QPalette.ColorRole.Text)
-    mix = BORDER_MIX
     return QColor.fromRgbF(
         base.redF() + (text.redF() - base.redF()) * mix,
         base.greenF() + (text.greenF() - base.greenF()) * mix,
@@ -160,15 +172,30 @@ _OUTLINED = {
 
 
 class CurvisStyle(QProxyStyle):
-    """Fusion, with outlines and pressed toggles that show in both themes.
+    """Fusion, with outlines, grid lines and close buttons that show in both themes.
 
     Fusion draws outlines a little darker than the window, which disappears on a dark
-    window. Here fields, check boxes and radio buttons get :func:`control_border`, and a
-    checked toggle button (e.g. Calculate's "Not paired") gets the selection colour.
+    window. Here fields, check boxes and radio buttons get :func:`control_border`, table
+    grid lines get :func:`grid_line`, a checked toggle button (e.g. Calculate's "Not
+    paired") gets the selection colour, and a tab's close button is a thin cross in the
+    text colours instead of Fusion's bitmap.
     """
 
     def __init__(self) -> None:
         super().__init__("Fusion")
+
+    def styleHint(  # noqa: N802 (Qt API)
+        self,
+        hint: QStyle.StyleHint,
+        option: QStyleOption | None = None,
+        widget: QWidget | None = None,
+        return_data: object = None,
+    ) -> int:
+        if hint == QStyle.StyleHint.SH_Table_GridLineColor:
+            palette = option.palette if option is not None else QApplication.palette()
+            rgba = grid_line(palette).rgba()
+            return rgba - (1 << 32) if rgba >= 1 << 31 else rgba  # a signed C int
+        return super().styleHint(hint, option, widget, return_data)  # type: ignore[arg-type]
 
     def drawPrimitive(  # noqa: N802 (Qt API)
         self,
@@ -177,6 +204,9 @@ class CurvisStyle(QProxyStyle):
         painter: QPainter,
         widget: QWidget | None = None,
     ) -> None:
+        if element == _E.PE_IndicatorTabClose:
+            self._draw_tab_close(option, painter)
+            return
         super().drawPrimitive(element, option, painter, widget)
         if element in _OUTLINED or element == _E.PE_IndicatorRadioButton:
             enabled = bool(option.state & QStyle.StateFlag.State_Enabled)
@@ -202,6 +232,33 @@ class CurvisStyle(QProxyStyle):
             painter.setBrush(fill)
             painter.drawRoundedRect(QRectF(option.rect).adjusted(0.5, 0.5, -1.5, -1.5), 2, 2)
             painter.restore()
+
+    def _draw_tab_close(self, option: QStyleOption, painter: QPainter) -> None:
+        """A thin cross: secondary text colour, text colour on a soft square when hovered."""
+        state = option.state
+        hovered = bool(state & (QStyle.StateFlag.State_MouseOver | QStyle.StateFlag.State_Sunken))
+        palette = option.palette
+        rect = QRectF(option.rect)
+        side = min(rect.width(), rect.height())
+        box = QRectF(0, 0, side, side)
+        box.moveCenter(rect.center())
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        if hovered:
+            fill = QColor(palette.color(QPalette.ColorRole.Text))
+            fill.setAlphaF(0.25 if state & QStyle.StateFlag.State_Sunken else 0.14)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(fill)
+            painter.drawRoundedRect(box, 3, 3)
+        role = QPalette.ColorRole.Text if hovered else QPalette.ColorRole.PlaceholderText
+        pen = QPen(palette.color(role), 1.4)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        inset = side * 0.3
+        cross = box.adjusted(inset, inset, -inset, -inset)
+        painter.drawLine(cross.topLeft(), cross.bottomRight())
+        painter.drawLine(cross.topRight(), cross.bottomLeft())
+        painter.restore()
 
 
 def system_is_dark() -> bool:

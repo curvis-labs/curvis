@@ -100,12 +100,15 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
 | **Errors**: the error line, an invalid field's message | `BrightText` | #B3261E | #FF8080 |
 | Outlines of fields, lists, check boxes, radio buttons | `control_border()`: `Text` mixed 60 % into `Base`, ≥ 3 : 1 | #77869A | #98A0A9 |
 | A checked toggle button (*Not paired* / *Paired*) | `Highlight`, filled at 25 % | | |
+| Table grid lines | `grid_line()`: `Text` mixed 22 % into `Base`, ≥ 1.3 : 1 on `Base` and `AlternateBase` | | |
+| Tab close button | a thin × in `PlaceholderText`; `Text` on a soft square when hovered | | |
 
 - The icon's teal is too light for text on white (3.0 : 1), so the light theme uses a darker
   teal. Emerald is never used for text in the light theme.
 - Red is the only colour not taken from the icon; nothing in the icon can say “error”.
 - Fusion draws outlines a shade darker than the window, which vanishes on a dark window, so
-  `CurvisStyle` (in `theme.py`) draws them with `control_border()` instead.
+  `CurvisStyle` (in `theme.py`) draws them with `control_border()` instead, the table grid
+  with `grid_line()`, and the tab close button as a thin cross instead of Fusion's bitmap.
 - **Warnings** are not coloured. They show the standard warning icon in front of normal text.
   **Errors** use the error icon and `BrightText`. Colour is never the only signal, because
   icons and words carry the meaning too.
@@ -190,3 +193,50 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   *Export graph*. A new shortcut must not clash with these or with platform standard keys.
 - **Accessible names**: every control has a buddy label, visible text or `setAccessibleName`.
   The tests check this for every dialog.
+
+## 7. Toolbars
+
+Mockup: `docs/mockups/toolbars.html`.
+
+- **Two toolbars in one row** under the menu bar: the **main toolbar** (New project, Open
+  project, Save project, Undo, Redo), then the **table toolbar** (Import data, Add column,
+  Group as replicates, Set category, Calculate, Plot, Analyze). The table toolbar shows while a
+  table is shown; the main toolbar always shows. They are fixed in place (not movable or
+  floating).
+- **Every button is a registered action** (`ActionRegistry`): the same `QAction` as the menu
+  item and the command palette entry. No action exists only in a toolbar.
+- **Labels.** Main toolbar: icons only. Their meaning is universal, and the tooltip gives the
+  name and shortcut (“Save project (Ctrl+S)”). Table toolbar: icon with the text beside it,
+  because these are Curvis's own tasks and need words. The text is the menu text without the
+  ellipsis and mnemonic (“Group as replicates”).
+- **Plot** has a menu arrow and opens the chart families (XY, Bar, Survival, Interaction).
+  This is SPEC.md's toolbar for picking a chart family. A family the table cannot draw is
+  disabled, and its tooltip says why (“Needs a Time + Event pair”).
+- **Disabled buttons** use the disabled text colour. Their tooltip says why (“Nothing to
+  undo”, “Select columns to group”), like a disabled OK button.
+- **Narrow windows.** The toolbars keep one row. Buttons that do not fit move into the overflow
+  menu (») at the end, in the same order; text never wraps.
+- **Icons**: 20 × 20 line icons on a 20 px grid, round caps and joins, no fills. Files:
+  `src/curvis/ui/icons/toolbar/` (its README lists them). Two tones, each mapped to a
+  palette role when the theme changes, so one file serves both themes:
+  - the **object** (folder, page, table, axes) in navy, 1.5 px → `ButtonText`;
+  - the **action** (plus, open lid, arrow, folded corner, data in a chart) in teal, 1.5 px →
+    `Link` (#007A7A light, #00A6A6 dark; the icon's own teal is too light on a light window).
+
+  No third tone: thin detail such as table grid lines blurs at 20 px, so it is left out.
+
+  Two tones never meet at a joint. An action part is a closed shape with a gap around it
+  (the save label, the bars) or a separate stroke (the import arrow). Where it shares an edge
+  with the outline, it draws that edge alone (the import fold's diagonal). A project is a
+  folder (New project: folder with a plus; Open project: folder with its lid lifted). A table
+  tool's icon matches the mark used in the table where there is one (Calculate uses the ƒ of
+  calculated columns). Disabled icons use the disabled text colour for both tones, and an
+  icon on a highlighted menu row uses `HighlightedText` for both.
+- **States**: hover shows a soft square (`Text` at 14 %), pressed at 25 %, and a menu that is
+  open stays pressed, the same as the tab close button. Buttons are 28 px high, with 4 px
+  between buttons and a separator between groups (file | undo/redo, and the table toolbar's
+  data | columns | results groups).
+- **Keyboard.** The toolbars are not in the Tab order, because every button has a shortcut or
+  menu entry. The tooltips name the shortcut.
+- **Open:** a toolbar for graph formatting is not decided yet. It is not in SPEC.md.
+
