@@ -43,3 +43,24 @@ def test_parse_and_compile_formula(benchmark: Any) -> None:
         compile_formula(FORMULA)
 
     benchmark(parse_and_compile)
+
+
+def test_recalculate_paired_calculation_100k_rows(benchmark: Any) -> None:
+    """A paired calculated column: its role values (a mean of three columns) plus the formula."""
+    from curvis.data import Column, Pairing, Table, role_values
+
+    rng = np.random.default_rng(1)
+    columns = [Column.new(f"a{i}", "Y", rng.normal(size=N_ROWS), id=f"a{i}") for i in range(3)]
+    columns += [Column.new(f"b{i}", "Y", rng.normal(size=N_ROWS), id=f"b{i}") for i in range(3)]
+    table = Table("T", columns)
+    pairing = Pairing(("a0", "a1", "a2"), ("b0", "b1", "b2"), paired=True)
+    compiled = compile_formula("({B} - {A:mean}) / {A:mean} * 100")
+    constants = resolve_constants()
+
+    def recalculate() -> np.ndarray:
+        roles = role_values(table, pairing, 1, compiled.formula.roles)
+        return compiled({}, constants, N_ROWS, roles)
+
+    result = benchmark(recalculate)
+    assert result.shape == (N_ROWS,)
+    assert benchmark.stats.stats.mean < RECALC_TARGET_S
