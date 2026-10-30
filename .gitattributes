@@ -1,0 +1,2 @@
+# Import fixtures are byte-exact test inputs (BOM, CRLF, UTF-16): never convert them.
+tests/data/** -text

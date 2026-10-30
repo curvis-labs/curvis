@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
+    QDialog,
     QFileDialog,
     QMainWindow,
     QMenu,
@@ -31,9 +32,12 @@ from curvis.ui.table import TableView
 
 if TYPE_CHECKING:
     from curvis.compute import JobError, Scheduler
+    from curvis.core import Command
+    from curvis.io.importers import CsvOptions
 
 PROJECT_SUFFIX = ".cvp"
 PROJECT_FILTER = "Curvis projects (*.cvp)"
+IMPORT_FILTER = "Text data (*.csv *.tsv *.txt);;All files (*)"
 
 STATUS_MESSAGE_MS = 6000
 """How long a note such as a refused edit stays in the status bar."""
@@ -83,6 +87,8 @@ class MainWindow(QMainWindow):
         self.registry = ActionRegistry(self)
         self._scheduler: Scheduler | None = None
         self._pending_opens: dict[str, Path] = {}  # scheduler node -> file
+        # scheduler node -> (file, tab to import into; None for a new project)
+        self._pending_imports: dict[str, tuple[Path, DocumentTab | None]] = {}
         self._untitled_count = 0
         self._table_actions_created = False
 
@@ -117,6 +123,13 @@ class MainWindow(QMainWindow):
         k = QKeySequence.StandardKey
         r.register("file.new", "&New project", self.new_document, category="File", shortcut=k.New)
         r.register("file.open", "&Open…", self.open_document, category="File", shortcut=k.Open)
+        r.register(
+            "file.import",
+            "&Import data…",
+            self.import_data,
+            category="File",
+            shortcut="Ctrl+Shift+I",
+        )
         r.register("file.save", "&Save", self.save_current, category="File", shortcut=k.Save)
         r.register(
             "file.save_as",
@@ -155,7 +168,7 @@ class MainWindow(QMainWindow):
     def _create_menus(self) -> None:
         a = self.registry.action
         file_menu = self.menuBar().addMenu("&File")
-        file_menu.addActions([a("file.new"), a("file.open")])
+        file_menu.addActions([a("file.new"), a("file.open"), a("file.import")])
         file_menu.addSeparator()
         file_menu.addActions([a("file.save"), a("file.save_as")])
         file_menu.addSeparator()
@@ -370,6 +383,9 @@ class MainWindow(QMainWindow):
         return self._scheduler
 
     def _on_job_finished(self, node: str, result: object) -> None:
+        if node in self._pending_imports:
+            self._finish_import(*self._pending_imports.pop(node), result)
+            return
         path = self._pending_opens.pop(node, None)
         if path is None:
             return
@@ -378,6 +394,12 @@ class MainWindow(QMainWindow):
         self.settings.add_recent_project(path)
 
     def _on_job_failed(self, node: str, error: JobError) -> None:
+        if node in self._pending_imports:
+            source, _tab = self._pending_imports.pop(node)
+            self._show_error(
+                "Cannot import data", f"'{source.name}' could not be imported.\n\n{error.message}"
+            )
+            return
         path = self._pending_opens.pop(node, None)
         if path is None:
             return
@@ -396,6 +418,68 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.tabs)
         self._update_state()
         return tab
+
+    # --- import ---------------------------------------------------------------------
+
+    def import_data(self) -> None:
+        """Ask for a CSV or TSV file, show the Import dialog, then import the file."""
+        path = self._ask_import_path()
+        if path is None:
+            return
+        from curvis.ui.import_dialog import ImportDialog
+
+        self.scheduler.start_process_pool()  # warm up the workers while the dialog is open
+        dialog = ImportDialog(path, self.scheduler, self)
+        try:
+            if self._exec_import_dialog(dialog):
+                self.start_import(path, dialog.options())
+        finally:
+            dialog.deleteLater()
+
+    def start_import(self, path: Path, options: CsvOptions) -> None:
+        """Read ``path`` in a worker process, then put it into the current table.
+
+        The columns fill the table's empty columns first and are added at the end
+        otherwise, as one undo step. Without an open project, a new one is made.
+        """
+        from curvis.compute import Job
+        from curvis.io.importers import read_csv
+
+        node = f"import:{_file_key(path)}"
+        self._pending_imports[node] = (path, self.current_tab)
+        self._show_status(f"Importing {path.name}…")
+        job = Job(read_csv, (str(path), options))
+        self.scheduler.submit(node, job, weight="heavy", delay_ms=0)
+
+    def _finish_import(self, path: Path, tab: DocumentTab | None, result: object) -> None:
+        from curvis.core import AddTable, CommandError, CommandGroup, ImportColumns
+        from curvis.io.importers import CsvData
+
+        assert isinstance(result, CsvData)
+        if tab is None or tab not in self.document_tabs():
+            tab = self.new_document()
+        document = tab.document
+        source = f"'{path.name}'"
+        command: Command
+        if tab.table_view is not None:
+            command = ImportColumns(tab.table_view.model().table_id, result.columns, source)
+        else:
+            table = Table.blank()
+            command = CommandGroup(
+                f"Import {source}",
+                [AddTable(table), ImportColumns(table.id, result.columns, source)],
+            )
+        try:
+            document.execute(command)
+        except CommandError as exc:
+            self._show_error("Cannot import data", f"'{path.name}' could not be imported.\n\n{exc}")
+            return
+        self.tabs.setCurrentWidget(tab)
+        rows = f"{result.n_rows:,} row{'s' if result.n_rows != 1 else ''}"
+        columns = len(result.columns)
+        self._show_status(
+            f"Imported {rows} and {columns} column{'s' if columns != 1 else ''} from {path.name}."
+        )
 
     def save_current(self) -> bool:
         tab = self.current_tab
@@ -585,6 +669,13 @@ class MainWindow(QMainWindow):
         start = str(tab.path) if tab.path else f"{tab.title}{PROJECT_SUFFIX}"
         name, _ = QFileDialog.getSaveFileName(self, "Save project", start, PROJECT_FILTER)
         return Path(name) if name else None
+
+    def _ask_import_path(self) -> Path | None:
+        name, _ = QFileDialog.getOpenFileName(self, "Import data", "", IMPORT_FILTER)
+        return Path(name) if name else None
+
+    def _exec_import_dialog(self, dialog: QDialog) -> bool:
+        return dialog.exec() == QDialog.DialogCode.Accepted
 
     def _show_error(self, title: str, message: str) -> None:
         QMessageBox.warning(self, title, message)

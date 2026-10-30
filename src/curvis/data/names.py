@@ -20,6 +20,16 @@ def column_letters(index: int) -> str:
     return letters
 
 
+def unique_name(name: str, taken: Iterable[str]) -> str:
+    """``name``, or ``name (2)``, ``name (3)``, … if it is in ``taken`` (ignoring case)."""
+    used = {name_key(t) for t in taken}
+    candidate, n = name, 1
+    while name_key(candidate) in used:
+        n += 1
+        candidate = f"{name} ({n})"
+    return candidate
+
+
 def next_column_names(taken: Iterable[str], count: int = 1) -> list[str]:
     """The first ``count`` names A, B, C, … that are not in ``taken`` (ignoring case)."""
     used = {name_key(name) for name in taken}

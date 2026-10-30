@@ -13,6 +13,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 import numpy.typing as npt
 
 from curvis.data import (
@@ -28,7 +29,7 @@ from curvis.data import (
 )
 from curvis.data.column import coerce_cell, convert_values, writable
 from curvis.data.layout import column_category
-from curvis.data.names import name_key
+from curvis.data.names import name_key, unique_name
 
 if TYPE_CHECKING:
     from curvis.core.document import Document
@@ -870,6 +871,88 @@ class SetCellValue(Command):
         if self._block is None:
             return (self.table_id, self.column_id)
         return self._block.touched_nodes
+
+
+# --- import ------------------------------------------------------------------------
+
+
+def _is_empty_column(column: Column) -> bool:
+    """True for a column with no values that is in no replicate group or category."""
+    if column.group_id is not None or column.category_id is not None:
+        return False
+    if column.role.is_numeric:
+        return bool(np.isnan(column.values).all())
+    return all(v is None or v == "" for v in column.values)
+
+
+class ImportColumns(Command):
+    """Put imported columns into a table: into its empty columns first, then at the end.
+
+    Imported columns fill the empty columns (see :func:`_is_empty_column`) left to
+    right. A filled column keeps its place and id but takes the imported name, role
+    and values; the remaining columns are added on the right. A name already used by
+    another column gets " (2)", " (3)", …. The table grows to the longer of its own and
+    the imported row count; a table whose columns were all empty takes the imported
+    row count. ``source`` names the file in the undo text.
+    """
+
+    def __init__(self, table_id: str, columns: Sequence[Column], source: str) -> None:
+        self.table_id = table_id
+        self.columns = list(columns)
+        self.source = source
+        self._before: list[tuple[Column, npt.NDArray[Any]]] = []
+        self._touched: tuple[str, ...] = (table_id,)
+
+    def do(self, doc: Document) -> None:
+        table = _get_table(doc, self.table_id)
+        if not self.columns:
+            raise CommandError("There are no columns to import.")
+        n_rows = len(self.columns[0])
+        if any(len(c) != n_rows for c in self.columns):
+            raise CommandError("The imported columns have different lengths.")
+        try:
+            for column in self.columns:
+                column.check()
+        except ValueError as exc:
+            raise CommandError(str(exc)) from None
+
+        empty = [i for i, c in enumerate(table.columns) if _is_empty_column(c)]
+        if len(empty) < len(table.columns):
+            n_rows = max(n_rows, table.n_rows)
+        slots = empty[: len(self.columns)]
+        taken = [c.name for i, c in enumerate(table.columns) if i not in slots]
+        placed: list[Column] = []
+        for i, column in enumerate(self.columns):
+            column_id = table.columns[slots[i]].id if i < len(slots) else column.id
+            name = unique_name(column.name, taken)
+            taken.append(name)
+            placed.append(Column(name, column.role, column.values, column.unit, id=column_id))
+        ids = [c.id for c in table.columns]
+        if any(c.id in ids for c in placed[len(slots) :]):
+            raise CommandError("These columns are already in the table.")
+
+        self._before = [(c, c.values) for c in table.columns]
+        columns = list(table.columns)
+        for slot, column in zip(slots, placed, strict=False):
+            columns[slot] = column
+        columns.extend(placed[len(slots) :])
+        table.columns = columns
+        table.resize(n_rows)
+        self._touched = _table_nodes(table)
+
+    def undo(self, doc: Document) -> None:
+        table = doc.table(self.table_id)
+        table.columns = [column for column, _ in self._before]
+        for column, values in self._before:
+            column.values = values
+
+    @property
+    def summary(self) -> str:
+        return f"Import {self.source}"
+
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return self._touched
 
 
 # --- groups ------------------------------------------------------------------------
