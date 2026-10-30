@@ -12,26 +12,26 @@
 -->
 <style>
   :root, :root[data-theme="light"] {
-    --window: #efefef; --text: #000000; --base: #ffffff; --altbase: #e9edf3;
-    --secondary: #5f5f66; --error: #b3261e; --link: #0000ff; --highlight: #308cc6;
-    --hl-text: #ffffff; --button: #efefef; --border: #b8b8b8; --frame: #c9c9c9;
-    --disabled: #9a9a9a; --canvas: #d9dbe0; --note: #3a3a40; --mark: #e8590c;
-    --s1: #0072b2; --s2: #d55e00; --s3: #009e73;
+    --window: #f4f6f8; --text: #1d3557; --base: #ffffff; --altbase: #e0f2f1;
+    --secondary: #667085; --error: #b3261e; --link: #007a7a; --highlight: #007a7a;
+    --hl-text: #ffffff; --button: #e9edf2; --border: #b9c1cc; --frame: #c3cad4;
+    --disabled: #9aa3b0; --canvas: #d5dbe3; --note: #1d3557; --mark: #e8590c;
+    --s1: #0072b2; --s2: #e69f00; --s3: #009e73;
   }
   :root[data-theme="dark"] {
-    --window: #2b2b2e; --text: #e8e8ea; --base: #1f1f22; --altbase: #2d3139;
-    --secondary: #9a9aa0; --error: #ff6b6b; --link: #6ea8ff; --highlight: #3d7bd9;
-    --hl-text: #ffffff; --button: #36363a; --border: #4a4a4f; --frame: #18181a;
-    --disabled: #7a7a80; --canvas: #141416; --note: #c8c8cc; --mark: #ff922b;
-    --s1: #56b4e9; --s2: #e69f00; --s3: #4fd1a5;
+    --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+    --secondary: #9aa8bc; --error: #ff8080; --link: #00a6a6; --highlight: #00a6a6;
+    --hl-text: #0f1f33; --button: #1d3557; --border: #2e4a70; --frame: #0a1626;
+    --disabled: #5e7491; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+    --s1: #0072b2; --s2: #e69f00; --s3: #009e73;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --window: #2b2b2e; --text: #e8e8ea; --base: #1f1f22; --altbase: #2d3139;
-      --secondary: #9a9aa0; --error: #ff6b6b; --link: #6ea8ff; --highlight: #3d7bd9;
-      --hl-text: #ffffff; --button: #36363a; --border: #4a4a4f; --frame: #18181a;
-      --disabled: #7a7a80; --canvas: #141416; --note: #c8c8cc; --mark: #ff922b;
-      --s1: #56b4e9; --s2: #e69f00; --s3: #4fd1a5;
+      --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+      --secondary: #9aa8bc; --error: #ff8080; --link: #00a6a6; --highlight: #00a6a6;
+      --hl-text: #0f1f33; --button: #1d3557; --border: #2e4a70; --frame: #0a1626;
+      --disabled: #5e7491; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+      --s1: #0072b2; --s2: #e69f00; --s3: #009e73;
     }
   }
   * { box-sizing: border-box; }
@@ -142,7 +142,7 @@
 <body>
 <header class="page">
   <h1>Curvis mockups — Analyze, Results, Format</h1>
-  <p>Drawn at 1:1 with the theme palette and the rules in <code>docs/DESIGN.md</code>. Orange numbers point to the notes. Underlined letters are mnemonics.</p>
+  <p>Drawn at 1:1 with the theme palette (the app icon's colours) and the rules in <code>docs/DESIGN.md</code>. Orange numbers point to the notes. Underlined letters are mnemonics.</p>
   <div class="switch" role="group" aria-label="Theme">
     <button type="button" data-set="light">Light</button>
     <button type="button" data-set="dark">Dark</button>

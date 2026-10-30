@@ -79,19 +79,26 @@ its tallest page**: use `FittedStack`. Long labels word-wrap; they never set the
 
 ## 3. Colour
 
-Use **palette roles only**, never hex values in widget code. `curvis.ui.theme` sets every role
-below in both themes. Each text/background pair has a contrast of at least **4.5 : 1**, and
-`tests/ui/test_theme.py` checks it.
+The themes use the colours of the app icon: navy #1D3557, teal #00A6A6, emerald #20C997,
+slate #667085 and off-white #F4F6F8. Use **palette roles only**, never hex values in widget
+code. `curvis.ui.theme` sets every role in both themes. Each text/background pair reaches
+at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
 
 | Use | Role | Light | Dark |
 | --- | --- | --- | --- |
-| Normal text | `WindowText` / `Text` | #000000 | #e8e8ea |
-| Secondary text: kind descriptions, hints, dimmed preview rows, empty states | `PlaceholderText` | #5f5f66 | #9a9aa0 |
-| **Errors**: the error line, an invalid field's message | `BrightText` | #b3261e | #ff6b6b |
-| Calculated-column background | `AlternateBase` | #e9edf3 | #2d3139 |
-| References in formulas (`[column]`, `{A}`) | `Link` | #0000ff | #6ea8ff |
-| Selection, drop indicator | `Highlight` / `HighlightedText` | Fusion | #3d7bd9 / #ffffff |
+| Dialog and window background | `Window` | #F4F6F8 off-white | #152840 deep navy |
+| Fields, lists, tables | `Base` | #FFFFFF | #0F1F33 |
+| Normal text | `WindowText` / `Text` | #1D3557 navy | #F4F6F8 off-white |
+| Secondary text: kind descriptions, hints, dimmed preview rows, empty states | `PlaceholderText` | #667085 slate | #9AA8BC light slate |
+| Selection | `Highlight` / `HighlightedText` | #007A7A dark teal / white | #00A6A6 teal / #0F1F33 |
+| References in formulas (`[column]`, `{A}`) | `Link` | #007A7A | #00A6A6 |
+| Calculated-column background | `AlternateBase` | #E0F2F1 teal tint | #1C3A4A teal tint |
+| Accent: fills only, used sparingly (focus, “done”) | `Accent` | #20C997 emerald | #20C997 |
+| **Errors**: the error line, an invalid field's message | `BrightText` | #B3261E | #FF8080 |
 
+- The icon's teal is too light for text on white (3.0 : 1), so the light theme uses a darker
+  teal. Emerald is never used for text in the light theme.
+- Red is the only colour not taken from the icon; nothing in the icon can say “error”.
 - **Warnings** are not coloured. They show the standard warning icon in front of normal text.
   **Errors** use the error icon and `BrightText`. Colour is never the only signal, because
   icons and words carry the meaning too.
@@ -100,6 +107,8 @@ below in both themes. Each text/background pair has a contrast of at least **4.5
   when its calculation fails, the error mark (⚠). They do not use colour.
 - Do not dim text by disabling the label. A disabled label means “not available”. Secondary
   text uses `PlaceholderText` through `secondary_label()`.
+- **Chart colours are not theme colours.** Series colours come from the chart's colour scheme
+  (step 3.5), so an exported graph looks the same whatever theme the app uses.
 
 ## 4. Wording
 
