@@ -1,14 +1,15 @@
 """Light and dark themes, in the colours of the app icon (docs/DESIGN.md, section 3).
 
-The Fusion style is used everywhere so that both themes look the same on every platform.
+The Fusion style (with :class:`CurvisStyle`'s outlines) is used everywhere, so that both
+themes look the same on every platform.
 Widgets must only use palette roles, never fixed colours; every colour is set here.
 """
 
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, Qt
-from PySide6.QtGui import QColor, QGuiApplication, QPalette
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QObject, QRectF, Qt
+from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPalette, QPen
+from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle, QStyleOption, QWidget
 
 from curvis.settings import Theme
 
@@ -78,6 +79,11 @@ _DARK_DISABLED = {
     _R.HighlightedText: "#9aa8bc",
 }
 
+# Outlines of fields, check boxes and radio buttons: Text mixed into Base, so they show
+# in both themes with at least BORDER_CONTRAST_MIN (WCAG AA for parts of controls).
+BORDER_MIX = 0.6
+BORDER_CONTRAST_MIN = 3.0
+
 # Text and background pairs that must reach CONTRAST_MIN in both themes (WCAG AA).
 CONTRAST_MIN = 4.5
 TEXT_PAIRS = (
@@ -132,6 +138,72 @@ def contrast(a: QColor, b: QColor) -> float:
     return (high + 0.05) / (low + 0.05)
 
 
+def control_border(palette: QPalette) -> QColor:
+    """The outline colour of fields, check boxes and radio buttons."""
+    base = palette.color(QPalette.ColorRole.Base)
+    text = palette.color(QPalette.ColorRole.Text)
+    mix = BORDER_MIX
+    return QColor.fromRgbF(
+        base.redF() + (text.redF() - base.redF()) * mix,
+        base.greenF() + (text.greenF() - base.greenF()) * mix,
+        base.blueF() + (text.blueF() - base.blueF()) * mix,
+    )
+
+
+_E = QStyle.PrimitiveElement
+_OUTLINED = {
+    _E.PE_IndicatorCheckBox,
+    _E.PE_IndicatorItemViewItemCheck,
+    _E.PE_FrameLineEdit,
+    _E.PE_Frame,
+}
+
+
+class CurvisStyle(QProxyStyle):
+    """Fusion, with outlines and pressed toggles that show in both themes.
+
+    Fusion draws outlines a little darker than the window, which disappears on a dark
+    window. Here fields, check boxes and radio buttons get :func:`control_border`, and a
+    checked toggle button (e.g. Calculate's "Not paired") gets the selection colour.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("Fusion")
+
+    def drawPrimitive(  # noqa: N802 (Qt API)
+        self,
+        element: QStyle.PrimitiveElement,
+        option: QStyleOption,
+        painter: QPainter,
+        widget: QWidget | None = None,
+    ) -> None:
+        super().drawPrimitive(element, option, painter, widget)
+        if element in _OUTLINED or element == _E.PE_IndicatorRadioButton:
+            enabled = bool(option.state & QStyle.StateFlag.State_Enabled)
+            if not enabled and element not in (_E.PE_FrameLineEdit, _E.PE_Frame):
+                return
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            painter.setPen(QPen(control_border(option.palette), 1))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            rect = QRectF(option.rect).adjusted(0.5, 0.5, -0.5, -0.5)
+            if element == _E.PE_IndicatorRadioButton:
+                painter.drawEllipse(rect.adjusted(0.5, 0.5, -0.5, -0.5))
+            else:
+                painter.drawRoundedRect(rect, 2, 2)
+            painter.restore()
+        elif element == _E.PE_PanelButtonCommand and option.state & QStyle.StateFlag.State_On:
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            highlight = option.palette.color(QPalette.ColorRole.Highlight)
+            fill = QColor(highlight)
+            fill.setAlphaF(0.25)
+            painter.setPen(QPen(highlight, 1))
+            painter.setBrush(fill)
+            painter.drawRoundedRect(QRectF(option.rect).adjusted(0.5, 0.5, -1.5, -1.5), 2, 2)
+            painter.restore()
+
+
 def system_is_dark() -> bool:
     """True when the operating system asks for a dark colour scheme."""
     return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
@@ -149,7 +221,7 @@ class ThemeManager(QObject):
         super().__init__(app)
         self._app = app
         self._theme = Theme.SYSTEM
-        app.setStyle("Fusion")
+        app.setStyle(CurvisStyle())
         app.styleHints().colorSchemeChanged.connect(self._on_system_change)
 
     @property

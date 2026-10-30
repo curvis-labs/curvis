@@ -3,7 +3,15 @@
 import pytest
 from PySide6.QtGui import QPalette
 
-from curvis.ui.theme import CONTRAST_MIN, TEXT_PAIRS, contrast, dark_palette, light_palette
+from curvis.ui.theme import (
+    BORDER_CONTRAST_MIN,
+    CONTRAST_MIN,
+    TEXT_PAIRS,
+    contrast,
+    control_border,
+    dark_palette,
+    light_palette,
+)
 
 
 @pytest.mark.parametrize("make", [light_palette, dark_palette], ids=["light", "dark"])
@@ -31,3 +39,12 @@ def test_contrast_of_black_and_white_is_21() -> None:
 
     assert contrast(QColor("#000"), QColor("#fff")) == pytest.approx(21.0)
     assert contrast(QColor("#777"), QColor("#777")) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("make", [light_palette, dark_palette], ids=["light", "dark"])
+def test_control_outlines_show_on_fields_and_windows(make: object) -> None:
+    palette = make()  # type: ignore[operator]
+    border = control_border(palette)
+    for background in (QPalette.ColorRole.Base, QPalette.ColorRole.Window):
+        ratio = contrast(border, palette.color(background))
+        assert ratio >= BORDER_CONTRAST_MIN, f"outline on {background.name}: {ratio:.2f} : 1"
