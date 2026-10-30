@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QSettings
 
+from curvis.core import ProjectConstant
 from curvis.settings import MAX_RECENT, Settings, Theme
 
 
@@ -104,3 +105,31 @@ def test_damaged_recent_list_is_skipped(ini: QSettings, settings: Settings, raw:
 def test_naive_recent_timestamp_read_as_utc(ini: QSettings, settings: Settings) -> None:
     ini.setValue(Settings.RECENT, '[{"path": "x.cvp", "opened_at": "2026-10-01T00:00:00"}]')
     assert settings.recent_projects[0].opened_at == T0
+
+
+def test_global_constants_persist(ini: QSettings, settings: Settings) -> None:
+    assert settings.global_constants == []
+    keys: list[str] = []
+    settings.changed.connect(keys.append)
+    constants = [ProjectConstant("k_on", 1.2e5, "1/(M*s)"), ProjectConstant("Kd", 3)]
+    settings.global_constants = constants
+    assert keys == [Settings.GLOBAL_CONSTANTS]
+    again = Settings(QSettings(ini.fileName(), QSettings.Format.IniFormat))
+    assert again.global_constants == constants
+
+
+def test_damaged_global_constants_are_skipped(ini: QSettings, settings: Settings) -> None:
+    ini.setValue(
+        Settings.GLOBAL_CONSTANTS,
+        '[{"id": "a", "name": "k", "value": 2.5, "unit": "s"},'
+        ' {"id": "b", "name": "x", "value": "2"}, {"id": "c", "name": "y", "value": true},'
+        ' {"id": "d", "name": "z", "value": 1e999}, {"name": "no id", "value": 1}, 7,'
+        ' {"id": "e", "name": "m", "value": 4}]',
+    )
+    assert [(c.name, c.value, c.unit) for c in settings.global_constants] == [
+        ("k", 2.5, "s"),
+        ("m", 4.0, ""),
+    ]
+    for raw in ("not json", '{"a": 1}'):
+        ini.setValue(Settings.GLOBAL_CONSTANTS, raw)
+        assert settings.global_constants == []

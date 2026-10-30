@@ -1,8 +1,9 @@
-"""App settings stored with QSettings: theme, decimal places and recent projects.
+"""App settings stored with QSettings: theme, decimal places, recent projects and global
+constants.
 
 Values are validated on read, so a damaged or hand-edited settings file falls back to the
-defaults instead of breaking the app. Recent projects are stored as one JSON string, which
-behaves the same in the Windows registry, macOS plists and INI files.
+defaults instead of breaking the app. Recent projects and global constants are each stored
+as one JSON string, which behaves the same in the Windows registry, macOS plists and INI files.
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ from enum import StrEnum
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QSettings, Signal
+
+from curvis.core.constants import ProjectConstant
 
 ORGANIZATION = "Curvis"
 ORGANIZATION_DOMAIN = "curvis.org"
@@ -67,6 +70,7 @@ class Settings(QObject):
     THEME = "appearance/theme"
     DECIMAL_PLACES = "tables/decimal_places"
     RECENT = "projects/recent"
+    GLOBAL_CONSTANTS = "formulas/global_constants"
 
     def __init__(self, store: QSettings | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -156,6 +160,44 @@ class Settings(QObject):
             for r in projects[:MAX_RECENT]
         ]
         self._set(self.RECENT, json.dumps(data))
+
+    # --- global constants ----------------------------------------------------------
+
+    @property
+    def global_constants(self) -> list[ProjectConstant]:
+        """User constants available in every project (a project constant overrides one).
+
+        Unreadable entries are skipped.
+        """
+        raw = self._store.value(self.GLOBAL_CONSTANTS, "[]")
+        try:
+            items = json.loads(str(raw))
+        except ValueError:
+            return []
+        if not isinstance(items, list):
+            return []
+        result: list[ProjectConstant] = []
+        for item in items:
+            try:
+                value = item["value"]
+                if isinstance(value, bool) or not isinstance(value, int | float):
+                    continue
+                result.append(
+                    ProjectConstant(
+                        name=str(item["name"]),
+                        value=value,
+                        unit=str(item.get("unit", "")),
+                        id=str(item["id"]),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+        return result
+
+    @global_constants.setter
+    def global_constants(self, constants: list[ProjectConstant]) -> None:
+        data = [{"id": c.id, "name": c.name, "value": c.value, "unit": c.unit} for c in constants]
+        self._set(self.GLOBAL_CONSTANTS, json.dumps(data))
 
     # --- helpers -----------------------------------------------------------------
 
