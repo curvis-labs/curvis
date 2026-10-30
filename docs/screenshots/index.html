@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dialog screenshots</title>
+<style>
+:root { --bg:#f4f6f8; --text:#1d3557; --muted:#667085; }
+@media (prefers-color-scheme: dark) { :root { --bg:#152840; --text:#f4f6f8; --muted:#9aa8bc; } }
+body { margin:0; padding:16px 24px 40px; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, sans-serif; }
+h1 { font-size:20px; } h2 { font-size:16px; margin:28px 0 8px; }
+p { color:var(--muted); max-width:70ch; }
+.pair { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; margin-bottom:12px; }
+figure { margin:0; } figcaption { color:var(--muted); font-size:12px; margin-bottom:4px; }
+img { display:block; max-width:100%; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+</style></head><body>
+<h1>Dialogs before and after the step 1.6 design pass</h1>
+<p>Offscreen screenshots at each dialog's default size, made with <code>scripts/dialog_screenshots.py</code> and the sample data in <code>tests/ui/dialog_samples.py</code>. The window frame is drawn by the operating system and is not part of the image.</p>
+<section><h2>Import</h2>
+<div class="pair"><figure><figcaption>Before · light</figcaption><img src="before/import-light.png" alt="Import before, light"></figure><figure><figcaption>After · light</figcaption><img src="after/import-light.png" alt="Import after, light"></figure></div>
+<div class="pair"><figure><figcaption>Before · dark</figcaption><img src="before/import-dark.png" alt="Import before, dark"></figure><figure><figcaption>After · dark</figcaption><img src="after/import-dark.png" alt="Import after, dark"></figure></div></section>
+<section><h2>Bulk rename (find and replace)</h2>
+<div class="pair"><figure><figcaption>Before · light</figcaption><img src="before/bulk_rename-light.png" alt="Bulk rename (find and replace) before, light"></figure><figure><figcaption>After · light</figcaption><img src="after/bulk_rename-light.png" alt="Bulk rename (find and replace) after, light"></figure></div>
+<div class="pair"><figure><figcaption>Before · dark</figcaption><img src="before/bulk_rename-dark.png" alt="Bulk rename (find and replace) before, dark"></figure><figure><figcaption>After · dark</figcaption><img src="after/bulk_rename-dark.png" alt="Bulk rename (find and replace) after, dark"></figure></div></section>
+<section><h2>Bulk rename (numbered names)</h2>
+<div class="pair"><figure><figcaption>Before · light</figcaption><img src="before/bulk_rename_numbered-light.png" alt="Bulk rename (numbered names) before, light"></figure><figure><figcaption>After · light</figcaption><img src="after/bulk_rename_numbered-light.png" alt="Bulk rename (numbered names) after, light"></figure></div>
+<div class="pair"><figure><figcaption>Before · dark</figcaption><img src="before/bulk_rename_numbered-dark.png" alt="Bulk rename (numbered names) before, dark"></figure><figure><figcaption>After · dark</figcaption><img src="after/bulk_rename_numbered-dark.png" alt="Bulk rename (numbered names) after, dark"></figure></div></section>
+<section><h2>Calculate</h2>
+<div class="pair"><figure><figcaption>Before · light</figcaption><img src="before/calculate-light.png" alt="Calculate before, light"></figure><figure><figcaption>After · light</figcaption><img src="after/calculate-light.png" alt="Calculate after, light"></figure></div>
+<div class="pair"><figure><figcaption>Before · dark</figcaption><img src="before/calculate-dark.png" alt="Calculate before, dark"></figure><figure><figcaption>After · dark</figcaption><img src="after/calculate-dark.png" alt="Calculate after, dark"></figure></div></section>
+<section><h2>Calculate (paired)</h2>
+<div class="pair"><figure><figcaption>Before · light</figcaption><img src="before/calculate_paired-light.png" alt="Calculate (paired) before, light"></figure><figure><figcaption>After · light</figcaption><img src="after/calculate_paired-light.png" alt="Calculate (paired) after, light"></figure></div>
+<div class="pair"><figure><figcaption>Before · dark</figcaption><img src="before/calculate_paired-dark.png" alt="Calculate (paired) before, dark"></figure><figure><figcaption>After · dark</figcaption><img src="after/calculate_paired-dark.png" alt="Calculate (paired) after, dark"></figure></div></section>
+<section><h2>Calculate (custom formula with an error)</h2>
+<div class="pair"><figure><figcaption>Before · light</figcaption><img src="before/calculate_custom-light.png" alt="Calculate (custom formula with an error) before, light"></figure><figure><figcaption>After · light</figcaption><img src="after/calculate_custom-light.png" alt="Calculate (custom formula with an error) after, light"></figure></div>
+<div class="pair"><figure><figcaption>Before · dark</figcaption><img src="before/calculate_custom-dark.png" alt="Calculate (custom formula with an error) before, dark"></figure><figure><figcaption>After · dark</figcaption><img src="after/calculate_custom-dark.png" alt="Calculate (custom formula with an error) after, dark"></figure></div></section>
+<section><h2>Constants</h2>
+<div class="pair"><figure><figcaption>Before · light</figcaption><img src="before/constants-light.png" alt="Constants before, light"></figure><figure><figcaption>After · light</figcaption><img src="after/constants-light.png" alt="Constants after, light"></figure></div>
+<div class="pair"><figure><figcaption>Before · dark</figcaption><img src="before/constants-dark.png" alt="Constants before, dark"></figure><figure><figcaption>After · dark</figcaption><img src="after/constants-dark.png" alt="Constants after, dark"></figure></div></section>
+<section><h2>Constant editor</h2>
+<div class="pair"><figure><figcaption>Before · light</figcaption><img src="before/constant_editor-light.png" alt="Constant editor before, light"></figure><figure><figcaption>After · light</figcaption><img src="after/constant_editor-light.png" alt="Constant editor after, light"></figure></div>
+<div class="pair"><figure><figcaption>Before · dark</figcaption><img src="before/constant_editor-dark.png" alt="Constant editor before, dark"></figure><figure><figcaption>After · dark</figcaption><img src="after/constant_editor-dark.png" alt="Constant editor after, dark"></figure></div></section>
+<section><h2>Settings</h2>
+<div class="pair"><figure><figcaption>Before · light</figcaption><img src="before/settings-light.png" alt="Settings before, light"></figure><figure><figcaption>After · light</figcaption><img src="after/settings-light.png" alt="Settings after, light"></figure></div>
+<div class="pair"><figure><figcaption>Before · dark</figcaption><img src="before/settings-dark.png" alt="Settings before, dark"></figure><figure><figcaption>After · dark</figcaption><img src="after/settings-dark.png" alt="Settings after, dark"></figure></div></section>
+</body></html>

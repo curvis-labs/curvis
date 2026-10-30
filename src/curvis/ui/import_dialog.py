@@ -20,13 +20,11 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
-    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QSpinBox,
     QTableView,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -39,6 +37,17 @@ from curvis.io.importers import (
     CsvPreview,
     Delimiter,
     read_preview,
+)
+from curvis.ui.dialogs import (
+    SPACING,
+    CollapsibleSection,
+    DialogSkeleton,
+    Severity,
+    buddy_label,
+    columns,
+    form_layout,
+    set_tab_order,
+    size_workbench,
 )
 
 if TYPE_CHECKING:
@@ -111,7 +120,6 @@ class ImportDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Import data")
         self.setObjectName("importDialog")
-        self.resize(760, 560)
         self.path = Path(path)
         self.preview: CsvPreview | None = None
         self.error: str | None = None
@@ -121,6 +129,7 @@ class ImportDialog(QDialog):
 
         self.file_label = QLabel(self.path.name, self)
         self.file_label.setToolTip(str(self.path))
+        self.file_label.setWordWrap(True)
 
         self.delimiter = QComboBox(self)
         self.delimiter.addItem("Auto-detect", None)
@@ -134,10 +143,6 @@ class ImportDialog(QDialog):
         )
         self.no_header = QCheckBox("&No header row", self)
         self.no_header.setToolTip("Name the columns A, B, C, …")
-        header_box = QHBoxLayout()
-        header_box.addWidget(self.header_row)
-        header_box.addWidget(self.no_header)
-        header_box.addStretch()
 
         self.first_column_is_x = QCheckBox("&First column is X", self)
         self.first_column_is_x.setToolTip(
@@ -150,64 +155,77 @@ class ImportDialog(QDialog):
         self.first_row.setToolTip("The first row to import, numbered as in the file.")
         self.last_row = _spin_box(self, 0, ROW_MAX, "Last")
         self.last_row.setToolTip("The last row to import, numbered as in the file.")
+        self.last_row.setAccessibleName("Last row")
         self.first_column = _spin_box(self, 1, COLUMN_MAX)
         self.first_column.setToolTip("The first column to import; column 1 is the first.")
         self.last_column = _spin_box(self, 0, COLUMN_MAX, "Last")
         self.last_column.setToolTip("The last column to import.")
+        self.last_column.setAccessibleName("Last column")
 
-        self.advanced_toggle = QToolButton(self)
-        self.advanced_toggle.setText("Advanced")
-        self.advanced_toggle.setCheckable(True)
-        self.advanced_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.advanced_toggle.setArrowType(Qt.ArrowType.RightArrow)
-        self.advanced_toggle.setAutoRaise(True)
+        self.advanced_section = CollapsibleSection(parent=self)
+        self.advanced_toggle = self.advanced_section.toggle
+        self.advanced = self.advanced_section.content
         self.decimal_comma = QCheckBox("Decimal &comma (1,5 means 1.5)", self)
         self.decimal_comma.setToolTip("On by default when the delimiter is a semicolon.")
-        self.advanced = QWidget(self)
-        advanced_layout = QVBoxLayout(self.advanced)
-        advanced_layout.setContentsMargins(16, 0, 0, 0)
-        advanced_layout.addWidget(self.decimal_comma)
-        self.advanced.setVisible(False)
+        self.advanced_section.content_layout.addWidget(self.decimal_comma)
 
-        form = QFormLayout()
+        form = form_layout()
         form.addRow("File", self.file_label)
         form.addRow("&Delimiter", self.delimiter)
-        header_label = QLabel("&Header row", self)
-        header_label.setBuddy(self.header_row)  # a layout row gets no buddy by itself
-        form.addRow(header_label, header_box)
-        rows_label = QLabel("&Rows", self)
-        rows_label.setBuddy(self.first_row)
-        form.addRow(rows_label, _range_box(self, self.first_row, self.last_row))
-        columns_label = QLabel("C&olumns", self)
-        columns_label.setBuddy(self.first_column)
-        form.addRow(columns_label, _range_box(self, self.first_column, self.last_column))
+        form.addRow(buddy_label("&Header row", self.header_row, self), self.header_row)
+        form.addRow("", self.no_header)
+        form.addRow(
+            buddy_label("&Rows", self.first_row, self),
+            _range_box(self, self.first_row, self.last_row),
+        )
+        form.addRow(
+            buddy_label("C&olumns", self.first_column, self),
+            _range_box(self, self.first_column, self.last_column),
+        )
         form.addRow("", self.first_column_is_x)
 
         self.model = PreviewModel(self)
         self.table = QTableView(self)
         self.table.setObjectName("importPreview")
+        self.table.setAccessibleName("Preview of the import")
         self.table.setModel(self.model)
         self.table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         self.table.setWordWrap(False)
-        self.status = QLabel("Reading the file…", self)
-        self.status.setWordWrap(True)
 
-        self.buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        self.skeleton = DialogSkeleton(self, "Import")
+        self.buttons = self.skeleton.buttons
+        assert self.skeleton.ok_button is not None
+        self.ok_button = self.skeleton.ok_button
+        self.status = self.skeleton.feedback
+        left, right = columns(self.skeleton.body, 2, 3)
+        options = QGroupBox("Options", self)
+        options_layout = QVBoxLayout(options)
+        options_layout.addLayout(form)
+        options_layout.addWidget(self.advanced_section)
+        options_layout.addStretch(1)
+        left.addWidget(options, 1)
+        preview = QGroupBox("Preview", self)
+        preview_layout = QVBoxLayout(preview)
+        preview_layout.addWidget(self.table)
+        right.addWidget(preview, 1)
+        self.skeleton.set_problem("Reading the file…")
+        set_tab_order(
+            [
+                self.delimiter,
+                self.header_row,
+                self.no_header,
+                self.first_row,
+                self.last_row,
+                self.first_column,
+                self.last_column,
+                self.first_column_is_x,
+                self.advanced_toggle,
+                self.decimal_comma,
+                self.table,
+            ]
         )
-        self.ok_button = self.buttons.button(QDialogButtonBox.StandardButton.Ok)
-        self.ok_button.setText("Import")
-        self.ok_button.setEnabled(False)
-        self.buttons.accepted.connect(self.accept)
-        self.buttons.rejected.connect(self.reject)
-
-        layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(self.advanced_toggle, 0, Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(self.advanced)
-        layout.addWidget(self.table, 1)
-        layout.addWidget(self.status)
-        layout.addWidget(self.buttons)
+        self.delimiter.setFocus()
+        size_workbench(self)
 
         self.delimiter.currentIndexChanged.connect(self._on_delimiter_changed)
         self.header_row.valueChanged.connect(self._on_header_changed)
@@ -216,7 +234,6 @@ class ImportDialog(QDialog):
         for spin in (self.first_row, self.last_row, self.first_column, self.last_column):
             spin.valueChanged.connect(self._refresh)
         self.decimal_comma.clicked.connect(self._on_decimal_comma_clicked)
-        self.advanced_toggle.toggled.connect(self._on_advanced_toggled)
         scheduler.finished.connect(self._on_job_finished)
         scheduler.failed.connect(self._on_job_failed)
         self._refresh(delay_ms=0)
@@ -285,11 +302,6 @@ class ImportDialog(QDialog):
         self._decimal_comma = checked
         self._refresh()
 
-    def _on_advanced_toggled(self, shown: bool) -> None:
-        self.advanced.setVisible(shown)
-        arrow = Qt.ArrowType.DownArrow if shown else Qt.ArrowType.RightArrow
-        self.advanced_toggle.setArrowType(arrow)
-
     # --- results ---------------------------------------------------------------------
 
     def _on_job_finished(self, node: str, result: object) -> None:
@@ -301,8 +313,8 @@ class ImportDialog(QDialog):
         self.delimiter.setItemText(0, f"Auto-detect ({DELIMITER_NAMES[result.delimiter]})")
         self.decimal_comma.setEnabled(result.delimiter != ",")
         self.decimal_comma.setChecked(result.decimal_comma)
-        self.status.setText(_describe(result))
-        self.ok_button.setEnabled(True)
+        self.skeleton.set_problem(None)
+        self.skeleton.set_status(_describe(result))
 
     def _on_job_failed(self, node: str, error: JobError) -> None:
         if node != self._node:
@@ -314,8 +326,7 @@ class ImportDialog(QDialog):
             self.error = f"The file could not be read: {error.message}"
         self.model.set_preview(None)
         self.delimiter.setItemText(0, "Auto-detect")
-        self.status.setText(self.error)
-        self.ok_button.setEnabled(False)
+        self.skeleton.set_problem(self.error, Severity.ERROR)
 
 
 def _spin_box(parent: QWidget, low: int, high: int, special: str = "") -> QSpinBox:
@@ -323,17 +334,15 @@ def _spin_box(parent: QWidget, low: int, high: int, special: str = "") -> QSpinB
     spin = QSpinBox(parent)
     spin.setRange(low, high)
     spin.setSpecialValueText(special)
-    spin.setMinimumWidth(90)
     return spin
 
 
 def _range_box(parent: QWidget, first: QSpinBox, last: QSpinBox) -> QHBoxLayout:
     """``first`` "to" ``last`` on one line."""
     box = QHBoxLayout()
+    box.setSpacing(SPACING)
     box.addWidget(first)
-    to = QLabel("to", parent)
-    to.setBuddy(last)
-    box.addWidget(to)
+    box.addWidget(QLabel("to", parent))
     box.addWidget(last)
     box.addStretch()
     return box

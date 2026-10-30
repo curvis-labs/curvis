@@ -381,7 +381,7 @@ def test_bulk_rename_columns_and_groups_in_one_step(
     control, treated = (g.id for g in t.replicate_groups)
 
     def fill(dialog: BulkRenameDialog) -> None:
-        dialog.number_mode.setChecked(True)
+        dialog.set_numbered(True)
         assert dialog.pages.currentIndex() == 1
         dialog.set_checked(NodeKind.COLUMN, ["C1", "C2", "C3"])
         for item, widget in dialog.items:

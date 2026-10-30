@@ -24,7 +24,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -36,8 +35,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QSizePolicy,
-    QStackedWidget,
-    QTabBar,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -56,6 +53,18 @@ from curvis.formula import (
     check,
     parse,
     resolve_constants,
+)
+from curvis.ui.dialogs import (
+    FIELD_WIDTH,
+    SECTION_SPACING,
+    DialogSkeleton,
+    FittedStack,
+    choice_tabs,
+    columns,
+    error_label,
+    secondary_label,
+    set_tab_order,
+    size_workbench,
 )
 
 KINDS = (
@@ -150,7 +159,7 @@ class _NumberEdit(QLineEdit):
     def __init__(self, value: float, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.set_value(value)
-        self.setMaximumWidth(120)
+        self.setMaximumWidth(FIELD_WIDTH)
 
     def value(self) -> float | None:
         try:
@@ -170,7 +179,7 @@ class _ReferenceOptions(QWidget):
 
     def __init__(self, verb: str, columns: Sequence[Column], parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.stack = QStackedWidget(self)
+        self.stack = FittedStack(self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.stack)
@@ -178,12 +187,14 @@ class _ReferenceOptions(QWidget):
         unpaired = QWidget()
         grid = QGridLayout(unpaired)
         grid.setContentsMargins(0, 0, 0, 0)
-        self.first = QRadioButton(f"{verb} the &first value of each column")
+        self.first = QRadioButton(f"{verb} the f&irst value of each column")
         self.value_radio = QRadioButton(f"{verb} a &value:")
         self.value_edit = _NumberEdit(0.0)
-        self.column_radio = QRadioButton(f"{verb} another column, &row by row:")
-        self.column_mean_radio = QRadioButton(f"{verb} the &mean of another column:")
+        self.value_edit.setAccessibleName(f"Value to {verb.lower()}")
+        self.column_radio = QRadioButton(f"{verb} another column, ro&w by row:")
+        self.column_mean_radio = QRadioButton(f"{verb} the mean of anot&her column:")
         self.column_combo = QComboBox()
+        self.column_combo.setAccessibleName("Reference column")
         for column in columns:
             self.column_combo.addItem(column.name, column.id)
         self.unpaired_group = QButtonGroup(self)
@@ -207,8 +218,8 @@ class _ReferenceOptions(QWidget):
         paired = QWidget()
         box = QVBoxLayout(paired)
         box.setContentsMargins(0, 0, 0, 0)
-        self.matched = QRadioButton(f"{verb} the &matching role A column")
-        self.role_mean = QRadioButton(f"{verb} the m&ean of the role A columns")
+        self.matched = QRadioButton(f"{verb} the ma&tching role A column")
+        self.role_mean = QRadioButton(f"{verb} the mean of the role A col&umns")
         self.matched.setProperty("reference", cf.MATCHED)
         self.role_mean.setProperty("reference", cf.ROLE_MEAN)
         self.paired_group = QButtonGroup(self)
@@ -226,7 +237,6 @@ class _ReferenceOptions(QWidget):
 
     def set_paired(self, paired: bool) -> None:
         self.stack.setCurrentIndex(1 if paired else 0)
-        _fit_stack(self.stack)
         self.changed.emit()
 
     def params(self) -> dict[str, JsonValue]:
@@ -269,7 +279,7 @@ class _NormalizeOptions(QWidget):
         super().__init__(parent)
         grid = QGridLayout(self)
         grid.setContentsMargins(0, 0, 0, 0)
-        self.own = QRadioButton("Each column's own &minimum (0%) and maximum (100%)")
+        self.own = QRadioButton("Each column's o&wn minimum (0%) and maximum (100%)")
         self.values = QRadioButton("These &values:")
         self.low = _NumberEdit(0.0)
         self.high = _NumberEdit(100.0)
@@ -279,9 +289,12 @@ class _NormalizeOptions(QWidget):
         self.own.setChecked(True)
         grid.addWidget(self.own, 0, 0, 1, 5)
         grid.addWidget(self.values, 1, 0)
-        grid.addWidget(QLabel("0% ="), 1, 1)
+        low_label, high_label = QLabel("0% ="), QLabel("100% =")
+        low_label.setBuddy(self.low)
+        high_label.setBuddy(self.high)
+        grid.addWidget(low_label, 1, 1)
         grid.addWidget(self.low, 1, 2)
-        grid.addWidget(QLabel("100% ="), 1, 3)
+        grid.addWidget(high_label, 1, 3)
         grid.addWidget(self.high, 1, 4)
         grid.setColumnStretch(5, 1)
         self.group.buttonToggled.connect(lambda *_: self._update())
@@ -344,8 +357,8 @@ class CalculateDialog(QDialog):
         self._sources = [c for c in self.table.columns if c.role.is_numeric and c.id not in own]
 
         self.setWindowTitle("Edit calculation" if calculation else "Calculate")
-        self.resize(900, 640)
         self._build()
+        size_workbench(self)
         if calculation is not None:
             self._load(calculation)
         else:
@@ -355,48 +368,49 @@ class CalculateDialog(QDialog):
     # --- building ----------------------------------------------------------------------
 
     def _build(self) -> None:
-        outer = QVBoxLayout(self)
+        self.skeleton = DialogSkeleton(self, "Update" if self.editing else "Calculate")
+        self.buttons = self.skeleton.buttons
+        assert self.skeleton.ok_button is not None
+        self.ok_button = self.skeleton.ok_button
+        self.problem_label = self.skeleton.feedback
+        body = self.skeleton.body
 
-        top = QHBoxLayout()
-        self.type_tabs = QTabBar()
-        self.type_tabs.setExpanding(False)
-        self.type_tabs.setDrawBase(False)
-        self.type_tabs.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.type_tabs.setAccessibleName("Calculation type")
+        self.type_tabs = choice_tabs(self, "Calculation type")
         for kind in KINDS:
             index = self.type_tabs.addTab(kind.label)
             self.type_tabs.setTabData(index, kind.value)
             self.type_tabs.setTabToolTip(index, KIND_DESCRIPTIONS[kind])
-        self.type_description = QLabel()
-        self.type_description.setEnabled(False)
-        top.addWidget(self.type_tabs)
-        top.addStretch(1)
-        outer.addLayout(top)
-        outer.addWidget(self.type_description)
+        self.type_description = secondary_label(parent=self)
+        body.addWidget(self.type_tabs)
+        body.addWidget(self.type_description)
 
-        columns = QHBoxLayout()
-        outer.addLayout(columns, 1)
-        columns.addWidget(self._build_data(), 1)
-        right = QVBoxLayout()
-        columns.addLayout(right, 1)
+        left, right = columns(body)
+        left.addWidget(self._build_data(), 1)
         right.addWidget(self._build_options())
         right.addWidget(self._build_formula(), 1)
-
-        self.problem_label = QLabel()
-        self.problem_label.setWordWrap(True)
-        outer.addWidget(self.problem_label)
-        footer = QHBoxLayout()
-        self._build_details(footer)
-        footer.addStretch(1)
-        self.buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        self._build_details()
+        set_tab_order(
+            [
+                self.type_tabs,
+                self.not_paired,
+                self.paired,
+                self.a_name,
+                self.b_name,
+                self.tree,
+                self.select_all_button,
+                self.deselect_all_button,
+                self.role_a_button,
+                self.role_b_button,
+                self.options,
+                self.formula_edit,
+                *self.palette_buttons.values(),
+                self.manage_constants_button,
+                self.palette_list,
+                self.suffix_edit,
+                self.append_check,
+            ]
         )
-        self.ok_button = self.buttons.button(QDialogButtonBox.StandardButton.Ok)
-        self.ok_button.setText("Update" if self.editing else "Calculate")
-        self.buttons.accepted.connect(self.accept)
-        self.buttons.rejected.connect(self.reject)
-        footer.addWidget(self.buttons)
-        outer.addLayout(footer)
+        self.tree.setFocus()
 
         self.type_tabs.currentChanged.connect(self._on_kind_changed)
 
@@ -429,6 +443,7 @@ class CalculateDialog(QDialog):
         self.tree = QTreeWidget()
         self.tree.setColumnCount(2)
         self.tree.setHeaderLabels(["Column", "Role"])
+        self.tree.setAccessibleName("Columns to calculate")
         self.tree.setRootIsDecorated(True)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.tree.setMinimumHeight(140)
@@ -436,8 +451,8 @@ class CalculateDialog(QDialog):
         layout.addWidget(self.tree)
 
         buttons = QHBoxLayout()
-        select_all = QPushButton("Select a&ll")
-        deselect_all = QPushButton("&Deselect all")
+        select_all = self.select_all_button = QPushButton("Select a&ll")
+        deselect_all = self.deselect_all_button = QPushButton("&Deselect all")
         self.role_a_button = QPushButton("Set role A")
         self.role_b_button = QPushButton("Set role B")
         select_all.clicked.connect(lambda: self._check_all(True))
@@ -503,10 +518,9 @@ class CalculateDialog(QDialog):
     def _build_options(self) -> QGroupBox:
         self.options_box = QGroupBox("Options")
         layout = QVBoxLayout(self.options_box)
-        self.options = QStackedWidget()
+        self.options = FittedStack()
         reference_columns = [c for c in self.table.columns if c.role.is_numeric]
-        self.custom_options = QLabel()
-        self.custom_options.setWordWrap(True)
+        self.custom_options = secondary_label()
         self.baseline_options = _ReferenceOptions("Subtract", reference_columns)
         self.normalize_options = _NormalizeOptions()
         self.fold_options = _ReferenceOptions("Divide by", reference_columns)
@@ -521,15 +535,10 @@ class CalculateDialog(QDialog):
             options.changed.connect(self._regenerate)
         layout.addWidget(self.options)
         self.options_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
-        self.options.currentChanged.connect(self._fit_options)
         return self.options_box
 
-    def _fit_options(self, _current: int) -> None:
-        _fit_stack(self.options)
-        self.options_box.updateGeometry()
-
     def _build_formula(self) -> QGroupBox:
-        box = QGroupBox("Formula")
+        box = QGroupBox("Fo&rmula")
         layout = QVBoxLayout(box)
         self.formula_edit = QPlainTextEdit()
         self.formula_edit.setTabChangesFocus(True)
@@ -537,8 +546,7 @@ class CalculateDialog(QDialog):
         self.formula_edit.setAccessibleName("Formula")
         self.highlighter = FormulaHighlighter(self.formula_edit.document(), self.formula_edit)
         layout.addWidget(self.formula_edit)
-        self.formula_error = QLabel()
-        self.formula_error.setWordWrap(True)
+        self.formula_error = error_label()
         layout.addWidget(self.formula_error)
 
         tabs = QHBoxLayout()
@@ -562,6 +570,7 @@ class CalculateDialog(QDialog):
         tabs.addWidget(self.manage_constants_button)
         layout.addLayout(tabs)
         self.palette_list = QListWidget()
+        self.palette_list.setAccessibleName("Insert into the formula")
         self.palette_list.setToolTip("Double-click or press Enter to insert")
         self.palette_list.itemActivated.connect(self._insert_item)
         layout.addWidget(self.palette_list, 1)
@@ -570,19 +579,18 @@ class CalculateDialog(QDialog):
         self.formula_edit.textChanged.connect(self._on_formula_edited)
         return box
 
-    def _build_details(self, row: QHBoxLayout) -> None:
+    def _build_details(self) -> None:
         """Column suffix and placement, in the row with the dialog's buttons."""
         self.suffix_edit = QLineEdit(cf.DEFAULT_SUFFIXES[CalculationKind.BASELINE])
-        self.suffix_edit.setMaximumWidth(120)
+        self.suffix_edit.setMaximumWidth(FIELD_WIDTH)
         self.suffix_edit.textEdited.connect(self._on_suffix_edited)
         self.suffix_edit.textChanged.connect(self._validate)
         self.append_check = QCheckBox("Append at the &end")
         suffix_label = QLabel("Column &suffix:")
         suffix_label.setBuddy(self.suffix_edit)
-        row.addWidget(suffix_label)
-        row.addWidget(self.suffix_edit)
-        row.addSpacing(16)
-        row.addWidget(self.append_check)
+        self.skeleton.add_secondary(suffix_label)
+        self.skeleton.add_secondary(self.suffix_edit)
+        self.skeleton.add_secondary(self.append_check, SECTION_SPACING)
 
     # --- starting state ----------------------------------------------------------------
 
@@ -888,10 +896,8 @@ class CalculateDialog(QDialog):
                 self.highlighter.rehighlight()
         self.formula_error.setText(error.reason + "." if error and text.strip() else "")
         problem = self.problem()
-        self.ok_button.setEnabled(problem is None)
-        self.problem_label.setText(
-            "" if problem is None or (error and problem == error.reason) else problem
-        )
+        under_formula = error is not None and problem == error.reason and bool(text.strip())
+        self.skeleton.set_problem(problem, shown_in=self.formula_error if under_formula else None)
 
     # --- insert palette ----------------------------------------------------------------
 
@@ -987,20 +993,6 @@ class CalculateDialog(QDialog):
         self._global_constants = list(constants)
         self._fill_palette()
         self._validate()
-
-
-def _fit_stack(stack: QStackedWidget) -> None:
-    """Size ``stack`` to the page shown, not to its tallest page."""
-    for i in range(stack.count()):
-        page = stack.widget(i)
-        if page is not None:
-            policy = (
-                QSizePolicy.Policy.Preferred
-                if i == stack.currentIndex()
-                else QSizePolicy.Policy.Ignored
-            )
-            page.setSizePolicy(policy, policy)
-    stack.updateGeometry()
 
 
 def _children(item: QTreeWidgetItem) -> list[QTreeWidgetItem]:

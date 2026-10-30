@@ -1,58 +1,207 @@
-"""Light and dark themes. The Fusion style is used everywhere so that both themes look
-the same on every platform; widgets must only use palette roles, never fixed colours."""
+"""Light and dark themes, in the colours of the app icon (docs/DESIGN.md, section 3).
+
+The Fusion style (with :class:`CurvisStyle`'s outlines) is used everywhere, so that both
+themes look the same on every platform.
+Widgets must only use palette roles, never fixed colours; every colour is set here.
+"""
 
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, Qt
-from PySide6.QtGui import QColor, QGuiApplication, QPalette
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QObject, QRectF, Qt
+from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPalette, QPen
+from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle, QStyleOption, QWidget
 
 from curvis.settings import Theme
 
+_R = QPalette.ColorRole
+
+# The icon's colours: navy #1D3557, teal #00A6A6, emerald #20C997, slate #667085 and
+# off-white #F4F6F8. Teal is darkened to #007A7A for text and selection on light
+# backgrounds, where the icon's teal is too light to read (3.0 : 1 on white).
+_LIGHT = {
+    _R.Window: "#f4f6f8",
+    _R.WindowText: "#1d3557",
+    _R.Base: "#ffffff",
+    _R.AlternateBase: "#e0f2f1",  # calculated columns: a light teal tint
+    _R.ToolTipBase: "#1d3557",
+    _R.ToolTipText: "#f4f6f8",
+    _R.PlaceholderText: "#667085",  # secondary text
+    _R.Text: "#1d3557",
+    _R.Button: "#e9edf2",
+    _R.ButtonText: "#1d3557",
+    _R.BrightText: "#b3261e",  # errors
+    _R.Light: "#ffffff",
+    _R.Midlight: "#f0f3f6",
+    _R.Mid: "#c3cad4",
+    _R.Dark: "#8a94a3",
+    _R.Shadow: "#4a5568",
+    _R.Highlight: "#007a7a",
+    _R.HighlightedText: "#ffffff",
+    _R.Link: "#007a7a",
+    _R.LinkVisited: "#005f5f",
+    _R.Accent: "#20c997",
+}
+_LIGHT_DISABLED = {
+    _R.WindowText: "#9aa3b0",
+    _R.Text: "#9aa3b0",
+    _R.ButtonText: "#9aa3b0",
+    _R.Highlight: "#c3cad4",
+    _R.HighlightedText: "#ffffff",
+}
 _DARK = {
-    QPalette.ColorRole.Window: "#2b2b2e",
-    QPalette.ColorRole.WindowText: "#e8e8ea",
-    QPalette.ColorRole.Base: "#1f1f22",
-    QPalette.ColorRole.AlternateBase: "#28282b",
-    QPalette.ColorRole.ToolTipBase: "#3a3a3e",
-    QPalette.ColorRole.ToolTipText: "#e8e8ea",
-    QPalette.ColorRole.PlaceholderText: "#8c8c92",
-    QPalette.ColorRole.Text: "#e8e8ea",
-    QPalette.ColorRole.Button: "#36363a",
-    QPalette.ColorRole.ButtonText: "#e8e8ea",
-    QPalette.ColorRole.BrightText: "#ff6b6b",
-    QPalette.ColorRole.Light: "#4a4a4f",
-    QPalette.ColorRole.Midlight: "#3e3e43",
-    QPalette.ColorRole.Mid: "#303034",
-    QPalette.ColorRole.Dark: "#18181a",
-    QPalette.ColorRole.Shadow: "#0c0c0d",
-    QPalette.ColorRole.Highlight: "#3d7bd9",
-    QPalette.ColorRole.HighlightedText: "#ffffff",
-    QPalette.ColorRole.Link: "#6ea8ff",
-    QPalette.ColorRole.LinkVisited: "#b493ff",
+    _R.Window: "#152840",
+    _R.WindowText: "#f4f6f8",
+    _R.Base: "#0f1f33",
+    _R.AlternateBase: "#1c3a4a",  # calculated columns: a dark teal tint
+    _R.ToolTipBase: "#1d3557",
+    _R.ToolTipText: "#f4f6f8",
+    _R.PlaceholderText: "#9aa8bc",  # secondary text
+    _R.Text: "#f4f6f8",
+    _R.Button: "#1d3557",
+    _R.ButtonText: "#f4f6f8",
+    _R.BrightText: "#ff8080",  # errors
+    _R.Light: "#2e4a70",
+    _R.Midlight: "#24405f",
+    _R.Mid: "#1a2f4a",
+    _R.Dark: "#0a1626",
+    _R.Shadow: "#050b14",
+    _R.Highlight: "#00a6a6",
+    _R.HighlightedText: "#0f1f33",
+    _R.Link: "#00a6a6",
+    _R.LinkVisited: "#20c997",
+    _R.Accent: "#20c997",
 }
 _DARK_DISABLED = {
-    QPalette.ColorRole.WindowText: "#7a7a80",
-    QPalette.ColorRole.Text: "#7a7a80",
-    QPalette.ColorRole.ButtonText: "#7a7a80",
-    QPalette.ColorRole.HighlightedText: "#b0b0b5",
-    QPalette.ColorRole.Highlight: "#3a3a3e",
+    _R.WindowText: "#5e7491",
+    _R.Text: "#5e7491",
+    _R.ButtonText: "#5e7491",
+    _R.Highlight: "#24405f",
+    _R.HighlightedText: "#9aa8bc",
 }
 
+# Outlines of fields, check boxes and radio buttons: Text mixed into Base, so they show
+# in both themes with at least BORDER_CONTRAST_MIN (WCAG AA for parts of controls).
+BORDER_MIX = 0.6
+BORDER_CONTRAST_MIN = 3.0
 
-def dark_palette() -> QPalette:
-    """The palette of the dark theme."""
+# Text and background pairs that must reach CONTRAST_MIN in both themes (WCAG AA).
+CONTRAST_MIN = 4.5
+TEXT_PAIRS = (
+    (_R.WindowText, _R.Window),
+    (_R.Text, _R.Base),
+    (_R.Text, _R.AlternateBase),
+    (_R.ButtonText, _R.Button),
+    (_R.PlaceholderText, _R.Window),
+    (_R.PlaceholderText, _R.Base),
+    (_R.BrightText, _R.Window),
+    (_R.BrightText, _R.Base),
+    (_R.BrightText, _R.AlternateBase),
+    (_R.Link, _R.Window),
+    (_R.Link, _R.Base),
+    (_R.HighlightedText, _R.Highlight),
+    (_R.ToolTipText, _R.ToolTipBase),
+)
+
+
+def _palette(
+    colors: dict[QPalette.ColorRole, str], disabled: dict[QPalette.ColorRole, str]
+) -> QPalette:
     palette = QPalette()
-    for role, color in _DARK.items():
+    for role, color in colors.items():
         palette.setColor(role, QColor(color))
-    for role, color in _DARK_DISABLED.items():
+    for role, color in disabled.items():
         palette.setColor(QPalette.ColorGroup.Disabled, role, QColor(color))
     return palette
 
 
-def light_palette(app: QApplication) -> QPalette:
-    """The palette of the light theme (the Fusion style's own)."""
-    return app.style().standardPalette()
+def dark_palette() -> QPalette:
+    """The palette of the dark theme."""
+    return _palette(_DARK, _DARK_DISABLED)
+
+
+def light_palette() -> QPalette:
+    """The palette of the light theme."""
+    return _palette(_LIGHT, _LIGHT_DISABLED)
+
+
+def contrast(a: QColor, b: QColor) -> float:
+    """The WCAG contrast ratio of two colours, from 1 to 21."""
+
+    def luminance(color: QColor) -> float:
+        def channel(v: float) -> float:
+            return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+
+        r, g, b = (channel(c) for c in (color.redF(), color.greenF(), color.blueF()))
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    high, low = sorted((luminance(a), luminance(b)), reverse=True)
+    return (high + 0.05) / (low + 0.05)
+
+
+def control_border(palette: QPalette) -> QColor:
+    """The outline colour of fields, check boxes and radio buttons."""
+    base = palette.color(QPalette.ColorRole.Base)
+    text = palette.color(QPalette.ColorRole.Text)
+    mix = BORDER_MIX
+    return QColor.fromRgbF(
+        base.redF() + (text.redF() - base.redF()) * mix,
+        base.greenF() + (text.greenF() - base.greenF()) * mix,
+        base.blueF() + (text.blueF() - base.blueF()) * mix,
+    )
+
+
+_E = QStyle.PrimitiveElement
+_OUTLINED = {
+    _E.PE_IndicatorCheckBox,
+    _E.PE_IndicatorItemViewItemCheck,
+    _E.PE_FrameLineEdit,
+    _E.PE_Frame,
+}
+
+
+class CurvisStyle(QProxyStyle):
+    """Fusion, with outlines and pressed toggles that show in both themes.
+
+    Fusion draws outlines a little darker than the window, which disappears on a dark
+    window. Here fields, check boxes and radio buttons get :func:`control_border`, and a
+    checked toggle button (e.g. Calculate's "Not paired") gets the selection colour.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("Fusion")
+
+    def drawPrimitive(  # noqa: N802 (Qt API)
+        self,
+        element: QStyle.PrimitiveElement,
+        option: QStyleOption,
+        painter: QPainter,
+        widget: QWidget | None = None,
+    ) -> None:
+        super().drawPrimitive(element, option, painter, widget)
+        if element in _OUTLINED or element == _E.PE_IndicatorRadioButton:
+            enabled = bool(option.state & QStyle.StateFlag.State_Enabled)
+            if not enabled and element not in (_E.PE_FrameLineEdit, _E.PE_Frame):
+                return
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            painter.setPen(QPen(control_border(option.palette), 1))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            rect = QRectF(option.rect).adjusted(0.5, 0.5, -0.5, -0.5)
+            if element == _E.PE_IndicatorRadioButton:
+                painter.drawEllipse(rect.adjusted(0.5, 0.5, -0.5, -0.5))
+            else:
+                painter.drawRoundedRect(rect, 2, 2)
+            painter.restore()
+        elif element == _E.PE_PanelButtonCommand and option.state & QStyle.StateFlag.State_On:
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            highlight = option.palette.color(QPalette.ColorRole.Highlight)
+            fill = QColor(highlight)
+            fill.setAlphaF(0.25)
+            painter.setPen(QPen(highlight, 1))
+            painter.setBrush(fill)
+            painter.drawRoundedRect(QRectF(option.rect).adjusted(0.5, 0.5, -1.5, -1.5), 2, 2)
+            painter.restore()
 
 
 def system_is_dark() -> bool:
@@ -72,7 +221,7 @@ class ThemeManager(QObject):
         super().__init__(app)
         self._app = app
         self._theme = Theme.SYSTEM
-        app.setStyle("Fusion")
+        app.setStyle(CurvisStyle())
         app.styleHints().colorSchemeChanged.connect(self._on_system_change)
 
     @property
@@ -82,7 +231,7 @@ class ThemeManager(QObject):
     def apply(self, theme: Theme) -> None:
         self._theme = Theme(theme)
         dark = system_is_dark() if self._theme is Theme.SYSTEM else self._theme is Theme.DARK
-        self._app.setPalette(dark_palette() if dark else light_palette(self._app))
+        self._app.setPalette(dark_palette() if dark else light_palette())
 
     def _on_system_change(self, _scheme: Qt.ColorScheme) -> None:
         if self._theme is Theme.SYSTEM:

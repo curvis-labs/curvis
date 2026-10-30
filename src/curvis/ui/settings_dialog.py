@@ -1,19 +1,12 @@
-"""The Settings dialog. Changes apply when you click OK."""
+"""The Settings dialog. Changes apply when you click Save."""
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import (
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QSpinBox,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QComboBox, QDialog, QSpinBox, QWidget
 
 from curvis.settings import Settings, Theme
 from curvis.settings.store import DECIMAL_PLACES_MAX, DECIMAL_PLACES_MIN
+from curvis.ui.dialogs import DialogSkeleton, form_layout, size_simple
 
 
 class SettingsDialog(QDialog):
@@ -34,19 +27,14 @@ class SettingsDialog(QDialog):
         self.decimal_places.setValue(settings.decimal_places)
         self.decimal_places.setToolTip("Number of decimal places shown in calculated columns.")
 
-        form = QFormLayout()
+        self.skeleton = DialogSkeleton(self, "Save")
+        self.buttons = self.skeleton.buttons
+        form = form_layout()
         form.addRow("&Theme", self.theme)
         form.addRow("&Decimal places in calculated columns", self.decimal_places)
-
-        self.buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
-        )
-        self.buttons.accepted.connect(self.accept)
-        self.buttons.rejected.connect(self.reject)
-
-        layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(self.buttons)
+        self.skeleton.body.addLayout(form)
+        self.skeleton.body.addStretch(1)
+        size_simple(self)
 
     def accept(self) -> None:
         theme = Theme(self.theme.currentData())
