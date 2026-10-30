@@ -193,3 +193,39 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   *Export graph*. A new shortcut must not clash with these or with platform standard keys.
 - **Accessible names**: every control has a buddy label, visible text or `setAccessibleName`.
   The tests check this for every dialog.
+
+## 7. Toolbars
+
+Mockup: `docs/mockups/toolbars.html`.
+
+- **Two toolbars in one row** under the menu bar: the **main toolbar** (New project, Open
+  project, Save project, Undo, Redo), then the **table toolbar** (Import data, Add column,
+  Group as replicates, Set category, Calculate, Plot, Analyze). The table toolbar shows while a
+  table is shown; the main toolbar always shows. They are fixed in place (not movable or
+  floating).
+- **Every button is a registered action** (`ActionRegistry`): the same `QAction` as the menu
+  item and the command palette entry. No action exists only in a toolbar.
+- **Labels.** Main toolbar: icons only. Their meaning is universal, and the tooltip gives the
+  name and shortcut (“Save project (Ctrl+S)”). Table toolbar: icon with the text beside it,
+  because these are Curvis's own tasks and need words. The text is the menu text without the
+  ellipsis and mnemonic (“Group as replicates”).
+- **Plot** has a menu arrow and opens the chart families (XY, Bar, Survival, Interaction).
+  This is SPEC.md's toolbar for picking a chart family. A family the table cannot draw is
+  disabled, and its tooltip says why (“Needs a Time + Event pair”).
+- **Disabled buttons** use the disabled text colour. Their tooltip says why (“Nothing to
+  undo”, “Select columns to group”), like a disabled OK button.
+- **Narrow windows.** The toolbars keep one row. Buttons that do not fit move into the overflow
+  menu (») at the end, in the same order; text never wraps.
+- **Icons**: 20 × 20 line icons on a 20 px grid, 1.5 px strokes with round caps and joins, no
+  fill except small accents. They are SVG files in `src/curvis/ui/icons/toolbar/`, drawn in
+  `currentColor` and coloured from the palette when the theme changes (`ButtonText`; disabled
+  text when disabled), so one file serves both themes. A table tool's icon matches the mark used
+  in the table where there is one (Calculate uses the ƒ of calculated columns).
+- **States**: hover shows a soft square (`Text` at 14 %), pressed at 25 %, and a menu that is
+  open stays pressed, the same as the tab close button. Buttons are 28 px high, with 4 px
+  between buttons and a separator between groups (file | undo/redo, and the table toolbar's
+  data | columns | results groups).
+- **Keyboard.** The toolbars are not in the Tab order, because every button has a shortcut or
+  menu entry. The tooltips name the shortcut.
+- **Open:** a toolbar for graph formatting is not decided yet. It is not in SPEC.md.
+

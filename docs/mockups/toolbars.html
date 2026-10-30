@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curvis toolbars</title>
+<!--
+  Mockup of the main toolbar and the table toolbar (SPEC.md, DESIGN.md section 7), for
+  step 2.5 to build from. Drawn at 1:1 with the theme palette. The icons are the proposed
+  20 x 20 line icons; step 2.5 turns them into SVG files in src/curvis/ui/icons/toolbar/.
+-->
+<style>
+  :root, :root[data-theme="light"] {
+    --window: #f4f6f8; --text: #1d3557; --base: #ffffff; --altbase: #e0f2f1;
+    --secondary: #667085; --link: #007a7a; --highlight: #007a7a; --hl-text: #ffffff;
+    --button: #e9edf2; --border: #c3cad4; --grid: #cdd3da; --disabled: #9aa3b0;
+    --tip-bg: #1d3557; --tip-text: #f4f6f8; --canvas: #d5dbe3; --note: #1d3557; --mark: #e8590c;
+    --hover: rgba(29, 53, 87, .14); --press: rgba(29, 53, 87, .25);
+  }
+  :root[data-theme="dark"] {
+    --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+    --secondary: #9aa8bc; --link: #00a6a6; --highlight: #00a6a6; --hl-text: #0f1f33;
+    --button: #1d3557; --border: #2e4a70; --grid: #3e4c5d; --disabled: #5e7491;
+    --tip-bg: #1d3557; --tip-text: #f4f6f8; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+    --hover: rgba(244, 246, 248, .14); --press: rgba(244, 246, 248, .25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+      --secondary: #9aa8bc; --link: #00a6a6; --highlight: #00a6a6; --hl-text: #0f1f33;
+      --button: #1d3557; --border: #2e4a70; --grid: #3e4c5d; --disabled: #5e7491;
+      --tip-bg: #1d3557; --tip-text: #f4f6f8; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+      --hover: rgba(244, 246, 248, .14); --press: rgba(244, 246, 248, .25);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--note);
+         font: 13px/1.4 system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  header.page { padding: 20px 24px 8px 40px; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header.page h1 { font-size: 20px; margin: 0; }
+  header.page p { margin: 0; flex: 1 1 320px; }
+  .switch button { font: inherit; padding: 4px 12px; border: 1px solid var(--border);
+                   background: var(--button); color: var(--text); border-radius: 3px; cursor: pointer; }
+  .switch button[aria-pressed="true"] { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  section.board { padding: 16px 24px 32px 40px; overflow-x: auto; }
+  section.board > h2 { font-size: 16px; margin: 8px 0 12px; }
+  .row { display: flex; gap: 24px; align-items: flex-start; }
+  .notes { width: 320px; flex: none; }
+  .notes ol { margin: 0; padding-left: 22px; } .notes li { margin-bottom: 6px; }
+  .notes li::marker { color: var(--mark); font-weight: 700; }
+
+  .win { flex: none; background: var(--window); color: var(--text); border: 1px solid var(--border);
+         box-shadow: 0 8px 28px rgba(0,0,0,.28); position: relative; }
+  .titlebar { height: 30px; display: flex; align-items: center; justify-content: center;
+              border-bottom: 1px solid var(--border); font-weight: 600; }
+  .menubar { display: flex; gap: 16px; padding: 4px 10px; }
+  u { text-underline-offset: 2px; }
+  .toolbars { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--border);
+              white-space: nowrap; overflow: hidden; }
+  .tb { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 5px; border-radius: 3px;
+        color: var(--text); flex: none; }
+  .tb.icon { width: 28px; justify-content: center; padding: 0; }
+  .tb.hover { background: var(--hover); }
+  .tb.press { background: var(--press); }
+  .tb.dis { color: var(--disabled); }
+  .tb svg { width: 20px; height: 20px; flex: none; }
+  .tb .arrow { margin-left: -2px; font-size: 10px; color: var(--secondary); }
+  .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex: none; }
+  .gap { width: 12px; flex: none; }
+  .tabs { display: flex; padding: 4px 8px 0; gap: 2px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 4px 10px; border: 1px solid var(--border); border-bottom: none; border-radius: 3px 3px 0 0;
+         background: var(--button); display: flex; gap: 8px; align-items: center; }
+  .tab.on { background: var(--window); position: relative; top: 1px; }
+  .tab .x { color: var(--secondary); font-size: 12px; }
+  .grid { background: var(--base); overflow: hidden; }
+  .grid table { border-collapse: collapse; }
+  .grid th { background: var(--button); border: 1px solid var(--border); font-weight: 400; padding: 2px 8px; min-width: 90px; }
+  .grid th.rh { min-width: 24px; text-align: left; }
+  .grid th small { display: block; }
+  .grid td { border: 1px solid var(--grid); padding: 2px 8px; text-align: right; min-width: 90px; height: 23px; }
+  .grid td.calc { background: var(--altbase); }
+  .grid tr.sel td.c { background: var(--highlight); color: var(--hl-text); }
+  .tip { position: absolute; background: var(--tip-bg); color: var(--tip-text); padding: 3px 8px; border-radius: 3px;
+         font-size: 12px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.3); z-index: 3; }
+  .menu { position: absolute; background: var(--base); border: 1px solid var(--border); border-radius: 3px;
+          box-shadow: 0 6px 18px rgba(0,0,0,.3); padding: 4px 0; z-index: 3; min-width: 200px; }
+  .menu div { padding: 4px 12px 4px 10px; display: flex; gap: 8px; align-items: center; }
+  .menu div.hl { background: var(--highlight); color: var(--hl-text); }
+  .menu div.dis { color: var(--disabled); }
+  .menu svg { width: 20px; height: 20px; }
+  .menu small { margin-left: auto; color: var(--secondary); padding-left: 16px; }
+  .m { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--mark); color: #fff;
+       font: 700 11px/18px system-ui, sans-serif; text-align: center; z-index: 4; box-shadow: 0 0 0 2px var(--window); }
+  .sheet { display: grid; grid-template-columns: repeat(6, 150px); gap: 4px; }
+  .sheet .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px; }
+  .sheet .big svg { width: 40px; height: 40px; }
+  .sheet .label { font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Curvis toolbars</h1>
+  <p>Main toolbar and table toolbar from SPEC.md, following <code>docs/DESIGN.md</code> section 7. Drawn at 1:1 with the theme palette. Orange numbers point to the notes.</p>
+  <div class="switch" role="group" aria-label="Theme">
+    <button type="button" data-set="light">Light</button>
+    <button type="button" data-set="dark">Dark</button>
+  </div>
+</header>
+
+<!-- ============================================================ WIDE -->
+<section class="board">
+  <h2>1 · Main window, 1100 px wide (Calculate hovered, Redo disabled)</h2>
+  <div class="row">
+    <div class="win" style="width:1100px">
+      <div class="titlebar">Curvis — Experiment 12.cvp</div>
+      <div class="menubar"><span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>T</u>able</span><span><u>V</u>iew</span></div>
+      <div class="toolbars">
+        <span class="m" style="left:-26px;top:66px">1</span>
+        <span class="tb icon" title="New project (Ctrl+N)"><i data-icon="new"></i></span>
+        <span class="tb icon"><i data-icon="open"></i></span>
+        <span class="tb icon"><i data-icon="save"></i></span>
+        <span class="sep"></span>
+        <span class="tb icon"><i data-icon="undo"></i></span>
+        <span class="tb icon dis"><i data-icon="redo"></i></span>
+        <span class="gap"></span>
+        <span class="m" style="left:196px;top:44px">2</span>
+        <span class="tb"><i data-icon="import"></i>Import data</span>
+        <span class="sep"></span>
+        <span class="tb"><i data-icon="column"></i>Add column</span>
+        <span class="tb"><i data-icon="group"></i>Group as replicates</span>
+        <span class="tb"><i data-icon="category"></i>Set category</span>
+        <span class="tb hover"><i data-icon="calculate"></i>Calculate</span>
+        <span class="sep"></span>
+        <span class="m" style="left:806px;top:44px">3</span>
+        <span class="tb"><i data-icon="plot"></i>Plot<span class="arrow">▾</span></span>
+        <span class="tb"><i data-icon="analyze"></i>Analyze</span>
+      </div>
+      <div class="tip" style="left:625px;top:102px">Calculate (Ctrl+Shift+K)</div>
+      <div class="tip" style="left:178px;top:102px">Nothing to redo</div>
+      <span class="m" style="left:-26px;top:104px">4</span>
+      <div class="tabs"><div class="tab">Untitled <span class="x">✕</span></div><div class="tab on">Experiment 12 <span class="x">✕</span></div></div>
+      <div class="grid">
+        <table>
+          <tr><th class="rh"></th><th>Dose (µM)<small>X</small></th><th>Control<small>Y</small></th><th>Drug<small>Y</small></th><th>Drug norm<small>ƒ Y</small></th><th></th><th></th></tr>
+          <tr class="sel"><th class="rh">1</th><td>0.01</td><td>10.2</td><td class="c">11.4</td><td class="calc">0.0</td><td></td><td></td></tr>
+          <tr class="sel"><th class="rh">2</th><td>0.1</td><td>9.9</td><td class="c">18.4</td><td class="calc">9.4</td><td></td><td></td></tr>
+          <tr class="sel"><th class="rh">3</th><td>1</td><td>10.1</td><td class="c">52.3</td><td class="calc">57.0</td><td></td><td></td></tr>
+          <tr class="sel"><th class="rh">4</th><td>10</td><td>10.8</td><td class="c">82.6</td><td class="calc">100.0</td><td></td><td></td></tr>
+          <tr><th class="rh">5</th><td></td><td></td><td></td><td class="calc"></td><td></td><td></td></tr>
+          <tr><th class="rh">6</th><td></td><td></td><td></td><td class="calc"></td><td></td><td></td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="notes">
+      <ol>
+        <li><b>Main toolbar</b>: New project, Open project, Save project | Undo, Redo. Icons only; the tooltip gives name and shortcut.</li>
+        <li><b>Table toolbar</b>, shown while a table is shown: Import data | Add column, Group as replicates, Set category, Calculate | Plot, Analyze. Icon with text, because these are Curvis's own tasks.</li>
+        <li><b>Plot</b> has a menu arrow: it opens the chart families (see 2). <b>Analyze</b> opens the Analyze dialog.</li>
+        <li><b>Disabled</b> buttons use the disabled colour, and their tooltip says why. Hover shows a soft square.</li>
+      </ol>
+      <p>Every button is the same action as its menu item and command palette entry. The toolbars are fixed in place and not in the Tab order.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ PLOT MENU -->
+<section class="board">
+  <h2>2 · Plot menu open (a table without time/event pairs)</h2>
+  <div class="row">
+    <div class="win" style="width:560px;height:220px;overflow:visible">
+      <div class="toolbars" style="overflow:visible">
+        <span class="tb"><i data-icon="calculate"></i>Calculate</span>
+        <span class="sep"></span>
+        <span class="tb press"><i data-icon="plot"></i>Plot<span class="arrow">▾</span></span>
+        <span class="tb"><i data-icon="analyze"></i>Analyze</span>
+      </div>
+      <div class="menu" style="left:104px;top:38px">
+        <div class="hl"><i data-icon="xy"></i>XY</div>
+        <div><i data-icon="bar"></i>Bar</div>
+        <div class="dis"><i data-icon="survival"></i>Survival<small>Needs a Time + Event pair</small></div>
+        <div class="dis"><i data-icon="interaction"></i>Interaction<small>Needs a two-way ANOVA</small></div>
+      </div>
+    </div>
+    <div class="notes">
+      <p>This menu is SPEC.md's “pick a chart family from the toolbar”: it makes a graph of that family from the table, and the Format dialog picks the variant (scatter or line, box, violin …).</p>
+      <p>A family the table cannot draw stays in the list, disabled, with the reason beside it, so users learn what each needs.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ NARROW -->
+<section class="board">
+  <h2>3 · Narrow window, 720 px: buttons that do not fit go into the overflow menu</h2>
+  <div class="row">
+    <div class="win" style="width:720px;height:250px;overflow:visible">
+      <div class="menubar"><span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>T</u>able</span><span><u>V</u>iew</span></div>
+      <div class="toolbars" style="overflow:visible">
+        <span class="tb icon"><i data-icon="new"></i></span>
+        <span class="tb icon"><i data-icon="open"></i></span>
+        <span class="tb icon"><i data-icon="save"></i></span>
+        <span class="sep"></span>
+        <span class="tb icon"><i data-icon="undo"></i></span>
+        <span class="tb icon dis"><i data-icon="redo"></i></span>
+        <span class="gap"></span>
+        <span class="tb"><i data-icon="import"></i>Import data</span>
+        <span class="sep"></span>
+        <span class="tb"><i data-icon="column"></i>Add column</span>
+        <span class="tb"><i data-icon="group"></i>Group as replicates</span>
+        <span style="flex:1"></span>
+        <span class="tb press" style="padding:0 8px">»</span>
+      </div>
+      <div class="menu" style="right:6px;top:64px">
+        <div><i data-icon="category"></i>Set category</div>
+        <div><i data-icon="calculate"></i>Calculate</div>
+        <div><i data-icon="plot"></i>Plot<small>▸</small></div>
+        <div><i data-icon="analyze"></i>Analyze</div>
+      </div>
+    </div>
+    <div class="notes">
+      <p>The toolbars keep one row. Qt moves the buttons that do not fit into the » menu, in order, with their text. Text never wraps or shrinks.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ICONS -->
+<section class="board">
+  <h2>4 · Icons: 20 × 20, 1.5 px line, drawn in the text colour (normal and disabled; 2× below)</h2>
+  <div class="win" style="padding:12px;display:inline-block">
+    <div class="sheet" id="sheet"></div>
+  </div>
+</section>
+
+<script>
+  var ICONS = {
+    new: '<path d="M5 2.75h6.5L15 6.25v11H5z"/><path d="M11.5 2.75v3.5H15"/><path d="M10 9.25v5.5M7.25 12h5.5"/>',
+    open: '<path d="M2.75 15.75V4.25h4.5l1.75 2h7.25v2.5"/><path d="M2.75 15.75 5 8.75h12.75l-2.25 7z"/>',
+    save: '<path d="M3.75 3.75h10l2.5 2.5v10H3.75z"/><path d="M6.5 3.75v3.5h6v-3.5"/><path d="M6.25 16.25V11h7.5v5.25"/>',
+    undo: '<path d="M7.5 4.75 4 8.25l3.5 3.5"/><path d="M4 8.25h7.75a4 4 0 0 1 0 8H9"/>',
+    redo: '<path d="M12.5 4.75 16 8.25l-3.5 3.5"/><path d="M16 8.25H8.25a4 4 0 0 0 0 8H11"/>',
+    import: '<rect x="7.75" y="3.75" width="8.5" height="12.5" rx="1"/><path d="M7.75 8h8.5M7.75 12h8.5M12 3.75v12.5"/><path d="M1.75 10h7"/><path d="M6.25 7.5 8.75 10l-2.5 2.5"/>',
+    column: '<rect x="3.75" y="3.75" width="5.5" height="12.5" rx="1"/><path d="M3.75 7.75h5.5M3.75 11.75h5.5"/><path d="M14.25 7v6M11.25 10h6"/>',
+    group: '<path d="M3.25 5.75v-2.5h13.5v2.5"/><rect x="3" y="8" width="3.5" height="9" rx=".75"/><rect x="8.25" y="8" width="3.5" height="9" rx=".75"/><rect x="13.5" y="8" width="3.5" height="9" rx=".75"/>',
+    category: '<path d="M3.25 3.25h6.5l7 7-6.5 6.5-7-7z"/><circle cx="7" cy="7" r="1.25"/>',
+    calculate: '<path d="M14 3.5c-2.75-.9-4.25.5-4.75 3L7.5 14.75c-.5 2.25-2 2.75-3.75 2.25"/><path d="M6.25 8.25h6.5"/>',
+    plot: '<path d="M3.25 3.25v13.5h13.5"/><path d="M6 13.5 9 9.75l2.5 2 4.25-6"/>',
+    analyze: '<path d="M3.75 16.75V12h4v4.75M12.25 16.75V10h4v6.75"/><path d="M5.75 10.25V8h8.5v.5"/><path d="M10 1.75V5.25M8.5 2.6l3 1.8M11.5 2.6l-3 1.8"/>',
+    xy: '<path d="M3.25 3.25v13.5h13.5"/><circle cx="7" cy="12.5" r="1.25"/><circle cx="10.5" cy="9" r="1.25"/><circle cx="14" cy="6" r="1.25"/>',
+    bar: '<path d="M3.25 16.75h13.5"/><path d="M4.75 16.75v-7h3v7M11.25 16.75v-11h3v11"/>',
+    survival: '<path d="M3.25 3.25v13.5h13.5"/><path d="M3.25 5h3.5v3h3v3.5h4v2.5h2.5"/>',
+    interaction: '<path d="M3.25 3.25v13.5h13.5"/><path d="M5.5 12.5l9-5M5.5 7l9 6"/>'
+  };
+  function svg(name) {
+    return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
+  }
+  document.querySelectorAll("i[data-icon]").forEach(function (el) { el.outerHTML = svg(el.dataset.icon); });
+  var names = [["new","New project"],["open","Open project"],["save","Save project"],["undo","Undo"],["redo","Redo"],["import","Import data"],
+               ["column","Add column"],["group","Group as replicates"],["category","Set category"],["calculate","Calculate"],["plot","Plot"],["analyze","Analyze"],
+               ["xy","XY"],["bar","Bar"],["survival","Survival"],["interaction","Interaction"]];
+  var sheet = document.getElementById("sheet");
+  names.forEach(function (n) {
+    sheet.insertAdjacentHTML("beforeend",
+      '<div class="cell"><div style="display:flex;gap:10px"><span class="tb icon">' + svg(n[0]) + '</span><span class="tb icon dis">' + svg(n[0]) +
+      '</span></div><span class="big tb">' + svg(n[0]) + '</span><span class="label">' + n[1] + '</span></div>');
+  });
+  (function () {
+    var root = document.documentElement, buttons = document.querySelectorAll(".switch button");
+    function show(theme) {
+      root.setAttribute("data-theme", theme);
+      buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.set === theme)); });
+      try { localStorage.setItem("curvis-mockup-theme", theme); } catch (e) {}
+    }
+    var start = null;
+    try { start = localStorage.getItem("curvis-mockup-theme"); } catch (e) {}
+    if (!start) start = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    buttons.forEach(function (b) { b.addEventListener("click", function () { show(b.dataset.set); }); });
+    show(start);
+  })();
+</script>
+</body>
+</html>

@@ -387,6 +387,7 @@ Make a plan first. When done, report validation and benchmark results.
 **Done when**
 - [ ] XY (scatter/line with SD or SEM error bars and fitted curve overlay), bar and box graphs draw from a table.
 - [ ] Graphs redraw within 50 ms after a data edit; legend clicks toggle series on XY charts.
+- [ ] The main and table toolbars follow docs/DESIGN.md (section 7) and the approved toolbar mockup.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.5 in docs/PHASES.md.
@@ -395,7 +396,8 @@ Build src/curvis/charts:
 - ChartSpec dataclasses: chart family and variant, series (data source, symbol, size, line style, width, color, error-bar type), axes (title, range, label, linear/log), title, aspect ratio, color scheme, text size, overlays (fitted curves from analyses).
 - A builder that creates a sensible default spec from a table (replicate groups become one series with SD or SEM error bars; a Y column with an Error column uses those pre-computed values).
 - render_qt with pyqtgraph: XY scatter/line with SD or SEM error bars and fit overlays, bar (mean with error bars), box. Legend click toggles a series on XY charts.
-- Graph tab in the document; a toolbar to pick the chart family; graphs are dependency-graph nodes and redraw when data or fits change.
+- Graph tab in the document; graphs are dependency-graph nodes and redraw when data or fits change.
+- The main toolbar and the table toolbar from SPEC.md, following docs/DESIGN.md section 7 and docs/mockups/toolbars.html. The table toolbar's Plot button opens the chart-family menu. Draw the icons as SVG line icons coloured from the palette; pytest-qt tests that every toolbar button is a registered action and that disabled buttons say why.
 - Tests for the spec builder and a benchmark for redraw after a data edit.
 
 Make a plan first. When done, report what you built and the redraw benchmark.
