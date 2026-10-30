@@ -377,7 +377,8 @@ class MainWindow(QMainWindow):
 
         node = f"open:{_file_key(path)}"
         self._pending_opens[node] = path
-        self.scheduler.submit(node, Job(_load_project, (str(path),)), delay_ms=0)
+        job = Job(_load_project, (str(path),), imports=("curvis.io.project",))
+        self.scheduler.submit(node, job, delay_ms=0)
 
     @property
     def scheduler(self) -> Scheduler:

@@ -1,5 +1,6 @@
 """Module-level job functions for the compute tests (worker processes must import them)."""
 
+import importlib
 import os
 import threading
 import time
@@ -17,6 +18,11 @@ def add(a: float, b: float) -> float:
 def where() -> tuple[int, int]:
     """(process id, thread id) of the worker that runs the job."""
     return os.getpid(), threading.get_ident()
+
+
+def imported_on(module: str) -> int:
+    """The thread id the module recorded when it was first imported."""
+    return int(importlib.import_module(module).imported_on)
 
 
 def describe(arr: np.ndarray[Any, Any]) -> dict[str, Any]:
