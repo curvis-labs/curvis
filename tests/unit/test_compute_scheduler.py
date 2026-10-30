@@ -2,10 +2,12 @@
 
 import os
 import pickle
+import sys
 import threading
 import time
 from collections.abc import Iterator
 from multiprocessing import shared_memory
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -227,6 +229,34 @@ def test_job_that_cancels_itself_reports_cancelled(
 def test_check_cancelled_outside_a_job_does_nothing() -> None:
     check_cancelled()
     assert not is_cancelled()
+
+
+def test_light_job_imports_are_loaded_on_the_main_thread(
+    qtbot: QtBot,
+    scheduler: Scheduler,
+    rec: Recorder,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Loading extension modules on a worker while Qt runs can crash (PySide6 import hook).
+    (tmp_path / "curvis_probe_module.py").write_text(
+        "import threading\nimported_on = threading.get_ident()\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.delitem(sys.modules, "curvis_probe_module", raising=False)
+    job = Job(jobs.imported_on, ("curvis_probe_module",), imports=("curvis_probe_module",))
+    scheduler.submit("n", job, delay_ms=0)
+    qtbot.waitUntil(lambda: bool(rec.finished))
+    assert rec.results == [threading.get_ident()]
+
+
+def test_a_light_job_import_that_fails_is_reported_by_the_job(
+    qtbot: QtBot, scheduler: Scheduler, rec: Recorder
+) -> None:
+    job = Job(jobs.imported_on, ("curvis_no_such_module",), imports=("curvis_no_such_module",))
+    scheduler.submit("n", job, delay_ms=0)
+    qtbot.waitUntil(lambda: bool(rec.failed))
+    assert rec.failed[0][1].error_type == "ModuleNotFoundError"
 
 
 def test_light_job_error_is_reported(qtbot: QtBot, scheduler: Scheduler, rec: Recorder) -> None:

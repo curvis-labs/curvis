@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import importlib
 import multiprocessing
 import os
 import time
@@ -59,6 +60,16 @@ def _run_light(job: JobLike, flag: CancelFlag) -> Any:
         return job()
     finally:
         set_current_flag(None)
+
+
+def _import_on_main_thread(job: JobLike) -> None:
+    """Import the modules a light job needs before a worker thread runs it."""
+    if not isinstance(job, Job):
+        return
+    for name in job.imports:
+        # A module that fails to import is left to the job, which then reports the error.
+        with contextlib.suppress(Exception):
+            importlib.import_module(name)
 
 
 def _default_processes() -> int:
@@ -226,6 +237,7 @@ class Scheduler(QObject):
 
     def _start(self, node_id: str, job: JobLike, weight: Weight) -> None:
         if weight == "light":
+            _import_on_main_thread(job)
             flag = CancelFlag()
             run = _Run(node_id, weight, flag)
             run.future = self._threads.submit(_run_light, job, flag)

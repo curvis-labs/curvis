@@ -245,7 +245,7 @@ class ImportDialog(QDialog):
 
     def _refresh(self, *_args: object, delay_ms: int | None = None) -> None:
         """Read the preview again with the current options (debounced)."""
-        job = Job(read_preview, (str(self.path), self.options(), PREVIEW_ROWS))
+        job = Job(read_preview, (str(self.path), self.options(), PREVIEW_ROWS), imports=("polars",))
         self._scheduler.submit(self._node, job, delay_ms=delay_ms)
 
     def _on_delimiter_changed(self, _index: int) -> None:

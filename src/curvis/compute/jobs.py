@@ -4,6 +4,11 @@ A job is either a zero-argument callable (light jobs only) or a :class:`Job` wit
 function and its arguments. Heavy jobs run in another process, so their function must
 be defined at module level and their arguments must be picklable; NumPy arrays among
 the arguments are passed through shared memory instead of being pickled.
+
+A light job that needs a heavy third-party module (Polars, PyArrow, ...) names it in
+:attr:`Job.imports`. The scheduler imports those modules on the main thread before the
+job starts: loading an extension module on a worker thread while PySide6's import hook
+and the Qt event loop run on the main thread can crash the interpreter.
 """
 
 from __future__ import annotations
@@ -20,11 +25,16 @@ WEIGHTS: tuple[Weight, ...] = ("light", "heavy")
 
 @dataclass(frozen=True)
 class Job:
-    """A function to call with ``args`` and ``kwargs``."""
+    """A function to call with ``args`` and ``kwargs``.
+
+    ``imports`` are module names the function imports lazily; for light jobs the
+    scheduler imports them on the main thread first (see the module docstring).
+    """
 
     fn: Callable[..., Any]
     args: tuple[Any, ...] = ()
     kwargs: Mapping[str, Any] = field(default_factory=dict)
+    imports: tuple[str, ...] = ()
 
     def __call__(self) -> Any:
         return self.fn(*self.args, **self.kwargs)
