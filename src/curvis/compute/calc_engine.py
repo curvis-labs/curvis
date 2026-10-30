@@ -81,6 +81,7 @@ class CalcEngine(QObject):
         self._signatures: dict[str, _Signature] = {}
         self._graph_errors: dict[str, str] = {}  # problems found while declaring a node
         self._pending: list[str] = []
+        self._global_names = {c.name for c in global_constants()}
         # The graph must be up to date before the recalculator reads it after a command,
         # and definition changes are recomputed after it has marked its stale nodes.
         self._unsubscribe_sync = document.undo_stack.subscribe(self._sync_on_event)
@@ -105,8 +106,14 @@ class CalcEngine(QObject):
         self.recalculator.recompute(list(self._signatures))
 
     def constants_changed(self, names: Sequence[str]) -> None:
-        """The global constants ``names`` were added, changed or removed."""
+        """The constants ``names`` were added, changed or removed outside a command."""
         self.recalculator.changed([constant_node(n) for n in names], delay_ms=0)
+
+    def global_constants_changed(self) -> None:
+        """The global constants changed: recompute what uses the old or the new ones."""
+        current = {c.name for c in self.global_constants()}
+        self.constants_changed(sorted(self._global_names | current))
+        self._global_names = current
 
     def close(self) -> None:
         self._unsubscribe_sync()

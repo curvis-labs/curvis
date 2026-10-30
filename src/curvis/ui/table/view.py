@@ -136,9 +136,16 @@ class CellDelegate(QStyledItemDelegate):
 
 
 class TableView(QTableView):
-    """The table of one document. ``error`` sends why an edit was refused."""
+    """The table of one document. ``error`` sends why an edit was refused.
+
+    Opening the Calculate dialog is left to the owner of the view: the view asks for it
+    with ``calculate_requested`` and ``edit_calculation_requested``.
+    """
 
     error = Signal(str)
+    calculate_requested = Signal()
+    edit_calculation_requested = Signal(str)
+    """Id of a calculated column whose calculation should be edited."""
 
     def __init__(self, model: TableModel, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -228,6 +235,12 @@ class TableView(QTableView):
         ]
         bottom = y0 + n_rows * row_h
 
+        # Calculated columns get a background of their own.
+        calculated = palette.color(group, QPalette.ColorRole.AlternateBase)
+        for c, x, w in cols:
+            if model.is_calculated_column(c):
+                painter.fillRect(x, y0, w, bottom - y0, calculated)
+
         # Selected cells.
         visible = [
             (max(t, first_row), max(lf, first_col), min(b, last_row), min(rt, last_col))
@@ -313,7 +326,18 @@ class TableView(QTableView):
         trigger: QAbstractItemView.EditTrigger = QAbstractItemView.EditTrigger.AllEditTriggers,
         event: QEvent | None = None,
     ) -> bool:
-        self.cell_delegate.enter_mode = trigger == QAbstractItemView.EditTrigger.AnyKeyPressed
+        triggers = QAbstractItemView.EditTrigger
+        if index.isValid() and self.model().is_calculated_column(index.column()):
+            column = self.model().column_at(index.column())
+            assert column is not None
+            if trigger in (triggers.DoubleClicked, triggers.EditKeyPressed):
+                self.edit_calculation_requested.emit(column.id)
+            elif trigger == triggers.AnyKeyPressed:
+                self.error.emit(
+                    f"Column '{column.name}' is calculated. Edit its calculation to change it."
+                )
+            return False
+        self.cell_delegate.enter_mode = trigger == triggers.AnyKeyPressed
         return super().edit(index, trigger, event)  # type: ignore[arg-type]  # Qt allows null
 
     def move_cursor(self, d_row: int, d_col: int) -> None:
@@ -647,10 +671,30 @@ class TableView(QTableView):
             model.category_at(cols) is not None
         )
         menu.addSeparator()
+        menu.addAction("Ca&lculate…", self.calculate_requested.emit)
+        edit_calc = menu.addAction("&Edit calculation…", self.edit_current_calculation)
+        edit_calc.setEnabled(self.current_calculated_column() is not None)
+        menu.addSeparator()
         menu.addAction("Move &left", self.move_selected_left).setEnabled(has_columns)
         menu.addAction("Move righ&t", self.move_selected_right).setEnabled(has_columns)
         menu.addAction("&Bulk rename…", self.bulk_rename)
         return menu
+
+    def current_calculated_column(self) -> str | None:
+        """Id of the calculated column of the current cell, or None."""
+        column = self.model().column_at(self.currentIndex().column())
+        if column is None or not self.model().is_calculated_column(self.currentIndex().column()):
+            return None
+        return column.id
+
+    def edit_current_calculation(self) -> bool:
+        """Ask to edit the calculation of the current column; False if it is not calculated."""
+        column_id = self.current_calculated_column()
+        if column_id is None:
+            self.error.emit("This column is not calculated.")
+            return False
+        self.edit_calculation_requested.emit(column_id)
+        return True
 
     def _show_header_menu(self, pos: QPoint) -> None:
         header = self.horizontalHeader()
