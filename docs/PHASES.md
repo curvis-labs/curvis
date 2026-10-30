@@ -256,9 +256,9 @@ Make a plan first. When done, report what you built and the test results.
 **Gate for phase 1:** spend an hour entering, pasting, importing and calculating real data from your lab. Note anything awkward and fix it before phase 2.
 
 **Done when**
-- [ ] docs/DESIGN.md describes dialog layout, spacing, colours, wording, feedback and keyboard use, and you have approved it.
-- [ ] You have approved mockups of the Analyze dialog, the Results panel and the Format dialog.
-- [ ] The existing dialogs follow DESIGN.md in light and dark themes, with nothing overlapping or cut off at their default size.
+- [x] docs/DESIGN.md describes dialog layout, spacing, colours, wording, feedback and keyboard use, and you have approved it.
+- [x] You have approved mockups of the Analyze dialog, the Results panel and the Format dialog.
+- [x] The existing dialogs follow DESIGN.md in light and dark themes, with nothing overlapping or cut off at their default size.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 1.6 in docs/PHASES.md.
