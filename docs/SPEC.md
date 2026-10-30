@@ -33,7 +33,7 @@ Columns can be organized further:
 
 Columns and column groups are movable by drag and drop.
 
-**Import.** CSV, TSV and Excel (.xlsx and .xls) files load through a preview dialog where you pick the header row and the delimiter (auto-detect, comma, semicolon, tab or space).
+**Import.** CSV, TSV and Excel (.xlsx and .xls) files load through a preview dialog where you pick the header row and the delimiter (auto-detect, comma, semicolon, tab or space), and optionally the range of rows and columns to import.
 
 **Calculated columns.** The Calculate dialog adds derived columns from four ready-made calculations or a custom formula:
 

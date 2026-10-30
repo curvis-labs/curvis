@@ -1,0 +1,7 @@
+Export title
+Sample,Dose,Resp,Note
+s1,1,10,a
+s2,2,20,b
+s3,3,30,c
+s4,4,40,d
+total,10,100,,extra
