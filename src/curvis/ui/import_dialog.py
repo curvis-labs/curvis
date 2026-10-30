@@ -201,13 +201,13 @@ class ImportDialog(QDialog):
         options = QGroupBox("Options", self)
         options_layout = QVBoxLayout(options)
         options_layout.addLayout(form)
+        options_layout.addWidget(self.advanced_section)
         options_layout.addStretch(1)
         left.addWidget(options, 1)
         preview = QGroupBox("Preview", self)
         preview_layout = QVBoxLayout(preview)
         preview_layout.addWidget(self.table)
         right.addWidget(preview, 1)
-        self.skeleton.body.addWidget(self.advanced_section)
         self.skeleton.set_problem("Reading the file…")
         set_tab_order(
             [
@@ -219,9 +219,9 @@ class ImportDialog(QDialog):
                 self.first_column,
                 self.last_column,
                 self.first_column_is_x,
-                self.table,
                 self.advanced_toggle,
                 self.decimal_comma,
+                self.table,
             ]
         )
         self.delimiter.setFocus()

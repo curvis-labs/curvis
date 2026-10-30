@@ -18,10 +18,10 @@ Format, Import).
 │ One sentence on what the selected kind does.       ← secondary text   │
 │ ┌ Inputs ──────────────┐ ┌ Options ───────────────────────────────┐ │
 │ │ what to work on      │ │ options of the selected kind (stacked) │ │
-│ │ (columns, file …)    │ ├ Result ────────────────────────────────┤ │
+│ │ (columns, file …)    │ │ ▸ Advanced         ← collapsed section │ │
+│ │                      │ ├ Result ────────────────────────────────┤ │
 │ │                      │ │ formula, preview, live graph …         │ │
 │ └──────────────────────┘ └────────────────────────────────────────┘ │
-│ ▸ Advanced                                 ← collapsed section       │
 │ ⚠ Feedback line: why OK is disabled, or a warning                    │
 │ Secondary settings (suffix, placement)          [Calculate] [Cancel] │
 └──────────────────────────────────────────────────────────────────────┘
@@ -31,13 +31,15 @@ Format, Import).
   most used kind, or the one that best fits the data. A one-line description of the selected
   kind sits under the tabs.
 - **Inputs** go in the left column; **options** and **result** go in the right column. Both
-  columns get equal stretch. Options sit at the top of the right column at the height of their
+  columns get equal stretch, unless one holds a wide list or preview, which then gets 3 : 2
+  (Import's preview, Bulk rename's list of names). Options sit at the top of the right column at the height of their
   current page. The result takes the rest of the height. When a kind has nothing to pick
   (Format › Graph), its options move into the left column and the result stays on the right.
 - **Secondary settings** (naming, placement, “append at the end”) go at the left of the button
   row. They never go in the main columns.
-- **Advanced options** go in a collapsed `Advanced` section under the columns. It is closed by
-  default and stays closed every time the dialog opens. The common case never needs it. Use
+- **Advanced options** go in a collapsed `Advanced` section at the bottom of the options panel
+  they extend (in Import, the options on the left). It is closed by default and stays closed
+  every time the dialog opens. The common case never needs it. Use
   `CollapsibleSection`.
 
 ### The simple dialog
@@ -65,7 +67,7 @@ Inner layouts (pages, rows) have zero margins; only the dialog has a margin.
 
 | Dialog | Default size | Minimum size |
 | --- | --- | --- |
-| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 |
+| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 (to be confirmed for Analyze and Format in steps 2.2 and 2.6) |
 | Bulk rename | 720 × 520 | 600 × 420 |
 | Constants | 560 × 420 | 460 × 340 |
 | Simple dialog (Settings, constant editor) | its size hint | its size hint, at least 360 wide |
@@ -163,8 +165,8 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
 
 ## 6. Keyboard
 
-- **Tab order is reading order**: choice tabs → left column (top to bottom) → right column →
-  Advanced → secondary settings → buttons. `set_tab_order()` sets it from a list.
+- **Tab order is reading order**: choice tabs → left column (top to bottom) → right column
+  (top to bottom, Advanced at the end of its options panel) → secondary settings → buttons. `set_tab_order()` sets it from a list.
 - **First focus** goes to the field the user most likely changes first: the list of columns in
   Calculate, the Find box in Bulk rename, the delimiter in Import.
 - **Choice tabs**: Ctrl+Tab and Ctrl+Shift+Tab move to the next and previous tab (`choice_tabs()`
