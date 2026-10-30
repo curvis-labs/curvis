@@ -31,13 +31,21 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QTabBar,
+    QVBoxLayout,
     QWidget,
 )
 from pytestqt.qtbot import QtBot
 
 from curvis.compute import Scheduler
+from curvis.core import CalculationKind
 from curvis.settings import Settings
-from curvis.ui.dialogs import WORKBENCH_MINIMUM, WORKBENCH_SIZE, DialogSkeleton
+from curvis.ui.dialogs import (
+    WORKBENCH_MINIMUM,
+    WORKBENCH_SIZE,
+    DialogSkeleton,
+    FittedStack,
+    secondary_label,
+)
 from curvis.ui.theme import dark_palette, light_palette
 from tests.ui.dialog_samples import SAMPLES, Context, settle
 
@@ -305,3 +313,52 @@ def test_the_checks_find_overlaps_cut_offs_and_clashes(qtbot: QtBot) -> None:
     assert any("cut off" in p for p in problems)
     letters = [mnemonic(text) for text, _ in mnemonic_texts(dialog)]  # type: ignore[arg-type]
     assert letters.count("s") == 2
+
+
+@pytest.mark.parametrize("size", ["default", "minimum"])
+def test_calculate_fits_a_wrapped_option_text(
+    size: str, qtbot: QtBot, context: Context, qapp: QApplication
+) -> None:
+    """Long role names make the custom formula's text wrap; the dialog makes room for it."""
+    dialog = open_sample("calculate_paired", qtbot, context, qapp)
+    dialog.set_kind(CalculationKind.CUSTOM)  # type: ignore[attr-defined]
+    dialog.a_name.setText("Vehicle control, day one")  # type: ignore[attr-defined]
+    dialog.b_name.setText("Treated with the drug, day one")  # type: ignore[attr-defined]
+    settle(dialog, context, qapp)
+    if size == "minimum":
+        resize(dialog, dialog.minimumSize().expandedTo(dialog.minimumSizeHint()), qapp)
+    problems = problems_with_fit(dialog)
+    assert not problems, "\n".join(problems)
+
+
+def test_a_fitted_stack_is_as_tall_as_the_page_shown(qtbot: QtBot) -> None:
+    stack = FittedStack()
+    short, tall = QWidget(), QWidget()
+    short.setMinimumHeight(20)
+    tall.setMinimumHeight(200)
+    stack.addWidget(short)
+    stack.addWidget(tall)
+    qtbot.addWidget(stack)
+    assert stack.minimumSizeHint().height() == 20
+    stack.setCurrentIndex(1)
+    assert stack.minimumSizeHint().height() == 200
+
+
+def test_a_fitted_stack_wraps_a_label_that_gets_its_text_later(qtbot: QtBot) -> None:
+    window = QWidget()
+    qtbot.addWidget(window)
+    layout = QVBoxLayout(window)
+    stack = FittedStack()
+    label = secondary_label()  # no text yet, as in Calculate's custom formula page
+    stack.addWidget(label)
+    stack.addWidget(QWidget())
+    layout.addWidget(stack)
+    layout.addStretch(1)
+    stack.setCurrentIndex(1)
+    label.setText("A sentence long enough to need several lines in a narrow window. " * 3)
+    stack.setCurrentIndex(0)
+    window.resize(200, 400)
+    window.show()
+    qtbot.waitExposed(window)
+    assert label.heightForWidth(label.width()) > 2 * label.fontMetrics().height()
+    qtbot.waitUntil(lambda: label.height() >= label.heightForWidth(label.width()), timeout=1000)

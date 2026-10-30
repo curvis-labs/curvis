@@ -395,12 +395,12 @@ class CalculateDialog(QDialog):
                 self.not_paired,
                 self.paired,
                 self.a_name,
+                self.role_a_button,
                 self.b_name,
+                self.role_b_button,
                 self.tree,
                 self.select_all_button,
                 self.deselect_all_button,
-                self.role_a_button,
-                self.role_b_button,
                 self.options,
                 self.formula_edit,
                 *self.palette_buttons.values(),
@@ -429,15 +429,25 @@ class CalculateDialog(QDialog):
         self.not_paired.setChecked(True)
         layout.addLayout(pairing_row)
 
-        names = QHBoxLayout()
+        # Each role's name, and the button that gives the selected columns that role.
+        names = QGridLayout()
         self.a_name = QLineEdit(DEFAULT_ROLE_A)
         self.b_name = QLineEdit(DEFAULT_ROLE_B)
         self.a_label = QLabel("Role &A name:")
         self.a_label.setBuddy(self.a_name)
         self.b_label = QLabel("Role &B name:")
         self.b_label.setBuddy(self.b_name)
-        for widget in (self.a_label, self.a_name, self.b_label, self.b_name):
-            names.addWidget(widget)
+        self.role_a_button = QPushButton("Set role A")
+        self.role_b_button = QPushButton("Set role B")
+        for row, widgets in enumerate(
+            (
+                (self.a_label, self.a_name, self.role_a_button),
+                (self.b_label, self.b_name, self.role_b_button),
+            )
+        ):
+            for column, widget in enumerate(widgets):
+                names.addWidget(widget, row, column)
+        names.setColumnStretch(1, 1)
         layout.addLayout(names)
 
         self.tree = QTreeWidget()
@@ -453,8 +463,6 @@ class CalculateDialog(QDialog):
         buttons = QHBoxLayout()
         select_all = self.select_all_button = QPushButton("Select a&ll")
         deselect_all = self.deselect_all_button = QPushButton("&Deselect all")
-        self.role_a_button = QPushButton("Set role A")
-        self.role_b_button = QPushButton("Set role B")
         select_all.clicked.connect(lambda: self._check_all(True))
         deselect_all.clicked.connect(lambda: self._check_all(False))
         self.role_a_button.clicked.connect(lambda: self.set_role_of_selected(ROLE_A))
@@ -462,8 +470,6 @@ class CalculateDialog(QDialog):
         for button in (select_all, deselect_all):
             buttons.addWidget(button)
         buttons.addStretch(1)
-        buttons.addWidget(self.role_a_button)
-        buttons.addWidget(self.role_b_button)
         layout.addLayout(buttons)
 
         self.pairing_group.buttonToggled.connect(lambda *_: self._on_pairing_changed())
@@ -547,6 +553,7 @@ class CalculateDialog(QDialog):
         self.highlighter = FormulaHighlighter(self.formula_edit.document(), self.formula_edit)
         layout.addWidget(self.formula_edit)
         self.formula_error = error_label()
+        self.formula_error.hide()  # shown only while there is an error, to save its line
         layout.addWidget(self.formula_error)
 
         tabs = QHBoxLayout()
@@ -895,6 +902,7 @@ class CalculateDialog(QDialog):
             with QSignalBlocker(self.formula_edit):
                 self.highlighter.rehighlight()
         self.formula_error.setText(error.reason + "." if error and text.strip() else "")
+        self.formula_error.setVisible(bool(self.formula_error.text()))
         problem = self.problem()
         under_formula = error is not None and problem == error.reason and bool(text.strip())
         self.skeleton.set_problem(problem, shown_in=self.formula_error if under_formula else None)

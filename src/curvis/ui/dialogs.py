@@ -19,7 +19,7 @@ from itertools import pairwise
 
 import shiboken6
 from PySide6.QtCore import QAbstractItemModel, QEvent, QObject, QSize, Qt, Signal
-from PySide6.QtGui import QKeySequence, QPalette, QShortcut
+from PySide6.QtGui import QKeySequence, QPalette, QResizeEvent, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QBoxLayout,
@@ -319,31 +319,46 @@ class CollapsibleSection(QWidget):
 class FittedStack(QStackedWidget):
     """A stacked widget that takes the size of the page shown, not of its tallest page.
 
-    Hidden pages get the Ignored size policy, which the stacked layout leaves out when it
-    works out its size; the page shown gets its own policy back.
+    Its size hints are those of the page shown. A page whose height depends on its width
+    (a word-wrapped label) gets the height it needs at the stack's width. The pages keep
+    their own size policies.
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._policies: dict[int, QSizePolicy] = {}
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
-        self.currentChanged.connect(lambda _index: self.fit())
+        self.currentChanged.connect(lambda _index: self.updateGeometry())
 
-    def addWidget(self, widget: QWidget) -> int:  # noqa: N802 (Qt API)
-        self._policies[id(widget)] = widget.sizePolicy()
-        index = super().addWidget(widget)
-        self.fit()
-        return index
+    def _fit(self, size: QSize) -> QSize:
+        page = self.currentWidget()
+        margins = self.contentsMargins()
+        if page is not None and page.hasHeightForWidth() and self.width() > 0:
+            inner = self.width() - margins.left() - margins.right()
+            size.setHeight(max(size.height(), page.heightForWidth(inner)))
+        return size.grownBy(margins)
 
-    def fit(self) -> None:
-        ignored = QSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-        for i in range(self.count()):
-            page = self.widget(i)
-            if page is None:
-                continue
-            own = self._policies.get(id(page), page.sizePolicy())
-            page.setSizePolicy(own if i == self.currentIndex() else ignored)
-        self.updateGeometry()
+    def sizeHint(self) -> QSize:  # noqa: N802 (Qt API)
+        page = self.currentWidget()
+        if page is None:
+            return super().sizeHint()
+        return self._fit(page.sizeHint().expandedTo(page.minimumSize()))
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (Qt API)
+        page = self.currentWidget()
+        if page is None:
+            return super().minimumSizeHint()
+        return self._fit(page.minimumSizeHint().expandedTo(page.minimumSize()))
+
+    def event(self, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.LayoutRequest:
+            self.updateGeometry()  # the page shown changed size: so does the stack
+        return super().event(event)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 (Qt API)
+        super().resizeEvent(event)
+        page = self.currentWidget()
+        if event.oldSize().width() != event.size().width() and page and page.hasHeightForWidth():
+            self.updateGeometry()  # a wrapped page needs another height at this width
 
 
 class EmptyState(QObject):
