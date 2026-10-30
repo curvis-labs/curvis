@@ -1,11 +1,11 @@
 """The Import dialog: preview a CSV or TSV file and choose how to read it.
 
 Each change of an option reads the file again as a scheduler job, and the preview shows
-the rows as the import would split them: rows above the header dimmed, the header row
-in bold, the first data rows of the row range, and each imported column's name and
-role in the column header (columns outside the column range are dimmed). Rows are
-numbered as in the file. The dialog only collects options; the main window runs the
-import.
+the rows as the import would split them: rows above the header dimmed, then the first
+data rows of the row range. The header row itself is not repeated in the grid: each
+imported column's name and role are in the column header (columns outside the column
+range are dimmed). Rows are numbered as in the file. The dialog only collects options;
+the main window runs the import.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QPersistentModelIndex, Qt
-from PySide6.QtGui import QFont, QPalette
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -52,26 +52,27 @@ COLUMN_MAX = 100_000
 
 
 class PreviewModel(QAbstractTableModel):
-    """The rows of a :class:`CsvPreview`, read-only."""
+    """The rows of a :class:`CsvPreview` except the header row, read-only."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.preview: CsvPreview | None = None
+        self._rows: list[int] = []  # index in preview.rows of each row shown
         self._columns = 0
 
     def set_preview(self, preview: CsvPreview | None) -> None:
         self.beginResetModel()
         self.preview = preview
+        self._rows = []
         self._columns = 0
         if preview is not None:
-            widest = max((len(r) for r in preview.rows), default=0)
+            self._rows = [i for i in range(len(preview.rows)) if i != preview.header_index]
+            widest = max((len(preview.rows[i]) for i in self._rows), default=0)
             self._columns = max(widest, len(preview.names))
         self.endResetModel()
 
     def rowCount(self, parent: _Index = QModelIndex()) -> int:  # noqa: B008, N802 (Qt API)
-        if parent.isValid() or self.preview is None:
-            return 0
-        return len(self.preview.rows)
+        return 0 if parent.isValid() else len(self._rows)
 
     def columnCount(self, parent: _Index = QModelIndex()) -> int:  # noqa: B008, N802 (Qt API)
         return 0 if parent.isValid() else self._columns
@@ -80,15 +81,11 @@ class PreviewModel(QAbstractTableModel):
         preview = self.preview
         if preview is None or not index.isValid():
             return None
-        row, col = index.row(), index.column()
+        row, col = self._rows[index.row()], index.column()
         if role == Qt.ItemDataRole.DisplayRole:
             record = preview.rows[row]
             return record[col] if col < len(record) else ""
-        if role == Qt.ItemDataRole.FontRole and row == preview.header_index:
-            font = QFont()
-            font.setBold(True)
-            return font
-        skipped = row < preview.data_start and row != preview.header_index
+        skipped = row < preview.data_start
         in_range = preview.column_start <= col < preview.column_start + len(preview.names)
         if role == Qt.ItemDataRole.ForegroundRole and (skipped or not in_range):
             return QApplication.palette().brush(QPalette.ColorRole.PlaceholderText)
@@ -100,7 +97,7 @@ class PreviewModel(QAbstractTableModel):
         if role != Qt.ItemDataRole.DisplayRole or self.preview is None:
             return None
         if orientation == Qt.Orientation.Vertical:
-            return str(self.preview.row_numbers[section])
+            return str(self.preview.row_numbers[self._rows[section]])
         column = section - self.preview.column_start
         if 0 <= column < len(self.preview.names):
             return f"{self.preview.names[column]}\n{self.preview.roles[column].value}"
@@ -147,8 +144,9 @@ class ImportDialog(QDialog):
             "The first number column in the column range becomes the X column."
         )
 
-        # 0 is shown as "First" or "Last": the whole file, whatever its size.
-        self.first_row = _spin_box(self, 0, ROW_MAX, "First")
+        # 0 is shown as "Last": to the end of the file, whatever its size.
+        # The first row starts at the first data row and follows the header row.
+        self.first_row = _spin_box(self, 2, ROW_MAX)
         self.first_row.setToolTip("The first row to import, numbered as in the file.")
         self.last_row = _spin_box(self, 0, ROW_MAX, "Last")
         self.last_row.setToolTip("The last row to import, numbered as in the file.")
@@ -212,7 +210,7 @@ class ImportDialog(QDialog):
         layout.addWidget(self.buttons)
 
         self.delimiter.currentIndexChanged.connect(self._on_delimiter_changed)
-        self.header_row.valueChanged.connect(self._refresh)
+        self.header_row.valueChanged.connect(self._on_header_changed)
         self.no_header.toggled.connect(self._on_no_header_toggled)
         self.first_column_is_x.toggled.connect(self._refresh)
         for spin in (self.first_row, self.last_row, self.first_column, self.last_column):
@@ -231,7 +229,7 @@ class ImportDialog(QDialog):
             header_row=None if self.no_header.isChecked() else self.header_row.value(),
             first_column_is_x=self.first_column_is_x.isChecked(),
             decimal_comma=self._decimal_comma,
-            first_row=self.first_row.value() or None,
+            first_row=self._first_row(),
             last_row=self.last_row.value() or None,
             first_column=self.first_column.value(),
             last_column=self.last_column.value() or None,
@@ -255,9 +253,33 @@ class ImportDialog(QDialog):
         self.decimal_comma.setEnabled(self.delimiter.currentData() != ",")
         self._refresh()
 
+    def _on_header_changed(self, _value: int) -> None:
+        self._follow_header()
+        self._refresh()
+
     def _on_no_header_toggled(self, checked: bool) -> None:
         self.header_row.setEnabled(not checked)
+        self._follow_header()
         self._refresh()
+
+    def _data_row(self) -> int:
+        """The first row under the header (row 1 without one)."""
+        return 1 if self.no_header.isChecked() else self.header_row.value() + 1
+
+    def _first_row(self) -> int | None:
+        """The first row option: ``None`` when it is the first data row anyway."""
+        value = self.first_row.value()
+        return value if value > self._data_row() else None
+
+    def _follow_header(self) -> None:
+        """Keep the first row at the first data row, unless the user moved it further."""
+        spin = self.first_row
+        at_start = spin.value() == spin.minimum()
+        spin.blockSignals(True)  # one refresh for the header change is enough
+        spin.setMinimum(self._data_row())
+        if at_start:
+            spin.setValue(spin.minimum())
+        spin.blockSignals(False)
 
     def _on_decimal_comma_clicked(self, checked: bool) -> None:
         self._decimal_comma = checked
