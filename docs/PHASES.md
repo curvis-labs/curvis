@@ -1,11 +1,11 @@
 # Curvis — build phases and Claude Code prompts
 
-Curvis is built in 5 phases and 25 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
+Curvis is built in 5 phases and 26 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
 
 | Phase | Steps | Ends with (gate) |
 | --- | --- | --- |
 | 0 Foundations | 0.1–0.5 | App starts on Windows, macOS and Linux from CI-built installers |
-| 1 Data tables | 1.1–1.5 | You can type, paste, import and calculate data comfortably |
+| 1 Data tables | 1.1–1.6 | You can type, paste, import and calculate data comfortably; dialogs follow one design |
 | 2 Core analyses + MVP | 2.1–2.7 | MVP beta: core tests match R, speed targets met |
 | 3 Full outline | 3.1–3.6 | Every feature in SPEC.md works |
 | 4 Release 1.0 | 4.1–4.2 | Validation report published, 1.0 installers released |
@@ -229,8 +229,6 @@ Make a plan first. When done, report what you built, test results and the benchm
 
 ### Step 1.5 — Calculate dialog and live calculated columns
 
-**Gate for phase 1:** spend an hour entering, pasting, importing and calculating real data from your lab. Note anything awkward and fix it before phase 2.
-
 **Done when**
 - [x] Baseline subtraction, normalize 0–100%, fold change and custom formula create calculated columns.
 - [x] Calculated columns update automatically when their inputs change and can be edited later.
@@ -251,6 +249,39 @@ Decisions to confirm with me before coding:
 - Normalize 0–100%: normalise to the column's own min/max, or to user-chosen 0% and 100% values?
 
 Make a plan first. When done, report what you built and the test results.
+```
+
+### Step 1.6 — UI design guidelines and dialog pass
+
+**Gate for phase 1:** spend an hour entering, pasting, importing and calculating real data from your lab. Note anything awkward and fix it before phase 2.
+
+**Done when**
+- [ ] docs/DESIGN.md describes dialog layout, spacing, colours, wording, feedback and keyboard use, and you have approved it.
+- [ ] You have approved mockups of the Analyze dialog, the Results panel and the Format dialog.
+- [ ] The existing dialogs follow DESIGN.md in light and dark themes, with nothing overlapping or cut off at their default size.
+
+```text
+Read CLAUDE.md, docs/SPEC.md and step 1.6 in docs/PHASES.md.
+
+Write short UI design guidelines and bring the existing dialogs in line with them. Add no new features:
+- docs/DESIGN.md, short and concrete:
+  - Dialog layout, with the Calculate dialog as the reference: choices as tabs across the top, inputs on the left, options and result on the right, secondary settings in the button row, advanced options in a collapsed section. Say when a simple one-column dialog is enough.
+  - Spacing, margins, default and minimum dialog sizes, and how panels resize (a stacked panel takes the height of the page shown, not of its tallest page).
+  - Colours from palette roles only: which role is used for what (calculated columns, errors, warnings, role badges), with enough contrast in light and dark themes.
+  - Wording: sentence case, verbs on buttons ("Calculate", "Import"), button order, mnemonics that do not clash within a dialog.
+  - Feedback: where errors, assumption warnings and plain-language readings appear; a disabled OK always shows why; empty states.
+  - Keyboard: tab order, shortcuts, command palette entries.
+- A small shared module in src/curvis/ui for what DESIGN.md defines (dialog skeleton, spacing, stacked-page sizing), used by the existing dialogs.
+- Mockups (an HTML canvas, not code) of the Analyze dialog, the Results panel and the Format dialog from SPEC.md, following DESIGN.md, for steps 2.2 and 2.6 to build from.
+- Apply DESIGN.md to the Import, Bulk rename, Calculate, Constants and Settings dialogs. Take offscreen screenshots of each in light and dark theme, before and after.
+- Add a line to the UI conventions in CLAUDE.md that points to docs/DESIGN.md.
+- pytest-qt tests that every dialog fits its default size without overlapping widgets, and that every control has a label or an accessible name.
+
+Decisions to confirm with me before coding:
+- OK/Cancel order: follow each platform (Qt's default), or one fixed order everywhere?
+- Which dialogs, besides Analyze, Results panel and Format, should get mockups now?
+
+Make a plan first. Show me DESIGN.md and the mockups before changing any dialog. When done, report what changed in each dialog with the before and after screenshots, and the test results.
 ```
 
 ---
@@ -292,6 +323,7 @@ Build the analysis framework, with no real statistics yet (use the descriptive s
 - Analyze dialog: families and analyses filtered by can_run, opening on survival / curve fits / compare groups per SPEC.md; parameters form with sensible defaults and an "Advanced" section.
 - Results panel docked next to the table; Ctrl+C copies the selection as tab-separated text.
 - Analyses are dependency-graph nodes: they rerun when source data changes and show a "stale" badge while running. Recently used analyses are remembered in settings.
+- Follow docs/DESIGN.md and the Analyze dialog and Results panel mockups approved in step 1.6.
 - pytest-qt tests for filtering, running, rerunning and copying.
 
 Make a plan first. When done, report what you built and the test results.
@@ -379,7 +411,7 @@ Make a plan first. When done, report what you built and the redraw benchmark.
 Read CLAUDE.md, docs/SPEC.md and step 2.6 in docs/PHASES.md.
 
 Build:
-- Format dialog editing the ChartSpec only (one undoable command per OK): graph title, aspect ratio presets (4:3, 16:9, 1:1, 3:4, 3:2) and custom size, each axis (title, range, label, linear/log), each series (symbol, size, line style, width, color, error-bar type), color scheme and chart text size. Changes preview live.
+- Format dialog editing the ChartSpec only (one undoable command per OK): graph title, aspect ratio presets (4:3, 16:9, 1:1, 3:4, 3:2) and custom size, each axis (title, range, label, linear/log), each series (symbol, size, line style, width, color, error-bar type), color scheme and chart text size. Changes preview live. Follow docs/DESIGN.md and the Format dialog mockup approved in step 1.6.
 - render_mpl: Matplotlib renderer from the same ChartSpec for XY, bar and box; export to PNG (choose dpi), SVG and PDF with embedded fonts.
 - Image-diff tests comparing render_qt and render_mpl output for every variant in light and dark theme, with a documented threshold; an export benchmark.
 
