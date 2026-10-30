@@ -17,15 +17,10 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QHBoxLayout,
+    QGroupBox,
     QHeaderView,
-    QLabel,
     QLineEdit,
-    QRadioButton,
     QSpinBox,
-    QStackedWidget,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -35,6 +30,17 @@ from PySide6.QtWidgets import (
 from curvis.data import NodeKind, Table, name_error
 from curvis.data.layout import Node, layout_tree
 from curvis.data.rename import NUMBER_MARK, find_replace, numbered_name
+from curvis.ui.dialogs import (
+    FIELD_WIDTH,
+    DialogSkeleton,
+    FittedStack,
+    Severity,
+    choice_tabs,
+    columns,
+    form_layout,
+    secondary_label,
+    set_tab_order,
+)
 
 _KIND_LABELS = {
     NodeKind.CATEGORY: "Category",
@@ -76,22 +82,19 @@ class BulkRenameDialog(QDialog):
         self.table = table
         checked = set(checked_columns) or {c.id for c in table.columns}
 
-        self.find_mode = QRadioButton("&Find and replace", self)
-        self.number_mode = QRadioButton("&Numbered names", self)
-        self.find_mode.setChecked(True)
-        modes = QHBoxLayout()
-        modes.addWidget(self.find_mode)
-        modes.addWidget(self.number_mode)
-        modes.addStretch()
+        self.mode_tabs = choice_tabs(self, "Renaming rule")
+        self.mode_tabs.addTab("Find and replace")
+        self.mode_tabs.addTab("Numbered names")
+        self.mode_description = secondary_label(parent=self)
 
         self.find_edit = QLineEdit(self)
         self.replace_edit = QLineEdit(self)
         self.match_case = QCheckBox("Match &case", self)
         find_page = QWidget(self)
-        find_form = QFormLayout(find_page)
-        find_form.setContentsMargins(0, 0, 0, 0)
-        find_form.addRow("Find:", self.find_edit)
-        find_form.addRow("Replace with:", self.replace_edit)
+        find_form = form_layout()
+        find_page.setLayout(find_form)
+        find_form.addRow("&Find", self.find_edit)
+        find_form.addRow("&Replace with", self.replace_edit)
         find_form.addRow("", self.match_case)
 
         self.pattern_edit = QLineEdit(self)
@@ -105,19 +108,22 @@ class BulkRenameDialog(QDialog):
         self.step_spin = QSpinBox(self)
         self.step_spin.setRange(-1000, 1000)
         self.step_spin.setValue(1)
+        for spin in (self.start_spin, self.step_spin):
+            spin.setMaximumWidth(FIELD_WIDTH)
         number_page = QWidget(self)
-        number_form = QFormLayout(number_page)
-        number_form.setContentsMargins(0, 0, 0, 0)
-        number_form.addRow("Pattern:", self.pattern_edit)
-        number_form.addRow("Start at:", self.start_spin)
-        number_form.addRow("Step:", self.step_spin)
+        number_form = form_layout()
+        number_page.setLayout(number_form)
+        number_form.addRow("&Pattern", self.pattern_edit)
+        number_form.addRow("&Start at", self.start_spin)
+        number_form.addRow("S&tep", self.step_spin)
 
-        self.pages = QStackedWidget(self)
+        self.pages = FittedStack(self)
         self.pages.addWidget(find_page)
         self.pages.addWidget(number_page)
 
         self.tree = QTreeWidget(self)
         self.tree.setObjectName("bulkRenameItems")
+        self.tree.setAccessibleName("Names to change")
         self.tree.setHeaderLabels(["Name", "New name", "Kind"])
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.tree.setRootIsDecorated(False)
@@ -126,34 +132,44 @@ class BulkRenameDialog(QDialog):
         self._fill_tree(checked)
         self.tree.expandAll()
 
-        self.status = QLabel(self)
-        self.status.setWordWrap(True)
-        self.buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self
+        self.skeleton = DialogSkeleton(self, "Rename")
+        self.buttons = self.skeleton.buttons
+        self.status = self.skeleton.feedback
+        body = self.skeleton.body
+        body.addWidget(self.mode_tabs)
+        body.addWidget(self.mode_description)
+        left, right = columns(body, 3, 2)
+        items_box = QGroupBox("Tick what to rename", self)
+        QVBoxLayout(items_box).addWidget(self.tree)
+        left.addWidget(items_box, 1)
+        rule_box = QGroupBox("Rule", self)
+        QVBoxLayout(rule_box).addWidget(self.pages)
+        right.addWidget(rule_box)
+        right.addStretch(1)
+        set_tab_order(
+            [
+                self.mode_tabs,
+                self.tree,
+                self.find_edit,
+                self.replace_edit,
+                self.match_case,
+                self.pattern_edit,
+                self.start_spin,
+                self.step_spin,
+            ]
         )
-        ok = self.buttons.button(QDialogButtonBox.StandardButton.Ok)
-        ok.setText("Rename")
-        self.buttons.accepted.connect(self.accept)
-        self.buttons.rejected.connect(self.reject)
-
-        layout = QVBoxLayout(self)
-        layout.addLayout(modes)
-        layout.addWidget(self.pages)
-        layout.addWidget(QLabel("Tick what to rename:", self))
-        layout.addWidget(self.tree, 1)
-        layout.addWidget(self.status)
-        layout.addWidget(self.buttons)
-        self.resize(520, 480)
+        self.setMinimumSize(600, 420)
+        self.resize(720, 520)
 
         for edit in (self.find_edit, self.replace_edit, self.pattern_edit):
             edit.textChanged.connect(self._update)
         for spin in (self.start_spin, self.step_spin):
             spin.valueChanged.connect(self._update)
         self.match_case.toggled.connect(self._update)
-        self.number_mode.toggled.connect(self._on_mode_changed)
+        self.mode_tabs.currentChanged.connect(self._on_mode_changed)
         self.tree.itemChanged.connect(self._update)
         self.find_edit.setFocus()
-        self._update()
+        self._on_mode_changed()
 
     # --- items -------------------------------------------------------------------------
 
@@ -201,7 +217,7 @@ class BulkRenameDialog(QDialog):
     def new_names(self) -> dict[str, str]:
         """New name by id for every ticked item (unchanged names included)."""
         checked = self.checked_items()
-        if self.number_mode.isChecked():
+        if self.numbered:
             pattern = self.pattern_edit.text()
             if not pattern.strip():
                 return {}
@@ -236,10 +252,24 @@ class BulkRenameDialog(QDialog):
         r = self.renames()
         return name_error(self.table, r.columns, r.groups, r.categories)
 
-    def _on_mode_changed(self) -> None:
-        numbered = self.number_mode.isChecked()
+    @property
+    def numbered(self) -> bool:
+        """True for numbered names, False for find and replace."""
+        return self.mode_tabs.currentIndex() == 1
+
+    def set_numbered(self, numbered: bool) -> None:
+        self.mode_tabs.setCurrentIndex(1 if numbered else 0)
+
+    def _on_mode_changed(self, *_args: object) -> None:
+        numbered = self.numbered
         self.pages.setCurrentIndex(1 if numbered else 0)
-        (self.pattern_edit if numbered else self.find_edit).setFocus()
+        self.mode_description.setText(
+            f"Number the ticked items: {NUMBER_MARK} in the pattern becomes 1, 2, 3, …"
+            if numbered
+            else "Replace text in the names of the ticked items."
+        )
+        if self.isVisible():
+            (self.pattern_edit if numbered else self.find_edit).setFocus()
         self._update()
 
     def _update(self) -> None:
@@ -256,10 +286,9 @@ class BulkRenameDialog(QDialog):
         error = self.error() if renames else None
         n = len(renames.columns) + len(renames.groups) + len(renames.categories)
         if error:
-            self.status.setText(error)
+            self.skeleton.set_problem(error, Severity.ERROR)
         elif n == 0:
-            self.status.setText("No names change yet.")
+            self.skeleton.set_problem("No names change yet.")
         else:
-            self.status.setText("1 name will change." if n == 1 else f"{n} names will change.")
-        ok = self.buttons.button(QDialogButtonBox.StandardButton.Ok)
-        ok.setEnabled(n > 0 and error is None)
+            self.skeleton.set_problem(None)
+            self.skeleton.set_status("1 name will change." if n == 1 else f"{n} names will change.")

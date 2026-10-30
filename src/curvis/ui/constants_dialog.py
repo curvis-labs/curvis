@@ -14,8 +14,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
-    QDialogButtonBox,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -31,6 +29,15 @@ from curvis.core import AddConstant, CommandError, Document, EditConstant, Remov
 from curvis.core.constants import ProjectConstant
 from curvis.formula import BUILTIN_CONSTANTS, constant_name_problem
 from curvis.settings import Settings
+from curvis.ui.dialogs import (
+    SPACING,
+    DialogSkeleton,
+    EmptyState,
+    Severity,
+    form_layout,
+    secondary_label,
+    size_simple,
+)
 
 _ID = Qt.ItemDataRole.UserRole
 
@@ -48,25 +55,23 @@ class ConstantEditor(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
-        layout = QFormLayout(self)
+        self.skeleton = DialogSkeleton(self, "Save" if constant else "Add")
         self.name = QLineEdit(constant.name if constant else "")
         self.value = QLineEdit(repr(constant.value) if constant else "")
         self.unit = QLineEdit(constant.unit if constant else "")
-        layout.addRow("&Name:", self.name)
-        layout.addRow("&Value:", self.value)
-        layout.addRow("&Unit:", self.unit)
-        self.problem = QLabel()
-        layout.addRow(self.problem)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        self.ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
+        self.unit.setPlaceholderText("Optional, e.g. 1/s")
+        form = form_layout()
+        form.addRow("&Name", self.name)
+        form.addRow("&Value", self.value)
+        form.addRow("&Unit", self.unit)
+        self.skeleton.body.addLayout(form)
+        self.skeleton.body.addStretch(1)
+        assert self.skeleton.ok_button is not None
+        self.ok = self.skeleton.ok_button
         for edit in (self.name, self.value):
             edit.textChanged.connect(self._validate)
         self._validate()
+        size_simple(self)
 
     def number(self) -> float | None:
         try:
@@ -76,11 +81,16 @@ class ConstantEditor(QDialog):
         return value if math.isfinite(value) else None
 
     def _validate(self) -> None:
-        problem = constant_name_problem(self.name.text().strip())
+        name = self.name.text().strip()
+        problem = constant_name_problem(name) if name else "Enter a name."
         if problem is None and self.number() is None:
             problem = "Enter a number for the value."
-        self.problem.setText(problem or "")
-        self.ok.setEnabled(problem is None)
+        self.skeleton.set_problem(problem)
+
+    @property
+    def problem(self) -> str:
+        """Why Add or Save is disabled, or ""."""
+        return self.skeleton.feedback.text()
 
 
 class ConstantsDialog(QDialog):
@@ -93,27 +103,25 @@ class ConstantsDialog(QDialog):
         self.document = document
         self.settings = settings
         self.setWindowTitle("Constants")
-        self.resize(560, 420)
-        layout = QVBoxLayout(self)
+        self.skeleton = DialogSkeleton(self, close_only=True)
+        body = self.skeleton.body
         intro = QLabel(
             "Use constants in formulas by name, e.g. [Rate] * k_on. A project constant "
             "overrides a global one with the same name."
         )
         intro.setWordWrap(True)
-        layout.addWidget(intro)
+        body.addWidget(intro)
         self.tabs = QTabWidget()
-        layout.addWidget(self.tabs, 1)
+        self.tabs.tabBar().setAccessibleName("Kind of constants")
+        body.addWidget(self.tabs, 1)
         self.tables: dict[Scope, QTableWidget] = {}
         if document is not None:
             self.tabs.addTab(self._scope_page(Scope.PROJECT), "&Project")
         self.tabs.addTab(self._scope_page(Scope.GLOBAL), "&Global")
         self.tabs.addTab(self._builtin_page(), "&Built-in")
-        self.error = QLabel()
-        self.error.setWordWrap(True)
-        layout.addWidget(self.error)
-        close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        close.rejected.connect(self.reject)
-        layout.addWidget(close)
+        self.error = self.skeleton.feedback  # why the last change was refused
+        self.setMinimumSize(460, 340)
+        self.resize(560, 420)
         self.refresh()
 
     # --- pages -----------------------------------------------------------------------------
@@ -121,10 +129,14 @@ class ConstantsDialog(QDialog):
     def _scope_page(self, scope: Scope) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        layout.setContentsMargins(SPACING, SPACING, SPACING, SPACING)
+        layout.setSpacing(SPACING)
         table = _constants_table()
+        table.setAccessibleName(f"{scope.value.capitalize()} constants")
         table.itemDoubleClicked.connect(lambda *_: self._edit_selected(scope))
         self.tables[scope] = table
         layout.addWidget(table, 1)
+        EmptyState(table, f"No {scope.value} constants yet. Click Add to make one.")
         buttons = QHBoxLayout()
         add = QPushButton("&Add…")
         edit = QPushButton("&Edit…")
@@ -137,13 +149,14 @@ class ConstantsDialog(QDialog):
         buttons.addStretch(1)
         layout.addLayout(buttons)
         if scope is Scope.GLOBAL:
-            note = QLabel("Global constants are saved on this computer, for every project.")
-            note.setWordWrap(True)
-            layout.addWidget(note)
+            layout.addWidget(
+                secondary_label("Global constants are saved on this computer, for every project.")
+            )
         return page
 
     def _builtin_page(self) -> QWidget:
         table = _constants_table(description=True)
+        table.setAccessibleName("Built-in constants")
         table.setRowCount(len(BUILTIN_CONSTANTS))
         for row, constant in enumerate(BUILTIN_CONSTANTS):
             values = (constant.name, f"{constant.value:.10g}", constant.unit, constant.description)
@@ -201,7 +214,7 @@ class ConstantsDialog(QDialog):
         if problem is None and any(c.name == constant.name for c in others):
             problem = f"There is already a global constant called '{constant.name}'."
         if problem is not None:
-            self.error.setText(problem)
+            self.error.show_message(problem, Severity.ERROR)
             return False
         constants = self.settings.global_constants
         if constant_id is None:
@@ -218,7 +231,7 @@ class ConstantsDialog(QDialog):
         try:
             self.document.execute(command)
         except CommandError as exc:
-            self.error.setText(str(exc))
+            self.error.show_message(str(exc), Severity.ERROR)
             return False
         self.error.clear()
         self.refresh()
