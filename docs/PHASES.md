@@ -183,9 +183,9 @@ Make a plan first. When done, report what you built and the test results.
 ### Step 1.3 — CSV/TSV import
 
 **Done when**
-- [ ] Import preview shows the file, lets you pick header row and delimiter (auto, comma, semicolon, tab, space).
-- [ ] A 100,000-row CSV imports in under 1 s.
-- [ ] Odd files (BOM, quoted fields, decimal commas, empty cells) import correctly or give a clear message.
+- [x] Import preview shows the file, lets you pick header row and delimiter (auto, comma, semicolon, tab, space).
+- [x] A 100,000-row CSV imports in under 1 s.
+- [x] Odd files (BOM, quoted fields, decimal commas, empty cells) import correctly or give a clear message.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 1.3 in docs/PHASES.md.
