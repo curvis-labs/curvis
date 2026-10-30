@@ -50,6 +50,34 @@ jobs:
       - name: Tests
         run: uv run pytest
 
+  # Statistics against the committed R reference fixtures (tests/validation/fixtures),
+  # as its own check so a disagreement with R stands out. R is not needed here.
+  validation:
+    name: validation (R reference results)
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v7
+
+      # pytest-qt loads Qt when pytest starts, even for tests that do not use it.
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libfontconfig1 \
+            libdbus-1-3 libglib2.0-0
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Compare with R
+        run: uv run pytest tests/validation -v
+
   bench:
     name: benchmarks
     runs-on: ubuntu-latest
