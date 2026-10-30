@@ -152,6 +152,45 @@ def test_closing_the_dialog_stops_listening(qtbot: QtBot, scheduler: Scheduler) 
     scheduler.finished.emit(dialog._node, None)  # nobody is connected any more
 
 
+def test_row_and_column_ranges_update_the_preview(qtbot: QtBot, scheduler: Scheduler) -> None:
+    dialog = open_dialog(qtbot, scheduler, "ranges.csv")
+    assert dialog.first_row.text() == "First"
+    assert dialog.last_row.text() == "Last"
+    assert dialog.last_column.text() == "Last"
+    assert dialog.error is not None and dialog.error.startswith("Row 2 has 4 values")
+
+    dialog.header_row.setValue(2)
+    dialog.first_row.setValue(4)
+    dialog.last_row.setValue(5)
+    dialog.first_column.setValue(2)
+    dialog.last_column.setValue(3)
+    wait_preview(qtbot, dialog)
+    options = dialog.options()
+    assert (options.first_row, options.last_row) == (4, 5)
+    assert (options.first_column, options.last_column) == (2, 3)
+    assert dialog.ok_button.isEnabled()
+    assert [dialog.model.headerData(r, Qt.Orientation.Vertical) for r in range(4)] == [
+        "1",
+        "2",
+        "4",
+        "5",
+    ]
+    assert header(dialog, 0) == ""  # outside the column range
+    assert header(dialog, 1) == "Dose\nY"
+    dim = QApplication.palette().brush(QPalette.ColorRole.PlaceholderText)
+    assert dialog.model.index(2, 0).data(Qt.ItemDataRole.ForegroundRole) == dim
+    assert dialog.model.index(2, 1).data(Qt.ItemDataRole.ForegroundRole) is None
+    assert dialog.status.text() == "Comma-separated, 2 columns, 2 rows."
+
+
+def test_a_bad_range_shows_its_message(qtbot: QtBot, scheduler: Scheduler) -> None:
+    dialog = open_dialog(qtbot, scheduler, "basic.csv")
+    dialog.last_column.setValue(9)
+    wait_preview(qtbot, dialog)
+    assert dialog.error == "The file has only 3 columns."
+    assert not dialog.ok_button.isEnabled()
+
+
 # --- main window ---------------------------------------------------------------------
 
 
@@ -240,6 +279,17 @@ def test_failed_import_shows_an_error(
     assert prompts.errors and prompts.errors[0][0] == "Cannot import data"
     assert "could not be opened" in prompts.errors[0][1]
     assert window.tabs.count() == 0
+
+
+def test_import_with_ranges(qtbot: QtBot, window: MainWindow) -> None:
+    options = CsvOptions(header_row=2, first_row=4, last_row=6, first_column=2, last_column=3)
+    window.start_import(DATA / "ranges.csv", options)
+    wait_import(qtbot, window)
+    tab = window.current_tab
+    assert tab is not None
+    table = tab.document.tables[0]
+    assert [c.name for c in table.columns] == ["Dose", "Resp"]
+    assert table.columns[0].values.tolist() == [2.0, 3.0, 4.0]
 
 
 def test_import_is_in_the_file_menu_and_command_palette(window: MainWindow) -> None:

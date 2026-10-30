@@ -312,3 +312,101 @@ def test_numbers_round_trip_through_csv(
     got = np.column_stack([c.values for c in data.columns]) if data.n_rows else np.empty((0, 3))
     np.testing.assert_array_equal(got, expected)
     assert all(c.role is ColumnRole.Y for c in data.columns)
+
+
+# --- row and column ranges -----------------------------------------------------------
+
+RANGES = DATA / "ranges.csv"  # title, header in row 2, data in rows 3-6, a long total row 7
+
+
+def test_row_range_uses_file_row_numbers() -> None:
+    data = read("ranges.csv", header_row=2, first_row=4, last_row=5)
+    assert summary(data)[:2] == [("Sample", "Text", ["s2", "s3"]), ("Dose", "Y", [2.0, 3.0])]
+
+
+def test_first_row_above_the_header_starts_under_it() -> None:
+    data = read("ranges.csv", header_row=2, first_row=1, last_row=4)
+    assert list(data.columns[0].values) == ["s1", "s2"]
+
+
+def test_column_range_and_first_column_is_x_in_range() -> None:
+    data = read(
+        "ranges.csv",
+        header_row=2,
+        last_row=6,
+        first_column=2,
+        last_column=3,
+        first_column_is_x=True,
+    )
+    assert summary(data) == [
+        ("Dose", "X", [1.0, 2.0, 3.0, 4.0]),
+        ("Resp", "Y", [10.0, 20.0, 30.0, 40.0]),
+    ]
+
+
+def test_long_row_outside_the_range_is_ignored() -> None:
+    with pytest.raises(CsvImportError, match="Row 7 has 5 values"):
+        read("ranges.csv", header_row=2)
+    assert read("ranges.csv", header_row=2, last_row=6).n_rows == 4
+    preview = read_preview(RANGES, CsvOptions(header_row=2, last_row=6))
+    assert len(preview.rows) - preview.data_start == 4
+    assert not preview.more_rows
+
+
+@pytest.mark.parametrize("reader", [read_csv, read_preview])
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"header_row": 2, "first_row": 9}, "The file has only 7 rows, so there is no row 9."),
+        ({"header_row": 2, "last_row": 6, "last_column": 5}, "The file has only 4 columns."),
+        ({"header_row": 2, "last_row": 6, "first_column": 5}, "The file has only 4 columns."),
+        ({"header_row": 2, "first_row": 5, "last_row": 4}, "The rows run from 5 to 4."),
+        ({"header_row": 2, "last_row": 2}, r"Row 2 is above the first data row \(3\)."),
+        ({"header_row": 2, "first_column": 3, "last_column": 2}, "The columns run from 3 to 2."),
+        ({"header_row": 2, "first_row": 4}, "Row 7 has 5 values"),  # the long row is in range
+    ],
+)
+def test_bad_ranges_give_a_clear_message(
+    reader: Any, options: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(CsvImportError, match=message):
+        reader(RANGES, CsvOptions(**options))
+
+
+def test_preview_numbers_the_rows_shown_and_marks_the_column_range() -> None:
+    options = CsvOptions(header_row=2, first_row=5, last_row=6, first_column=2)
+    preview = read_preview(RANGES, options)
+    assert preview.row_numbers == (1, 2, 5, 6)
+    assert preview.rows[2] == ("s3", "3", "30", "c")
+    assert preview.column_start == 1
+    assert preview.names == ("Dose", "Resp", "Note")
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        CsvOptions(header_row=2, first_row=4, last_row=6),
+        CsvOptions(header_row=2, last_row=5, first_column=2, first_column_is_x=True),
+        CsvOptions(header_row=None, first_row=3, last_row=6, last_column=3),
+    ],
+)
+def test_preview_agrees_with_the_import_for_ranges(options: CsvOptions) -> None:
+    data = read_csv(RANGES, options)
+    preview = read_preview(RANGES, options)
+    assert preview.names == tuple(c.name for c in data.columns)
+    assert preview.roles == tuple(c.role for c in data.columns)
+    assert len(preview.rows) - preview.data_start == data.n_rows
+
+
+def test_preview_reads_rows_far_down_the_file(tmp_path: Path) -> None:
+    path = tmp_path / "long.csv"
+    path.write_text("n\n" + "".join(f"{i}\n" for i in range(PREVIEW_ROWS * 50)))
+    preview = read_preview(path, CsvOptions(first_row=4000, last_row=4002))
+    assert preview.row_numbers == (1, 4000, 4001, 4002)
+    assert preview.rows[1:] == (("3998",), ("3999",), ("4000",))
+
+
+def test_range_options_start_at_1() -> None:
+    for name in ("first_row", "last_row", "first_column", "last_column"):
+        with pytest.raises(ValueError):
+            CsvOptions(**{name: 0})

@@ -10,8 +10,9 @@ The file is decoded once: UTF-8 (with or without a byte-order mark), UTF-16 with
 byte-order mark, and otherwise Windows-1252, the encoding of "CSV" files that Excel
 saves on Windows. Nothing here uses Qt, so :func:`read_csv` can run in a worker process.
 
-Row numbers (the header row, and rows named in messages) count records from the top of
-the file, starting at 1. A quoted field may hold a line break; it is still one record.
+Row numbers (the header row, the row range, and rows named in messages) count records
+from the top of the file, starting at 1. A quoted field may hold a line break; it is
+still one record. Column numbers start at 1 for the first column of the file.
 """
 
 from __future__ import annotations
@@ -21,11 +22,12 @@ import csv
 import io
 import re
 from collections import Counter
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
@@ -57,6 +59,7 @@ _DETECT_CONSISTENT = 0.9
 _SNIFF_BYTES = 64 * 1024
 _PREVIEW_BYTES = 2 * 1024 * 1024
 _BINARY_PROBE = 8 * 1024
+_CODECS = {"UTF-8": "utf-8-sig", "UTF-16": "utf-16", "Windows-1252": "cp1252", "Latin-1": "latin-1"}
 
 # A quoted field (kept as is), spaces at the start or end of a line (removed), or a run
 # of spaces (one delimiter). Used for space-delimited files, which often align columns.
@@ -75,23 +78,52 @@ class CsvOptions:
     names (rows above it are skipped), or ``None`` when the file has no header and the
     columns are named A, B, C, …. ``decimal_comma`` ``None`` means: on for a semicolon
     delimiter, off otherwise. It never applies to a comma delimiter.
+
+    Only rows ``first_row`` to ``last_row`` and columns ``first_column`` to
+    ``last_column`` are imported (both ends included). ``first_row`` ``None`` starts at
+    the first row under the header; ``last_row`` and ``last_column`` ``None`` go to the
+    end. "First column is X" applies to the first number column in the range.
     """
 
     delimiter: Delimiter | None = None
     header_row: int | None = 1
     first_column_is_x: bool = False
     decimal_comma: bool | None = None
+    first_row: int | None = None
+    last_row: int | None = None
+    first_column: int = 1
+    last_column: int | None = None
 
     def __post_init__(self) -> None:
         if self.delimiter is not None and self.delimiter not in DELIMITERS:
             raise ValueError(f"unsupported delimiter {self.delimiter!r}")
-        if self.header_row is not None and self.header_row < 1:
-            raise ValueError("header_row starts at 1")
+        for name in ("header_row", "first_row", "last_row", "first_column", "last_column"):
+            value = getattr(self, name)
+            if value is not None and value < 1:
+                raise ValueError(f"{name} starts at 1")
 
     @property
     def skip_rows(self) -> int:
         """Rows above the header (0 without a header)."""
         return self.header_row - 1 if self.header_row is not None else 0
+
+    @property
+    def data_row(self) -> int:
+        """The first row that can hold data: the row under the header, or row 1."""
+        return self.skip_rows + 2 if self.header_row is not None else 1
+
+    @property
+    def start_row(self) -> int:
+        """The first row imported: ``first_row``, but never above :attr:`data_row`."""
+        return max(self.data_row, self.first_row or 0)
+
+    @property
+    def read_from(self) -> int:
+        """Rows not read at all: those above the header, or above the range without one.
+
+        The first row read sets the number of columns.
+        """
+        return self.skip_rows if self.header_row is not None else self.start_row - 1
 
 
 @dataclass(frozen=True)
@@ -112,14 +144,18 @@ class CsvData:
 class CsvPreview:
     """The top of a file for the import dialog.
 
-    ``rows`` are the records from the top of the file as text: the skipped rows, the
-    header (at ``header_index``, ``None`` without a header) and up to
-    :data:`PREVIEW_ROWS` data rows. ``names`` and ``roles`` describe the columns the
-    import would make, judged from the data rows shown.
+    ``rows`` are records of the file as text: the rows above the header, the header (at
+    ``header_index``, ``None`` without a header) and up to :data:`PREVIEW_ROWS` data
+    rows from the start of the row range; ``row_numbers`` gives each one's row number in
+    the file. ``names`` and ``roles`` describe the columns the import would make,
+    judged from the data rows shown; the first of them is column ``column_start`` of
+    the file (0-based).
     """
 
     rows: tuple[tuple[str, ...], ...]
+    row_numbers: tuple[int, ...]
     header_index: int | None
+    column_start: int
     names: tuple[str, ...]
     roles: tuple[ColumnRole, ...]
     delimiter: Delimiter
@@ -143,6 +179,7 @@ def read_csv(path: str | Path, options: CsvOptions | None = None) -> CsvData:
     import polars as pl
 
     options = options or CsvOptions()
+    _check_ranges(options)
     data = _read_bytes(path)
     text, encoding = _decode(data)
     delimiter, decimal_comma = _resolve(text, options)
@@ -153,32 +190,54 @@ def read_csv(path: str | Path, options: CsvOptions | None = None) -> CsvData:
         source = data  # Polars skips a UTF-8 byte-order mark itself
     else:
         source = text.encode("utf-8")
-    try:
-        frame = pl.read_csv(
+
+    def parse(truncate: bool) -> pl.DataFrame:
+        return pl.read_csv(
             source,
             has_header=False,
             infer_schema=False,
             separator=delimiter,
             quote_char='"',
-            skip_rows=options.skip_rows,
+            skip_rows=options.read_from,
+            n_rows=None if options.last_row is None else options.last_row - options.read_from,
             raise_if_empty=False,
+            truncate_ragged_lines=truncate,
         )
+
+    try:
+        frame = parse(truncate=False)
     except pl.exceptions.PolarsError as exc:
         error = _shape_error(text, delimiter, options)
-        raise (error or CsvImportError(f"The file could not be read: {exc}")) from None
+        if error is not None:
+            raise error from None
+        try:  # the long rows are outside the row range, which drops them anyway
+            frame = parse(truncate=True)
+        except pl.exceptions.PolarsError:
+            raise CsvImportError(f"The file could not be read: {exc}") from None
 
     if options.header_row is not None:
         if frame.height == 0:
-            raise CsvImportError(_past_end_message(text, delimiter, options.header_row))
-        header = frame.row(0)
+            count = _count_records(text, delimiter)
+            raise CsvImportError(_past_end_message(count, options.header_row))
+        header: Sequence[str | None] = frame.row(0)
         if all(cell is None or not cell.strip() for cell in header):
             raise CsvImportError(_empty_header_message(options.header_row))
         frame = frame.slice(1)
-        names = _column_names(header, frame.width)
     else:
+        if options.first_row is not None and frame.height == 0:
+            count = _count_records(text, delimiter)
+            raise CsvImportError(_row_past_end_message(options.first_row, count))
         if frame.width == 0 or frame.height == 0:
             raise CsvImportError("The file is empty.")
-        names = _column_names((), frame.width)
+        header = ()
+    first_read = options.read_from + (2 if options.header_row is not None else 1)
+    offset = options.start_row - first_read  # rows between the header and the range
+    if options.first_row is not None and offset >= frame.height:
+        count = _count_records(text, delimiter)
+        raise CsvImportError(_row_past_end_message(options.first_row, count))
+    start, stop = _column_span(options, frame.width)
+    frame = frame.slice(offset).select(frame.columns[start:stop])
+    names = _column_names(header[start:stop], stop - start)
     frame = _drop_trailing_empty_rows(frame)
     columns = _typed_columns(frame, names, decimal_comma, options.first_column_is_x)
     return CsvData(tuple(columns), delimiter, decimal_comma, encoding)
@@ -187,14 +246,16 @@ def read_csv(path: str | Path, options: CsvOptions | None = None) -> CsvData:
 def read_preview(
     path: str | Path, options: CsvOptions | None = None, rows: int = PREVIEW_ROWS
 ) -> CsvPreview:
-    """Read the top of the file at ``path`` for the import dialog.
+    """Read the rows of the file at ``path`` that the import dialog shows.
 
     Uses the same rules as :func:`read_csv`, applied to the rows shown, and raises the
-    same :class:`CsvImportError` for those rows.
+    same :class:`CsvImportError` for those rows. The delimiter and encoding are judged
+    from the start of the file; only the rows up to the last one shown are read.
     """
     import polars as pl
 
     options = options or CsvOptions()
+    _check_ranges(options)
     with open(path, "rb") as file:
         data = file.read(_PREVIEW_BYTES + 1)
     complete = len(data) <= _PREVIEW_BYTES
@@ -202,43 +263,61 @@ def read_preview(
     if not complete and "\n" in text:
         text = text[: text.rindex("\n") + 1]  # drop the cut-off last line
     delimiter, decimal_comma = _resolve(text, options)
-    if delimiter == " ":
-        text = _collapse_spaces(text)
 
-    start = options.skip_rows
-    data_start = start + 1 if options.header_row is not None else start
-    records = [tuple(r) for r in islice(_records(text, delimiter), data_start + rows + 1)]
-    more_rows = len(records) > data_start + rows or not complete
-    records = records[: data_start + rows]
+    head: list[tuple[str, ...]] = []  # rows above the header, and the header
+    shown: list[tuple[int, tuple[str, ...]]] = []
+    width: int | None = None
+    count = 0
+    more_rows = False
+    with _file_records(path, encoding, delimiter) as records:
+        for count, cells in enumerate(records, start=1):
+            record = tuple(cells)
+            if count < options.data_row:
+                head.append(record)
+                if count == options.header_row:
+                    width = len(record)
+                continue
+            if count < options.start_row:
+                continue
+            if width is None:
+                width = len(record)
+            if options.last_row is not None and count > options.last_row:
+                break
+            if len(shown) == rows:
+                more_rows = True
+                break
+            shown.append((count, record))
 
     if options.header_row is not None:
-        if len(records) <= start:
-            raise CsvImportError(_past_end_message(text, delimiter, options.header_row))
-        header: Sequence[str] = records[start]
+        if count < options.header_row:
+            raise CsvImportError(_past_end_message(count, options.header_row))
+        header: Sequence[str] = head[options.skip_rows]
         if not any(cell.strip() for cell in header):
             raise CsvImportError(_empty_header_message(options.header_row))
-        width = len(header)
     else:
         header = ()
-        width = len(records[0]) if records else 0
-        if width == 0:
-            raise CsvImportError("The file is empty.")
-    data_rows = records[data_start:]
-    for offset, record in enumerate(data_rows):
+    if options.first_row is not None and not shown and count < options.start_row:
+        raise CsvImportError(_row_past_end_message(options.first_row, count))
+    if not width:
+        raise CsvImportError("The file is empty.")
+    for number, record in shown:
         if len(record) > width:
-            raise CsvImportError(_ragged_message(data_start + offset + 1, len(record), width))
+            raise CsvImportError(_ragged_message(number, len(record), width))
 
+    start, stop = _column_span(options, width)
     frame = pl.DataFrame(
-        {str(i): [r[i] if i < len(r) else None for r in data_rows] for i in range(width)},
-        schema={str(i): pl.String for i in range(width)},
+        {str(i): [r[i] if i < len(r) else None for _, r in shown] for i in range(start, stop)},
+        schema={str(i): pl.String for i in range(start, stop)},
     )
     if not more_rows:
         frame = _drop_trailing_empty_rows(frame)
-    names = _column_names(header, width)
+    names = _column_names(header[start:stop], stop - start)
     columns = _typed_columns(frame, names, decimal_comma, options.first_column_is_x)
     return CsvPreview(
-        rows=tuple(records),
-        header_index=start if options.header_row is not None else None,
+        rows=(*head, *(record for _, record in shown)),
+        row_numbers=(*range(1, len(head) + 1), *(number for number, _ in shown)),
+        header_index=options.skip_rows if options.header_row is not None else None,
+        column_start=start,
         names=tuple(c.name for c in columns),
         roles=tuple(c.role for c in columns),
         delimiter=delimiter,
@@ -337,6 +416,46 @@ def _records(text: str, delimiter: Delimiter) -> Iterator[list[str]]:
     return csv.reader(io.StringIO(text, newline=""), delimiter=delimiter, quotechar='"')
 
 
+def _count_records(text: str, delimiter: Delimiter) -> int:
+    try:
+        return sum(1 for _ in _records(text, delimiter))
+    except csv.Error:
+        return 0
+
+
+@contextmanager
+def _file_records(path: str | Path, encoding: str, delimiter: Delimiter) -> Iterator[Any]:
+    """The records of the file, read as they are needed."""
+    with open(path, encoding=_CODECS[encoding], errors="replace", newline="") as file:
+        lines: Iterable[str] = file
+        if delimiter == " ":
+            lines = (_collapse_spaces(line) for line in file)
+        yield csv.reader(lines, delimiter=delimiter, quotechar='"')
+
+
+def _check_ranges(options: CsvOptions) -> None:
+    """Refuse a row or column range that ends before it starts."""
+    first, last = options.first_row, options.last_row
+    if first is not None and last is not None and last < first:
+        raise CsvImportError(f"The rows run from {first} to {last}. Swap them around.")
+    if last is not None and last < options.data_row:
+        raise CsvImportError(f"Row {last} is above the first data row ({options.data_row}).")
+    first_column, last_column = options.first_column, options.last_column
+    if last_column is not None and last_column < first_column:
+        raise CsvImportError(
+            f"The columns run from {first_column} to {last_column}. Swap them around."
+        )
+
+
+def _column_span(options: CsvOptions, width: int) -> tuple[int, int]:
+    """The 0-based start and end of the column range in a file with ``width`` columns."""
+    last = options.last_column or width
+    if options.first_column > width or last > width:
+        column = "column" if width == 1 else "columns"
+        raise CsvImportError(f"The file has only {width} {column}.")
+    return options.first_column - 1, last
+
+
 # --- messages ----------------------------------------------------------------------
 
 
@@ -351,31 +470,37 @@ def _empty_header_message(row: int) -> str:
     return f"Row {row} is empty. Choose the row that holds the column names."
 
 
-def _past_end_message(text: str, delimiter: Delimiter, header_row: int) -> str:
-    try:
-        count = sum(1 for _ in _records(text, delimiter))
-    except csv.Error:
-        return f"The file has fewer than {header_row} rows."
+def _past_end_message(count: int, header_row: int) -> str:
     return f"The file has only {count} rows, so row {header_row} cannot be the header."
 
 
+def _row_past_end_message(row: int, count: int) -> str:
+    return f"The file has only {count} rows, so there is no row {row}."
+
+
 def _shape_error(text: str, delimiter: Delimiter, options: CsvOptions) -> CsvImportError | None:
-    """A clear message for a file Polars refused: the first row with too many values."""
+    """A clear message for a file Polars refused: the first row in range with too many values.
+
+    ``None`` when every row in the range is fine (the long rows are outside it).
+    """
     width: int | None = None
+    number = 0
     try:
         for number, record in enumerate(_records(text, delimiter), start=1):
-            if number <= options.skip_rows:
+            if number <= options.read_from:
                 continue
+            if options.last_row is not None and number > options.last_row:
+                break
             if width is None:
                 if options.header_row is not None and not any(c.strip() for c in record):
                     return CsvImportError(_empty_header_message(number))
                 width = len(record)
-            elif len(record) > width:
+            elif number >= options.start_row and len(record) > width:
                 return CsvImportError(_ragged_message(number, len(record), width))
     except csv.Error as exc:
         return CsvImportError(f"The file could not be read: {exc}")
     if width is None and options.header_row is not None:
-        return CsvImportError(_past_end_message(text, delimiter, options.header_row))
+        return CsvImportError(_past_end_message(number, options.header_row))
     return None
 
 
