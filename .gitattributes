@@ -1,2 +1,6 @@
 # Import fixtures are byte-exact test inputs (BOM, CRLF, UTF-16): never convert them.
 tests/data/** -text
+
+# R writes validation fixtures with LF line endings on every platform; keep them LF in
+# Windows checkouts too, so regenerating them does not show line-ending changes.
+tests/validation/fixtures/** text eol=lf
