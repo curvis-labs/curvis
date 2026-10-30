@@ -5,11 +5,11 @@
   "description": "Small spread on a large offset, where naive sums lose precision.",
   "generated_by": {
     "script": "validation/r/scripts/descriptive_stats.R",
-    "r_version": "R version 4.3.3 (2024-02-29)",
-    "platform": "x86_64-pc-linux-gnu",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
     "packages": {
-      "jsonlite": "1.8.8",
-      "stats": "4.3.3"
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
     }
   },
   "inputs": {
