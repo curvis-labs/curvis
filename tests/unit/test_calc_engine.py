@@ -229,3 +229,15 @@ def test_opening_a_document_recomputes_its_calculations(scheduler: Scheduler) ->
         assert doc.undo_stack.count == 2  # recomputing is not an undo step
     finally:
         engine.close()
+
+
+def test_the_column_of_a_deleted_source_stays_an_error_column_after_an_edit(lab: Lab) -> None:
+    calc = lab.add("{A} * 2", Pairing(("a1", "b1")))
+    orphan = calc.columns[1].column_id
+    lab.doc.execute(RemoveColumn("T", "b1"))
+    edited = Calculation("T", "{A} * 3", Pairing(("a1",)), id=calc.id)
+    lab.doc.execute(edit_calculation(lab.doc, edited))
+    lab.settle()
+    assert lab.values(lab.doc.calculations[0]) == [3, 6, 9]
+    assert "deleted" in lab.engine.errors[orphan]
+    assert nan_equal(list(lab.table.column(orphan).values), [NAN] * 3)

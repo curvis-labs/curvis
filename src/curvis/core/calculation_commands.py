@@ -162,8 +162,11 @@ def edit_calculation(doc: Document, calculation: Calculation) -> Command:
     """One command that changes the calculation with ``calculation.id`` to ``calculation``.
 
     Calculated columns whose source is still selected are kept (renamed if they still
-    carry the old suffix and the suffix changed); the others are removed, and columns are
-    added for newly selected sources. ``calculation.columns`` is ignored.
+    carry the old suffix and the suffix changed), and columns are added for newly
+    selected sources. A calculated column whose source was deleted from the table is
+    kept too, as an error column, so its name and place show what is missing. The other
+    calculated columns (sources no longer selected) are removed. ``calculation.columns``
+    is ignored.
     """
     try:
         old = doc.calculation(calculation.id)
@@ -176,7 +179,12 @@ def edit_calculation(doc: Document, calculation: Calculation) -> Command:
     targets = _in_table_order(table, calculation.pairing.targets)
     ids = {c.id for c in table.columns}
     kept = {o.source_id: o for o in old.columns if o.source_id in targets and o.column_id in ids}
-    dropped = [o.column_id for o in old.columns if o.source_id not in kept and o.column_id in ids]
+    orphans = tuple(o for o in old.columns if o.source_id not in ids and o.column_id in ids)
+    dropped = [
+        o.column_id
+        for o in old.columns
+        if o.source_id not in kept and o not in orphans and o.column_id in ids
+    ]
     commands: list[Command] = [RemoveColumn(table.id, c) for c in dropped]
 
     remaining = [c for c in table.columns if c.id not in dropped]
@@ -199,6 +207,7 @@ def edit_calculation(doc: Document, calculation: Calculation) -> Command:
         commands.append(ReorderColumns(table.id, order, "Place calculated columns"))
     added = {source: column.id for source, column in outputs}
     columns = tuple(kept[t] if t in kept else CalculatedColumn(added[t], t) for t in targets)
+    columns += orphans
     final = replace(calculation, columns=columns)
     commands.append(SetCalculation(final, "Store calculation"))
     return CommandGroup(f"Edit calculation ({calculation.kind.label.lower()})", commands)

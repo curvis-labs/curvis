@@ -434,3 +434,16 @@ def test_version_2_files_get_no_calculations(tmp_path: Path) -> None:
         for name, raw in files.items():
             zf.writestr(name, raw)
     assert load(path).calculations == []
+
+
+def test_edit_keeps_the_column_of_a_deleted_source_as_an_error_column() -> None:
+    doc, table = lab_document()
+    calc = one_calc(doc, ("a1", "a2"))
+    orphan = calc.columns[1]
+    doc.execute(RemoveColumn("T", "a2"))
+    edited = Calculation("T", "{A} * 3", Pairing(("a1",)), suffix="_x", id=calc.id)
+    doc.execute(edit_calculation(doc, edited))
+    (stored,) = doc.calculations
+    assert stored.columns == (calc.columns[0], orphan)
+    assert table.column(orphan.column_id).name == "baseline 2_calc"  # not renamed
+    assert stored.target_index(orphan) == -1
