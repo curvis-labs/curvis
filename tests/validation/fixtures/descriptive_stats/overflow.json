@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "analysis": "descriptive_stats",
+  "case": "overflow",
+  "description": "Values near the largest double, whose sums overflow in double precision. R accumulates in long double where the platform has it (x86-64).",
+  "generated_by": {
+    "script": "validation/r/scripts/descriptive_stats.R",
+    "r_version": "R version 4.3.3 (2024-02-29)",
+    "platform": "x86_64-pc-linux-gnu",
+    "packages": {
+      "jsonlite": "1.8.8",
+      "stats": "4.3.3"
+    }
+  },
+  "inputs": {
+    "replicates": [
+      [1e+308, 1.5e+308, -1e+308, 1e+308],
+      [1e+308, 1.7e+308, -1.2e+308, -1e+308],
+      ["NaN", 1.6e+308, "NaN", 5]
+    ]
+  },
+  "expected": {
+    "n": [2, 3, 2, 3],
+    "mean": [1e+308, 1.6e+308, -1.1e+308, 2.7777777777777777],
+    "sd": [0, "Inf", "Inf", "Inf"],
+    "sem": [0, "Inf", "Inf", "Inf"],
+    "ci_lower": [1e+308, "NaN", "NaN", "NaN"],
+    "ci_upper": [1e+308, "NaN", "NaN", "NaN"]
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "sd": "statistic",
+    "sem": "statistic",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

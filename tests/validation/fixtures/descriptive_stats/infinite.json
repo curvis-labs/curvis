@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "analysis": "descriptive_stats",
+  "case": "infinite",
+  "description": "Infinite values: the mean is infinite (or NaN), SD, SEM and CI are NaN.",
+  "generated_by": {
+    "script": "validation/r/scripts/descriptive_stats.R",
+    "r_version": "R version 4.3.3 (2024-02-29)",
+    "platform": "x86_64-pc-linux-gnu",
+    "packages": {
+      "jsonlite": "1.8.8",
+      "stats": "4.3.3"
+    }
+  },
+  "inputs": {
+    "replicates": [
+      [1, 1, "Inf", "Inf", "-Inf", "Inf", "-Inf"],
+      [2, "-Inf", "-Inf", "Inf", "-Inf", "NaN", "NaN"],
+      ["Inf", 2, 1, "Inf", "NaN", "NaN", 3]
+    ]
+  },
+  "expected": {
+    "n": [3, 3, 3, 3, 2, 1, 2],
+    "mean": ["Inf", "-Inf", "NaN", "Inf", "-Inf", "Inf", "-Inf"],
+    "sd": ["NaN", "NaN", "NaN", "NaN", "NaN", "NaN", "NaN"],
+    "sem": ["NaN", "NaN", "NaN", "NaN", "NaN", "NaN", "NaN"],
+    "ci_lower": ["NaN", "NaN", "NaN", "NaN", "NaN", "NaN", "NaN"],
+    "ci_upper": ["NaN", "NaN", "NaN", "NaN", "NaN", "NaN", "NaN"]
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "sd": "statistic",
+    "sem": "statistic",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

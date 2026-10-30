@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "analysis": "descriptive_stats",
+  "case": "n_small",
+  "description": "n = 0, 1 and 2 in three replicate columns (the others missing).",
+  "generated_by": {
+    "script": "validation/r/scripts/descriptive_stats.R",
+    "r_version": "R version 4.3.3 (2024-02-29)",
+    "platform": "x86_64-pc-linux-gnu",
+    "packages": {
+      "jsonlite": "1.8.8",
+      "stats": "4.3.3"
+    }
+  },
+  "inputs": {
+    "replicates": [
+      ["NaN", 4.2, "NaN", 5, -1.5, "NaN", 1e-08],
+      ["NaN", "NaN", "NaN", 7, "NaN", 0.1, 3e-08],
+      ["NaN", "NaN", -3.5, "NaN", 2.25, 0.2, "NaN"]
+    ]
+  },
+  "expected": {
+    "n": [0, 1, 1, 2, 2, 2, 2],
+    "mean": ["NaN", 4.2, -3.5, 6, 0.375, 0.15000000000000002, 2e-08],
+    "sd": ["NaN", "NaN", "NaN", 1.4142135623730951, 2.6516504294495533, 0.07071067811865477, 1.4142135623730949e-08],
+    "sem": ["NaN", "NaN", "NaN", 1, 1.875, 0.05, 9.999999999999999e-09],
+    "ci_lower": ["NaN", "NaN", "NaN", -6.706204736174694, -23.44913388032755, -0.48531023680873475, -1.0706204736174692e-07],
+    "ci_upper": ["NaN", "NaN", "NaN", 18.706204736174694, 24.19913388032755, 0.7853102368087348, 1.4706204736174692e-07]
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "sd": "statistic",
+    "sem": "statistic",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}
