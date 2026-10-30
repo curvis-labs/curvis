@@ -291,8 +291,8 @@ Make a plan first. Show me DESIGN.md and the mockups before changing any dialog.
 ### Step 2.1 — Validation harness
 
 **Done when**
-- [ ] `validation/r/` can generate JSON fixtures; `tests/validation` compares Python results to them with the CLAUDE.md tolerances.
-- [ ] You have reviewed the harness and one worked example (a simple mean/SD fixture).
+- [x] `validation/r/` can generate JSON fixtures; `tests/validation` compares Python results to them with the CLAUDE.md tolerances.
+- [x] You have reviewed the harness and one worked example (a simple mean/SD fixture).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.1 in docs/PHASES.md.
