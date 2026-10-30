@@ -101,6 +101,7 @@ A change that makes a benchmark more than 15% slower is a failure.
 
 ## UI conventions
 
+- Follow `docs/DESIGN.md` (layout, spacing, colours, wording, feedback, keyboard) and build dialogs from `src/curvis/ui/dialogs.py`; `tests/ui/test_dialog_design.py` checks every dialog.
 - Sensible defaults: every dialog works with one click on OK for the common case. Advanced options go in a collapsed section.
 - Results show a one-line plain-language reading next to the numbers, and warnings when assumptions look violated.
 - Every action is reachable by keyboard; add it to the command palette (Ctrl+K).

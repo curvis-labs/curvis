@@ -16,13 +16,13 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
-from PySide6.QtCore import QSettings  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QApplication
+from tests.ui.dialog_samples import SAMPLES, Context, settle
 
-from curvis.compute import Scheduler  # noqa: E402
-from curvis.settings import Settings, Theme  # noqa: E402
-from curvis.ui.theme import ThemeManager  # noqa: E402
-from tests.ui.dialog_samples import SAMPLES, Context, settle  # noqa: E402
+from curvis.compute import Scheduler
+from curvis.settings import Settings, Theme
+from curvis.ui.theme import ThemeManager
 
 
 def main(out: Path) -> None:

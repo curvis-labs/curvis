@@ -104,8 +104,8 @@ def _bulk_rename(ctx: Context) -> QDialog:
 
 def _bulk_rename_numbered(ctx: Context) -> QDialog:
     dialog = BulkRenameDialog(sample_document().table("t"), ["Drug1", "Drug2", "Drug3"])
-    dialog.number_mode.setChecked(True)
-    dialog.pattern_edit.setText("Drug #")
+    dialog.set_numbered(True)
+    dialog.pattern_edit.setText("Treated #")
     return dialog
 
 

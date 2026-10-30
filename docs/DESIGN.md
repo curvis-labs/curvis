@@ -37,7 +37,8 @@ Format, Import).
 - **Secondary settings** (naming, placement, “append at the end”) go at the left of the button
   row. They never go in the main columns.
 - **Advanced options** go in a collapsed `Advanced` section under the columns. It is closed by
-  default and stays closed every time the dialog opens. The common case never needs it.
+  default and stays closed every time the dialog opens. The common case never needs it. Use
+  `CollapsibleSection`.
 
 ### The simple dialog
 
@@ -64,7 +65,7 @@ Inner layouts (pages, rows) have zero margins; only the dialog has a margin.
 
 | Dialog | Default size | Minimum size |
 | --- | --- | --- |
-| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 720 × 500 |
+| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 |
 | Bulk rename | 720 × 520 | 600 × 420 |
 | Constants | 560 × 420 | 460 × 340 |
 | Simple dialog (Settings, constant editor) | its size hint | its size hint, at least 360 wide |
@@ -95,10 +96,14 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
 | Calculated-column background | `AlternateBase` | #E0F2F1 teal tint | #1C3A4A teal tint |
 | Accent: fills only, used sparingly (focus, “done”) | `Accent` | #20C997 emerald | #20C997 |
 | **Errors**: the error line, an invalid field's message | `BrightText` | #B3261E | #FF8080 |
+| Outlines of fields, lists, check boxes, radio buttons | `control_border()`: `Text` mixed 60 % into `Base`, ≥ 3 : 1 | #77869A | #98A0A9 |
+| A checked toggle button (*Not paired* / *Paired*) | `Highlight`, filled at 25 % | | |
 
 - The icon's teal is too light for text on white (3.0 : 1), so the light theme uses a darker
   teal. Emerald is never used for text in the light theme.
 - Red is the only colour not taken from the icon; nothing in the icon can say “error”.
+- Fusion draws outlines a shade darker than the window, which vanishes on a dark window, so
+  `CurvisStyle` (in `theme.py`) draws them with `control_border()` instead.
 - **Warnings** are not coloured. They show the standard warning icon in front of normal text.
   **Errors** use the error icon and `BrightText`. Colour is never the only signal, because
   icons and words carry the meaning too.
@@ -123,10 +128,15 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
 - A button or menu item that opens another dialog ends in “…” (*Manage constants…*, *Add…*).
 - Form labels have **no trailing colon**. A radio button or check box that leads into a field on
   the same line may end in one (“Subtract a value:”).
-- **Mnemonics** (`&`): every label with a buddy field, every check box, radio button, tab and
-  push button has one, except OK and Cancel, which have Enter and Esc. Widgets visible at the same
-  time must not share a letter. Pick the first letter if free, then a strong consonant. The
-  test fails on a clash.
+- **Mnemonics** (`&`): every label of a field, every check box, radio button and push button
+  has one, except the dialog's own buttons (OK, Cancel, Close have Enter and Esc). Widgets
+  visible at the same time must not share a letter. Pick the first letter if free, then a
+  strong consonant. Choice tabs need none (Ctrl+Tab moves between them), and in a crowded
+  dialog a button that acts on a selection may go without one when no letter is free
+  (Calculate's *Set role A* / *Set role B*). A group box may carry one; it moves the focus to
+  its first field (Calculate's *Fo&rmula*). Connecting words (“to” in *Rows 2 to Last*) are
+  plain text; the fields after them have an accessible name. The tests fail on a clash or a
+  missing mnemonic.
 - Messages are one short sentence that says **what to do**: “Enter a column suffix.”, not
   “Invalid suffix”.
 
@@ -149,16 +159,16 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   stays visible with a “Recalculating…” badge.
 - **Empty states**: an empty list or table shows one centred `PlaceholderText` sentence that says
   what belongs there and how to add it (“No global constants yet. Click Add to make one.”).
-  It never shows just a blank box.
+  It never shows just a blank box. Use `EmptyState`.
 
 ## 6. Keyboard
 
 - **Tab order is reading order**: choice tabs → left column (top to bottom) → right column →
-  Advanced → secondary settings → buttons. `DialogSkeleton.set_tab_order()` sets it from a list.
+  Advanced → secondary settings → buttons. `set_tab_order()` sets it from a list.
 - **First focus** goes to the field the user most likely changes first: the list of columns in
-  Calculate, the Find box in Bulk rename, the Delimiter in Import.
-- **Choice tabs**: Ctrl+Tab and Ctrl+Shift+Tab move to the next and previous tab, and each tab has
-  a mnemonic. Arrow keys work when the tab bar has focus.
+  Calculate, the Find box in Bulk rename, the delimiter in Import.
+- **Choice tabs**: Ctrl+Tab and Ctrl+Shift+Tab move to the next and previous tab (`choice_tabs()`
+  sets this up). Arrow keys work when the tab bar has focus.
 - **Enter** runs the OK button, except in multi-line editors. **Esc** cancels. **Space** toggles the
   focused check box or tree item.
 - **Lists in dialogs**: Enter or a double-click runs the list's main action (insert, edit).
