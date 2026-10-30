@@ -268,7 +268,7 @@ def test_add_calculation_at_the_end_and_with_unique_names() -> None:
 
 
 def test_add_calculation_rejects_bad_pairing_and_text_columns() -> None:
-    doc, table = lab_document()
+    doc, _table = lab_document()
     with pytest.raises(CommandError, match="same number"):
         pairing = Pairing(("a1", "a2"), ("b1", "b2", "b3"), paired=True)
         add_calculation(doc, Calculation("T", "{B}", pairing))
@@ -285,7 +285,7 @@ def one_calc(
 
 
 def test_calculated_columns_cannot_be_written_or_made_text() -> None:
-    doc, table = lab_document()
+    doc, _table = lab_document()
     calc = one_calc(doc)
     output = calc.columns[0].column_id
     with pytest.raises(CommandError, match="is calculated"):
@@ -310,7 +310,7 @@ def test_import_does_not_fill_calculated_columns() -> None:
 
 
 def test_removing_a_calculated_column_updates_its_calculation() -> None:
-    doc, table = lab_document()
+    doc, _table = lab_document()
     calc = one_calc(doc, ("a1", "a2"))
     first, second = (c.column_id for c in calc.columns)
     doc.execute(RemoveColumn("T", first))
