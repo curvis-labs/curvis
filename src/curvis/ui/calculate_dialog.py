@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QFormLayout,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -38,6 +37,7 @@ from PySide6.QtWidgets import (
     QRadioButton,
     QSizePolicy,
     QStackedWidget,
+    QTabBar,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -226,6 +226,7 @@ class _ReferenceOptions(QWidget):
 
     def set_paired(self, paired: bool) -> None:
         self.stack.setCurrentIndex(1 if paired else 0)
+        _fit_stack(self.stack)
         self.changed.emit()
 
     def params(self) -> dict[str, JsonValue]:
@@ -343,7 +344,7 @@ class CalculateDialog(QDialog):
         self._sources = [c for c in self.table.columns if c.role.is_numeric and c.id not in own]
 
         self.setWindowTitle("Edit calculation" if calculation else "Calculate")
-        self.resize(880, 720)
+        self.resize(900, 640)
         self._build()
         if calculation is not None:
             self._load(calculation)
@@ -355,38 +356,38 @@ class CalculateDialog(QDialog):
 
     def _build(self) -> None:
         outer = QVBoxLayout(self)
+
+        top = QHBoxLayout()
+        self.type_tabs = QTabBar()
+        self.type_tabs.setExpanding(False)
+        self.type_tabs.setDrawBase(False)
+        self.type_tabs.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.type_tabs.setAccessibleName("Calculation type")
+        for kind in KINDS:
+            index = self.type_tabs.addTab(kind.label)
+            self.type_tabs.setTabData(index, kind.value)
+            self.type_tabs.setTabToolTip(index, KIND_DESCRIPTIONS[kind])
+        self.type_description = QLabel()
+        self.type_description.setEnabled(False)
+        top.addWidget(self.type_tabs)
+        top.addStretch(1)
+        outer.addLayout(top)
+        outer.addWidget(self.type_description)
+
         columns = QHBoxLayout()
         outer.addLayout(columns, 1)
-
-        left = QVBoxLayout()
-        type_label = QLabel("Calculation &type")
-        self.type_list = QListWidget()
-        self.type_list.setMaximumWidth(220)
-        for kind in KINDS:
-            item = QListWidgetItem(kind.label)
-            item.setData(_ID, kind.value)
-            item.setToolTip(KIND_DESCRIPTIONS[kind])
-            self.type_list.addItem(item)
-        type_label.setBuddy(self.type_list)
-        self.type_description = QLabel()
-        self.type_description.setWordWrap(True)
-        self.type_description.setMaximumWidth(220)
-        self.type_description.setEnabled(False)
-        left.addWidget(type_label)
-        left.addWidget(self.type_list, 1)
-        left.addWidget(self.type_description)
-        columns.addLayout(left)
-
+        columns.addWidget(self._build_data(), 1)
         right = QVBoxLayout()
         columns.addLayout(right, 1)
-        right.addWidget(self._build_data(), 3)
         right.addWidget(self._build_options())
-        right.addWidget(self._build_formula(), 2)
-        right.addWidget(self._build_details())
+        right.addWidget(self._build_formula(), 1)
 
         self.problem_label = QLabel()
         self.problem_label.setWordWrap(True)
         outer.addWidget(self.problem_label)
+        footer = QHBoxLayout()
+        self._build_details(footer)
+        footer.addStretch(1)
         self.buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -394,9 +395,10 @@ class CalculateDialog(QDialog):
         self.ok_button.setText("Update" if self.editing else "Calculate")
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
-        outer.addWidget(self.buttons)
+        footer.addWidget(self.buttons)
+        outer.addLayout(footer)
 
-        self.type_list.currentRowChanged.connect(self._on_kind_changed)
+        self.type_tabs.currentChanged.connect(self._on_kind_changed)
 
     def _build_data(self) -> QGroupBox:
         box = QGroupBox("Data")
@@ -522,16 +524,8 @@ class CalculateDialog(QDialog):
         self.options.currentChanged.connect(self._fit_options)
         return self.options_box
 
-    def _fit_options(self, current: int) -> None:
-        """Size the options box to the page shown, not to the tallest page."""
-        for i in range(self.options.count()):
-            page = self.options.widget(i)
-            if page is not None:
-                policy = (
-                    QSizePolicy.Policy.Preferred if i == current else QSizePolicy.Policy.Ignored
-                )
-                page.setSizePolicy(policy, policy)
-        self.options.updateGeometry()
+    def _fit_options(self, _current: int) -> None:
+        _fit_stack(self.options)
         self.options_box.updateGeometry()
 
     def _build_formula(self) -> QGroupBox:
@@ -576,23 +570,19 @@ class CalculateDialog(QDialog):
         self.formula_edit.textChanged.connect(self._on_formula_edited)
         return box
 
-    def _build_details(self) -> QGroupBox:
-        box = QGroupBox("Column details")
-        layout = QFormLayout(box)
-        row = QHBoxLayout()
+    def _build_details(self, row: QHBoxLayout) -> None:
+        """Column suffix and placement, in the row with the dialog's buttons."""
         self.suffix_edit = QLineEdit(cf.DEFAULT_SUFFIXES[CalculationKind.BASELINE])
-        self.suffix_edit.setMaximumWidth(160)
+        self.suffix_edit.setMaximumWidth(120)
         self.suffix_edit.textEdited.connect(self._on_suffix_edited)
         self.suffix_edit.textChanged.connect(self._validate)
-        self.append_check = QCheckBox("Append columns at the &end")
+        self.append_check = QCheckBox("Append at the &end")
+        suffix_label = QLabel("Column &suffix:")
+        suffix_label.setBuddy(self.suffix_edit)
+        row.addWidget(suffix_label)
         row.addWidget(self.suffix_edit)
         row.addSpacing(16)
         row.addWidget(self.append_check)
-        row.addStretch(1)
-        suffix_label = QLabel("Column &suffix:")
-        suffix_label.setBuddy(self.suffix_edit)
-        layout.addRow(suffix_label, row)
-        return box
 
     # --- starting state ----------------------------------------------------------------
 
@@ -644,11 +634,11 @@ class CalculateDialog(QDialog):
 
     @property
     def kind(self) -> CalculationKind:
-        item = self.type_list.currentItem()
-        return CalculationKind(item.data(_ID)) if item is not None else CalculationKind.CUSTOM
+        data = self.type_tabs.tabData(self.type_tabs.currentIndex())
+        return CalculationKind(data) if data is not None else CalculationKind.CUSTOM
 
     def set_kind(self, kind: CalculationKind) -> None:
-        self.type_list.setCurrentRow(KINDS.index(kind))
+        self.type_tabs.setCurrentIndex(KINDS.index(kind))
 
     @property
     def formula(self) -> str:
@@ -863,7 +853,7 @@ class CalculateDialog(QDialog):
         if not self._updating and self.kind is not CalculationKind.CUSTOM:
             generated = cf.generate(self.kind, self.params(), self.pairing(), self.table)
             if self.formula != generated:
-                with QSignalBlocker(self.type_list):
+                with QSignalBlocker(self.type_tabs):
                     self.set_kind(CalculationKind.CUSTOM)
                 self.options.setCurrentIndex(KINDS.index(CalculationKind.CUSTOM))
                 self.type_description.setText(KIND_DESCRIPTIONS[CalculationKind.CUSTOM])
@@ -997,6 +987,20 @@ class CalculateDialog(QDialog):
         self._global_constants = list(constants)
         self._fill_palette()
         self._validate()
+
+
+def _fit_stack(stack: QStackedWidget) -> None:
+    """Size ``stack`` to the page shown, not to its tallest page."""
+    for i in range(stack.count()):
+        page = stack.widget(i)
+        if page is not None:
+            policy = (
+                QSizePolicy.Policy.Preferred
+                if i == stack.currentIndex()
+                else QSizePolicy.Policy.Ignored
+            )
+            page.setSizePolicy(policy, policy)
+    stack.updateGeometry()
 
 
 def _children(item: QTreeWidgetItem) -> list[QTreeWidgetItem]:
