@@ -44,11 +44,13 @@ def header(dialog: ImportDialog, section: int) -> str:
 def test_preview_shows_the_file_with_names_and_roles(qtbot: QtBot, scheduler: Scheduler) -> None:
     dialog = open_dialog(qtbot, scheduler, "basic.csv")
     assert dialog.preview is not None
-    assert dialog.model.rowCount() == 4  # header + 3 data rows
+    assert dialog.model.rowCount() == 3  # the header row is not repeated in the grid
     assert dialog.model.columnCount() == 3
     assert header(dialog, 0) == "Dose\nY"
     assert header(dialog, 2) == "Label\nText"
-    assert dialog.model.index(2, 1).data() == "30.25"
+    assert dialog.model.index(0, 0).data() == "0.1"
+    assert dialog.model.index(1, 1).data() == "30.25"
+    assert dialog.model.headerData(0, Qt.Orientation.Vertical) == "2"
     assert dialog.delimiter.itemText(0) == "Auto-detect (Comma)"
     assert dialog.status.text() == "Comma-separated, 3 columns, 3 rows."
     assert dialog.ok_button.isEnabled()
@@ -85,10 +87,12 @@ def test_header_row_skips_and_dims_the_rows_above(qtbot: QtBot, scheduler: Sched
     assert dialog.options().header_row == 3
     assert [header(dialog, i) for i in range(2)] == ["Well\nText", "OD600\nY"]
     dim = QApplication.palette().brush(QPalette.ColorRole.PlaceholderText)
+    assert dialog.model.rowCount() == 4  # two rows above the header, two data rows
     assert dialog.model.index(0, 0).data(Qt.ItemDataRole.ForegroundRole) == dim
-    assert dialog.model.index(2, 0).data(Qt.ItemDataRole.FontRole).bold()
-    assert dialog.model.index(3, 0).data(Qt.ItemDataRole.ForegroundRole) is None
-    assert dialog.model.headerData(3, Qt.Orientation.Vertical) == "4"
+    assert dialog.model.index(2, 0).data() == "A1"
+    assert dialog.model.index(2, 0).data(Qt.ItemDataRole.ForegroundRole) is None
+    vertical = [dialog.model.headerData(r, Qt.Orientation.Vertical) for r in range(4)]
+    assert vertical == ["1", "2", "4", "5"]
 
 
 def test_no_header_names_columns_by_letter(qtbot: QtBot, scheduler: Scheduler) -> None:
@@ -154,7 +158,7 @@ def test_closing_the_dialog_stops_listening(qtbot: QtBot, scheduler: Scheduler) 
 
 def test_row_and_column_ranges_update_the_preview(qtbot: QtBot, scheduler: Scheduler) -> None:
     dialog = open_dialog(qtbot, scheduler, "ranges.csv")
-    assert dialog.first_row.text() == "First"
+    assert dialog.first_row.value() == 2  # the first data row
     assert dialog.last_row.text() == "Last"
     assert dialog.last_column.text() == "Last"
     assert dialog.error is not None and dialog.error.startswith("Row 2 has 4 values")
@@ -169,18 +173,29 @@ def test_row_and_column_ranges_update_the_preview(qtbot: QtBot, scheduler: Sched
     assert (options.first_row, options.last_row) == (4, 5)
     assert (options.first_column, options.last_column) == (2, 3)
     assert dialog.ok_button.isEnabled()
-    assert [dialog.model.headerData(r, Qt.Orientation.Vertical) for r in range(4)] == [
-        "1",
-        "2",
-        "4",
-        "5",
-    ]
+    vertical = [dialog.model.headerData(r, Qt.Orientation.Vertical) for r in range(3)]
+    assert vertical == ["1", "4", "5"]
     assert header(dialog, 0) == ""  # outside the column range
     assert header(dialog, 1) == "Dose\nY"
     dim = QApplication.palette().brush(QPalette.ColorRole.PlaceholderText)
-    assert dialog.model.index(2, 0).data(Qt.ItemDataRole.ForegroundRole) == dim
-    assert dialog.model.index(2, 1).data(Qt.ItemDataRole.ForegroundRole) is None
+    assert dialog.model.index(1, 0).data(Qt.ItemDataRole.ForegroundRole) == dim
+    assert dialog.model.index(1, 1).data(Qt.ItemDataRole.ForegroundRole) is None
     assert dialog.status.text() == "Comma-separated, 2 columns, 2 rows."
+
+
+def test_first_row_follows_the_header_row(qtbot: QtBot, scheduler: Scheduler) -> None:
+    dialog = open_dialog(qtbot, scheduler, "header_row_3.csv")
+    assert (dialog.first_row.minimum(), dialog.first_row.value()) == (2, 2)
+    dialog.header_row.setValue(3)
+    assert (dialog.first_row.minimum(), dialog.first_row.value()) == (4, 4)
+    assert dialog.options().first_row is None  # the first data row is the default
+    dialog.first_row.setValue(5)
+    assert dialog.options().first_row == 5
+    dialog.header_row.setValue(1)
+    assert (dialog.first_row.minimum(), dialog.first_row.value()) == (2, 5)  # kept
+    dialog.no_header.setChecked(True)
+    assert dialog.first_row.minimum() == 1
+    assert dialog.options().first_row == 5
 
 
 def test_a_bad_range_shows_its_message(qtbot: QtBot, scheduler: Scheduler) -> None:
