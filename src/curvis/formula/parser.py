@@ -18,8 +18,9 @@ a formula is ever run as Python.
 from __future__ import annotations
 
 import math
+import threading
 from dataclasses import dataclass
-from functools import cache, lru_cache
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
 
 from curvis.data.names import name_key
@@ -245,9 +246,26 @@ class _Build:
         return Binary(_OPS[op.type], left, right, _span(left, right))
 
 
-@cache
+_lock = threading.Lock()
+_lark: Lark | None = None
+
+
 def _parser() -> Lark:
     """The LALR parser, built on first use so importing this module stays cheap."""
-    from lark import Lark
+    global _lark
+    if _lark is None:
+        with _lock:  # warm_up() may be building it on a worker thread right now
+            if _lark is None:
+                from lark import Lark
 
-    return Lark(GRAMMAR, parser="lalr", transformer=_Build(), maybe_placeholders=True)
+                _lark = Lark(GRAMMAR, parser="lalr", transformer=_Build(), maybe_placeholders=True)
+    return _lark
+
+
+def warm_up() -> None:
+    """Build the parser now, so the first formula the user types is not slowed down.
+
+    Importing Lark and building the grammar takes ~150 ms. The app calls this on a
+    worker thread shortly after start-up. Safe to call from any thread, any number of times.
+    """
+    _parser()

@@ -17,7 +17,7 @@ from curvis.formula.constants import (
     resolve_constants,
 )
 from curvis.formula.errors import FormulaError
-from curvis.formula.parser import Formula, parse
+from curvis.formula.parser import Formula, parse, warm_up
 
 __all__ = [
     "BUILTIN_CONSTANTS",
@@ -36,4 +36,5 @@ __all__ = [
     "parse",
     "resolve_constants",
     "to_text",
+    "warm_up",
 ]

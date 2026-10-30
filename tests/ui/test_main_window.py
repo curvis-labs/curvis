@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from pytestqt.qtbot import QtBot
 
 from curvis.core import Document
@@ -236,3 +237,25 @@ def test_quit_closes_window_when_nothing_is_modified(window: MainWindow) -> None
     window.new_document()
     window.registry.action("file.quit").trigger()
     assert not window.isVisible()
+
+
+def test_warm_up_builds_the_formula_parser_on_a_worker_thread(
+    qtbot: QtBot, window: MainWindow, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import threading
+
+    from curvis.formula import parser
+
+    built_on: list[threading.Thread] = []
+    real_parser = parser._parser
+
+    def recording_parser() -> object:
+        built_on.append(threading.current_thread())
+        return real_parser()
+
+    monkeypatch.setattr(parser, "_lark", None)
+    monkeypatch.setattr(parser, "_parser", recording_parser)
+    window.warm_up_formulas()
+    qtbot.waitUntil(lambda: not window.scheduler.busy)
+    assert parser._lark is not None
+    assert built_on and built_on[0] is not threading.main_thread()

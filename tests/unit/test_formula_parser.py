@@ -185,3 +185,33 @@ def test_errors_with_positions(text: str, message: str, start: int, end: int) ->
 def test_python_code_is_rejected(text: str) -> None:
     with pytest.raises(FormulaError):
         parse(text)
+
+
+# --- warm-up ---------------------------------------------------------------------
+
+
+def test_warm_up_from_many_threads_builds_the_parser_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    import threading
+
+    import lark
+
+    from curvis.formula import parser, warm_up
+
+    builds: list[int] = []
+    real_lark = lark.Lark
+
+    def counting_lark(*args: object, **kwargs: object) -> lark.Lark:
+        builds.append(1)
+        return real_lark(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(parser, "_lark", None)
+    monkeypatch.setattr(lark, "Lark", counting_lark)
+    threads = [threading.Thread(target=warm_up) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert builds == [1]
+    parse.cache_clear()
+    assert parse("1 + 2").root == b(BinaryOp.ADD, n(1), n(2))
+    assert builds == [1]
