@@ -1,0 +1,171 @@
+# Curvis — UI design guidelines
+
+Short rules for dialogs and panels. The shared code for them is `src/curvis/ui/dialogs.py`;
+use it instead of building margins, button rows or collapsible sections by hand.
+Mockups for dialogs still to be built are in `docs/mockups/`.
+
+## 1. Dialog layout
+
+### The workbench dialog (reference: Calculate)
+
+Use it when the user picks **one of several kinds** of thing *and* chooses **inputs** *and*
+sets **options** whose **result** they want to see before clicking OK (Calculate, Analyze,
+Format, Import).
+
+```
+┌ Title ───────────────────────────────────────────────────────────────┐
+│ [Kind 1] [Kind 2] [Kind 3] [Kind 4]                ← choices as tabs  │
+│ One sentence on what the selected kind does.       ← secondary text   │
+│ ┌ Inputs ──────────────┐ ┌ Options ───────────────────────────────┐ │
+│ │ what to work on      │ │ options of the selected kind (stacked) │ │
+│ │ (columns, file …)    │ ├ Result ────────────────────────────────┤ │
+│ │                      │ │ formula, preview, live graph …         │ │
+│ └──────────────────────┘ └────────────────────────────────────────┘ │
+│ ▸ Advanced                                 ← collapsed section       │
+│ ⚠ Feedback line: why OK is disabled, or a warning                    │
+│ Secondary settings (suffix, placement)          [Calculate] [Cancel] │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+- **Choices** are a tab bar across the top, left-aligned, not stretched. The first tab is the
+  most used kind, or the one that best fits the data. A one-line description of the selected
+  kind sits under the tabs.
+- **Inputs** go in the left column; **options** and **result** go in the right column. Both
+  columns get equal stretch. Options sit at the top of the right column at the height of their
+  current page. The result takes the rest of the height. When a kind has nothing to pick
+  (Format › Graph), its options move into the left column and the result stays on the right.
+- **Secondary settings** (naming, placement, “append at the end”) go at the left of the button
+  row. They never go in the main columns.
+- **Advanced options** go in a collapsed `Advanced` section under the columns. It is closed by
+  default and stays closed every time the dialog opens. The common case never needs it.
+
+### The simple dialog
+
+Use one column (a form, then the feedback line, then the buttons) when there is **no kind to
+choose and no result to preview**, and at most about eight fields: Settings, the constant
+editor, Export. A **list manager** (Constants) is one column too: scope tabs on top, a list,
+then a row of *Add… / Edit… / Delete* buttons under the list, and *Close*.
+
+Do not use group boxes in a simple dialog. A form needs no frame.
+
+## 2. Spacing and sizes
+
+All values are in device-independent pixels and live in `curvis.ui.dialogs` as constants.
+
+| Constant | Value | Use |
+| --- | --- | --- |
+| `MARGIN` | 12 | Dialog content margin, all sides |
+| `SPACING` | 8 | Between related controls; form rows; inside a group box |
+| `SECTION_SPACING` | 16 | Between the two columns, and between sections stacked vertically |
+| `INDENT` | 20 | Fields that belong to the radio button or check box above them |
+| `FIELD_WIDTH` | 120 | Short number and text fields (values, suffixes) |
+
+Inner layouts (pages, rows) have zero margins; only the dialog has a margin.
+
+| Dialog | Default size | Minimum size |
+| --- | --- | --- |
+| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 720 × 500 |
+| Bulk rename | 720 × 520 | 600 × 420 |
+| Constants | 560 × 420 | 460 × 340 |
+| Simple dialog (Settings, constant editor) | its size hint | its size hint, at least 360 wide |
+
+At the default and the minimum size **nothing overlaps and nothing is cut off**. The tests
+in `tests/ui/test_dialog_design.py` check this for every dialog.
+
+**Resizing.** Extra width is shared equally between the two columns. Extra height goes to the
+one widget that holds a list, a table, a preview or a graph (stretch 1). Everything else keeps
+its preferred height. A **stacked panel takes the height of the page shown, not the height of
+its tallest page**: use `FittedStack`. Long labels word-wrap; they never set the dialog's width.
+
+## 3. Colour
+
+Use **palette roles only**, never hex values in widget code. `curvis.ui.theme` sets every role
+below in both themes. Each text/background pair has a contrast of at least **4.5 : 1**, and
+`tests/ui/test_theme.py` checks it.
+
+| Use | Role | Light | Dark |
+| --- | --- | --- | --- |
+| Normal text | `WindowText` / `Text` | #000000 | #e8e8ea |
+| Secondary text: kind descriptions, hints, dimmed preview rows, empty states | `PlaceholderText` | #5f5f66 | #9a9aa0 |
+| **Errors**: the error line, an invalid field's message | `BrightText` | #b3261e | #ff6b6b |
+| Calculated-column background | `AlternateBase` | #e9edf3 | #2d3139 |
+| References in formulas (`[column]`, `{A}`) | `Link` | #0000ff | #6ea8ff |
+| Selection, drop indicator | `Highlight` / `HighlightedText` | Fusion | #3d7bd9 / #ffffff |
+
+- **Warnings** are not coloured. They show the standard warning icon in front of normal text.
+  **Errors** use the error icon and `BrightText`. Colour is never the only signal, because
+  icons and words carry the meaning too.
+- **Role badges** (X, Y, Error, Time, Event in the column header) are text on the header's
+  second line, in the header's own text colour. A calculated column adds its mark (ƒ) and,
+  when its calculation fails, the error mark (⚠). They do not use colour.
+- Do not dim text by disabling the label. A disabled label means “not available”. Secondary
+  text uses `PlaceholderText` through `secondary_label()`.
+
+## 4. Wording
+
+- **Sentence case** everywhere: titles, tabs, labels, buttons (“Bulk rename”, “Column suffix”).
+- **Window titles** name the task: “Calculate”, “Edit calculation”, “Import data”, “Bulk rename”,
+  “Constants”, “Settings”.
+- **The OK button is a verb for what it does**: *Calculate*, *Update* (when editing), *Import*,
+  *Rename*, *Run* (Analyze), *Apply* (Format), *Save* (Settings), *Add* / *Save* (constant
+  editor). Cancel stays *Cancel*. A dialog whose changes take effect immediately has only *Close*.
+- **Button order follows the platform**, as `QDialogButtonBox` does (OK–Cancel on Windows and
+  KDE, Cancel–OK on macOS and GNOME). Never order the buttons by hand.
+- A button or menu item that opens another dialog ends in “…” (*Manage constants…*, *Add…*).
+- Form labels have **no trailing colon**. A radio button or check box that leads into a field on
+  the same line may end in one (“Subtract a value:”).
+- **Mnemonics** (`&`): every label with a buddy field, every check box, radio button, tab and
+  push button has one, except OK and Cancel, which have Enter and Esc. Widgets visible at the same
+  time must not share a letter. Pick the first letter if free, then a strong consonant. The
+  test fails on a clash.
+- Messages are one short sentence that says **what to do**: “Enter a column suffix.”, not
+  “Invalid suffix”.
+
+## 5. Feedback
+
+- **The feedback line** sits just above the button row and spans the dialog. It shows, in order of
+  priority: an error (icon + `BrightText`), a warning (icon), or a status sentence (“3 names will
+  change.”). When there is nothing to say it is empty but keeps its height, so the layout does
+  not jump.
+- **A disabled OK always shows why.** The reason is either in the feedback line or directly under
+  the one field that causes it (like the formula error under the formula). It is never in both
+  places and never missing. `DialogSkeleton.set_problem()` does both: it sets the text and
+  enables or disables OK.
+- **Field errors** go directly under the field and mark the place (a wavy underline in a formula).
+- **Work in progress** (reading a file, running an analysis) shows a status sentence (“Reading the
+  file…”). OK stays disabled until there is a result.
+- **Results panel**: each result starts with its plain-language reading (one sentence, normal
+  text). Assumption warnings follow, each with the warning icon. Then come the numbers. An
+  analysis that cannot run shows the error and what to change instead of numbers. A stale result
+  stays visible with a “Recalculating…” badge.
+- **Empty states**: an empty list or table shows one centred `PlaceholderText` sentence that says
+  what belongs there and how to add it (“No global constants yet. Click Add to make one.”).
+  It never shows just a blank box.
+
+## 6. Keyboard
+
+- **Tab order is reading order**: choice tabs → left column (top to bottom) → right column →
+  Advanced → secondary settings → buttons. `DialogSkeleton.set_tab_order()` sets it from a list.
+- **First focus** goes to the field the user most likely changes first: the list of columns in
+  Calculate, the Find box in Bulk rename, the Delimiter in Import.
+- **Choice tabs**: Ctrl+Tab and Ctrl+Shift+Tab move to the next and previous tab, and each tab has
+  a mnemonic. Arrow keys work when the tab bar has focus.
+- **Enter** runs the OK button, except in multi-line editors. **Esc** cancels. **Space** toggles the
+  focused check box or tree item.
+- **Lists in dialogs**: Enter or a double-click runs the list's main action (insert, edit).
+- **Every dialog has an action** in `ActionRegistry` with a category, so it appears in the
+  menus and the command palette (Ctrl+K). Shortcuts in use:
+
+  | Shortcut | Action |
+  | --- | --- |
+  | Ctrl+K | Command palette |
+  | Ctrl+, | Settings |
+  | Ctrl+Shift+I | Import data |
+  | Ctrl+Shift+K | Calculate |
+  | Ctrl+Shift+E | Edit calculation |
+  | — | Bulk rename, Constants (menu and palette only) |
+
+  Reserved for later steps: Ctrl+Shift+A *Analyze*, Ctrl+Shift+F *Format graph*, Ctrl+Shift+X
+  *Export graph*. A new shortcut must not clash with these or with platform standard keys.
+- **Accessible names**: every control has a buddy label, visible text or `setAccessibleName`.
+  The tests check this for every dialog.

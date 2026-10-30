@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curvis mockups</title>
+<!--
+  Mockups for steps 2.2 (Analyze dialog, Results panel) and 2.6 (Format dialog).
+  Drawn at 1:1 in device-independent pixels, with the palette values of curvis.ui.theme.
+  They follow docs/DESIGN.md; numbered markers refer to the notes beside each mockup.
+  This is a picture to build from, not code to copy.
+-->
+<style>
+  :root, :root[data-theme="light"] {
+    --window: #efefef; --text: #000000; --base: #ffffff; --altbase: #e9edf3;
+    --secondary: #5f5f66; --error: #b3261e; --link: #0000ff; --highlight: #308cc6;
+    --hl-text: #ffffff; --button: #efefef; --border: #b8b8b8; --frame: #c9c9c9;
+    --disabled: #9a9a9a; --canvas: #d9dbe0; --note: #3a3a40; --mark: #e8590c;
+    --s1: #0072b2; --s2: #d55e00; --s3: #009e73;
+  }
+  :root[data-theme="dark"] {
+    --window: #2b2b2e; --text: #e8e8ea; --base: #1f1f22; --altbase: #2d3139;
+    --secondary: #9a9aa0; --error: #ff6b6b; --link: #6ea8ff; --highlight: #3d7bd9;
+    --hl-text: #ffffff; --button: #36363a; --border: #4a4a4f; --frame: #18181a;
+    --disabled: #7a7a80; --canvas: #141416; --note: #c8c8cc; --mark: #ff922b;
+    --s1: #56b4e9; --s2: #e69f00; --s3: #4fd1a5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --window: #2b2b2e; --text: #e8e8ea; --base: #1f1f22; --altbase: #2d3139;
+      --secondary: #9a9aa0; --error: #ff6b6b; --link: #6ea8ff; --highlight: #3d7bd9;
+      --hl-text: #ffffff; --button: #36363a; --border: #4a4a4f; --frame: #18181a;
+      --disabled: #7a7a80; --canvas: #141416; --note: #c8c8cc; --mark: #ff922b;
+      --s1: #56b4e9; --s2: #e69f00; --s3: #4fd1a5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--note);
+         font: 13px/1.4 system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  header.page { padding: 20px 24px 8px; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header.page h1 { font-size: 20px; margin: 0; color: var(--note); }
+  header.page p { margin: 0; flex: 1 1 320px; }
+  .switch button { font: inherit; padding: 4px 12px; border: 1px solid var(--border);
+                   background: var(--button); color: var(--text); border-radius: 3px; cursor: pointer; }
+  .switch button[aria-pressed="true"] { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  section.board { padding: 16px 24px 32px 40px; overflow-x: auto; }
+  section.board > h2 { font-size: 16px; margin: 8px 0 12px; color: var(--note); }
+  .row { display: flex; gap: 24px; align-items: flex-start; }
+  .notes { width: 300px; flex: none; }
+  .notes ol { margin: 0; padding-left: 22px; }
+  .notes li { margin-bottom: 6px; }
+  .notes li::marker { color: var(--mark); font-weight: 700; }
+
+  /* --- the drawn widgets (Fusion-like) --- */
+  .win { flex: none; background: var(--window); color: var(--text); border: 1px solid var(--frame);
+         box-shadow: 0 8px 28px rgba(0,0,0,.28); font-size: 13px; position: relative; }
+  .titlebar { height: 30px; display: flex; align-items: center; justify-content: center;
+              border-bottom: 1px solid var(--frame); font-weight: 600; }
+  .body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+  .tab { padding: 5px 14px; border: 1px solid var(--border); border-bottom: none; margin-right: -1px;
+         background: var(--button); border-radius: 3px 3px 0 0; }
+  .tab.on { background: var(--window); position: relative; top: 1px; font-weight: 600; }
+  .tab.hidden { display: none; }
+  u { text-decoration: underline; text-underline-offset: 2px; }
+  .secondary { color: var(--secondary); }
+  .cols { display: flex; gap: 16px; flex: 1; min-height: 0; }
+  .col { flex: 1 1 0; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .group { border: 1px solid var(--border); border-radius: 3px; padding: 14px 8px 8px; position: relative;
+           display: flex; flex-direction: column; gap: 8px; }
+  .group > .legend { position: absolute; top: -9px; left: 8px; background: var(--window); padding: 0 4px; }
+  .grow { flex: 1; }
+  .list { background: var(--base); border: 1px solid var(--border); overflow: hidden; }
+  .list .h { display: flex; background: var(--button); border-bottom: 1px solid var(--border); }
+  .list .h div, .list .r div { padding: 3px 6px; }
+  .list .r { display: flex; align-items: center; }
+  .list .r.sel { background: var(--highlight); color: var(--hl-text); }
+  .list .r.dim { color: var(--disabled); }
+  .c1 { flex: 1; } .c2 { width: 64px; } .c3 { width: 90px; text-align: right; }
+  .cb { display: inline-block; width: 13px; height: 13px; border: 1px solid var(--border); background: var(--base);
+        vertical-align: -2px; margin-right: 6px; border-radius: 2px; position: relative; }
+  .cb.on::after { content: ""; position: absolute; left: 3px; top: 0px; width: 4px; height: 8px;
+                  border: solid var(--text); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .cb.part::after { content: ""; position: absolute; left: 2px; top: 5px; width: 7px; height: 2px; background: var(--text); }
+  .rb { display: inline-block; width: 13px; height: 13px; border: 1px solid var(--border); background: var(--base);
+        border-radius: 50%; vertical-align: -2px; margin-right: 6px; position: relative; }
+  .rb.on::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--text); }
+  .btn { display: inline-block; text-align: center; padding: 4px 12px; min-width: 76px;
+         border: 1px solid var(--border); background: var(--button); border-radius: 3px; white-space: nowrap; }
+  .btn.def { border-color: var(--highlight); box-shadow: inset 0 0 0 1px var(--highlight); }
+  .btn.seg { min-width: 0; border-radius: 0; margin-right: -1px; }
+  .btn.seg.on { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  .btn.dis { color: var(--disabled); }
+  .field { display: inline-block; background: var(--base); border: 1px solid var(--border); border-radius: 2px;
+           padding: 3px 6px; min-width: 120px; }
+  .field.combo::after { content: "▾"; float: right; margin-left: 10px; color: var(--secondary); }
+  .field.w60 { min-width: 64px; }
+  .form { display: grid; grid-template-columns: max-content 1fr; gap: 8px 12px; align-items: center; }
+  .indent { padding-left: 20px; }
+  .line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .buttonrow { display: flex; align-items: center; gap: 8px; }
+  .buttonrow .spacer { flex: 1; }
+  .feedback { min-height: 19px; display: flex; gap: 6px; align-items: center; }
+  .warn::before { content: "⚠"; color: var(--text); }
+  .err { color: var(--error); }
+  .err::before { content: "⛔"; }
+  .advanced { display: flex; align-items: center; gap: 4px; }
+  .advanced::before { content: "▸"; color: var(--secondary); }
+  .summary { background: var(--base); border: 1px solid var(--border); padding: 8px; }
+  .m { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--mark); color: #fff;
+       font: 700 11px/18px system-ui, sans-serif; text-align: center; z-index: 2; box-shadow: 0 0 0 2px var(--window); }
+  .ref { color: var(--link); }
+
+  /* main-window frame for the Results panel */
+  .mw { display: flex; flex-direction: column; }
+  .mw .menubar { display: flex; gap: 16px; padding: 4px 10px; border-bottom: 1px solid var(--border); }
+  .mw .main { display: flex; flex: 1; min-height: 0; }
+  .grid { flex: 1; background: var(--base); border-right: 1px solid var(--border); overflow: hidden; }
+  .grid table, .res table { border-collapse: collapse; width: 100%; }
+  .grid th { background: var(--button); border: 1px solid var(--border); font-weight: 400; padding: 2px 6px;
+             text-align: left; white-space: nowrap; }
+  .grid th small { display: block; color: var(--text); }
+  .grid td { border: 1px solid var(--border); padding: 2px 6px; text-align: right; }
+  .grid td.calc { background: var(--altbase); }
+  .dock { width: 460px; flex: none; display: flex; flex-direction: column; }
+  .dock .dt { display: flex; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--border); gap: 8px; }
+  .res { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+  .res h3 { margin: 0; font-size: 13px; }
+  .res .reading { font-size: 14px; }
+  .res table { background: var(--base); border: 1px solid var(--border); }
+  .res th { text-align: left; font-weight: 600; background: var(--button); padding: 3px 6px; border-bottom: 1px solid var(--border); }
+  .res td { padding: 3px 6px; border-bottom: 1px solid var(--altbase); }
+  .res td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .res tr.sel td { background: var(--highlight); color: var(--hl-text); }
+  .badge { border: 1px solid var(--border); border-radius: 9px; padding: 0 8px; font-size: 12px; color: var(--secondary); }
+  .empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--secondary); padding: 24px; }
+  .preview { background: var(--base); border: 1px solid var(--border); flex: 1; display: flex; }
+  .preview svg { width: 100%; height: 100%; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Curvis mockups — Analyze, Results, Format</h1>
+  <p>Drawn at 1:1 with the theme palette and the rules in <code>docs/DESIGN.md</code>. Orange numbers point to the notes. Underlined letters are mnemonics.</p>
+  <div class="switch" role="group" aria-label="Theme">
+    <button type="button" data-set="light">Light</button>
+    <button type="button" data-set="dark">Dark</button>
+  </div>
+</header>
+
+<!-- ============================================================ ANALYZE -->
+<section class="board">
+  <h2>1 · Analyze dialog (step 2.2) — workbench, 900 × 640</h2>
+  <div class="row">
+    <div class="win" style="width:900px;height:640px;display:flex;flex-direction:column">
+      <div class="titlebar">Analyze</div>
+      <div class="body" style="flex:1;min-height:0">
+        <span class="m" style="left:-26px;top:52px">1</span>
+        <div class="tabs">
+          <div class="tab on"><u>C</u>ompare groups</div>
+          <div class="tab">Fit a c<u>u</u>rve</div>
+          <div class="tab hidden">Survival</div>
+        </div>
+        <div class="secondary">Test whether the means or medians of two or more groups differ.</div>
+        <div class="cols">
+          <div class="col">
+            <span class="m" style="left:-26px;top:100px">2</span>
+            <div class="group grow">
+              <div class="legend">Data</div>
+              <div class="line"><span class="btn seg on" style="border-radius:3px 0 0 3px"><u>N</u>ot paired</span><span class="btn seg" style="border-radius:0 3px 3px 0">Paired (A/<u>B</u> roles)</span></div>
+              <div class="list grow">
+                <div class="h"><div class="c1">Column</div><div class="c2">n</div></div>
+                <div class="r"><div class="c1"><span class="cb on"></span>Control</div><div class="c2">6</div></div>
+                <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2">6</div></div>
+                <div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2">6</div></div>
+                <div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2">5</div></div>
+                <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;Dose (X)</div><div class="c2">–</div></div>
+              </div>
+              <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
+            </div>
+          </div>
+          <div class="col">
+            <span class="m" style="left:448px;top:100px">3</span>
+            <div class="group">
+              <div class="legend">Analysis</div>
+              <div><span class="rb"></span><u>t</u>-test <span class="badge">recent</span></div>
+              <div><span class="rb on"></span><u>O</u>ne-way ANOVA</div>
+              <div><span class="rb"></span><u>M</u>ann-Whitney U</div>
+              <div><span class="rb"></span><u>K</u>ruskal-Wallis</div>
+            </div>
+            <div class="group">
+              <div class="legend">Options</div>
+              <div class="form">
+                <span>Desi<u>g</u>n</span><span class="line"><span><span class="rb on"></span>Ordinary</span><span><span class="rb"></span>Repeated measures</span></span>
+                <span><u>P</u>ost-hoc test</span><span class="field combo">Dunnett (vs. control)</span>
+                <span>Cont<u>r</u>ol group</span><span class="field combo">Control</span>
+              </div>
+            </div>
+            <span class="m" style="left:448px;top:366px">4</span>
+            <div class="group grow">
+              <div class="legend">What will run</div>
+              <div class="summary grow">Ordinary one-way ANOVA on 4 groups (Control, Drug A, Drug B, Drug C), then Dunnett's multiple comparisons test of each group against Control.</div>
+            </div>
+          </div>
+        </div>
+        <span class="m" style="left:-26px;top:553px">5</span>
+        <div class="advanced"><span><u>A</u>dvanced</span></div>
+        <span class="m" style="left:-26px;top:580px">6</span>
+        <div class="feedback warn">Drug C has 5 values and the others 6; the test still works with unequal groups.</div>
+        <div class="buttonrow">
+          <span class="spacer"></span>
+          <span class="btn def">Run</span><span class="btn">Cancel</span>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <ol>
+        <li><b>Families as tabs.</b> Only families the table supports are shown (Survival is hidden here because there are no time/event pairs). The dialog opens on the best-fitting family (SPEC.md).</li>
+        <li><b>Inputs on the left:</b> the same column tree and pairing toggle as Calculate, so paired tests reuse the A/B pairing.</li>
+        <li><b>Analysis and options on the right.</b> The analysis list shows only what <code>can_run</code> allows, recently used ones are marked, and the options panel takes the height of the selected analysis's page.</li>
+        <li><b>Result:</b> one plain sentence that says what will run, with exact method names.</li>
+        <li><b>Advanced</b> is collapsed, e.g. confidence level. One click on Run covers the common case.</li>
+        <li><b>Feedback line:</b> a warning (icon + normal text). When Run is disabled, the reason appears here, e.g. “Tick at least two groups.”</li>
+      </ol>
+      <p>Button order follows the platform; shown here as on Windows and KDE.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ RESULTS -->
+<section class="board">
+  <h2>2 · Results panel (step 2.2) — docked to the right of the table</h2>
+  <div class="row">
+    <div class="win mw" style="width:1100px;height:600px">
+      <div class="titlebar">Curvis — Experiment 12.cvp</div>
+      <div class="menubar"><span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>V</u>iew</span><span><u>T</u>able</span><span><u>A</u>nalyze</span></div>
+      <div class="main">
+        <div class="grid">
+          <table>
+            <tr><th></th><th>Control<small>Y</small></th><th>Drug A<small>Y</small></th><th>Drug B<small>Y</small></th><th>Drug C<small>Y</small></th><th>Drug B norm<small>ƒ Y</small></th></tr>
+            <tr><th>1</th><td>10.2</td><td>12.9</td><td>15.8</td><td>17.1</td><td class="calc">54.9</td></tr>
+            <tr><th>2</th><td>9.8</td><td>13.4</td><td>16.4</td><td>18.0</td><td class="calc">61.6</td></tr>
+            <tr><th>3</th><td>11.1</td><td>12.2</td><td>15.1</td><td>16.6</td><td class="calc">47.0</td></tr>
+            <tr><th>4</th><td>10.5</td><td>13.8</td><td>17.2</td><td>17.9</td><td class="calc">70.5</td></tr>
+            <tr><th>5</th><td>9.9</td><td>12.6</td><td>16.0</td><td>18.4</td><td class="calc">57.1</td></tr>
+            <tr><th>6</th><td>10.7</td><td>13.1</td><td>16.9</td><td></td><td class="calc">67.2</td></tr>
+          </table>
+        </div>
+        <div class="dock">
+          <div class="dt">
+            <b>Results</b>
+            <span class="field combo" style="flex:1">One-way ANOVA · Data 1</span>
+            <span class="btn" style="min-width:0"><u>E</u>dit…</span>
+          </div>
+          <div class="res" style="position:relative;padding-left:30px">
+            <span class="m" style="left:6px;top:10px">1</span>
+            <div class="reading">The group means differ (P &lt; 0.001). Drug A, Drug B and Drug C are each higher than Control.</div>
+            <span class="m" style="left:6px;top:60px">2</span>
+            <div class="warn" style="display:flex;gap:6px">The SDs differ between groups (Brown-Forsythe P = 0.03); the ANOVA assumes equal SDs.</div>
+            <span class="m" style="left:6px;top:100px">3</span>
+            <h3>Ordinary one-way ANOVA</h3>
+            <table>
+              <tr><th>Source</th><th>DF</th><th>F</th><th>P value</th><th></th></tr>
+              <tr><td>Between groups</td><td class="n">3</td><td class="n">128.4</td><td class="n">&lt; 0.001</td><td>***</td></tr>
+              <tr><td>Within groups</td><td class="n">19</td><td class="n"></td><td class="n"></td><td></td></tr>
+            </table>
+            <h3>Dunnett's multiple comparisons test</h3>
+            <table>
+              <tr><th>Comparison</th><th>Mean diff.</th><th>95% CI</th><th>Adj. P</th><th></th></tr>
+              <tr><td>Drug A vs. Control</td><td class="n">2.63</td><td class="n">1.71 to 3.55</td><td class="n">&lt; 0.001</td><td>***</td></tr>
+              <tr class="sel"><td>Drug B vs. Control</td><td class="n">5.85</td><td class="n">4.93 to 6.77</td><td class="n">&lt; 0.001</td><td>***</td></tr>
+              <tr class="sel"><td>Drug C vs. Control</td><td class="n">7.29</td><td class="n">6.33 to 8.25</td><td class="n">&lt; 0.001</td><td>***</td></tr>
+            </table>
+            <span class="m" style="left:6px;top:368px">4</span>
+            <div class="secondary">* P &lt; 0.05, ** P &lt; 0.01, *** P &lt; 0.001. Ctrl+C copies the selected rows.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <ol>
+        <li><b>Plain-language reading first</b>, one sentence in normal text, slightly larger.</li>
+        <li><b>Assumption warnings</b> follow, each with the warning icon. They do not use colour.</li>
+        <li><b>Numbers</b> in tables with exact method names. Rows are selectable, and Ctrl+C copies tab-separated text.</li>
+        <li><b>Star thresholds</b> are always printed under the results.</li>
+      </ol>
+      <p>The combo box switches between the table's analyses, and <u>E</u>dit… reopens the Analyze dialog with the stored parameters. While a rerun is pending, a <span class="badge">Recalculating…</span> badge appears next to the combo box and the old numbers stay visible.</p>
+      <p>Calculated column <i>Drug B norm</i> shows the ƒ mark in its role badge and the <code>AlternateBase</code> background.</p>
+      <p><b>Empty state:</b></p>
+      <div class="win" style="width:300px;height:120px;display:flex">
+        <div class="empty">No analyses yet.<br>Press Ctrl+Shift+A to analyze this table.</div>
+      </div>
+      <p style="margin-top:12px"><b>Cannot run:</b></p>
+      <div class="win" style="width:300px;padding:10px"><div class="err" style="display:flex;gap:6px">Drug C has no values. Tick it off or enter data, then click Edit… to run again.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ FORMAT -->
+<section class="board">
+  <h2>3 · Format dialog (step 2.6) — workbench, 900 × 640</h2>
+  <div class="row">
+    <div class="win" style="width:900px;height:640px;display:flex;flex-direction:column">
+      <div class="titlebar">Format graph</div>
+      <div class="body" style="flex:1;min-height:0">
+        <span class="m" style="left:-26px;top:52px">1</span>
+        <div class="tabs">
+          <div class="tab"><u>G</u>raph</div>
+          <div class="tab"><u>A</u>xes</div>
+          <div class="tab on"><u>S</u>eries</div>
+          <div class="tab">Colors and te<u>x</u>t</div>
+        </div>
+        <div class="secondary">Symbols, lines, colors and error bars. Select several series to change them together.</div>
+        <div class="cols">
+          <div class="col">
+            <span class="m" style="left:-26px;top:100px">2</span>
+            <div class="group grow">
+              <div class="legend">Series</div>
+              <div class="list grow">
+                <div class="r"><div class="c1"><span class="sw" style="background:var(--s1)"></span>Control</div></div>
+                <div class="r sel"><div class="c1"><span class="sw" style="background:var(--s2)"></span>Drug A</div></div>
+                <div class="r sel"><div class="c1"><span class="sw" style="background:var(--s3)"></span>Drug B</div></div>
+              </div>
+              <div class="secondary">2 series selected.</div>
+            </div>
+          </div>
+          <div class="col">
+            <span class="m" style="left:448px;top:100px">3</span>
+            <div class="group">
+              <div class="legend">Options</div>
+              <div class="form">
+                <span>S<u>y</u>mbol</span><span class="line"><span class="field combo w60">● Circle</span> <span>Si<u>z</u>e</span> <span class="field w60">7</span></span>
+                <span><u>L</u>ine style</span><span class="line"><span class="field combo w60">— Solid</span> <span><u>W</u>idth</span> <span class="field w60">1.5</span></span>
+                <span>C<u>o</u>lor</span><span class="line"><span class="field combo"><span class="sw" style="background:repeating-linear-gradient(45deg,var(--s2) 0 4px,var(--s3) 4px 8px)"></span>Mixed</span></span>
+                <span><u>E</u>rror bars</span><span class="field combo">SD</span>
+              </div>
+            </div>
+            <span class="m" style="left:448px;top:268px">4</span>
+            <div class="group grow">
+              <div class="legend">Preview</div>
+              <div class="preview">
+                <svg viewBox="0 0 400 220" role="img" aria-label="Live preview of the graph">
+                  <g fill="none" stroke="var(--text)" stroke-width="1">
+                    <line x1="40" y1="190" x2="390" y2="190"/><line x1="40" y1="10" x2="40" y2="190"/>
+                  </g>
+                  <g font-size="10" fill="var(--text)">
+                    <text x="200" y="214" text-anchor="middle">Dose (µM)</text>
+                    <text x="12" y="100" transform="rotate(-90 12 100)" text-anchor="middle">Response</text>
+                  </g>
+                  <polyline fill="none" stroke="var(--s1)" stroke-width="1.5" points="60,170 120,166 180,160 240,150 300,146 360,142"/>
+                  <polyline fill="none" stroke="var(--s2)" stroke-width="1.5" points="60,165 120,150 180,118 240,84 300,66 360,60"/>
+                  <polyline fill="none" stroke="var(--s3)" stroke-width="1.5" points="60,160 120,136 180,96 240,56 300,38 360,32"/>
+                  <g fill="var(--s1)"><circle cx="60" cy="170" r="3.5"/><circle cx="120" cy="166" r="3.5"/><circle cx="180" cy="160" r="3.5"/><circle cx="240" cy="150" r="3.5"/><circle cx="300" cy="146" r="3.5"/><circle cx="360" cy="142" r="3.5"/></g>
+                  <g fill="var(--s2)"><circle cx="60" cy="165" r="3.5"/><circle cx="120" cy="150" r="3.5"/><circle cx="180" cy="118" r="3.5"/><circle cx="240" cy="84" r="3.5"/><circle cx="300" cy="66" r="3.5"/><circle cx="360" cy="60" r="3.5"/></g>
+                  <g fill="var(--s3)"><circle cx="60" cy="160" r="3.5"/><circle cx="120" cy="136" r="3.5"/><circle cx="180" cy="96" r="3.5"/><circle cx="240" cy="56" r="3.5"/><circle cx="300" cy="38" r="3.5"/><circle cx="360" cy="32" r="3.5"/></g>
+                  <g stroke="var(--s3)"><line x1="180" y1="86" x2="180" y2="106"/><line x1="240" y1="47" x2="240" y2="65"/></g>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="feedback"></div>
+        <div class="buttonrow">
+          <span class="spacer"></span>
+          <span class="btn def">Apply</span><span class="btn">Cancel</span>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <ol>
+        <li><b>Sections as tabs:</b> Graph, Axes, Series, Colors and text, following SPEC.md's list of Format controls.</li>
+        <li><b>Inputs on the left:</b> the items to format. Axes lists X and Y. Series lists the series and allows several to be selected at once.</li>
+        <li><b>Options on the right</b> for the selection. A value that differs between the selected series shows “Mixed”.</li>
+        <li><b>Result:</b> the live preview, drawn by the same renderer and spec. Changes appear at once; Apply makes them one undoable command, and Cancel discards them.</li>
+      </ol>
+      <p><b>Graph tab</b> has nothing to pick, so its options take the left column (DESIGN.md §1) and the preview stays right:</p>
+      <div class="win" style="width:330px;padding:12px">
+        <div class="form">
+          <span><u>T</u>itle</span><span class="field">Dose response</span>
+          <span>Aspect <u>r</u>atio</span><span class="line" style="gap:0"><span class="btn seg on" style="border-radius:3px 0 0 3px">4:3</span><span class="btn seg">16:9</span><span class="btn seg">1:1</span><span class="btn seg">3:4</span><span class="btn seg">3:2</span><span class="btn seg" style="border-radius:0 3px 3px 0">Custom</span></span>
+          <span>Size</span><span class="line"><span class="field w60" style="color:var(--disabled)">12 cm</span> × <span class="field w60" style="color:var(--disabled)">9 cm</span></span>
+        </div>
+      </div>
+      <p style="margin-top:12px"><b>Axes tab</b> options: <u>T</u>itle, Range (<u>F</u>rom / t<u>o</u>, or Auto), La<u>b</u>el, Scale (L<u>i</u>near / Lo<u>g</u>). The title and label wording follow SPEC.md.</p>
+      <p><b>Colors and text tab</b>: Color sc<u>h</u>eme and chart text si<u>z</u>e, in the left column.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll(".switch button");
+    function show(theme) {
+      root.setAttribute("data-theme", theme);
+      buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.set === theme)); });
+      try { localStorage.setItem("curvis-mockup-theme", theme); } catch (e) {}
+    }
+    var start = null;
+    try { start = localStorage.getItem("curvis-mockup-theme"); } catch (e) {}
+    if (!start) start = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    buttons.forEach(function (b) { b.addEventListener("click", function () { show(b.dataset.set); }); });
+    show(start);
+  })();
+</script>
+</body>
+</html>
