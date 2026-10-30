@@ -1,7 +1,9 @@
-"""The document: tables, constants and settings of a project, its change log and undo stack."""
+"""The document: tables, calculations, constants and settings of a project, its change log
+and undo stack."""
 
 from dataclasses import dataclass, field
 
+from curvis.core.calculations import Calculation
 from curvis.core.change_log import ChangeLog
 from curvis.core.commands import Command
 from curvis.core.constants import JsonValue, ProjectConstant
@@ -17,6 +19,7 @@ class Document:
     name: str = "Untitled"
     tables: list[Table] = field(default_factory=list)
     constants: list[ProjectConstant] = field(default_factory=list)
+    calculations: list[Calculation] = field(default_factory=list)
     settings: dict[str, JsonValue] = field(default_factory=dict)
     change_log: ChangeLog = field(default_factory=ChangeLog)
     id: str = field(default_factory=new_id)
@@ -50,3 +53,28 @@ class Document:
         """The table called ``name`` (ignoring case), or ``None``."""
         key = name_key(name)
         return next((t for t in self.tables if name_key(t.name) == key), None)
+
+    def calculation(self, calculation_id: str) -> Calculation:
+        """The calculation with ``calculation_id``; raises ``KeyError`` if there is none."""
+        for calculation in self.calculations:
+            if calculation.id == calculation_id:
+                return calculation
+        raise KeyError(calculation_id)
+
+    def calculation_of(self, column_id: str) -> Calculation | None:
+        """The calculation that fills the column ``column_id``, or ``None``."""
+        for calculation in self.calculations:
+            if calculation.output_for(column_id) is not None:
+                return calculation
+        return None
+
+    def is_calculated(self, column_id: str) -> bool:
+        """True if the column ``column_id`` is a calculated column."""
+        return self.calculation_of(column_id) is not None
+
+    def constant(self, constant_id: str) -> ProjectConstant:
+        """The project constant with ``constant_id``; raises ``KeyError`` if there is none."""
+        for constant in self.constants:
+            if constant.id == constant_id:
+                return constant
+        raise KeyError(constant_id)

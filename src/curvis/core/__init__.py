@@ -1,5 +1,19 @@
 """Document model, commands and undo stack, change log and dependency graph."""
 
+from curvis.core.calculation_commands import (
+    AddConstant,
+    EditConstant,
+    RemoveConstant,
+    SetCalculation,
+    add_calculation,
+    edit_calculation,
+)
+from curvis.core.calculations import (
+    CalculatedColumn,
+    Calculation,
+    CalculationKind,
+    constant_node,
+)
 from curvis.core.change_log import ChangeLog, ChangeLogEntry
 from curvis.core.commands import (
     AddColumn,
@@ -31,8 +45,12 @@ from curvis.core.undo_stack import UNDO_LIMIT, UndoEvent, UndoStack
 __all__ = [
     "UNDO_LIMIT",
     "AddColumn",
+    "AddConstant",
     "AddTable",
     "BulkRename",
+    "CalculatedColumn",
+    "Calculation",
+    "CalculationKind",
     "ChangeLog",
     "ChangeLogEntry",
     "Command",
@@ -41,17 +59,20 @@ __all__ = [
     "CycleError",
     "DependencyGraph",
     "Document",
+    "EditConstant",
     "GroupColumns",
     "ImportColumns",
     "JsonValue",
     "MoveColumn",
     "ProjectConstant",
     "RemoveColumn",
+    "RemoveConstant",
     "RemoveTable",
     "RenameCategoryFactor",
     "RenameColumn",
     "RenameTable",
     "ReorderColumns",
+    "SetCalculation",
     "SetCategory",
     "SetCellBlock",
     "SetCellValue",
@@ -59,4 +80,7 @@ __all__ = [
     "UndoEvent",
     "UndoStack",
     "UngroupColumns",
+    "add_calculation",
+    "constant_node",
+    "edit_calculation",
 ]

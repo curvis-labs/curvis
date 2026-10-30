@@ -6,10 +6,12 @@ The grammar, from loosest to tightest binding::
     a × b, a ÷ b, a % b   left to right (% is modulo)
     −a, +a                so −2^2 = −(2^2) = −4
     a ^ b                 right to left: 2^3^2 = 2^9; the exponent may be negative: 2^−1
-    number, [column], CONSTANT, FUNCTION(…), (…)
+    number, [column], {role}, {role:mean}, CONSTANT, FUNCTION(…), (…)
 
 ``*``, ``/`` and ``-`` are accepted as well as ``×``, ``÷`` and ``−``. A ``]`` inside
-a column name is written ``]]``. Function names ignore case; constant names do not.
+a column name is written ``]]``. Function names, role names and ``mean`` ignore case;
+constant names do not. Role references are used by the Calculate dialog to apply one
+formula to many columns (see :mod:`curvis.data.pairing`).
 
 The parser only builds a tree of the dataclasses in :mod:`curvis.formula.ast`; nothing in
 a formula is ever run as Python.
@@ -33,6 +35,8 @@ from curvis.formula.ast import (
     Function,
     Node,
     Number,
+    RoleRef,
+    RoleStat,
     Span,
     Unary,
     UnaryOp,
@@ -63,6 +67,7 @@ GRAMMAR = r"""
 
 ?atom: NUMBER                -> number
     | COLUMN                 -> column
+    | ROLE                   -> role
     | NAME LPAR [arguments] RPAR -> call
     | NAME                   -> constant
     | LPAR sum RPAR          -> group
@@ -80,6 +85,7 @@ RPAR: ")"
 COMMA: ","
 NUMBER: /([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?/
 COLUMN: /\[([^\]]|\]\])*\]/
+ROLE: /\{[^{}]*\}/
 NAME: /[^\W\d]\w*/
 
 %ignore /\s+/
@@ -108,6 +114,8 @@ class Formula:
     are dropped)."""
     constants: tuple[str, ...]
     """Constant names referenced, in order of first use."""
+    roles: tuple[str, ...] = ()
+    """Keys (:attr:`RoleRef.key`) of the role references, in order of first use."""
 
 
 @lru_cache(maxsize=256)
@@ -127,24 +135,29 @@ def parse(text: str) -> Formula:
         raise FormulaError("The formula is not valid", max(e.pos_in_stream or 0, 0)) from None
     columns: dict[str, str] = {}
     constants: dict[str, None] = {}
-    _collect(root, columns, constants)
-    return Formula(text, root, tuple(columns.values()), tuple(constants))
+    roles: dict[str, None] = {}
+    _collect(root, columns, constants, roles)
+    return Formula(text, root, tuple(columns.values()), tuple(constants), tuple(roles))
 
 
-def _collect(node: Node, columns: dict[str, str], constants: dict[str, None]) -> None:
+def _collect(
+    node: Node, columns: dict[str, str], constants: dict[str, None], roles: dict[str, None]
+) -> None:
     match node:
         case ColumnRef(name):
             columns.setdefault(name_key(name), name)
         case ConstantRef(name):
             constants.setdefault(name)
+        case RoleRef():
+            roles.setdefault(node.key)
         case Unary(_, operand):
-            _collect(operand, columns, constants)
+            _collect(operand, columns, constants, roles)
         case Binary(_, left, right):
-            _collect(left, columns, constants)
-            _collect(right, columns, constants)
+            _collect(left, columns, constants, roles)
+            _collect(right, columns, constants, roles)
         case Call(_, args):
             for arg in args:
-                _collect(arg, columns, constants)
+                _collect(arg, columns, constants, roles)
 
 
 def _character_error(text: str, pos: int) -> FormulaError:
@@ -153,6 +166,10 @@ def _character_error(text: str, pos: int) -> FormulaError:
         return FormulaError("The column name has no closing ']'", pos, len(text))
     if char == "]":
         return FormulaError("']' has no matching '['", pos)
+    if char == "{":
+        return FormulaError("The role has no closing '}'", pos, len(text))
+    if char == "}":
+        return FormulaError("'}' has no matching '{'", pos)
     return FormulaError(f"'{char}' cannot be used in a formula", pos)
 
 
@@ -204,6 +221,23 @@ class _Build:
         if not name.strip():
             raise FormulaError("The column name is empty", token.start_pos or 0, token.end_pos)
         return ColumnRef(name, _span(token))
+
+    def role(self, children: list[Token]) -> RoleRef:
+        (token,) = children
+        start, end = token.start_pos or 0, token.end_pos or 0
+        name, colon, stat_text = str(token)[1:-1].partition(":")
+        name = name.strip()
+        if not name:
+            raise FormulaError("The role name is empty", start, end)
+        stat: RoleStat | None = None
+        if colon:
+            try:
+                stat = RoleStat(stat_text.strip().casefold())
+            except ValueError:
+                raise FormulaError(
+                    f"Unknown statistic '{stat_text.strip()}': write {{{name}:mean}}", start, end
+                ) from None
+        return RoleRef(name, stat, Span(start, end))
 
     def constant(self, children: list[Token]) -> ConstantRef:
         (token,) = children

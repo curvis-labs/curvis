@@ -6,7 +6,7 @@ See :mod:`curvis.formula.parser` for the grammar and :mod:`curvis.formula.compil
 for how values, missing values and column functions behave.
 """
 
-from curvis.formula.ast import Function, Node, to_text
+from curvis.formula.ast import Function, Node, RoleRef, RoleStat, to_text
 from curvis.formula.compiler import CompiledFormula, check, compile_formula, evaluate
 from curvis.formula.constants import (
     BUILTIN_CONSTANTS,
@@ -18,6 +18,7 @@ from curvis.formula.constants import (
 )
 from curvis.formula.errors import FormulaError
 from curvis.formula.parser import Formula, parse, warm_up
+from curvis.formula.rewrite import rename_columns
 
 __all__ = [
     "BUILTIN_CONSTANTS",
@@ -28,12 +29,15 @@ __all__ = [
     "FormulaError",
     "Function",
     "Node",
+    "RoleRef",
+    "RoleStat",
     "check",
     "compile_formula",
     "constant_name_problem",
     "evaluate",
     "is_valid_constant_name",
     "parse",
+    "rename_columns",
     "resolve_constants",
     "to_text",
     "warm_up",
