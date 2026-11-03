@@ -11,6 +11,10 @@ document's calculations (before the recalculator looks at the graph), then recom
 the columns whose definition changed: a new or edited calculation, a renamed or added
 column that a formula refers to.
 
+Other derived nodes (analyses) share the engine's graph and recalculator through
+:meth:`CalcEngine.attach`, so they are recomputed in one dependency order with the
+calculated columns they read.
+
 Values of calculated columns are derived data: the engine writes the results straight
 into the column, not through a command, so recomputing is never an undo step. Formula
 errors leave the column empty (NaN) and are kept in :attr:`CalcEngine.errors`.
@@ -20,7 +24,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -42,6 +46,23 @@ from curvis.core import (
 from curvis.data import Table, role_values
 
 type _Signature = tuple[object, ...]
+
+
+class NodeProvider(Protocol):
+    """Declares more nodes in a :class:`CalcEngine`'s graph and plans their jobs."""
+
+    def sync(self) -> list[str]:
+        """Bring the provider's nodes in the graph up to date with the document.
+
+        Called after every do, undo or redo, before stale nodes are found. Returns the
+        nodes whose definition changed, which are then recomputed.
+        """
+
+    def owns(self, node: str) -> bool:
+        """True if ``node`` is one of the provider's nodes."""
+
+    def plan(self, node: str) -> NodeJob | None:
+        """The job that recomputes ``node`` (see :data:`~curvis.compute.recalc.Planner`)."""
 
 
 def _evaluate(
@@ -81,6 +102,7 @@ class CalcEngine(QObject):
         self._signatures: dict[str, _Signature] = {}
         self._graph_errors: dict[str, str] = {}  # problems found while declaring a node
         self._pending: list[str] = []
+        self._providers: list[NodeProvider] = []
         self._global_names = {c.name for c in global_constants()}
         # The graph must be up to date before the recalculator reads it after a command,
         # and definition changes are recomputed after it has marked its stale nodes.
@@ -105,6 +127,13 @@ class CalcEngine(QObject):
         """Recompute every calculated column (e.g. after opening a project)."""
         self.recalculator.recompute(list(self._signatures))
 
+    def attach(self, provider: NodeProvider) -> None:
+        """Add the nodes of ``provider`` to the graph and compute them."""
+        self._providers.append(provider)
+        changed = provider.sync()
+        if changed:
+            self.recalculator.recompute(changed)
+
     def constants_changed(self, names: Sequence[str]) -> None:
         """The constants ``names`` were added, changed or removed outside a command."""
         self.recalculator.changed([constant_node(n) for n in names], delay_ms=0)
@@ -124,6 +153,8 @@ class CalcEngine(QObject):
 
     def _sync_on_event(self, _event: UndoEvent) -> None:
         self._pending = self._sync()
+        for provider in self._providers:
+            self._pending += provider.sync()
 
     def _run_pending(self, _event: UndoEvent) -> None:
         pending, self._pending = self._pending, []
@@ -149,7 +180,7 @@ class CalcEngine(QObject):
                     calculation.target_index(output),
                     tuple(node_reads),
                 )
-        for node in self.graph.nodes:
+        for node in old:  # only this engine's nodes: providers manage their own
             if node not in new:
                 self.graph.remove_node(node)
                 self.errors.pop(node, None)
@@ -172,6 +203,9 @@ class CalcEngine(QObject):
     # --- computing -----------------------------------------------------------------------
 
     def _plan(self, node: str) -> NodeJob | None:
+        if node not in self._signatures:
+            provider = next((p for p in self._providers if p.owns(node)), None)
+            return provider.plan(node) if provider is not None else None
         found = self._find(node)
         if found is None:
             return None

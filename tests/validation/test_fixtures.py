@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.validation.adapters import ADAPTERS
+from tests.validation.adapters import ADAPTERS, run_descriptive_analysis
 from tests.validation.harness import (
     FIXTURE_DIR,
     REPO_ROOT,
@@ -61,3 +61,16 @@ def test_tolerance_exceptions_are_documented() -> None:
     documented = set(re.findall(r"`([^`]+:[^`]+)`", text))
     missing = set(EXCEPTIONS) - documented
     assert not missing, f"tolerance exceptions not listed in TOLERANCES.md: {sorted(missing)}"
+
+
+DESCRIPTIVE = [p for p in FIXTURES if p.parent.name == "descriptive_stats"]
+
+
+@pytest.mark.parametrize("path", DESCRIPTIVE, ids=fixture_id)
+def test_descriptive_statistics_analysis_matches_r(path: Path) -> None:
+    """The Descriptive statistics analysis, run as the app runs it, against the same
+    fixtures as row_stats and mean_ci."""
+    fixture = load_fixture(path)
+    mismatches = compare(fixture, run_descriptive_analysis(fixture.inputs))
+    if mismatches:
+        pytest.fail(format_report(fixture, mismatches), pytrace=False)

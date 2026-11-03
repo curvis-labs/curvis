@@ -61,8 +61,12 @@ TABLE_ACTIONS = (
     "table.move_right",
     "table.calculate",
     "table.edit_calculation",
+    "analyze.analyze",
 )
 """Actions that need a table view in the current tab."""
+
+ANALYSIS_ACTIONS = ("analyze.edit", "analyze.delete")
+"""Actions that need an analysis shown in the Results panel."""
 
 
 FORMULA_WARM_UP = "formula:warm-up"
@@ -206,7 +210,7 @@ class MainWindow(QMainWindow):
         r.register(
             "edit.copy",
             "&Copy",
-            self._table_call(TableView.copy_selection),
+            self._tab_call(DocumentTab.copy),
             category="Edit",
             shortcut=k.Copy,
         )
@@ -330,6 +334,25 @@ class MainWindow(QMainWindow):
             self.show_constants,
             category="Table",
         )
+        r.register(
+            "analyze.analyze",
+            "&Analyze…",
+            self._tab_call(DocumentTab.analyze),
+            category="Analyze",
+            shortcut="Ctrl+Shift+A",
+        )
+        r.register(
+            "analyze.edit",
+            "&Edit analysis…",
+            self._tab_call(DocumentTab.edit_analysis),
+            category="Analyze",
+        )
+        r.register(
+            "analyze.delete",
+            "&Delete analysis",
+            self._tab_call(DocumentTab.delete_analysis),
+            category="Analyze",
+        )
         a = self.registry.action
         self._edit_menu.insertActions(
             self._settings_separator, [a("edit.copy"), a("edit.paste"), a("edit.clear")]
@@ -364,6 +387,11 @@ class MainWindow(QMainWindow):
         table_menu.addActions(
             [a("table.calculate"), a("table.edit_calculation"), a("table.constants")]
         )
+        analyze_menu = QMenu("&Analyze", self)
+        self.menuBar().insertMenu(self._view_menu.menuAction(), analyze_menu)
+        analyze_menu.addAction(a("analyze.analyze"))
+        analyze_menu.addSeparator()
+        analyze_menu.addActions([a("analyze.edit"), a("analyze.delete")])
 
     # --- documents --------------------------------------------------------------------
 
@@ -458,9 +486,12 @@ class MainWindow(QMainWindow):
             decimal_places=self.settings.decimal_places,
             scheduler=self.scheduler,
             global_constants=lambda: self.settings.global_constants,
+            recent_analyses=lambda: self.settings.recent_analyses,
         )
         tab.message.connect(self._show_status)
         tab.manage_constants_requested.connect(self.show_constants)
+        tab.analysis_used.connect(self.settings.add_recent_analysis)
+        tab.state_changed.connect(functools.partial(self._on_tab_state_changed, tab))
         index = self.tabs.addTab(tab, tab.title)
         self.tabs.setTabToolTip(index, str(path) if path else tab.title)
         document.undo_stack.subscribe(functools.partial(self._on_undo_event, tab))
@@ -670,6 +701,10 @@ class MainWindow(QMainWindow):
     def _on_undo_event(self, tab: DocumentTab, _event: UndoEvent) -> None:
         self._update_tab(tab)
 
+    def _on_tab_state_changed(self, tab: DocumentTab) -> None:
+        if tab is self.current_tab:
+            self._update_state()
+
     def _on_current_tab_changed(self, _index: int) -> None:
         self._update_state()
 
@@ -710,6 +745,9 @@ class MainWindow(QMainWindow):
         if self._table_actions_created:
             for action_id in TABLE_ACTIONS:
                 a(action_id).setEnabled(has_table)
+            has_analysis = has_table and tab is not None and tab.current_analysis_id is not None
+            for action_id in ANALYSIS_ACTIONS:
+                a(action_id).setEnabled(has_analysis)
         stack = tab.document.undo_stack if tab is not None else None
         undo, redo = a("edit.undo"), a("edit.redo")
         undo.setEnabled(stack is not None and stack.can_undo)

@@ -1,8 +1,9 @@
-"""The document: tables, calculations, constants and settings of a project, its change log
-and undo stack."""
+"""The document: tables, calculations, analyses, constants and settings of a project, its
+change log and undo stack."""
 
 from dataclasses import dataclass, field
 
+from curvis.analysis.base import Analysis
 from curvis.core.calculations import Calculation
 from curvis.core.change_log import ChangeLog
 from curvis.core.commands import Command
@@ -20,6 +21,7 @@ class Document:
     tables: list[Table] = field(default_factory=list)
     constants: list[ProjectConstant] = field(default_factory=list)
     calculations: list[Calculation] = field(default_factory=list)
+    analyses: list[Analysis] = field(default_factory=list)
     settings: dict[str, JsonValue] = field(default_factory=dict)
     change_log: ChangeLog = field(default_factory=ChangeLog)
     id: str = field(default_factory=new_id)
@@ -78,3 +80,14 @@ class Document:
             if constant.id == constant_id:
                 return constant
         raise KeyError(constant_id)
+
+    def analysis(self, analysis_id: str) -> Analysis:
+        """The analysis with ``analysis_id``; raises ``KeyError`` if there is none."""
+        for analysis in self.analyses:
+            if analysis.id == analysis_id:
+                return analysis
+        raise KeyError(analysis_id)
+
+    def analyses_of(self, table_id: str) -> list[Analysis]:
+        """The analyses whose source is the table ``table_id``, in the order they were made."""
+        return [a for a in self.analyses if a.table_id == table_id]

@@ -5,7 +5,7 @@ in the light and the dark theme.
 
 Each dialog is shown at its default size, with the sample data of
 tests/ui/dialog_samples.py. Files are named <dialog>-<theme>.png; the main window is
-main_window-<theme>.png.
+main_window-<theme>.png, and the Results panel next to a table results_panel-<theme>.png.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
-from tests.ui.dialog_samples import SAMPLES, Context, settle
+from tests.ui.dialog_samples import SAMPLES, Context, grouped_document, settle
 
 from curvis.compute import Scheduler
 from curvis.settings import Settings, Theme
@@ -56,6 +56,33 @@ def main_window(settings: Settings, app: QApplication, path: Path) -> None:
     app.processEvents()
 
 
+def results_panel(settings: Settings, app: QApplication, path: Path) -> None:
+    """The sample table with descriptive statistics of its two replicate groups."""
+    from curvis.analysis.base import Analysis, get
+    from curvis.core import add_analysis
+
+    window = MainWindow(settings)
+    window._ask_save = lambda _tab: SaveChoice.DISCARD  # type: ignore[method-assign]
+    window.resize(1200, 640)
+    window.show()
+    document = grouped_document()
+    tab = window._add_tab(document, None)
+    kind = get("descriptive_statistics")
+    table = document.table("t")
+    inputs = kind.default_inputs(table)[:2]
+    document.execute(add_analysis(document, Analysis(kind.id, "t", inputs, kind.default_params())))
+    window.scheduler.wait_idle()
+    for _ in range(10):
+        app.processEvents()
+    assert tab.analysis_engine is not None and tab.analysis_engine.results
+    window.grab().save(str(path))
+    print(path, f"{window.width()}x{window.height()}")
+    window.close()
+    window.scheduler.shutdown()
+    window.deleteLater()
+    app.processEvents()
+
+
 def main(out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     app = QApplication.instance() or QApplication(sys.argv)
@@ -78,6 +105,7 @@ def main(out: Path) -> None:
                     dialog.deleteLater()
                     app.processEvents()
                 main_window(ctx.settings, app, out / f"main_window-{theme.value}.png")
+                results_panel(ctx.settings, app, out / f"results_panel-{theme.value}.png")
         finally:
             ctx.scheduler.shutdown()
 

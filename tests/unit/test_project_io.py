@@ -16,6 +16,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from curvis.analysis.base import Analysis
 from curvis.core import ChangeLogEntry, Document, JsonValue, ProjectConstant, RenameTable
 from curvis.data import CategoryGroup, Column, ColumnRole, ReplicateGroup, Table, normalized_order
 from curvis.io import project
@@ -219,13 +220,14 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 3
+    assert data["schema_version"] == SCHEMA_VERSION == 4
     assert set(data["document"]) == {
         "id",
         "name",
         "tables",
         "constants",
         "calculations",
+        "analyses",
         "settings",
     }
     assert data["change_log"] == []
@@ -387,7 +389,7 @@ def test_newer_version(tmp_path: Path) -> None:
 
 
 def test_migrations_cover_every_older_version() -> None:
-    assert SCHEMA_VERSION == 3
+    assert SCHEMA_VERSION == 4
     assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
@@ -445,9 +447,11 @@ def test_version_1_files_get_the_default_category_factor(tmp_path: Path) -> None
 def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "old.cvp"
     save(Document(), path)
-    monkeypatch.setattr(project, "SCHEMA_VERSION", 4)
-    monkeypatch.setattr(project, "MIGRATIONS", {1: lambda data: data, 2: lambda data: data})
-    with pytest.raises(ProjectFileError, match="from format 3"):
+    monkeypatch.setattr(project, "SCHEMA_VERSION", 5)
+    monkeypatch.setattr(
+        project, "MIGRATIONS", {1: lambda data: data, 2: lambda data: data, 3: lambda data: data}
+    )
+    with pytest.raises(ProjectFileError, match="from format 4"):
         load(path)
 
 
@@ -562,3 +566,69 @@ def test_settings_that_are_not_json_are_rejected(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="JSON"):
         save(Document(settings={"limit": math.inf}), tmp_path / "p.cvp")
     assert list(tmp_path.iterdir()) == []
+
+
+# --- analyses ------------------------------------------------------------------------------
+
+
+def _analysis_document() -> tuple[Document, Analysis]:
+    from curvis.analysis.descriptive import DescriptiveParams
+
+    table = Table("T", [Column.new("a", "Y", [1.0, 2.0], id="a")], id="T")
+    analysis = Analysis(
+        "descriptive_statistics", "T", ("a",), DescriptiveParams(confidence_interval=False)
+    )
+    return Document(tables=[table], analyses=[analysis]), analysis
+
+
+def test_analyses_are_saved_with_their_inputs_and_parameters(tmp_path: Path) -> None:
+    document, analysis = _analysis_document()
+    save(document, tmp_path / "a.cvp")
+    loaded = load(tmp_path / "a.cvp")
+    assert loaded.analyses == [analysis]
+    with zipfile.ZipFile(tmp_path / "a.cvp") as zf:
+        stored = json.loads(zf.read(PROJECT_JSON))["document"]["analyses"][0]
+    assert stored["params"] == {"confidence_interval": False, "skip_empty_rows": True}
+    assert "result" not in stored  # results are derived, not saved
+
+
+def _rewrite(path: Path, change: Any) -> None:
+    with zipfile.ZipFile(path) as zf:
+        files = {name: zf.read(name) for name in zf.namelist()}
+    data = json.loads(files[PROJECT_JSON])
+    change(data)
+    files[PROJECT_JSON] = json.dumps(data).encode()
+    with zipfile.ZipFile(path, "w") as zf:
+        for name, raw in files.items():
+            zf.writestr(name, raw)
+
+
+def test_version_3_files_have_no_analyses(tmp_path: Path) -> None:
+    """Format 4 added analyses."""
+    path = tmp_path / "v3.cvp"
+    save(Document(tables=[Table("T", [Column.new("a", "Y", [1.0])])]), path)
+
+    def to_v3(data: dict[str, Any]) -> None:
+        data["schema_version"] = 3
+        del data["document"]["analyses"]
+
+    _rewrite(path, to_v3)
+    assert load(path).analyses == []
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda a: a.update(type="no_such_analysis"), "unknown type"),
+        (lambda a: a.update(table_id="gone"), "table that does not exist"),
+        (lambda a: a["params"].update(confidence_interval="yes"), "true or false"),
+        (lambda a: a.update(inputs="a"), "inputs"),
+    ],
+)
+def test_damaged_analyses_are_reported(tmp_path: Path, change: Any, message: str) -> None:
+    document, _analysis = _analysis_document()
+    path = tmp_path / "bad.cvp"
+    save(document, path)
+    _rewrite(path, lambda data: change(data["document"]["analyses"][0]))
+    with pytest.raises(CorruptProjectError, match=message):
+        load(path)

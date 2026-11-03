@@ -1,5 +1,11 @@
 """Document model, commands and undo stack, change log and dependency graph."""
 
+from curvis.core.analysis_commands import (
+    SetAnalysis,
+    add_analysis,
+    edit_analysis,
+    remove_analysis,
+)
 from curvis.core.calculation_commands import (
     AddConstant,
     EditConstant,
@@ -72,6 +78,7 @@ __all__ = [
     "RenameColumn",
     "RenameTable",
     "ReorderColumns",
+    "SetAnalysis",
     "SetCalculation",
     "SetCategory",
     "SetCellBlock",
@@ -80,7 +87,10 @@ __all__ = [
     "UndoEvent",
     "UndoStack",
     "UngroupColumns",
+    "add_analysis",
     "add_calculation",
     "constant_node",
+    "edit_analysis",
     "edit_calculation",
+    "remove_analysis",
 ]
