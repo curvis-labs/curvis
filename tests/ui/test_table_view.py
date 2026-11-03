@@ -507,7 +507,7 @@ def test_table_actions_are_in_the_command_palette(window: MainWindow) -> None:
 def test_table_menu_and_edit_menu_entries(window: MainWindow) -> None:
     window.new_document()
     menus = {a.text().replace("&", ""): a.menu() for a in window.menuBar().actions()}
-    assert list(menus) == ["File", "Edit", "Table", "View"]
+    assert list(menus) == ["File", "Edit", "Table", "Analyze", "View"]
     edit = [a.text().replace("&", "") for a in menus["Edit"].actions()]
     assert edit[edit.index("Copy") : edit.index("Copy") + 3] == ["Copy", "Paste", "Clear cells"]
     assert edit[-1] == "Settings…"

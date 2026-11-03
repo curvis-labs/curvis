@@ -19,6 +19,7 @@ from curvis.core.calculation_commands import add_calculation
 from curvis.core.constants import ProjectConstant
 from curvis.data import Column, ColumnRole, Pairing, Table
 from curvis.settings import Settings
+from curvis.ui.analyze_dialog import AnalyzeDialog
 from curvis.ui.calculate_dialog import CalculateDialog
 from curvis.ui.constants_dialog import ConstantEditor, ConstantsDialog
 from curvis.ui.import_dialog import ImportDialog
@@ -89,6 +90,35 @@ def _calculate_custom(ctx: Context) -> QDialog:
     return dialog
 
 
+def grouped_document() -> Document:
+    """The sample document with its replicates grouped as "Control" and "Drug"."""
+    from curvis.core import GroupColumns
+
+    doc = sample_document()
+    doc.execute(GroupColumns("t", ["Control1", "Control2", "Control3"], "Control"))
+    doc.execute(GroupColumns("t", ["Drug1", "Drug2", "Drug3"], "Drug"))
+    doc.undo_stack.clear()
+    return doc
+
+
+def _analyze(ctx: Context) -> QDialog:
+    return AnalyzeDialog(grouped_document(), "t", recent=["descriptive_statistics"])
+
+
+def _analyze_advanced(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t")
+    form = dialog.forms["descriptive_statistics"]
+    assert form.advanced is not None
+    form.advanced.set_expanded(True)
+    return dialog
+
+
+def _analyze_nothing_ticked(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.deselect_all_button.click()
+    return dialog
+
+
 def _import(ctx: Context) -> QDialog:
     dialog = ImportDialog(CSV, ctx.scheduler)
     dialog.header_row.setValue(3)
@@ -128,6 +158,9 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "calculate": _calculate,
     "calculate_paired": _calculate_paired,
     "calculate_custom": _calculate_custom,
+    "analyze": _analyze,
+    "analyze_advanced": _analyze_advanced,
+    "analyze_nothing_ticked": _analyze_nothing_ticked,
     "constants": _constants,
     "constant_editor": _constant_editor,
     "settings": _settings,

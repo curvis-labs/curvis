@@ -67,7 +67,15 @@ INPUTS = (QLineEdit, QComboBox, QAbstractSpinBox, QAbstractItemView, QPlainTextE
 # no letter is free (DESIGN.md, section 4).
 NO_MNEMONIC_NEEDED = {"Set role A", "Set role B"}
 
-WORKBENCH = {"import", "calculate", "calculate_paired", "calculate_custom"}
+WORKBENCH = {
+    "import",
+    "calculate",
+    "calculate_paired",
+    "calculate_custom",
+    "analyze",
+    "analyze_advanced",
+    "analyze_nothing_ticked",
+}
 
 
 @pytest.fixture
