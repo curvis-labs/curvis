@@ -134,7 +134,14 @@ def test_mean_ci_with_infinite_values_is_nan() -> None:
     assert math.isnan(low[0]) and math.isnan(high[0])
 
 
-FINITE = st.floats(min_value=-1e12, max_value=1e12, allow_nan=False, allow_infinity=False)
+# Values like measured data: at most 6 significant digits and at most 1e6 in size
+# (m * 10**e, |m| < 10**6, -6 <= e <= 0). Exact SDs to 1e-10 are not possible in floating
+# point for values that differ only in their last digits (e.g. 1e6 and the float just
+# below it), nor for tiny values whose squared deviations underflow. Large offsets are
+# covered by the R fixtures in tests/validation.
+FINITE = st.builds(
+    lambda m, e: m * 10.0**e, st.integers(-(10**6) + 1, 10**6 - 1), st.integers(-6, 0)
+)
 
 
 @given(
