@@ -50,10 +50,11 @@ One calculation can be applied to many columns at once: it makes one calculated 
 
 ## Analyses
 
-Curvis has 18 built-in analyses in three families. The Analyze dialog shows only the analyses your table can support. It opens on the family that best fits the data: survival when there are time/event pairs, curve fits when there are XY pairs, and group comparisons otherwise.
+Curvis has 19 built-in analyses in three families. The Analyze dialog shows only the analyses your table can support. It opens on the family that best fits the data: survival when there are time/event pairs, curve fits when there are XY pairs, and group comparisons otherwise.
 
 | Family | Analysis | Details |
 | --- | --- | --- |
+| Compare groups | Descriptive statistics | n, mean, SD, SEM and 95% confidence interval of each replicate group, row by row |
 | Compare groups | t-test | Unpaired or paired; mean difference with a confidence interval |
 | Compare groups | One-way ANOVA | Ordinary or repeated measures; Dunnett (vs. control), Holm or Tukey post-hoc tests |
 | Compare groups | Two-way ANOVA | Two named factors, built from category groups; Tukey post-hoc test for each significant factor |
