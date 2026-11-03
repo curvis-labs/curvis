@@ -310,9 +310,9 @@ Show me the R script before writing the Python side. Make a plan first. When don
 ### Step 2.2 — Analysis framework, Analyze dialog and Results panel
 
 **Done when**
-- [ ] The Analyze dialog shows only analyses the table supports and opens on the best-fitting family.
-- [ ] Results appear in a Results panel with stars, plain-language reading and Ctrl+C copy.
-- [ ] Analyses rerun automatically when data changes and can be reopened to change parameters.
+- [x] The Analyze dialog shows only analyses the table supports and opens on the best-fitting family.
+- [x] Results appear in a Results panel with stars, plain-language reading and Ctrl+C copy.
+- [x] Analyses rerun automatically when data changes and can be reopened to change parameters.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.2 in docs/PHASES.md.
