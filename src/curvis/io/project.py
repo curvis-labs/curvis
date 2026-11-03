@@ -30,6 +30,8 @@ import numpy as np
 import pyarrow as pa
 
 from curvis import __version__
+from curvis.analysis import base as analysis_base
+from curvis.analysis.base import Analysis, params_from_json, params_to_json
 from curvis.core.calculations import CalculatedColumn, Calculation, CalculationKind
 from curvis.core.change_log import ChangeLog, ChangeLogEntry
 from curvis.core.constants import JsonValue, ProjectConstant
@@ -45,7 +47,7 @@ from curvis.data import (
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -124,6 +126,15 @@ def _add_calculations(data: dict[str, Any]) -> dict[str, Any]:
     document = data.get("document")
     if isinstance(document, dict):
         document.setdefault("calculations", [])
+    return data
+
+
+@register_migration(3)
+def _add_analyses(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 4 stores analyses (type, source table, inputs and parameters)."""
+    document = data.get("document")
+    if isinstance(document, dict):
+        document.setdefault("analyses", [])
     return data
 
 
@@ -211,6 +222,7 @@ def _project_dict(document: Document, files: list[str]) -> dict[str, Any]:
                 for c in document.constants
             ],
             "calculations": [_calculation_dict(c) for c in document.calculations],
+            "analyses": [_analysis_dict(a) for a in document.analyses],
             "settings": document.settings,
         },
         "change_log": [
@@ -234,16 +246,31 @@ def _calculation_dict(calculation: Calculation) -> dict[str, Any]:
         "params": calculation.params,
         "suffix": calculation.suffix,
         "append_at_end": calculation.append_at_end,
-        "pairing": {
-            "paired": pairing.paired,
-            "a_name": pairing.a_name,
-            "b_name": pairing.b_name,
-            "a_columns": list(pairing.a_columns),
-            "b_columns": list(pairing.b_columns),
-        },
+        "pairing": _pairing_dict(pairing),
         "columns": [
             {"column_id": c.column_id, "source_id": c.source_id} for c in calculation.columns
         ],
+    }
+
+
+def _pairing_dict(pairing: Pairing) -> dict[str, Any]:
+    return {
+        "paired": pairing.paired,
+        "a_name": pairing.a_name,
+        "b_name": pairing.b_name,
+        "a_columns": list(pairing.a_columns),
+        "b_columns": list(pairing.b_columns),
+    }
+
+
+def _analysis_dict(analysis: Analysis) -> dict[str, Any]:
+    return {
+        "id": analysis.id,
+        "type": analysis.type,
+        "table_id": analysis.table_id,
+        "inputs": list(analysis.inputs),
+        "params": params_to_json(analysis.params),
+        "pairing": None if analysis.pairing is None else _pairing_dict(analysis.pairing),
     }
 
 
@@ -350,6 +377,11 @@ def _build_document(zf: zipfile.ZipFile, data: dict[str, Any]) -> Document:
     ]
     _check_unique([c.id for c in calculations], "calculation ids")
     _check_unique([o.column_id for c in calculations for o in c.columns], "calculated columns")
+    analyses = [
+        _read_analysis(a, f"analysis {i + 1}", tables)
+        for i, a in enumerate(_list(doc_data.get("analyses"), "analyses"))
+    ]
+    _check_unique([a.id for a in analyses], "analysis ids")
     settings: dict[str, JsonValue] = _obj(doc_data.get("settings"), "settings")
     change_log = ChangeLog()
     for i, e in enumerate(_list(data.get("change_log"), "change_log")):
@@ -359,6 +391,7 @@ def _build_document(zf: zipfile.ZipFile, data: dict[str, Any]) -> Document:
         tables=tables,
         constants=constants,
         calculations=calculations,
+        analyses=analyses,
         settings=settings,
         change_log=change_log,
         id=_str(doc_data.get("id"), "document id"),
@@ -472,14 +505,7 @@ def _read_calculation(value: Any, where: str, tables: list[Table]) -> Calculatio
         kind = CalculationKind(_str(obj.get("kind"), f"{where} kind"))
     except ValueError:
         raise _ContentError(f"{where} has an unknown kind") from None
-    pairing_obj = _obj(obj.get("pairing"), f"{where} pairing")
-    pairing = Pairing(
-        a_columns=tuple(_str_list(pairing_obj.get("a_columns"), f"{where} role A columns")),
-        b_columns=tuple(_str_list(pairing_obj.get("b_columns"), f"{where} role B columns")),
-        paired=_bool(pairing_obj.get("paired"), f"{where} paired"),
-        a_name=_str(pairing_obj.get("a_name"), f"{where} role A name"),
-        b_name=_str(pairing_obj.get("b_name"), f"{where} role B name"),
-    )
+    pairing = _read_pairing(obj.get("pairing"), where)
     column_ids = {c.id for c in table.columns}
     columns: list[CalculatedColumn] = []
     for i, item in enumerate(_list(obj.get("columns"), f"{where} columns")):
@@ -498,6 +524,42 @@ def _read_calculation(value: Any, where: str, tables: list[Table]) -> Calculatio
         suffix=_str(obj.get("suffix"), f"{where} suffix"),
         append_at_end=_bool(obj.get("append_at_end"), f"{where} append_at_end"),
         columns=tuple(columns),
+        id=_str(obj.get("id"), f"{where} id"),
+    )
+
+
+def _read_pairing(value: Any, where: str) -> Pairing:
+    pairing_obj = _obj(value, f"{where} pairing")
+    return Pairing(
+        a_columns=tuple(_str_list(pairing_obj.get("a_columns"), f"{where} role A columns")),
+        b_columns=tuple(_str_list(pairing_obj.get("b_columns"), f"{where} role B columns")),
+        paired=_bool(pairing_obj.get("paired"), f"{where} paired"),
+        a_name=_str(pairing_obj.get("a_name"), f"{where} role A name"),
+        b_name=_str(pairing_obj.get("b_name"), f"{where} role B name"),
+    )
+
+
+def _read_analysis(value: Any, where: str, tables: list[Table]) -> Analysis:
+    obj = _obj(value, where)
+    table_id = _str(obj.get("table_id"), f"{where} table_id")
+    if not any(t.id == table_id for t in tables):
+        raise _ContentError(f"{where} refers to a table that does not exist")
+    type_id = _str(obj.get("type"), f"{where} type")
+    try:
+        analysis_type = analysis_base.get(type_id)
+    except KeyError:
+        raise _ContentError(f"{where} is of an unknown type '{type_id}'") from None
+    try:
+        params = params_from_json(analysis_type.params_type, _obj(obj.get("params"), where))
+    except ValueError as e:
+        raise _ContentError(f"{where}: {e}") from None
+    raw_pairing = obj.get("pairing")
+    return Analysis(
+        type=type_id,
+        table_id=table_id,
+        inputs=tuple(_str_list(obj.get("inputs"), f"{where} inputs")),
+        params=params,
+        pairing=None if raw_pairing is None else _read_pairing(raw_pairing, where),
         id=_str(obj.get("id"), f"{where} id"),
     )
 

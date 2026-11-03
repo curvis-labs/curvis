@@ -133,3 +133,16 @@ def test_damaged_global_constants_are_skipped(ini: QSettings, settings: Settings
     for raw in ("not json", '{"a": 1}'):
         ini.setValue(Settings.GLOBAL_CONSTANTS, raw)
         assert settings.global_constants == []
+
+
+def test_recent_analyses_newest_first_capped(settings: Settings) -> None:
+    assert settings.recent_analyses == []
+    for type_id in ["a", "b", "c", "a", "d", "e", "f"]:
+        settings.add_recent_analysis(type_id)
+    assert settings.recent_analyses == ["f", "e", "d", "a", "c"]
+
+
+@pytest.mark.parametrize("raw", ["not json", '{"a": 1}', '[1, null, ""]'])
+def test_damaged_recent_analyses_are_skipped(ini: QSettings, settings: Settings, raw: str) -> None:
+    ini.setValue(Settings.RECENT_ANALYSES, raw)
+    assert settings.recent_analyses == []

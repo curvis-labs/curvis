@@ -1,5 +1,5 @@
-"""App settings stored with QSettings: theme, decimal places, recent projects and global
-constants.
+"""App settings stored with QSettings: theme, decimal places, recent projects, recently
+used analyses and global constants.
 
 Values are validated on read, so a damaged or hand-edited settings file falls back to the
 defaults instead of breaking the app. Recent projects and global constants are each stored
@@ -25,6 +25,9 @@ APPLICATION = "Curvis"
 
 MAX_RECENT = 10
 """Number of recent projects kept."""
+
+MAX_RECENT_ANALYSES = 5
+"""Number of recently used analysis types kept."""
 
 DECIMAL_PLACES_DEFAULT = 4
 DECIMAL_PLACES_MIN = 0
@@ -71,6 +74,7 @@ class Settings(QObject):
     DECIMAL_PLACES = "tables/decimal_places"
     RECENT = "projects/recent"
     GLOBAL_CONSTANTS = "formulas/global_constants"
+    RECENT_ANALYSES = "analyses/recent"
 
     def __init__(self, store: QSettings | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -160,6 +164,26 @@ class Settings(QObject):
             for r in projects[:MAX_RECENT]
         ]
         self._set(self.RECENT, json.dumps(data))
+
+    # --- recently used analyses ---------------------------------------------------
+
+    @property
+    def recent_analyses(self) -> list[str]:
+        """Ids of the analysis types used most recently, newest first."""
+        raw = self._store.value(self.RECENT_ANALYSES, "[]")
+        try:
+            items = json.loads(str(raw))
+        except ValueError:
+            return []
+        if not isinstance(items, list):
+            return []
+        ids = [item for item in items if isinstance(item, str) and item]
+        return list(dict.fromkeys(ids))[:MAX_RECENT_ANALYSES]
+
+    def add_recent_analysis(self, type_id: str) -> None:
+        """Put the analysis type ``type_id`` at the top of the recently used list."""
+        others = [t for t in self.recent_analyses if t != type_id]
+        self._set(self.RECENT_ANALYSES, json.dumps([type_id, *others][:MAX_RECENT_ANALYSES]))
 
     # --- global constants ----------------------------------------------------------
 
