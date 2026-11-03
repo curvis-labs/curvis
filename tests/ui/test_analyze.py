@@ -307,7 +307,7 @@ def first_grid(tab: DocumentTab) -> ResultGrid:
     return tab.results_panel.grids[0]
 
 
-def test_ctrl_c_copies_the_selected_cells_at_full_precision(
+def test_ctrl_c_copies_the_selected_cells_as_shown(
     tab: DocumentTab, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     table_id = tab.document.tables[0].id
@@ -327,9 +327,9 @@ def test_ctrl_c_copies_the_selected_cells_at_full_precision(
     qtbot.waitUntil(grid.hasFocus)
     QGuiApplication.clipboard().clear()
     qtbot.keyClick(grid, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
-    mean, sd = grid.grid.copied[0][2:4]
-    assert float(mean) == (1.1 + 3 + 5) / 3  # every digit, not the "3.033" shown
-    assert QGuiApplication.clipboard().text() == f"{mean}\t{sd}\r\n"
+    assert grid.grid.shown[0][2:4] == ("3.033", "1.950")
+    assert QGuiApplication.clipboard().text() == "3.033\t1.950\r\n"  # as shown
+    assert grid.model().index(0, 2).data(Qt.ItemDataRole.ToolTipRole) == repr((1.1 + 3 + 5) / 3)
 
 
 def test_selecting_everything_copies_the_headers_too(
@@ -347,7 +347,7 @@ def test_selecting_everything_copies_the_headers_too(
     assert lines[0].split("\t") == [
         "X", "n", "Mean", "SD", "SEM", "Lower 95% CI", "Upper 95% CI"
     ]  # fmt: skip
-    assert lines[1].split("\t")[:4] == ["1", "3", "3", "2"]
+    assert lines[1].split("\t")[:4] == ["1", "3", "3.000", "2.000"]
     assert len(lines) == 5  # header, three rows, and the final line break
 
 

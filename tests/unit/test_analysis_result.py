@@ -12,9 +12,9 @@ from curvis.analysis.result import (
     ResultColumn,
     ResultTable,
     Value,
-    copied,
     format_number,
     format_p,
+    full_text,
     grids,
     stars,
 )
@@ -79,14 +79,14 @@ def test_numbers_are_shown_with_four_significant_digits(value: float, text: str)
     assert format_number(value) == text
 
 
-def test_copied_numbers_keep_full_precision() -> None:
-    assert copied(0.1 + 0.2, Kind.NUMBER) == "0.30000000000000004"
-    assert copied(0.000123456789, Kind.P_VALUE) == "0.000123456789"
-    assert copied(3.0, Kind.NUMBER) == "3"
-    assert copied(7, Kind.INTEGER) == "7"
-    assert copied(math.nan, Kind.NUMBER) == ""
-    assert copied(None, Kind.TEXT) == ""
-    assert copied(math.inf, Kind.NUMBER) == "Infinity"
+def test_full_text_keeps_full_precision_for_tooltips() -> None:
+    assert full_text(0.1 + 0.2, Kind.NUMBER) == "0.30000000000000004"
+    assert full_text(0.000123456789, Kind.P_VALUE) == "0.000123456789"
+    assert full_text(3.0, Kind.NUMBER) == "3"
+    assert full_text(7, Kind.INTEGER) == "7"
+    assert full_text(math.nan, Kind.NUMBER) == ""
+    assert full_text(None, Kind.TEXT) == ""
+    assert full_text(math.inf, Kind.NUMBER) == "Infinity"
 
 
 def test_a_p_value_column_gets_a_stars_column() -> None:
@@ -103,7 +103,7 @@ def test_a_p_value_column_gets_a_stars_column() -> None:
     (grid,) = grids(result)
     assert grid.header == ("Comparison", "Mean diff.", "Adj. P", "")
     assert grid.shown[0] == ("Drug A vs. Control", "2.630", "< 0.001", "***")
-    assert grid.copied[0] == ("Drug A vs. Control", "2.63", "0.0004", "***")
+    assert grid.full[0] == ("Drug A vs. Control", "2.63", "0.0004", "***")
     assert grid.shown[1][-1] == ""
     assert grid.numeric == (False, True, True, False)
     assert result.has_p_values

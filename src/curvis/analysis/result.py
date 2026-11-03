@@ -2,8 +2,8 @@
 
 A :class:`Result` holds the exact method name, a one-line plain-language reading,
 assumption warnings, named values and tables (e.g. post-hoc comparisons). Values are
-stored as numbers; they are turned into text only for display (:func:`shown`) and for
-the clipboard (:func:`copied`, full precision).
+stored as numbers; they are turned into text only for display and the clipboard
+(:func:`shown`), and at full precision for tooltips (:func:`full_text`).
 
 A P value gets significance stars next to it: * P < 0.05, ** P < 0.01, *** P < 0.001.
 Results are frozen dataclasses of plain values, so they pickle across processes.
@@ -112,8 +112,8 @@ def shown(value: Cell, kind: Kind) -> str:
     return format_number(float(value))
 
 
-def copied(value: Cell, kind: Kind) -> str:
-    """The text Ctrl+C puts on the clipboard: numbers at full precision."""
+def full_text(value: Cell, kind: Kind) -> str:
+    """``value`` at full precision (the tooltip of a shown value)."""
     if _is_missing(value):
         return ""
     if isinstance(value, str):
@@ -193,7 +193,7 @@ class Result:
 
 @dataclass(frozen=True)
 class Grid:
-    """A result section laid out as text: what the panel shows and what Ctrl+C copies.
+    """A result section laid out as text: what the panel shows and Ctrl+C copies.
 
     A P-value column is followed by a stars column (heading "").
     """
@@ -201,7 +201,8 @@ class Grid:
     title: str
     header: tuple[str, ...]
     shown: tuple[tuple[str, ...], ...]
-    copied: tuple[tuple[str, ...], ...]
+    full: tuple[tuple[str, ...], ...]
+    """The same cells at full precision, for tooltips."""
     numeric: tuple[bool, ...]
     """Per column: right-align it (numbers)."""
 
@@ -217,20 +218,20 @@ def table_grid(table: ResultTable) -> Grid:
             header.append("")
             numeric.append(False)
     shown_rows: list[tuple[str, ...]] = []
-    copied_rows: list[tuple[str, ...]] = []
+    full_rows: list[tuple[str, ...]] = []
     for row in table.rows:
         shown_row: list[str] = []
-        copied_row: list[str] = []
+        full_row: list[str] = []
         for column, cell in zip(table.columns, row, strict=True):
             shown_row.append(shown(cell, column.kind))
-            copied_row.append(copied(cell, column.kind))
+            full_row.append(full_text(cell, column.kind))
             if column.kind is Kind.P_VALUE:
                 mark = stars(_p_of(cell))
                 shown_row.append(mark)
-                copied_row.append(mark)
+                full_row.append(mark)
         shown_rows.append(tuple(shown_row))
-        copied_rows.append(tuple(copied_row))
-    return Grid(table.title, tuple(header), tuple(shown_rows), tuple(copied_rows), tuple(numeric))
+        full_rows.append(tuple(full_row))
+    return Grid(table.title, tuple(header), tuple(shown_rows), tuple(full_rows), tuple(numeric))
 
 
 def values_grid(values: tuple[Value, ...], title: str = "") -> Grid:
@@ -238,19 +239,19 @@ def values_grid(values: tuple[Value, ...], title: str = "") -> Grid:
     with_stars = any(v.kind is Kind.P_VALUE for v in values)
     header = ("", "Value", "") if with_stars else ("", "Value")
     shown_rows: list[tuple[str, ...]] = []
-    copied_rows: list[tuple[str, ...]] = []
+    full_rows: list[tuple[str, ...]] = []
     for v in values:
         label = f"{v.label} ({v.unit})" if v.unit else v.label
         shown_row = [label, shown(v.value, v.kind)]
-        copied_row = [label, copied(v.value, v.kind)]
+        full_row = [label, full_text(v.value, v.kind)]
         if with_stars:
             mark = stars(_p_of(v.value)) if v.kind is Kind.P_VALUE else ""
             shown_row.append(mark)
-            copied_row.append(mark)
+            full_row.append(mark)
         shown_rows.append(tuple(shown_row))
-        copied_rows.append(tuple(copied_row))
+        full_rows.append(tuple(full_row))
     numeric = (False, True, False) if with_stars else (False, True)
-    return Grid(title, header, tuple(shown_rows), tuple(copied_rows), numeric)
+    return Grid(title, header, tuple(shown_rows), tuple(full_rows), numeric)
 
 
 def grids(result: Result) -> list[Grid]:

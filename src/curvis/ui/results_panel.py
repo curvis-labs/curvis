@@ -7,8 +7,8 @@ numbers in tables with exact method names, and the star thresholds. An analysis 
 cannot run shows the error and what to change instead. While an analysis reruns, a
 "Recalculating…" badge appears and the old numbers stay visible.
 
-Ctrl+C copies the selected cells of a result table as tab-separated text, with numbers
-at full precision.
+Ctrl+C copies the selected cells of a result table as tab-separated text, as they are
+shown (the tooltip of a rounded number gives its full value).
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ class GridModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole:
             return self.grid.shown[row][column]
         if role == Qt.ItemDataRole.ToolTipRole:
-            full = self.grid.copied[row][column]
+            full = self.grid.full[row][column]
             return full if full != self.grid.shown[row][column] else None
         if role == Qt.ItemDataRole.TextAlignmentRole:
             horizontal = (
@@ -148,7 +148,7 @@ class ResultGrid(QTableView):
         if len(rows) == len(grid.shown) and len(grid.shown) > 1:
             block.append([grid.header[c] for c in cols])
         for r in rows:
-            block.append([grid.copied[r][c] if (r, c) in chosen else "" for c in cols])
+            block.append([grid.shown[r][c] if (r, c) in chosen else "" for c in cols])
         return to_tsv(block)
 
     def copy_selection(self) -> bool:
