@@ -140,7 +140,7 @@ def test_a_table_without_data_to_analyze_says_so(qtbot: QtBot) -> None:
     assert dialog.skeleton.reason_shown()
 
 
-def test_the_data_list_shows_series_with_n_and_dims_other_columns(qtbot: QtBot) -> None:
+def test_with_x_values_n_is_the_number_of_replicates(qtbot: QtBot) -> None:
     doc = doc_with(
         Column.new("Dose", "X", [1, 2, 3]),
         Column.new("a1", "Y", [1, 2, None], id="a1"),
@@ -154,8 +154,25 @@ def test_the_data_list_shows_series_with_n_and_dims_other_columns(qtbot: QtBot) 
         for item in (dialog.tree.topLevelItem(i) for i in range(dialog.tree.topLevelItemCount()))
         if item is not None
     ]
-    assert rows == [("A", "3", True), ("b", "3", True), ("Dose (X)", "–", False)]
+    assert rows == [("A", "2", True), ("b", "1", True), ("Dose (X)", "–", False)]
+    header = dialog.tree.headerItem()
+    assert header is not None and header.toolTip(1) == "Number of replicates"
     assert dialog.checked_inputs() == ("gA", "b")
+
+
+def test_without_x_values_n_is_the_number_of_values(qtbot: QtBot) -> None:
+    doc = doc_with(
+        Column.new("Dose", "X", [None, None, None]),  # an empty X column: column data
+        Column.new("a1", "Y", [1, 2, None], id="a1"),
+        Column.new("a2", "Y", [1, None, None], id="a2"),
+        Column.new("b", "Y", [4, 5, 6], id="b"),
+    )
+    doc.execute(GroupColumns("T", ["a1", "a2"], "A", group_id="gA"))
+    dialog = dialog_for(qtbot, doc)
+    counts = [dialog.tree.topLevelItem(i).text(1) for i in range(2)]  # type: ignore[union-attr]
+    assert counts == ["3", "3"]
+    header = dialog.tree.headerItem()
+    assert header is not None and header.toolTip(1) == "Number of values"
 
 
 def test_run_is_disabled_with_a_reason_when_nothing_is_ticked(qtbot: QtBot) -> None:

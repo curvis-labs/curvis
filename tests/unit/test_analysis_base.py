@@ -208,7 +208,26 @@ def grouped_table() -> Table:
 def test_descriptive_candidates_are_the_series_with_their_n() -> None:
     kind = base.get("descriptive_statistics")
     choices = kind.candidates(grouped_table())
-    assert [(c.id, c.name, c.n_values) for c in choices] == [("g", "A", 3), ("b", "b", 3)]
+    assert [(c.id, c.name, c.n_values, c.n_replicates) for c in choices] == [
+        ("g", "A", 3, 2),
+        ("b", "b", 3, 1),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("x_values", "expected"),
+    [([1.0, 2.0, 3.0], True), ([NAN, 2.0, NAN], True), ([NAN, NAN, NAN], False), (None, False)],
+)
+def test_rows_match_x_needs_an_x_column_with_values(
+    x_values: list[float] | None, expected: bool
+) -> None:
+    columns = [Column.new("a", "Y", [1, 2, 3]), Column.new("label", "Text", ["p", "q", "r"])]
+    if x_values is not None:
+        columns.append(Column.new("x", "X", x_values))
+    t = Table("T", columns)
+    assert base.rows_match_x(t) is expected
+    (choice,) = base.series_choices(t)
+    assert choice.n(base.rows_match_x(t)) == (1 if expected else 3)
 
 
 def test_descriptive_statistics_reads_its_series_and_the_x_column() -> None:

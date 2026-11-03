@@ -50,6 +50,7 @@ from curvis.analysis.base import (
     check_param,
     opening_family,
     param_fields,
+    rows_match_x,
     runnable,
 )
 from curvis.core import Document
@@ -484,10 +485,15 @@ class AnalyzeDialog(QDialog):
     def _fill_tree(self, kind: AnalysisType) -> None:
         candidates = kind.candidates(self.table)
         used = {c for choice in candidates for c in choice.column_ids}
+        by_x = rows_match_x(self.table)
+        header = self.tree.headerItem()
+        if header is not None:
+            tip = "Number of replicates" if by_x else "Number of values"
+            header.setToolTip(_N_COLUMN, tip)
         with QSignalBlocker(self.tree):
             self.tree.clear()
             for choice in candidates:
-                item = QTreeWidgetItem([choice.name, str(choice.n_values)])
+                item = QTreeWidgetItem([choice.name, str(choice.n(by_x))])
                 item.setData(0, _ID, choice.id)
                 item.setFlags(
                     Qt.ItemFlag.ItemIsEnabled

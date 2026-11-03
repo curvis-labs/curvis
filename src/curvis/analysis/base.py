@@ -207,6 +207,16 @@ class InputChoice:
     """Number of values that are not missing."""
     column_ids: tuple[str, ...]
 
+    @property
+    def n_replicates(self) -> int:
+        """Number of replicate columns (1 for a Y column without a group)."""
+        return len(self.column_ids)
+
+    def n(self, rows_match_x: bool) -> int:
+        """The n shown for this input: its replicates when the rows are X values (each
+        row is one X, so the number of values says nothing), else its number of values."""
+        return self.n_replicates if rows_match_x else self.n_values
+
 
 @dataclass(frozen=True)
 class SeriesData:
@@ -236,6 +246,14 @@ def series_choices(table: Table) -> list[InputChoice]:
         n = sum(int(np.count_nonzero(~np.isnan(table.column(c).values))) for c in s.column_ids)
         choices.append(InputChoice(s.group_id or s.column_ids[0], s.name, n, s.column_ids))
     return choices
+
+
+def rows_match_x(table: Table) -> bool:
+    """True when the rows are matched to numeric X values: the table has an X column
+    with at least one value. A table without one (or with rows labelled by text) holds
+    column data, where each series is a sample of values."""
+    x = x_column_id(table)
+    return x is not None and bool(np.any(~np.isnan(table.column(x).values)))
 
 
 def x_column_id(table: Table) -> str | None:
