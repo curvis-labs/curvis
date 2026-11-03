@@ -67,7 +67,7 @@ Inner layouts (pages, rows) have zero margins; only the dialog has a margin.
 
 | Dialog | Default size | Minimum size |
 | --- | --- | --- |
-| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 (to be confirmed for Analyze and Format in steps 2.2 and 2.6) |
+| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 (to be confirmed for Format in step 2.6) |
 | Bulk rename | 720 × 520 | 600 × 420 |
 | Constants | 560 × 420 | 460 × 340 |
 | Simple dialog (Settings, constant editor) | its size hint | its size hint, at least 360 wide |
@@ -187,9 +187,10 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   | Ctrl+Shift+I | Import data |
   | Ctrl+Shift+K | Calculate |
   | Ctrl+Shift+E | Edit calculation |
-  | — | Bulk rename, Constants (menu and palette only) |
+  | Ctrl+Shift+A | Analyze |
+  | — | Bulk rename, Constants, Edit analysis, Delete analysis (menu and palette only) |
 
-  Reserved for later steps: Ctrl+Shift+A *Analyze*, Ctrl+Shift+F *Format graph*, Ctrl+Shift+X
+  Reserved for later steps: Ctrl+Shift+F *Format graph*, Ctrl+Shift+X
   *Export graph*. A new shortcut must not clash with these or with platform standard keys.
 - **Accessible names**: every control has a buddy label, visible text or `setAccessibleName`.
   The tests check this for every dialog.
