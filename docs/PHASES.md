@@ -388,9 +388,9 @@ Make a plan first. When done, report validation and benchmark results.
 ### Step 2.5 — Chart spec and on-screen graphs
 
 **Done when**
-- [ ] XY (scatter/line with SD or SEM error bars and fitted curve overlay), bar and box graphs draw from a table.
-- [ ] Graphs redraw within 50 ms after a data edit; legend clicks toggle series on XY charts.
-- [ ] The main and table toolbars follow docs/DESIGN.md (section 7) and the approved toolbar mockup.
+- [x] XY (scatter/line with SD or SEM error bars and fitted curve overlay), bar and box graphs draw from a table.
+- [x] Graphs redraw within 50 ms after a data edit; legend clicks toggle series on XY charts.
+- [x] The main and table toolbars follow docs/DESIGN.md (section 7) and the approved toolbar mockup.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.5 in docs/PHASES.md.
