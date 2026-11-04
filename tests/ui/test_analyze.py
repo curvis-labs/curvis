@@ -68,14 +68,21 @@ def tab(window: MainWindow) -> DocumentTab:
 
 
 def run_dialog(
-    monkeypatch: pytest.MonkeyPatch, setup: Setup | None = None, accept: bool = True
+    monkeypatch: pytest.MonkeyPatch,
+    setup: Setup | None = None,
+    accept: bool = True,
+    analysis: str | None = DESCRIPTIVE,
 ) -> list[AnalyzeDialog]:
-    """Make the tab's dialogs run ``setup`` and press Run (or Cancel)."""
+    """Make the tab's dialogs pick ``analysis`` (None: keep the one it opens on), run
+    ``setup`` and press Run (or Cancel). The tab's table has X values, so the dialog
+    opens on the curve fits; these tests use descriptive statistics."""
     shown: list[AnalyzeDialog] = []
 
     def exec_dialog(self: DocumentTab, dialog: QDialog) -> int:
         assert isinstance(dialog, AnalyzeDialog)
         shown.append(dialog)
+        if analysis is not None and dialog.windowTitle() != "Edit analysis":
+            dialog.set_analysis_type(analysis)
         if setup is not None:
             setup(dialog)
         if accept and dialog.ok_button.isEnabled():
@@ -113,7 +120,9 @@ def test_it_opens_on_curve_fits_for_xy_data(qtbot: QtBot) -> None:
     dialog = dialog_for(qtbot, doc_with(Column.new("x", "X", [1, 2]), Column.new("a", "Y", [1, 2])))
     assert tab_names(dialog) == ["Compare groups", "Fit a curve"]
     assert dialog.family is Family.FIT
-    assert dialog.analysis_type is not None and dialog.analysis_type.id == FakeFit.id
+    first_fit = base.runnable(dialog.table, Family.FIT)[0]
+    assert dialog.analysis_type is not None and dialog.analysis_type.id == first_fit.id
+    assert first_fit.id == "linear_regression"
     assert FakeSurvival.id not in dialog.radios  # the table has no time/event pair
     assert dialog.family_description.text() == Family.FIT.description
 

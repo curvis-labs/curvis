@@ -170,6 +170,22 @@ class ResultTable:
 
 
 @dataclass(frozen=True)
+class FittedCurve:
+    """A fitted curve for graphs: points along the fit and its confidence band, in the
+    units of the X column. The limits are NaN where the band is not defined."""
+
+    series_id: str
+    name: str
+    x: tuple[float, ...]
+    y: tuple[float, ...]
+    lower: tuple[float, ...]
+    upper: tuple[float, ...]
+    log_x: bool = False
+    """The points are spaced for a log X axis (dose-response on concentrations)."""
+    confidence: float = 0.95
+
+
+@dataclass(frozen=True)
 class Result:
     """What an analysis found."""
 
@@ -183,6 +199,8 @@ class Result:
     tables: tuple[ResultTable, ...] = ()
     notes: tuple[str, ...] = ()
     """Extra secondary sentences shown under the results."""
+    curves: tuple[FittedCurve, ...] = ()
+    """Fitted curves, for graphs (curve fits only)."""
 
     @property
     def has_p_values(self) -> bool:
