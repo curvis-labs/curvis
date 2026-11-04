@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curvis table tabs</title>
+<!--
+  Mockup of several tables per project, shown as sheet tabs along the bottom of the project
+  tab (version A, approved; B-D, a second row on top, tabs above the table only and a
+  vertical list, were not chosen). Also: New table, the warning when a table is closed,
+  renaming, the last table, and renaming a column in its header. Drawn at 1:1 with the theme palette (DESIGN.md section 3).
+-->
+<style>
+  :root, :root[data-theme="light"] {
+    --window: #f4f6f8; --text: #1d3557; --base: #ffffff; --altbase: #e0f2f1;
+    --secondary: #667085; --link: #007a7a; --highlight: #007a7a; --hl-text: #ffffff;
+    --button: #e9edf2; --border: #c3cad4; --grid: #cdd3da; --disabled: #9aa3b0;
+    --tip-bg: #1d3557; --tip-text: #f4f6f8; --canvas: #d5dbe3; --note: #1d3557; --mark: #e8590c;
+    --hover: rgba(29, 53, 87, .14); --press: rgba(29, 53, 87, .25);
+  }
+  :root[data-theme="dark"] {
+    --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+    --secondary: #9aa8bc; --link: #00a6a6; --highlight: #00a6a6; --hl-text: #0f1f33;
+    --button: #1d3557; --border: #2e4a70; --grid: #3e4c5d; --disabled: #5e7491;
+    --tip-bg: #1d3557; --tip-text: #f4f6f8; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+    --hover: rgba(244, 246, 248, .14); --press: rgba(244, 246, 248, .25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+      --secondary: #9aa8bc; --link: #00a6a6; --highlight: #00a6a6; --hl-text: #0f1f33;
+      --button: #1d3557; --border: #2e4a70; --grid: #3e4c5d; --disabled: #5e7491;
+      --tip-bg: #1d3557; --tip-text: #f4f6f8; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+      --hover: rgba(244, 246, 248, .14); --press: rgba(244, 246, 248, .25);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--note);
+         font: 13px/1.4 system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  header.page { padding: 20px 24px 8px 24px; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header.page h1 { font-size: 20px; margin: 0; }
+  header.page p { margin: 0; flex: 1 1 320px; max-width: 900px; }
+  .switch button { font: inherit; padding: 4px 12px; border: 1px solid var(--border);
+                   background: var(--button); color: var(--text); border-radius: 3px; cursor: pointer; }
+  .switch button[aria-pressed="true"] { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  section.board { padding: 16px 24px 28px; overflow-x: auto; }
+  section.board > h2 { font-size: 16px; margin: 8px 0 12px; }
+  .row { display: flex; gap: 24px; align-items: flex-start; }
+  .notes { width: 340px; flex: none; }
+  .notes ol { margin: 0; padding-left: 22px; } .notes li { margin-bottom: 6px; }
+  .notes li::marker { color: var(--mark); font-weight: 700; }
+  .notes .pro::before { content: "+ "; font-weight: 700; }
+  .notes .con::before { content: "− "; font-weight: 700; }
+  .notes p.pro, .notes p.con { margin: 4px 0; }
+
+  .win { flex: none; background: var(--window); color: var(--text); border: 1px solid var(--border);
+         box-shadow: 0 8px 28px rgba(0,0,0,.28); position: relative; display: flex; flex-direction: column; }
+  .titlebar { height: 30px; display: flex; align-items: center; justify-content: center;
+              border-bottom: 1px solid var(--border); font-weight: 600; flex: none; }
+  .menubar { display: flex; gap: 16px; padding: 4px 10px; flex: none; }
+  .menubar .open { background: var(--highlight); color: var(--hl-text); margin: -4px -6px; padding: 4px 6px; }
+  u { text-underline-offset: 2px; }
+  .toolbars { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--border);
+              white-space: nowrap; overflow: hidden; flex: none; }
+  .tb { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 5px; border-radius: 3px;
+        color: var(--text); flex: none; position: relative; }
+  .tb.icon { width: 28px; justify-content: center; padding: 0; }
+  .tb.hover { background: var(--hover); }
+  .tb.dis { color: var(--disabled); }
+  .tb svg, .menu svg { width: 20px; height: 20px; flex: none; }
+  svg .a { stroke: var(--link); }
+  .dis svg .a { stroke: var(--disabled); }
+  .menu .hl svg .a { stroke: currentColor; }
+  .tb .arrow { margin-left: -2px; font-size: 10px; color: var(--secondary); }
+  .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex: none; }
+  .gap { width: 12px; flex: none; }
+
+  /* project tabs: as in the app today (QTabWidget, document mode) */
+  .ptabs { display: flex; padding: 4px 8px 0; gap: 2px; border-bottom: 1px solid var(--border); flex: none; }
+  .ptab { padding: 4px 10px; border: 1px solid var(--border); border-bottom: none; border-radius: 3px 3px 0 0;
+          background: var(--button); display: flex; gap: 8px; align-items: center; }
+  .ptab.on { background: var(--window); position: relative; top: 1px; font-weight: 600; }
+  .x { color: var(--secondary); font-size: 11px; }
+  .plus { color: var(--secondary); width: 24px; height: 24px; display: inline-flex; align-items: center;
+          justify-content: center; border-radius: 3px; font-size: 16px; flex: none; }
+  .plus.hover { background: var(--hover); color: var(--text); }
+
+  /* content */
+  .content { display: flex; flex: 1; min-height: 0; }
+  .grid { background: var(--base); overflow: hidden; flex: 1; min-width: 0; }
+  .grid table { border-collapse: collapse; }
+  .grid th { background: var(--button); border: 1px solid var(--border); font-weight: 400; padding: 2px 8px; min-width: 86px; }
+  .grid th.rh { min-width: 26px; text-align: left; }
+  .grid th small { display: block; color: var(--text); }
+  .grid td { border: 1px solid var(--grid); padding: 2px 8px; text-align: right; min-width: 86px; height: 23px; }
+  .grid td.calc { background: var(--altbase); }
+  .side { width: 300px; flex: none; overflow: hidden; border-left: 1px solid var(--border); background: var(--window); display: flex; flex-direction: column; }
+  .stabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 8px; flex: none; }
+  .stab { padding: 6px 12px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .stab.on { border-bottom-color: var(--highlight); font-weight: 600; }
+  .result { padding: 10px 12px; }
+  .result h3 { font-size: 13px; margin: 0 0 2px; }
+  .result .sub { color: var(--secondary); margin-bottom: 8px; }
+  .result table { border-collapse: collapse; width: 100%; }
+  .result td { padding: 2px 0; border-bottom: 1px solid var(--grid); }
+  .result td + td { text-align: right; }
+  .muted { color: var(--secondary); }
+
+  /* A: sheet tabs along the bottom */
+  .btabs { display: flex; align-items: flex-start; gap: 0; padding: 0 8px 4px; border-top: 1px solid var(--border);
+           background: var(--window); flex: none; }
+  .btab { padding: 4px 12px; border: 1px solid var(--border); border-top: none; border-radius: 0 0 3px 3px;
+          background: var(--button); margin-right: 2px; display: flex; gap: 8px; align-items: center; margin-top: -1px; }
+  .btab.on { background: var(--base); border-top: 1px solid var(--base); font-weight: 600; }
+  .btab.hover { background: var(--hover); }
+  .btabs .plus { margin-top: 2px; }
+
+  /* B and C: flat tabs with a teal underline */
+  .ttabs { display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--border);
+           background: var(--window); flex: none; height: 32px; }
+  .ttab { padding: 6px 10px 5px; border-bottom: 2px solid transparent; margin-bottom: -1px; display: flex; gap: 8px;
+          align-items: center; }
+  .ttab.on { border-bottom-color: var(--highlight); font-weight: 600; }
+  .ttab.hover { background: var(--hover); border-radius: 3px 3px 0 0; }
+  .ttabs .plus { align-self: center; margin-left: 2px; }
+  .ttab .ico { width: 16px; height: 16px; }
+  .ttab .ico svg { width: 16px; height: 16px; }
+  .leftcol { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .side.c .stabs { height: 32px; align-items: flex-end; }
+
+  /* D: vertical tabs on the left */
+  .vtabs { width: 168px; flex: none; border-right: 1px solid var(--border); background: var(--window);
+           display: flex; flex-direction: column; padding: 6px 0; }
+  .vtabs .head { padding: 0 10px 6px; color: var(--secondary); font-size: 12px; display: flex; align-items: center; }
+  .vtabs .head .plus { margin-left: auto; }
+  .vtab { padding: 5px 10px 5px 8px; border-left: 3px solid transparent; display: flex; gap: 8px; align-items: center; }
+  .vtab.on { border-left-color: var(--highlight); background: var(--hover); font-weight: 600; }
+  .vtab .x { margin-left: auto; }
+  .vtab .count { margin-left: auto; color: var(--secondary); font-weight: 400; font-size: 12px; }
+
+  .tip { position: absolute; background: var(--tip-bg); color: var(--tip-text); padding: 3px 8px; border-radius: 3px;
+         font-size: 12px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.3); z-index: 3; }
+  .menu { position: absolute; background: var(--base); border: 1px solid var(--border); border-radius: 3px;
+          box-shadow: 0 6px 18px rgba(0,0,0,.3); padding: 4px 0; z-index: 3; min-width: 240px; }
+  .menu div { padding: 4px 12px 4px 10px; display: flex; gap: 8px; align-items: center; min-height: 28px; }
+  .menu div.hl { background: var(--highlight); color: var(--hl-text); }
+  .menu div.hl small { color: var(--hl-text); }
+  .menu .ms { height: 1px; min-height: 0; padding: 0; margin: 4px 0; background: var(--border); }
+  .menu .noicon { padding-left: 38px; }
+  .menu small { margin-left: auto; color: var(--secondary); padding-left: 16px; }
+  .m { display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: var(--mark); color: #fff;
+       font: 700 11px/18px system-ui, sans-serif; text-align: center; flex: none; vertical-align: middle;
+       box-shadow: 0 0 0 2px var(--window); }
+  .m.abs { position: absolute; z-index: 4; }
+  .status { border-top: 1px solid var(--border); padding: 3px 10px; font-size: 12px; color: var(--text); flex: none; }
+
+  /* dialog */
+  .dialog { background: var(--window); color: var(--text); border: 1px solid var(--border); width: 420px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.35); position: relative; }
+  .dialog .body { padding: 12px; display: flex; gap: 12px; }
+  .dialog .warn { width: 32px; height: 32px; flex: none; }
+  .dialog .lead { font-weight: 600; margin: 0 0 8px; }
+  .dialog p { margin: 0 0 8px; }
+  .dialog ul { margin: 0 0 8px; padding-left: 18px; }
+  .dialog .buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 0 12px 12px; }
+  .btn { padding: 4px 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--button); min-width: 80px; text-align: center; }
+  .btn.def { border-color: var(--highlight); box-shadow: inset 0 0 0 1px var(--highlight); }
+  .edit { background: var(--base); border: 1px solid var(--highlight); padding: 1px 4px; font-weight: 400; outline: 2px solid var(--accent, #20c997); outline-offset: 0; }
+  .empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--secondary); background: var(--window); text-align: center; padding: 24px; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Curvis table tabs</h1>
+  <p>A project holds several tables, each in its own tab inside the project tab. The Results and Graph panels stay at the right and show the analyses and graphs of the table that is selected. Orange numbers point to the notes.</p>
+  <div class="switch" role="group" aria-label="Theme">
+    <button type="button" data-set="light">Light</button>
+    <button type="button" data-set="dark">Dark</button>
+  </div>
+</header>
+
+<section class="board">
+  <h2>1 · Main window: table tabs along the bottom</h2>
+  <div class="row">
+    <div class="win" id="va" style="width:1040px;height:420px"></div>
+    <div class="notes">
+      <ol>
+        <li>Table tabs sit under the table and the side panel, as in a spreadsheet. The selected tab joins the table above it. The Results and Graph panels show the analyses and graphs of the selected table.</li>
+        <li><b>+</b> at the end of the row is New table (Ctrl+Shift+N). There is no toolbar button for it; the + is always visible.</li>
+        <li>Each tab has a close button. Closing deletes the table, after a warning (board 3).</li>
+      </ol>
+      <p>Import data, Add column, Calculate, Plot and Analyze act on the selected table.</p>
+    </div>
+  </div>
+</section>
+
+<section class="board">
+  <h2>2 · New table in the File menu (Ctrl+Shift+N)</h2>
+  <div class="row">
+    <div class="win" id="v5" style="width:760px;height:420px;overflow:visible"></div>
+    <div class="notes">
+      <ol>
+        <li><b>New table</b> in the File menu, right under New project, with Ctrl+Shift+N (not used yet, and not a platform standard key). It is also in the command palette.</li>
+        <li><b>Close table…</b> asks first (board 3). Ctrl+W keeps closing the project; its menu text becomes “Close project” so the two are told apart.</li>
+      </ol>
+      <p>The new table is named “Table 2”, “Table 3” …, added after the selected tab and selected. One undo step.</p>
+      <p><b>Import data</b> always goes into the selected table. The status bar names it: “Imported 96 rows and 4 columns from plate.csv into Viability.”</p>
+    </div>
+  </div>
+</section>
+
+<section class="board">
+  <h2>3 · Closing a table deletes it, after a warning</h2>
+  <div class="row">
+    <div class="dialog" id="v6"></div>
+    <div class="notes">
+      <ol>
+        <li>Window title names the task: “Close table”. The first line says what happens to what.</li>
+        <li>What else goes with it: its analyses and graphs (they belong to the table). A table with nothing attached gets only the first line.</li>
+        <li>Undo is one step (Ctrl+Z), and is said, so the warning does not feel final.</li>
+        <li>The verb button is <b>Delete table</b>. Cancel has the default focus, so Enter does not delete by accident.</li>
+      </ol>
+      <p>Closing an empty table (no data, no analyses, no graphs) does not ask.</p>
+      <p>Formulas read only columns of their own table, so the table's calculated columns go with it. A calculated column whose source column is gone shows its error (⚠ in the header, “Unknown column …”), as it does today when a column is deleted.</p>
+    </div>
+  </div>
+</section>
+
+<section class="board">
+  <h2>4 · Tab menu and renaming</h2>
+  <div class="row">
+    <div class="win" id="v7" style="width:640px;height:300px;overflow:visible"></div>
+    <div class="notes">
+      <ol>
+        <li>Double-click a tab to rename it in place. Enter keeps the name, Esc cancels. A name that is taken shows a message in the status bar and keeps the old name.</li>
+        <li>Right-click: Rename, Close table…, New table. Tabs can be dragged to change their order.</li>
+        <li>Ctrl+Page Down and Ctrl+Page Up go to the next and previous table (as in spreadsheets); Ctrl+Tab stays for the choice tabs in dialogs.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="board">
+  <h2>5 · The last table cannot be closed</h2>
+  <div class="row">
+    <div class="win" id="v8" style="width:760px;height:330px;overflow:visible"></div>
+    <div class="notes">
+      <ol>
+        <li>A project always has at least one table. With one table left, its tab has no close button.</li>
+        <li>Close table… is disabled, and says why: “A project needs at least one table.” (DESIGN.md: a disabled action always says why.)</li>
+      </ol>
+      <p>A new project starts with one blank table, as now. A project file without tables opens with one blank table added.</p>
+    </div>
+  </div>
+</section>
+
+<section class="board">
+  <h2>6 · Renaming a column in its header</h2>
+  <div class="row">
+    <div class="win" id="v9" style="width:760px;height:250px;overflow:visible"></div>
+    <div class="notes">
+      <ol>
+        <li>Double-click a column name (or Rename column, Ctrl+Shift+R) edits it in place, with the text selected. The role line (X, Y, ƒ Y …) stays visible under it.</li>
+        <li><b>Tab</b> keeps the name and edits the next column header to the right; <b>Shift+Tab</b> the one to the left. Tab on the last column keeps the name and stops (it adds no column).</li>
+        <li>Enter or a click elsewhere keeps the name; Esc cancels the header being edited (names already kept with Tab stay).</li>
+      </ol>
+      <p>Each changed name is one undo step (“Rename column 'Drug' to 'Drug A'”); a name left unchanged adds none.</p>
+      <p>An empty name or one already used in the table keeps the editor open and says why in the status bar: “Enter a column name.” / “'Control' is already used in this table. Enter another name.”</p>
+      <p>Replicate group and category names in the bands above work the same way (double-click, Enter, Esc); Tab moves to the next band in the same row. Bulk rename stays for many names at once.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  var ICONS = {
+      "new": "<path d=\"M17.25 10.75V7.25a1 1 0 0 0-1-1H10L8.25 4.25h-4.5a1 1 0 0 0-1 1v10.5a1 1 0 0 0 1 1H11\"/><path class=\"a\" d=\"M15 12.75v5M12.5 15.25h5\"/>",
+      "table": "<path d=\"M14.75 10.75V4.75a1 1 0 0 0-1-1H4.25a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H11\"/><path d=\"M3.25 7.25h11.5M7.25 7.25v7.5\"/><path class=\"a\" d=\"M15.25 12.75v5M12.75 15.25h5\"/>",
+      "tab": "<rect x=\"3.25\" y=\"4\" width=\"13.5\" height=\"12\" rx=\"1.25\"/><path d=\"M3.25 8h13.5M8 8v8\"/>",
+      "open": "<path d=\"M15 6.5v-.25a1 1 0 0 0-1-1H9.5L7.75 3.75h-4a1 1 0 0 0-1 1v11\"/><path class=\"a\" d=\"M2.75 15.75 5.1 9.9a1 1 0 0 1 .93-.65H16.5a.75.75 0 0 1 .7 1.02l-2.15 5.48z\"/>",
+      "save": "<path d=\"M4.75 3.25h9.5l2.5 2.75v9.75a1 1 0 0 1-1 1H4.75a1 1 0 0 1-1-1V4.25a1 1 0 0 1 1-1z\"/><path d=\"M6.75 3.25v3.25h6V3.25\"/><rect class=\"a\" x=\"6.5\" y=\"10.25\" width=\"7\" height=\"3.75\" rx=\".75\"/>",
+      "undo": "<path d=\"M7.25 3.5 3.75 6.75 7.25 10\"/><path d=\"M3.75 6.75h7.75a4.6 4.6 0 0 1 0 9.25H5\"/>",
+      "redo": "<path d=\"M12.75 3.5 16.25 6.75l-3.5 3.25\"/><path d=\"M16.25 6.75H8.5a4.6 4.6 0 0 0 0 9.25h6.5\"/>",
+      "import": "<path d=\"M6.25 12.75v3.5a1 1 0 0 0 1 1h8.75a1 1 0 0 0 1-1v-9\"/><path d=\"M6.25 7.75v-3.5a1 1 0 0 1 1-1H13\"/><path class=\"a\" d=\"M13 3.25v3a1 1 0 0 0 1 1h3z\"/><path class=\"a\" d=\"M2.75 10.25h7.75M8.25 7.75l2.5 2.5-2.5 2.5\"/>",
+      "column": "<rect x=\"3.25\" y=\"4\" width=\"13.5\" height=\"12\" rx=\"1.25\"/><path class=\"a\" d=\"M12.25 7.75v-2.5A1.25 1.25 0 0 0 11 4H9a1.25 1.25 0 0 0-1.25 1.25v9.5A1.25 1.25 0 0 0 9 16h2a1.25 1.25 0 0 0 1.25-1.25v-2.5\"/><path class=\"a\" d=\"M9.5 10H15M13.75 8.75 15 10l-1.25 1.25\"/>",
+      "group": "<rect x=\"3\" y=\"8\" width=\"3.5\" height=\"9\" rx=\".75\"/><rect x=\"8.25\" y=\"8\" width=\"3.5\" height=\"9\" rx=\".75\"/><rect x=\"13.5\" y=\"8\" width=\"3.5\" height=\"9\" rx=\".75\"/><path class=\"a\" d=\"M3.25 5.5V3.25h13.5V5.5\"/>",
+      "category": "<path d=\"M3.25 4.25a1 1 0 0 1 1-1h5.1a1 1 0 0 1 .7.3l6.5 6.5a1 1 0 0 1 0 1.4l-5.1 5.1a1 1 0 0 1-1.4 0l-6.5-6.5a1 1 0 0 1-.3-.7z\"/><circle class=\"a\" cx=\"7\" cy=\"7\" r=\"1.25\"/>",
+      "calculate": "<path d=\"M14 3.5c-2.75-.9-4.25.5-4.75 3L7.5 14.75c-.5 2.25-2 2.75-3.75 2.25\"/><path class=\"a\" d=\"M6.25 8.25h6.5\"/>",
+      "plot": "<path d=\"M3.25 3.25v13.5h13.5\"/><path class=\"a\" d=\"M6 13.25 9 9.5l2.5 2 4.25-6\"/>",
+      "analyze": "<path d=\"M3.75 16.75V12h4v4.75M12.25 16.75V10h4v6.75\"/><path class=\"a\" d=\"M5.75 10.25V8h8.5v.5\"/><path class=\"a\" d=\"M10 1.75V5.25M8.5 2.6l3 1.8M11.5 2.6l-3 1.8\"/>"
+  };
+  function svg(name) {
+    return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
+  }
+  function m(n, style) { return '<span class="m' + (style ? ' abs" style="' + style : '') + '">' + n + '</span>'; }
+
+  var TABLES = ["Dose response", "Viability", "Survival"];
+
+  function chrome(opts) {
+    opts = opts || {};
+    var menu = opts.fileOpen ? '<span class="open"><u>F</u>ile</span>' : '<span><u>F</u>ile</span>';
+    var tableToolbar = opts.noTable ? '' :
+      '<span class="gap"></span>' +
+      '<span class="tb">' + svg("import") + 'Import data</span><span class="sep"></span>' +
+      '<span class="tb">' + svg("column") + 'Add column</span>' +
+      '<span class="tb">' + svg("group") + 'Group as replicates</span>' +
+      '<span class="tb">' + svg("category") + 'Set category</span>' +
+      '<span class="tb">' + svg("calculate") + 'Calculate</span><span class="sep"></span>' +
+      '<span class="tb">' + svg("plot") + 'Plot<span class="arrow">▾</span></span>' +
+      '<span class="tb">' + svg("analyze") + 'Analyze</span>';
+    return '<div class="titlebar">Curvis — Experiment 12.cvp</div>' +
+      '<div class="menubar">' + menu + '<span><u>E</u>dit</span><span><u>T</u>able</span><span><u>V</u>iew</span></div>' +
+      '<div class="toolbars">' +
+        '<span class="tb icon">' + svg("new") + '</span>' +
+        '<span class="tb icon">' + svg("open") + '</span>' +
+        '<span class="tb icon">' + svg("save") + '</span><span class="sep"></span>' +
+        '<span class="tb icon">' + svg("undo") + '</span>' +
+        '<span class="tb icon dis">' + svg("redo") + '</span>' +
+        tableToolbar +
+      '</div>' +
+      '<div class="ptabs"><div class="ptab">Untitled <span class="x">✕</span></div><div class="ptab on">Experiment 12 <span class="x">✕</span></div></div>';
+  }
+  function grid() {
+    var rows = [["0.01","10.2","11.4","0.0"],["0.1","9.9","18.4","9.4"],["1","10.1","52.3","57.0"],["10","10.8","82.6","100.0"],["100","10.4","86.1","104.9"]];
+    var h = '<div class="grid"><table><tr><th class="rh"></th><th>Dose (µM)<small>X</small></th><th>Control<small>Y</small></th><th>Drug<small>Y</small></th><th>Drug norm<small>ƒ Y</small></th><th></th><th></th></tr>';
+    rows.forEach(function (r, i) {
+      h += '<tr><th class="rh">' + (i + 1) + '</th><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td class="calc">' + r[3] + '</td><td></td><td></td></tr>';
+    });
+    for (var i = rows.length; i < 9; i++) h += '<tr><th class="rh">' + (i + 1) + '</th><td></td><td></td><td></td><td class="calc"></td><td></td><td></td></tr>';
+    return h + '</table></div>';
+  }
+  function side(cls) {
+    return '<div class="side ' + (cls || '') + '"><div class="stabs"><div class="stab on">Results</div><div class="stab">Graph</div></div>' +
+      '<div class="result"><h3>Sigmoidal dose-response (4PL)</h3><div class="sub">Dose response · Drug</div>' +
+      '<p style="margin:0 0 8px">The half-maximal dose is 0.92 µM (95% CI 0.71 to 1.19).</p>' +
+      '<table><tr><td>Bottom</td><td>10.6</td></tr><tr><td>Top</td><td>87.0</td></tr><tr><td>EC50</td><td>0.92</td></tr><tr><td>Hill slope</td><td>1.08</td></tr><tr><td>R²</td><td>0.998</td></tr></table>' +
+      '<p class="muted" style="margin:10px 0 0">1 of 2 analyses of this table</p></div></div>';
+  }
+  function status(t) { return '<div class="status">' + (t || 'Ready') + '</div>'; }
+
+  function btabs(names, selected, opts) {
+    opts = opts || {};
+    return '<div class="btabs">' + names.map(function (t, i) {
+      var label = (opts.edit === i) ? '<span class="edit">' + opts.editText + '</span>' : t;
+      var close = names.length > 1 && opts.edit !== i ? ' <span class="x">✕</span>' : '';
+      return '<div class="btab' + (i === selected ? ' on' : '') + (opts.hover === i ? ' hover' : '') + '">' + label + close + '</div>';
+    }).join('') + '<span class="plus' + (opts.plusHover ? ' hover' : '') + '">+</span></div>';
+  }
+
+  // 1: main window
+  document.getElementById("va").innerHTML = chrome() +
+    '<div class="content">' + grid() + side() + '</div>' +
+    btabs(TABLES, 0, { plusHover: true }) + status() +
+    m(1, "left:-26px;bottom:34px") + m(2, "left:380px;bottom:34px") + m(3, "left:116px;bottom:6px") +
+    '<div class="tip" style="left:340px;bottom:56px">New table (Ctrl+Shift+N)</div>';
+
+  // 2: File menu
+  document.getElementById("v5").innerHTML = chrome({ fileOpen: true }) +
+    '<div class="content">' + grid() + '</div>' + btabs(TABLES, 1) +
+    status('Imported 96 rows and 4 columns from plate.csv into Viability.') +
+    '<div class="menu" style="left:4px;top:58px">' +
+      '<div>' + svg("new") + 'New project<small>Ctrl+N</small></div>' +
+      '<div class="hl">' + svg("table") + 'New table<small>Ctrl+Shift+N</small></div>' +
+      '<div>' + svg("open") + 'Open…<small>Ctrl+O</small></div>' +
+      '<div>' + svg("import") + 'Import data…<small>Ctrl+Shift+I</small></div>' +
+      '<div class="ms"></div>' +
+      '<div>' + svg("save") + 'Save<small>Ctrl+S</small></div>' +
+      '<div class="noicon">Save as…<small>Ctrl+Shift+S</small></div>' +
+      '<div class="ms"></div>' +
+      '<div class="noicon">Close table…</div>' +
+      '<div class="noicon">Close project<small>Ctrl+W</small></div>' +
+      '<div class="noicon">Quit<small>Ctrl+Q</small></div>' +
+    '</div>' +
+    m(1, "left:-26px;top:96px") + m(2, "left:-26px;top:258px");
+
+  // 3: dialog
+  document.getElementById("v6").innerHTML =
+    '<div class="titlebar">Close table</div>' +
+    '<div class="body"><svg class="warn" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4 30 28H2z" fill="#f5b400" stroke="#8a6500" stroke-width="1"/><path d="M16 12v8" stroke="#1d1d1d" stroke-width="2.5" stroke-linecap="round"/><circle cx="16" cy="24" r="1.6" fill="#1d1d1d"/></svg>' +
+    '<div><p class="lead">Closing “Viability” deletes the table from the project.</p>' +
+    '<p>This also deletes what belongs to it:</p><ul><li>1 analysis (Unpaired t test)</li><li>1 graph (Bar)</li></ul>' +
+    '<p class="muted">You can bring it back with Undo (Ctrl+Z).</p></div></div>' +
+    '<div class="buttons"><span class="btn">Delete table</span><span class="btn def">Cancel</span></div>' +
+    m(1, "left:-26px;top:6px") + m(2, "left:-26px;top:90px") + m(3, "left:-26px;top:150px") + m(4, "left:-26px;bottom:14px");
+
+  // 4: rename and context menu
+  document.getElementById("v7").innerHTML = chrome({ noTable: true }).replace(/<div class="toolbars">[\s\S]*?<\/div>/, '') +
+    '<div class="content">' + grid() + '</div>' +
+    btabs(["Dose response", "Viability", "Survival"], 1, { edit: 1, editText: "Viability 24 h", hover: 2 }) + status() +
+    '<div class="menu" style="left:250px;bottom:56px;min-width:200px">' +
+      '<div class="hl noicon">Rename</div><div class="noicon">Close table…</div><div class="ms"></div>' +
+      '<div>' + svg("table") + 'New table<small>Ctrl+Shift+N</small></div></div>' +
+    m(1, "left:-26px;bottom:34px") + m(2, "left:458px;bottom:150px") + m(3, "left:-26px;top:6px");
+
+  // 5: last table
+  document.getElementById("v8").innerHTML = chrome({ fileOpen: true }) +
+    '<div class="content">' + grid() + '</div>' + btabs(["Table 1"], 0) + status() +
+    '<div class="menu" style="left:4px;top:58px">' +
+      '<div>' + svg("new") + 'New project<small>Ctrl+N</small></div>' +
+      '<div>' + svg("table") + 'New table<small>Ctrl+Shift+N</small></div>' +
+      '<div class="ms"></div>' +
+      '<div class="noicon dis" style="color:var(--disabled)">Close table…</div>' +
+      '<div class="noicon">Close project<small>Ctrl+W</small></div>' +
+    '</div>' +
+    '<div class="tip" style="left:240px;top:126px">A project needs at least one table.</div>' +
+    m(1, "left:-26px;bottom:34px") + m(2, "left:-26px;top:140px");
+
+  // 6: rename a header in place
+  (function () {
+    var g = grid()
+      .replace('<th>Drug<small>Y</small></th>', '<th style="padding:1px 3px"><span class="edit" style="display:block;text-align:center">Drug A</span><small>Y</small></th>')
+      .replace('<th>Drug norm<small>ƒ Y</small></th>', '<th style="position:relative">Drug norm<small>ƒ Y</small></th>');
+    document.getElementById("v9").innerHTML = chrome({ noTable: true }).replace(/<div class="toolbars">[\s\S]*?<\/div>/, '') +
+      '<div class="content">' + g + '</div>' + btabs(TABLES, 0) + status() +
+      '<div class="tip" style="left:400px;top:92px">Tab › Drug norm · Shift+Tab ‹ Control</div>' +
+      m(1, "left:298px;top:70px") + m(2, "left:376px;top:94px") + m(3, "left:-26px;top:94px");
+  })();
+
+  (function () {
+    var root = document.documentElement, buttons = document.querySelectorAll(".switch button");
+    function show(theme) {
+      root.setAttribute("data-theme", theme);
+      buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.set === theme)); });
+      try { localStorage.setItem("curvis-mockup-theme", theme); } catch (e) {}
+    }
+    var start = null;
+    try { start = localStorage.getItem("curvis-mockup-theme"); } catch (e) {}
+    if (!start) start = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    buttons.forEach(function (b) { b.addEventListener("click", function () { show(b.dataset.set); }); });
+    show(start);
+  })();
+</script>
+</body>
+</html>

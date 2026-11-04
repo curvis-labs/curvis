@@ -4,7 +4,7 @@ A :class:`ChartSpec` is what the document stores for a graph (rule 2 of CLAUDE.m
 source table, chart family and variant, the series it draws with their style, both
 axes, title, aspect ratio, colour scheme, text size and the fitted curves laid over it.
 It holds no pixels and no computed values. The on-screen renderer
-(:mod:`curvis.charts.render_qt`) and the export renderer (step 2.6) both draw from it,
+(:mod:`curvis.charts.render_qt`) and the export renderer (step 2.7) both draw from it,
 and the Format dialog edits only the spec.
 
 Specs are frozen; a change makes a new spec (``dataclasses.replace``), so a command can

@@ -29,6 +29,7 @@ Columns can be organized further:
 
 - **Replicate groups** combine several Y columns into one series, from which mean, SD and SEM are calculated.
 - **Category groups** define a second factor for two-way ANOVA and grouped charts.
+- **Renaming in place.** Double-clicking a column name in the header edits it in place; Tab keeps the name and moves to the next column header on the right (Shift+Tab to the left), so a row of names can be typed in one go. Replicate group and category names in the header edit the same way.
 - **Bulk rename** relabels many columns and groups in one step.
 
 Columns and column groups are movable by drag and drop.
@@ -93,6 +94,7 @@ Clicking a legend entry on XY and survival charts toggles that series on or off.
 ## Projects, history and settings
 
 - **Projects.** All of a project's tables, graphs and analyses, plus its own constants, are saved together in one `.cvp` file. Each document opens as a tab in the main window.
+- **Tables in a project.** A project holds one or more tables, shown as tabs along the bottom of the project's tab, like the sheets of a spreadsheet. The Results and Graph panels show the analyses and graphs of the selected table, and Import data and the table toolbar act on it. *New table* (File menu, the + after the last table tab, Ctrl+Shift+N) adds a blank table after the selected one. Table tabs can be renamed (double-click) and reordered (drag). Closing a table deletes it, with its calculated columns, analyses and graphs, after a warning that lists them; Undo brings it back. A project always keeps at least one table, so the last table cannot be closed.
 - **Toolbars.** A main toolbar with New project, Open project, Save project, Undo and Redo, and a table toolbar with Import data, Add column, Group as replicates, Set category, Calculate, Plot and Analyze. Plot opens the chart families to pick from. Every toolbar button is also in the menus and the command palette.
 - **Launcher.** On start-up, a launcher screen offers a blank project, an Open button and a list of recent projects with relative timestamps (e.g. "2 days ago").
 - **Undo and redo.** Each document keeps up to 50 undo steps.

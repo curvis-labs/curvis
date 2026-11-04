@@ -1,12 +1,12 @@
 # Curvis — build phases and Claude Code prompts
 
-Curvis is built in 5 phases and 26 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
+Curvis is built in 5 phases and 27 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
 
 | Phase | Steps | Ends with (gate) |
 | --- | --- | --- |
 | 0 Foundations | 0.1–0.5 | App starts on Windows, macOS and Linux from CI-built installers |
 | 1 Data tables | 1.1–1.6 | You can type, paste, import and calculate data comfortably; dialogs follow one design |
-| 2 Core analyses + MVP | 2.1–2.7 | MVP beta: core tests match R, speed targets met |
+| 2 Core analyses + MVP | 2.1–2.8 | MVP beta: core tests match R, speed targets met |
 | 3 Full outline | 3.1–3.6 | Every feature in SPEC.md works |
 | 4 Release 1.0 | 4.1–4.2 | Validation report published, 1.0 installers released |
 
@@ -273,7 +273,7 @@ Write short UI design guidelines and bring the existing dialogs in line with the
   - Feedback: where errors, assumption warnings and plain-language readings appear; a disabled OK always shows why; empty states.
   - Keyboard: tab order, shortcuts, command palette entries.
 - A small shared module in src/curvis/ui for what DESIGN.md defines (dialog skeleton, spacing, stacked-page sizing), used by the existing dialogs.
-- Mockups (an HTML canvas, not code) of the Analyze dialog, the Results panel and the Format dialog from SPEC.md, following DESIGN.md, for steps 2.2 and 2.6 to build from.
+- Mockups (an HTML canvas, not code) of the Analyze dialog, the Results panel and the Format dialog from SPEC.md, following DESIGN.md, for steps 2.2 and 2.7 to build from.
 - Apply DESIGN.md to the Import, Bulk rename, Calculate, Constants and Settings dialogs. Take offscreen screenshots of each in light and dark theme, before and after.
 - Add a line to the UI conventions in CLAUDE.md that points to docs/DESIGN.md.
 - pytest-qt tests that every dialog fits its default size without overlapping widgets, and that every control has a label or an accessible name.
@@ -406,14 +406,38 @@ Build src/curvis/charts:
 Make a plan first. When done, report what you built and the redraw benchmark.
 ```
 
-### Step 2.6 — Format dialog and export
+### Step 2.6 — Several tables per project, renaming in place
+
+**Done when**
+- [ ] A project shows its tables as tabs along the bottom; New table (File menu, +, Ctrl+Shift+N) adds one, and tabs can be renamed and reordered.
+- [ ] Closing a table deletes it with its calculated columns, analyses and graphs after the warning, as one undo step; the last table cannot be closed.
+- [ ] The Results and Graph panels, Import data and the table toolbar follow the selected table; a project with several tables saves and opens unchanged.
+- [ ] Column, replicate group and category names are renamed in place in the header; Tab and Shift+Tab move to the next and previous header.
+
+```text
+Read CLAUDE.md, docs/SPEC.md and step 2.6 in docs/PHASES.md.
+
+Build several tables per project, following docs/DESIGN.md section 8 and docs/mockups/table-tabs.html (approved: tabs along the bottom):
+- Core: RemoveTable also removes the table's analyses and graphs (and their dependency-graph nodes), and undo restores all of it, as one command with a clear change-log summary. It refuses to remove the last table. Add MoveTable (reorder); RenameTable exists. A project file without tables opens with one blank table added.
+- DocumentTab: a tab bar along the bottom with one tab per table and a + button; the table view, Results panel and Graph panel show the selected table. Keep the selected table when commands change the document (undo of a removal reselects the restored table).
+- Actions in ActionRegistry: New table (File menu under New project, Ctrl+Shift+N), Close table… (File menu above Close project; menu and palette only), next/previous table (Ctrl+Page Down / Ctrl+Page Up). Rename the File menu's Close to Close project. No toolbar button for New table.
+- The Close table warning built from src/curvis/ui/dialogs.py, with Cancel as the default button; an empty table closes without asking. Disabled Close table says why.
+- Import data goes into the selected table; the status message names it.
+- Double-click rename in place and a tab context menu (Rename, Close table…, New table); drag to reorder.
+- Renaming in the column header, following docs/DESIGN.md section 9 and board 6 of the mockup: double-click a column name or Rename column (Ctrl+Shift+R, no longer a dialog) opens a field over the name; Enter or a click elsewhere keeps it, Esc cancels, Tab / Shift+Tab keep it and edit the next / previous header, stopping at the last column. Group and category bands use the same editor (Tab moves within their row). One RenameColumn (or group/category rename) per changed name; invalid names keep the field open with the reason in the status bar. Share the in-place editor with the table tab rename.
+- Tests: unit tests for the commands (remove with analyses and graphs, undo, last-table refusal, move), a save/open round trip with three tables, and pytest-qt tests for the main paths (new, switch, rename, close with warning, close the last table refused, import into the selected table, panels follow the table, header rename with Enter, Esc, Tab across several headers, Shift+Tab, the last column, an invalid name, undo per name). Check the graph redraw benchmark does not regress.
+
+Make a plan first. When done, report what you built, the tests and benchmarks, and anything open.
+```
+
+### Step 2.7 — Format dialog and export
 
 **Done when**
 - [ ] The Format dialog changes everything listed in SPEC.md that applies to XY, bar and box.
 - [ ] PNG, SVG and PDF exports match the on-screen graph (image-diff tests pass); 300 dpi export under 1 s.
 
 ```text
-Read CLAUDE.md, docs/SPEC.md and step 2.6 in docs/PHASES.md.
+Read CLAUDE.md, docs/SPEC.md and step 2.7 in docs/PHASES.md.
 
 Build:
 - Format dialog editing the ChartSpec only (one undoable command per OK): graph title, aspect ratio presets (4:3, 16:9, 1:1, 3:4, 3:2) and custom size, each axis (title, range, label, linear/log), each series (symbol, size, line style, width, color, error-bar type), color scheme and chart text size. Changes preview live. Follow docs/DESIGN.md and the Format dialog mockup approved in step 1.6.
@@ -423,7 +447,7 @@ Build:
 Make a plan first. When done, report what you built, image-diff results and the export benchmark.
 ```
 
-### Step 2.7 — MVP hardening and beta build
+### Step 2.8 — MVP hardening and beta build
 
 **Gate for phase 2 (MVP):** all validation tests pass, all benchmarks meet targets, and 10–20 beta users can install it.
 
@@ -433,7 +457,7 @@ Make a plan first. When done, report what you built, image-diff results and the 
 - [ ] Beta installers are built and a short getting-started guide exists.
 
 ```text
-Read CLAUDE.md, docs/SPEC.md and step 2.7 in docs/PHASES.md.
+Read CLAUDE.md, docs/SPEC.md and step 2.8 in docs/PHASES.md.
 
 Prepare the MVP beta:
 - Run all tests and benchmarks; profile and fix anything that misses a target. Report before/after numbers.

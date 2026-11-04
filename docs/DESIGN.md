@@ -67,7 +67,7 @@ Inner layouts (pages, rows) have zero margins; only the dialog has a margin.
 
 | Dialog | Default size | Minimum size |
 | --- | --- | --- |
-| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 (to be confirmed for Format in step 2.6) |
+| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 (to be confirmed for Format in step 2.7) |
 | Bulk rename | 720 × 520 | 600 × 420 |
 | Constants | 560 × 420 | 460 × 340 |
 | Simple dialog (Settings, constant editor) | its size hint | its size hint, at least 360 wide |
@@ -185,10 +185,13 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   | Ctrl+K | Command palette |
   | Ctrl+, | Settings |
   | Ctrl+Shift+I | Import data |
+  | Ctrl+Shift+N | New table |
+  | Ctrl+Shift+R | Rename column (in the header) |
+  | Ctrl+Page Down / Ctrl+Page Up | Next / previous table |
   | Ctrl+Shift+K | Calculate |
   | Ctrl+Shift+E | Edit calculation |
   | Ctrl+Shift+A | Analyze |
-  | — | Bulk rename, Constants, Edit analysis, Delete analysis (menu and palette only) |
+  | — | Bulk rename, Constants, Edit analysis, Delete analysis, Close table (menu and palette only) |
 
   Reserved for later steps: Ctrl+Shift+F *Format graph*, Ctrl+Shift+X
   *Export graph*. A new shortcut must not clash with these or with platform standard keys.
@@ -241,3 +244,49 @@ Mockup: `docs/mockups/toolbars.html`.
   menu entry. The tooltips name the shortcut.
 - **Open:** a toolbar for graph formatting is not decided yet. It is not in SPEC.md.
 
+## 8. Table tabs
+
+Mockup: `docs/mockups/table-tabs.html`.
+
+- **Where.** A project's tables are tabs along the bottom of the project tab, under the table
+  and the side panel, like spreadsheet sheets. The selected tab joins the table above it. The
+  project tabs stay at the top; the two rows never sit next to each other.
+- **The side panel follows the selected table.** Results and Graph show that table's analyses
+  and graphs. Import data and every table-toolbar action act on the selected table, and their
+  status messages name it (“Imported 96 rows and 4 columns from plate.csv into Viability.”).
+- **New table**: a *+* button after the last tab, *New table* in the File menu under *New
+  project*, Ctrl+Shift+N and the command palette. There is no toolbar button; the *+* is
+  always visible. The new table is named “Table 2”, “Table 3” … (the first free number), is
+  added after the selected tab, and is selected. One undo step.
+- **Closing.** Each tab has a close button (the thin × of section 3) while the project has
+  more than one table. *Close table…* is in the File menu above *Close project* (Ctrl+W),
+  and in the tab's context menu. Closing a table that holds data, analyses or graphs asks
+  first: window title “Close table”, the first line “Closing “<name>” deletes the table from
+  the project.”, then the analyses and graphs that go with it, then “You can bring it back with
+  Undo (Ctrl+Z).” The buttons are *Delete table* and *Cancel*; Cancel has the default focus.
+  An empty table closes without asking.
+- **The last table cannot be closed.** Its tab has no close button, and *Close table…* is
+  disabled with the reason “A project needs at least one table.”
+- **Renaming and order.** Double-click a tab to rename it in place: Enter keeps the name, Esc
+  cancels, and a name already used keeps the old name and says so in the status bar. The
+  context menu has *Rename*, *Close table…* and *New table*. Tabs can be dragged to reorder.
+- **Keyboard.** Ctrl+Page Down and Ctrl+Page Up select the next and previous table.
+
+## 9. Renaming in the column header
+
+Mockup: `docs/mockups/table-tabs.html`, board 6.
+
+- **Start.** Double-click a column name, or use *Rename column* (Ctrl+Shift+R) on the current
+  column: a field opens over the name in the header with the text selected. The role line
+  under it (X, Y, ƒ Y …) stays visible. *Rename column* opens no dialog, so its menu text has
+  no ellipsis.
+- **Keys.** Enter or a click elsewhere keeps the name. Esc cancels the header being edited.
+  Tab keeps the name and edits the next column header to the right, Shift+Tab the one to the
+  left. Tab on the last column keeps the name and stops; it never adds a column.
+- **Undo.** Each changed name is one undo step (“Rename column 'Drug' to 'Drug A'”). A name
+  left unchanged adds none, and names kept with Tab stay when a later header is cancelled.
+- **Invalid names.** An empty name or one already used in the table keeps the field open and
+  says why in the status bar: “Enter a column name.” or “'Control' is already used in this
+  table. Enter another name.” Esc gives up and keeps the old name.
+- **Group and category bands** rename the same way (double-click, Enter, Esc), instead of a
+  dialog; Tab moves to the next band in the same row. Bulk rename stays for many names at once.
