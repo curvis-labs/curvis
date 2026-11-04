@@ -72,7 +72,7 @@ Results appear in a Results panel next to the data, with significance stars (\*,
 
 ## Graphs
 
-Graphs are drawn directly from a data table. You pick a chart family from the toolbar, and the graph redraws when the data changes.
+Graphs are drawn directly from a data table. You pick a chart family from the toolbar, and the graph redraws when the data changes. The graph appears in a Graph panel next to the data. The user can toggle between Result and Graph panel.
 
 | Chart family | Variants |
 | --- | --- |
