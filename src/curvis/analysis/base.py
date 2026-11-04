@@ -423,10 +423,20 @@ def get(type_id: str) -> AnalysisType:
 
 
 def types() -> list[AnalysisType]:
-    """All analysis types, by family and then in registration order."""
+    """All analysis types: by family, then built-in types in the order of
+    BUILTIN_MODULES (the order of SPEC.md), then others in registration order."""
     load_builtin()
-    order = list(Family)
-    return sorted(_TYPES.values(), key=lambda t: order.index(t.family))
+    families = list(Family)
+    registered = list(_TYPES)
+
+    def key(t: AnalysisType) -> tuple[int, int, int]:
+        module = type(t).__module__
+        builtin = (
+            BUILTIN_MODULES.index(module) if module in BUILTIN_MODULES else len(BUILTIN_MODULES)
+        )
+        return families.index(t.family), builtin, registered.index(t.id)
+
+    return sorted(_TYPES.values(), key=key)
 
 
 def in_family(family: Family) -> list[AnalysisType]:

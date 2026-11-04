@@ -531,8 +531,13 @@ class AnalyzeDialog(QDialog):
         assert kind is not None
         self.options.setCurrentWidget(self.forms[kind.id])
         self._fill_tree(kind)
-        if kind.id not in self._started and self.editing is None and not self._checked:
-            self._checked = set(kind.default_inputs(self.table))
+        if kind.id not in self._started and self.editing is None:
+            # A new analysis starts from its own default inputs when nothing is ticked or
+            # the ticked series do not suit it (e.g. three ticked for a t test).
+            ticked = [c.id for c in kind.selected(self.table, sorted(self._checked))]
+            params = self.forms[kind.id].params()
+            if not ticked or kind.check(self.table, ticked, params) is not None:
+                self._checked = set(kind.default_inputs(self.table))
         self._started.add(kind.id)
         self.set_checked(sorted(self._checked))
 

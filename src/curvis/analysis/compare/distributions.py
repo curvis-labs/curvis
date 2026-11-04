@@ -38,14 +38,17 @@ DROP = 45.0
 """Parts of the integrand below e^-DROP times its largest value are left out."""
 
 _COARSE_U = 65
-_U_PANELS_SMALL_DF = 16
-"""Below df = 10 the density of log s has a long exponential tail: more panels."""
 _U_PANELS = 8
+_U_PANELS_MAX = 128
+_U_PANEL_WIDTH = 0.8
+"""Widest u panel. For small df the density of u = log s has a long exponential tail
+to the left (about 45 / df wide), which then needs more panels."""
 _Z_PANELS_MIN = 8
 _Z_PANELS_MAX = 64
 _Z_PANEL_WIDTH = 2.5
 """Widest z panel, in units of the integrand's feature width."""
 _Z_STEP = 0.25
+Z_LIMIT = 40.0
 
 
 def _log_chi_scaled_density_u(u: FloatArray, df: float) -> FloatArray:
@@ -74,18 +77,17 @@ def _composite(lo: FloatArray, hi: FloatArray, panels: int) -> tuple[FloatArray,
     return nodes.reshape(shape), weights.reshape(shape)
 
 
-def _z_grid(w: FloatArray) -> tuple[FloatArray, float]:
-    """A coarse z grid wide enough for every w in ``w`` (the mass of both integrands
-    lies within |z| <= w + 40)."""
-    half = float(np.max(w)) + 40.0
-    count = math.ceil(2 * half / _Z_STEP) + 1
-    return np.linspace(-half, half, count), 2 * half / (count - 1)
+def _z_grid() -> tuple[FloatArray, float]:
+    """The coarse z grid. Both integrands are phi(z) times a factor of at most k, so
+    beyond |z| = Z_LIMIT they are below e^-800: smaller than any P value a double holds."""
+    count = math.ceil(2 * Z_LIMIT / _Z_STEP) + 1
+    return np.linspace(-Z_LIMIT, Z_LIMIT, count), 2 * Z_LIMIT / (count - 1)
 
 
 def _log_rows(log_f: LogIntegrand, w: FloatArray) -> tuple[FloatArray, FloatArray, FloatArray]:
     """For each w (one row each): the log of the inner integral on a coarse grid, and
     the z range where the integrand is within e^-DROP of its row maximum."""
-    z, step = _z_grid(w)
+    z, step = _z_grid()
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
         values = log_f(z[None, :], w[:, None])
     values = np.where(np.isnan(values), -np.inf, values)
@@ -127,15 +129,17 @@ def _upper_tail(log_f: LogIntegrand, c: float, df: float, z_scale: float = 1.0) 
         first, last = int(inside[0]), int(inside[-1])
         width = hi - lo
         if first == 0 or last == _COARSE_U - 1:  # still large at an edge: widen
+            # To the left the density falls exponentially (as s^df), to the right
+            # faster than exponentially (as e^(-df s^2 / 2)), so widen less there.
             lo = lo - width if first == 0 else lo
-            hi = hi + width if last == _COARSE_U - 1 else hi
+            hi = hi + 1.0 if last == _COARSE_U - 1 else hi
             continue
         new_lo, new_hi = u[first - 1], u[last + 1]
         if last - first >= 16:  # the peak is resolved
             lo, hi = new_lo, new_hi
             break
         lo, hi = new_lo, new_hi
-    u_panels = _U_PANELS_SMALL_DF if df < 10 else _U_PANELS
+    u_panels = min(max(math.ceil((hi - lo) / _U_PANEL_WIDTH), _U_PANELS), _U_PANELS_MAX)
     u_nodes, u_weights = _composite(np.array(lo), np.array(hi), u_panels)
     w = c * np.exp(u_nodes)
     # The z range of each node, interpolated from the coarse rows (it changes smoothly

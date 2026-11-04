@@ -36,7 +36,7 @@ TEST_CHOICES = (
 
 @dataclass(frozen=True)
 class TTestParams(Params):
-    test: str = param(TTestKind.WELCH.value, "&Test", choices=TEST_CHOICES)
+    test: str = param(TTestKind.WELCH.value, "Test t&ype", choices=TEST_CHOICES)
 
 
 class TTest(GroupComparison):
