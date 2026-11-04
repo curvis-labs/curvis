@@ -17,6 +17,7 @@ Curvis is built in 5 phases and 26 steps. Each step is one Claude Code session t
 3. Install `uv`, Git and R (R is needed from step 2.1 on, to generate reference results).
 4. For each step: start a fresh Claude Code session in the repository, switch to plan mode, paste the step's prompt, review the plan, then let it implement.
 5. When a step reports done, check the "Done when" list yourself. Statistics steps also need you to review the R script before implementation starts.
+   **Generate fixtures locally with R 4.6.1.** Cloud sessions cannot install it (CRAN is blocked; Ubuntu only has R 4.3, whose `wilcox.test` treats ties differently). Run the R fixture scripts on your own machine with the renv project in `validation/r`, then commit `renv.lock` and the fixtures. Claude Code can write and test-run the scripts in the cloud, but never commits fixtures made with another R version.
 6. Merge the branch, tick the step below, and move on.
 
 Every prompt follows the same pattern: read the rules, confirm open decisions, plan, build with tests, report. Where a prompt lists **decisions**, Claude Code should ask you about them before writing code.
@@ -332,8 +333,10 @@ Make a plan first. When done, report what you built and the test results.
 ### Step 2.3 — Compare groups: t-test, one-way ANOVA, Mann-Whitney
 
 **Done when**
-- [ ] All three analyses match R fixtures, including edge cases.
-- [ ] One-way ANOVA (ordinary) offers Dunnett, Holm and Tukey post-hoc tests.
+- [x] All three analyses match R fixtures, including edge cases.
+- [x] One-way ANOVA (ordinary) offers Dunnett, Holm and Tukey post-hoc tests.
+
+Note: the fixtures for this step were generated locally with R 4.6.1, after the cloud session found it could only install R 4.3. Do the same for every later step that needs R fixtures (see step 5 of "How to use this file").
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.3 in docs/PHASES.md.
