@@ -574,6 +574,69 @@
           "median": 0.010092326000005869
         }
       ]
+    },
+    {
+      "name": "test_xy_redraw_after_data_edit",
+      "fullname": "tests/bench/test_graph.py::test_xy_redraw_after_data_edit",
+      "stats": {
+        "min": 0.025371706252076097
+      },
+      "runs": [
+        {
+          "min": 0.025371706252076097,
+          "median": 0.03375318572557805
+        },
+        {
+          "min": 0.027103164332214724,
+          "median": 0.0349373467137606
+        },
+        {
+          "min": 0.028608198143671115,
+          "median": 0.03741800261984437
+        }
+      ]
+    },
+    {
+      "name": "test_bar_redraw_after_data_edit",
+      "fullname": "tests/bench/test_graph.py::test_bar_redraw_after_data_edit",
+      "stats": {
+        "min": 0.024007950089564828
+      },
+      "runs": [
+        {
+          "min": 0.024007950089564828,
+          "median": 0.028471752367433035
+        },
+        {
+          "min": 0.026407910906191514,
+          "median": 0.030874905247311603
+        },
+        {
+          "min": 0.027885268301124488,
+          "median": 0.03565158744351956
+        }
+      ]
+    },
+    {
+      "name": "test_box_redraw_after_data_edit",
+      "fullname": "tests/bench/test_graph.py::test_box_redraw_after_data_edit",
+      "stats": {
+        "min": 0.02147142723998709
+      },
+      "runs": [
+        {
+          "min": 0.021613743755721494,
+          "median": 0.02687242509501939
+        },
+        {
+          "min": 0.02147142723998709,
+          "median": 0.026175043440613145
+        },
+        {
+          "min": 0.023345234454356212,
+          "median": 0.029443751499531948
+        }
+      ]
     }
   ]
 }

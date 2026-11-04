@@ -21,9 +21,10 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QMainWindow, QToolBar, QToolButton
 
 from curvis.ui.actions import ActionRegistry, RegisteredAction
+from curvis.ui.theme import TOOL_BUTTON_HEIGHT as BUTTON_HEIGHT
 from curvis.ui.toolbar_icons import ICON_SIZE, toolbar_icon
 
-BUTTON_HEIGHT = 28
+__all__ = ["BUTTON_HEIGHT", "build_main_toolbar", "build_table_toolbar", "set_tooltips"]
 
 
 @dataclass(frozen=True)
@@ -98,11 +99,11 @@ def _fill(
         action.setIcon(toolbar_icon(button.icon))
         action.setIconText(button_name(entry, button))
         toolbar.addAction(action)
-        widget = toolbar.widgetForAction(action)
-        if isinstance(widget, QToolButton):
-            widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # not in the Tab order
-            widget.setMinimumHeight(BUTTON_HEIGHT)
-            if action.menu() is not None:
+        # Toolbar buttons take no focus (not in the Tab order), and CurvisStyle makes
+        # them BUTTON_HEIGHT high, so only the Plot button needs a change here.
+        if action.menu() is not None:
+            widget = toolbar.widgetForAction(action)
+            if isinstance(widget, QToolButton):
                 widget.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
 
 

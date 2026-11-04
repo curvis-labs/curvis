@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -78,6 +78,28 @@ class ChartAxis(pg.AxisItem):  # type: ignore[misc]
             value = 10.0 ** (v * scale)
             out.append(f"{value:.6g}" if 1e-6 <= abs(value) < 1e7 else f"{value:.0e}")
         return out
+
+
+class CrispErrorBars(pg.ErrorBarItem):  # type: ignore[misc]
+    """Error bars drawn without antialiasing: they are only horizontal and vertical
+    lines, and antialiasing thousands of them costs most of a redraw."""
+
+    def paint(self, painter: QPainter, *args: Any) -> None:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        super().paint(painter, *args)
+
+
+@dataclass
+class _XYParts:
+    """The items of an XY graph, kept between renders so a data change only updates
+    their data (rebuilding the items costs more than the whole redraw budget)."""
+
+    key: object
+    series: list[tuple[Any, Any]]
+    """(points item, error bars) per series."""
+    curves: list[tuple[Any, Any, Any, Any]]
+    """(line, upper limit, lower limit, fill) per curve; all but the line are None
+    without a band."""
 
 
 class BoxItem(pg.GraphicsObject):  # type: ignore[misc]
@@ -153,6 +175,7 @@ class ChartView(QWidget):
         self.legend.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.legend.sigSampleClicked.connect(self._on_legend_clicked)
         self._legend_shown = False
+        self._xy_parts: _XYParts | None = None
         self.spec: ChartSpec | None = None
         self.data: ChartData | None = None
         self.message = ""
@@ -184,6 +207,13 @@ class ChartView(QWidget):
         aspect_changed = self.spec is None or self.spec.aspect != spec.aspect
         self.spec, self.data = spec, data
         colors = scheme(spec.color_scheme)
+        xy = spec.variant in (ChartVariant.SCATTER, ChartVariant.LINE)
+        parts = self._xy_parts
+        if xy and data is not None and parts is not None and parts.key == _xy_key(spec, data):
+            self._update_xy(spec, data)
+            self._apply_ranges(spec)
+            return
+        self._xy_parts = None
         plot = self.plot_item
         plot.clear()
         self.legend.clear()
@@ -228,39 +258,61 @@ class ChartView(QWidget):
         plot = self.plot_item
         self.legend.setLabelTextColor(colors.ink)
         self._show_legend(True)
-        width = _x_span(data)
         styles = {s.source: s for s in spec.series}
+        parts = _XYParts(_xy_key(spec, data), [], [])
         for curve in data.curves:
             style = styles.get(curve.series_source)
-            if style is None or len(curve.px) == 0:
+            if style is None:
                 continue
             color = QColor(style.color)
-            visible = style.visible
+            upper = lower = band = None
             if curve.show_band:
-                upper = pg.PlotCurveItem(curve.px, _nan_to_edge(curve.high, curve.py))
-                lower = pg.PlotCurveItem(curve.px, _nan_to_edge(curve.low, curve.py))
+                upper, lower = pg.PlotCurveItem(), pg.PlotCurveItem()
                 fill = QColor(color)
                 fill.setAlphaF(BAND_ALPHA)
                 band = pg.FillBetweenItem(upper, lower, brush=fill)
-                band.setVisible(visible)
+                band.setZValue(-1)
                 plot.addItem(band)
             pen = pg.mkPen(color, width=_points_to_px(style.line_width))
-            line = pg.PlotCurveItem(curve.px, curve.py, pen=pen)
-            line.setVisible(visible)
+            line = pg.PlotCurveItem(pen=pen)
             plot.addItem(line)
+            parts.curves.append((line, upper, lower, band))
         for series in data.xy:
             style = styles[series.source]
             item = pg.PlotDataItem(name=series.name, **_point_style(spec, style))
-            item.setData(series.px, series.py)
-            item.setVisible(style.visible)
+            # An exact 1 px cosmetic pen: Qt draws it on its fast path.
+            bars = CrispErrorBars(pen=pg.mkPen(QColor(style.color), width=1))
             plot.addItem(item)
-            self._drawn.xy.append((series, item))
+            plot.addItem(bars)
             self._drawn.legend_sources[id(item)] = series.source
             self.legend.addItem(item, series.name)
-            bars = _error_bars(series, width, style)
-            if bars is not None:
-                bars.setVisible(style.visible)
-                plot.addItem(bars)
+            parts.series.append((item, bars))
+        self._xy_parts = parts
+        self._update_xy(spec, data)
+
+    def _update_xy(self, spec: ChartSpec, data: ChartData) -> None:
+        """Put ``data`` into the items made by :meth:`_draw_xy`, and show or hide them."""
+        parts = self._xy_parts
+        assert parts is not None
+        styles = {s.source: s for s in spec.series}
+        visible_curves = [c for c in data.curves if c.series_source in styles]
+        for curve, (line, upper, lower, band) in zip(visible_curves, parts.curves, strict=True):
+            shown = styles[curve.series_source].visible and len(curve.px) > 0
+            line.setData(curve.px, curve.py)
+            line.setVisible(shown)
+            if band is not None:
+                upper.setData(curve.px, _nan_to_edge(curve.high, curve.py))
+                lower.setData(curve.px, _nan_to_edge(curve.low, curve.py))
+                band.setVisible(shown)
+        width = _x_span(data)
+        self._drawn.xy = []
+        for series, (item, bars) in zip(data.xy, parts.series, strict=True):
+            shown = styles[series.source].visible
+            item.setData(series.px, series.py)
+            item.setVisible(shown)
+            has_bars = _set_error_bars(bars, series, width)
+            bars.setVisible(shown and has_bars)
+            self._drawn.xy.append((series, item))
 
     def _show_legend(self, shown: bool) -> None:
         if shown == self._legend_shown:
@@ -424,20 +476,30 @@ def _point_style(spec: ChartSpec, style: SeriesSpec) -> dict[str, Any]:
     }
 
 
-def _error_bars(series: XYSeriesData, x_span: float, style: SeriesSpec) -> Any:
+def _xy_key(spec: ChartSpec, data: ChartData) -> object:
+    """What decides which items an XY graph has. While it stays the same, a redraw only
+    updates the items' data and visibility."""
+    shown = replace(spec, series=tuple(replace(s, visible=True) for s in spec.series))
+    return (
+        shown,
+        tuple((s.source, s.name) for s in data.xy),
+        tuple((c.series_source, c.show_band) for c in data.curves),
+    )
+
+
+def _set_error_bars(bars: Any, series: XYSeriesData, x_span: float) -> bool:
+    """Give ``bars`` the error bars of ``series``; False if it has none."""
     keep = np.isfinite(series.err_high) | np.isfinite(series.err_low)
     if not np.any(keep):
-        return None
-    top = np.nan_to_num(series.err_high[keep])
-    bottom = np.nan_to_num(series.err_low[keep])
-    return pg.ErrorBarItem(
+        return False
+    bars.setData(
         x=series.px[keep],
         y=series.py[keep],
-        top=top,
-        bottom=bottom,
+        top=np.nan_to_num(series.err_high[keep]),
+        bottom=np.nan_to_num(series.err_low[keep]),
         beam=0.012 * x_span,
-        pen=pg.mkPen(QColor(style.color), width=_points_to_px(1.0)),
     )
+    return True
 
 
 def _x_span(data: ChartData) -> float:

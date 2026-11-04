@@ -7,7 +7,7 @@ Widgets must only use palette roles, never fixed colours; every colour is set he
 
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, QRectF, Qt
+from PySide6.QtCore import QObject, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QApplication,
@@ -99,6 +99,7 @@ BORDER_CONTRAST_MIN = 3.0
 TOOL_HOVER_ALPHA = 0.14
 TOOL_PRESSED_ALPHA = 0.25
 TOOLBAR_SPACING = 4
+TOOL_BUTTON_HEIGHT = 28
 
 # Text and background pairs that must reach CONTRAST_MIN in both themes (WCAG AA).
 CONTRAST_MIN = 4.5
@@ -206,6 +207,18 @@ class CurvisStyle(QProxyStyle):
         if metric == QStyle.PixelMetric.PM_ToolBarItemSpacing:
             return TOOLBAR_SPACING
         return super().pixelMetric(metric, option, widget)
+
+    def sizeFromContents(  # noqa: N802 (Qt API)
+        self,
+        contents: QStyle.ContentsType,
+        option: QStyleOption,
+        size: QSize,
+        widget: QWidget | None = None,
+    ) -> QSize:
+        result = super().sizeFromContents(contents, option, size, widget)  # type: ignore[arg-type]
+        if contents == QStyle.ContentsType.CT_ToolButton and _in_toolbar(widget):
+            result.setHeight(max(result.height(), TOOL_BUTTON_HEIGHT))
+        return result
 
     def drawControl(  # noqa: N802 (Qt API)
         self,

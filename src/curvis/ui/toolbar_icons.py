@@ -17,6 +17,7 @@ draws them that way.
 
 from __future__ import annotations
 
+import functools
 from pathlib import Path
 
 from PySide6.QtCore import QByteArray, QPoint, QRect, QSize, Qt
@@ -103,7 +104,12 @@ class PaletteIconEngine(QIconEngine):
         return [QSize(ICON_SIZE, ICON_SIZE)]
 
 
+@functools.cache
+def _svg(name: str) -> str:
+    path: Path = TOOLBAR_ICONS_DIR / f"{name}.svg"
+    return path.read_text(encoding="utf-8")
+
+
 def toolbar_icon(name: str) -> QIcon:
     """The toolbar icon ``icons/toolbar/<name>.svg``."""
-    path: Path = TOOLBAR_ICONS_DIR / f"{name}.svg"
-    return QIcon(PaletteIconEngine(path.read_text(encoding="utf-8")))
+    return QIcon(PaletteIconEngine(_svg(name)))
