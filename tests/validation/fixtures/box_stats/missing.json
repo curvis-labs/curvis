@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "analysis": "box_stats",
+  "case": "missing",
+  "description": "Groups with missing values (NaN), which are left out.",
+  "generated_by": {
+    "script": "validation/r/scripts/box_stats.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1, "NaN", 3, 4, "NaN", 6],
+      ["NaN", "NaN", 2.5],
+      ["NaN", "NaN", "NaN"],
+      ["NaN", 5.2270833846047005, "NaN", "NaN", "NaN", "NaN", 3.4435416554727989, 3.1398009017951996, 4.786801404809121, 5.4962003905365222, "NaN", 4.3437567927107548, 5.7991943287834387, 7.3228278314212272, 6.072589000136853, 6.7183685448696382, 4.2749038228429104, 4.5327951436004197, 5.8580369731954187, "NaN"]
+    ]
+  },
+  "expected": {
+    "n": [4, 1, 0, 13],
+    "min": [1, 2.5, "NaN", 3.1398009017951996],
+    "q1": [1.5, 2.5, "NaN", 4.3093303077768326],
+    "median": [3.5, 2.5, "NaN", 5.2270833846047005],
+    "q3": [5.5, 2.5, "NaN", 5.9653129866661363],
+    "max": [6, 2.5, "NaN", 7.3228278314212272]
+  },
+  "kinds": {
+    "n": "exact",
+    "min": "exact",
+    "q1": "statistic",
+    "median": "statistic",
+    "q3": "statistic",
+    "max": "exact"
+  }
+}
