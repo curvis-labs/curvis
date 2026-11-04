@@ -361,9 +361,9 @@ Make a plan first. When done, report validation results per analysis.
 ### Step 2.4 — Curve fits: linear, polynomial, 4PL, 3PL
 
 **Done when**
-- [ ] Fits match R fixtures and applicable NIST StRD datasets.
-- [ ] Fits report parameters with standard errors and confidence intervals, R², and confidence bands.
-- [ ] X-range limits and fitting several series in one run work; 12 points × 20 series fit in under 200 ms.
+- [x] Fits match R fixtures and applicable NIST StRD datasets.
+- [x] Fits report parameters with standard errors and confidence intervals, R², and confidence bands.
+- [x] X-range limits and fitting several series in one run work; 12 points × 20 series fit in under 200 ms.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.4 in docs/PHASES.md.
