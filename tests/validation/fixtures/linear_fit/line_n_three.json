@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "linear_fit",
+  "case": "line_n_three",
+  "description": "Three points: df = 1.",
+  "generated_by": {
+    "script": "validation/r/scripts/linear_fit.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [1, 2, 4],
+    "y": [
+      [2.5, 3.8999999999999999, 8.1999999999999993]
+    ],
+    "degree": 1,
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [1, 2.5, 4]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [3],
+    "df": [1],
+    "coefficients": [0.34999999999999865, 1.9357142857142859],
+    "se": [0.49099025303098276, 0.18557687223952249],
+    "ci_lower": [-5.8886226784778861, -0.42226344726002063],
+    "ci_upper": [6.5886226784778836, 4.2936920186885921],
+    "r_squared": [0.99089265475740729],
+    "sy_x": [0.40089186286863626],
+    "band_fit": [2.2857142857142847, 5.1892857142857141, 8.0928571428571416],
+    "band_lower": [-2.0193443624354535, 2.2222287999505355, 3.1843350686262974],
+    "band_upper": [6.5907729338640229, 8.1563426286208927, 13.001379217087987]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "coefficients": "parameter",
+    "se": "parameter",
+    "ci_lower": "ci",
+    "ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "statistic",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

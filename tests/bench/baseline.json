@@ -511,6 +511,69 @@
           "median": 0.01786366400000361
         }
       ]
+    },
+    {
+      "name": "test_4pl_12_points_by_20_series",
+      "fullname": "tests/bench/test_fit.py::test_4pl_12_points_by_20_series",
+      "stats": {
+        "min": 0.06876088399999958
+      },
+      "runs": [
+        {
+          "min": 0.0698250250000001,
+          "median": 0.07085335800000792
+        },
+        {
+          "min": 0.06876088399999958,
+          "median": 0.06923346400000696
+        },
+        {
+          "min": 0.06891681700000163,
+          "median": 0.06994164500000011
+        }
+      ]
+    },
+    {
+      "name": "test_3pl_12_points_by_20_series",
+      "fullname": "tests/bench/test_fit.py::test_3pl_12_points_by_20_series",
+      "stats": {
+        "min": 0.067458452000011
+      },
+      "runs": [
+        {
+          "min": 0.06917212999999833,
+          "median": 0.06984743900000012
+        },
+        {
+          "min": 0.067458452000011,
+          "median": 0.06924060699998336
+        },
+        {
+          "min": 0.06863334999999893,
+          "median": 0.06923614199999406
+        }
+      ]
+    },
+    {
+      "name": "test_linear_regression_12_points_by_20_series",
+      "fullname": "tests/bench/test_fit.py::test_linear_regression_12_points_by_20_series",
+      "stats": {
+        "min": 0.00972957599999802
+      },
+      "runs": [
+        {
+          "min": 0.00972957599999802,
+          "median": 0.009875246999996534
+        },
+        {
+          "min": 0.009786380000008421,
+          "median": 0.009943130999999994
+        },
+        {
+          "min": 0.009797036999998454,
+          "median": 0.010092326000005869
+        }
+      ]
     }
   ]
 }

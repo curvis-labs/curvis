@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "linear_fit",
+  "case": "line_n_two",
+  "description": "Two points: the line goes through both (df = 0).",
+  "generated_by": {
+    "script": "validation/r/scripts/linear_fit.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [1, 3],
+    "y": [
+      [2.5, 6.0999999999999996]
+    ],
+    "degree": 1,
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 2, 4]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [2],
+    "df": [0],
+    "coefficients": [0.69999999999999862, 1.8],
+    "se": ["NaN", "NaN"],
+    "ci_lower": ["NaN", "NaN"],
+    "ci_upper": ["NaN", "NaN"],
+    "r_squared": [1],
+    "sy_x": ["NaN"],
+    "band_fit": [0.69999999999999862, 4.2999999999999989, 7.8999999999999986],
+    "band_lower": ["NaN", "NaN", "NaN"],
+    "band_upper": ["NaN", "NaN", "NaN"]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "coefficients": "parameter",
+    "se": "parameter",
+    "ci_lower": "ci",
+    "ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "statistic",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

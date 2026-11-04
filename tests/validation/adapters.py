@@ -197,3 +197,134 @@ def mann_whitney(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
         "median_a": r.a.median,
         "median_b": r.b.median,
     }
+
+
+# --- curve fits ----------------------------------------------------------------------
+
+
+def _x_range(inputs: Mapping[str, Any]) -> Any:
+    from curvis.analysis.fit.points import XRange
+
+    return XRange(float(inputs["x_min"]), float(inputs["x_max"]))
+
+
+@adapter("linear_fit")
+def linear_fit(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/linear_fit.R: lines and polynomials of degree 2-6."""
+    from curvis.analysis.fit.linear import fit_polynomial
+    from curvis.analysis.fit.points import fit_points
+
+    points = fit_points(inputs["x"], inputs["y"], _x_range(inputs))
+    f = fit_polynomial(points, int(inputs["degree"]))
+    fit, low, high = f.band(inputs["at"])
+    return {
+        "fit_ok": [f.ok],
+        "n": [f.n],
+        "df": [f.df if f.ok else float("nan")],
+        "coefficients": f.coefficients,
+        "se": f.se,
+        "ci_lower": f.ci_lower,
+        "ci_upper": f.ci_upper,
+        "r_squared": [f.r_squared],
+        "sy_x": [f.sy_x],
+        "band_fit": fit,
+        "band_lower": low,
+        "band_upper": high,
+    }
+
+
+@adapter("nist_linear")
+def nist_linear(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/nist_strd.R: NIST StRD linear datasets, certified values."""
+    from curvis.analysis.fit.linear import fit_polynomial
+    from curvis.analysis.fit.points import Points
+
+    f = fit_polynomial(Points(inputs["x"], inputs["y"]), int(inputs["degree"]))
+    out: dict[str, npt.ArrayLike] = {"coefficients": f.coefficients, "r_squared": [f.r_squared]}
+    # nist_strd.R leaves out the SDs of the exact fits, whose certified SDs are 0.
+    if inputs["dataset"] not in NIST_EXACT_LINEAR:
+        out["se"] = f.se
+        out["sy_x"] = [f.sy_x]
+    return out
+
+
+NIST_EXACT_LINEAR = {"Wampler1", "Wampler2"}
+NIST_ROUNDING_LEVEL = {"Lanczos1"}
+"""NIST nonlinear datasets whose residuals (~1e-13) are at rounding level, so their SDs,
+RSS and residual SD cannot be reproduced in double precision; nist_strd.R compares only
+their parameters and df (approved by the project owner, step 2.4)."""
+
+
+@adapter("dose_response")
+def dose_response(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/dose_response.R: 4PL and 3PL (Bottom = 0). A fit that is
+    not OK (too few points, not converged, ambiguous) reports no numbers, as R does."""
+    import math
+
+    import numpy as np
+
+    from curvis.analysis.fit.dose_response import dose_response_points, fit_dose_response
+
+    three = inputs["model"] == "3pl"
+    points = dose_response_points(inputs["x"], inputs["y"], inputs["x_is_log"], _x_range(inputs))
+    d = fit_dose_response(points, three_parameter=three, x_is_log=inputs["x_is_log"])
+    f = d.fit
+    names = (
+        ("top", "log_ec50", "hill_slope") if three else ("bottom", "top", "log_ec50", "hill_slope")
+    )
+    nan = float("nan")
+    out: dict[str, npt.ArrayLike] = {"fit_ok": [f.ok], "n": [f.n], "df": [f.df if f.ok else nan]}
+    for name in names:
+        i = f.names.index(name)
+        ok = f.ok
+        out[name] = [float(f.values[i]) if ok else nan]
+        out[f"{name}_se"] = [float(f.se[i]) if ok else nan]
+        out[f"{name}_ci_lower"] = [float(f.ci_lower[i]) if ok else nan]
+        out[f"{name}_ci_upper"] = [float(f.ci_upper[i]) if ok else nan]
+    low, high = d.ec50_ci
+    out["ec50"] = [d.ec50 if f.ok else nan]
+    out["ec50_ci_lower"] = [low if f.ok else nan]
+    out["ec50_ci_upper"] = [high if f.ok else nan]
+    out["r_squared"] = [f.r_squared if f.ok else nan]
+    out["sy_x"] = [f.sy_x if f.ok else nan]
+    fit, lower, upper = d.band(inputs["at"])
+    if not f.ok:
+        fit = lower = upper = np.full(len(inputs["at"]), math.nan)
+    out["band_fit"], out["band_lower"], out["band_upper"] = fit, lower, upper
+    return out
+
+
+@adapter("nist_nls")
+def nist_nls(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/nist_strd.R: NIST StRD nonlinear datasets from NIST's
+    starting values, against the certified values. The numbers of an ambiguous fit are
+    compared too (it converged; Curvis only declines to report them).
+
+    From starting values 1 (far from the solution) a fit may fail, but it must then say
+    so (not converged, or ambiguous): such a case is an expected failure (xfail), listed
+    in the report.
+    A fit that converges to the wrong values fails, from either start, as does any
+    failure from starting values 2."""
+    import pytest
+
+    from curvis.analysis.fit.engine import fit_model
+    from curvis.analysis.fit.points import Points
+    from tests.validation.nist_models import NistModel
+
+    start = inputs["start"]
+    model = NistModel(inputs["dataset"], len(start))
+    f = fit_model(model, Points(inputs["x"], inputs["y"]), start=start)
+    out: dict[str, Any] = {"parameters": f.values, "df": f.df}
+    # nist_strd.R leaves these out where the residuals are at rounding level.
+    if inputs["dataset"] not in NIST_ROUNDING_LEVEL:
+        out.update(se=f.se, rss=f.rss, sy_x=f.sy_x)
+    if inputs["start_number"] == 1 and not f.ok and _differs_from_nist(inputs, out):
+        pytest.xfail(f"{inputs['dataset']} from start 1: {f.status.value}: {f.message}")
+    return out
+
+
+def _differs_from_nist(inputs: Mapping[str, Any], out: Mapping[str, Any]) -> bool:
+    from tests.validation.harness import FIXTURE_DIR, compare, load_fixture
+
+    case = f"{inputs['dataset'].lower()}_start{inputs['start_number']}"
+    return bool(compare(load_fixture(FIXTURE_DIR / "nist_nls" / f"{case}.json"), out))

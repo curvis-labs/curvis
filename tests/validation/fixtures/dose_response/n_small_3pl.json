@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "analysis": "dose_response",
+  "case": "n_small_3pl",
+  "description": "Six concentrations, one replicate: df = 2 (4PL) or 3 (3PL). (3PL)",
+  "generated_by": {
+    "script": "validation/r/scripts/dose_response.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "drc": "4.0.0",
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [1.0000000000000001e-09, 1e-08, 9.9999999999999995e-08, 9.9999999999999995e-07, 1.0000000000000001e-05, 0.0001],
+    "y": [
+      [-1.0991129846154399, -2.0270398260882514, 9.4901191937907221, 54.609593423176953, 108.86942704525927, 117.53738839081771]
+    ],
+    "model": "3pl",
+    "x_is_log": false,
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [1.0000000000000001e-09, 1e-08, 9.9999999999999995e-08, 9.9999999999999995e-07, 1.0000000000000001e-05, 0.0001]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [6],
+    "df": [3],
+    "top": [119.00260371322433],
+    "top_se": [2.0698508584687052],
+    "top_ci_lower": [112.41541449620229],
+    "top_ci_upper": [125.58979293024638],
+    "log_ec50": [-5.9392430274274304],
+    "log_ec50_se": [0.032561202329142183],
+    "log_ec50_ci_lower": [-6.0428673054754043],
+    "log_ec50_ci_upper": [-5.8356187493794565],
+    "hill_slope": [1.0661697803506813],
+    "hill_slope_se": [0.086187683061295053],
+    "hill_slope_ci_lower": [0.79188210683129967],
+    "hill_slope_ci_upper": [1.3404574538700631],
+    "ec50": [1.1501565911710189e-06],
+    "ec50_ci_lower": [9.0600938111201855e-07],
+    "ec50_ci_upper": [1.4600954601490827e-06],
+    "r_squared": [0.99922597492027521],
+    "sy_x": [1.9659906435222883],
+    "band_fit": [0.064868383528286555, 0.75108642567703976, 8.1962928551569831, 55.072048290132471, 108.21567879859367, 117.99267035464536],
+    "band_lower": [-0.056311878400652951, -0.17716625784193152, 3.3724174218258964, 49.182489391324772, 103.10028887856571, 112.29730905452918],
+    "band_upper": [0.18604864545722605, 1.679339109196011, 13.020168288488069, 60.961607188940171, 113.33106871862164, 123.68803165476153]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "top": "parameter",
+    "top_se": "parameter",
+    "top_ci_lower": "ci",
+    "top_ci_upper": "ci",
+    "log_ec50": "parameter",
+    "log_ec50_se": "parameter",
+    "log_ec50_ci_lower": "ci",
+    "log_ec50_ci_upper": "ci",
+    "hill_slope": "parameter",
+    "hill_slope_se": "parameter",
+    "hill_slope_ci_lower": "ci",
+    "hill_slope_ci_upper": "ci",
+    "ec50": "parameter",
+    "ec50_ci_lower": "ci",
+    "ec50_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

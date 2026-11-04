@@ -102,11 +102,14 @@ def grouped_document() -> Document:
 
 
 def _analyze(ctx: Context) -> QDialog:
-    return AnalyzeDialog(grouped_document(), "t", recent=["descriptive_statistics"])
+    dialog = AnalyzeDialog(grouped_document(), "t", recent=["descriptive_statistics"])
+    dialog.set_analysis_type("descriptive_statistics")
+    return dialog
 
 
 def _analyze_advanced(ctx: Context) -> QDialog:
     dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.set_analysis_type("descriptive_statistics")
     form = dialog.forms["descriptive_statistics"]
     assert form.advanced is not None
     form.advanced.set_expanded(True)
@@ -115,6 +118,7 @@ def _analyze_advanced(ctx: Context) -> QDialog:
 
 def _analyze_nothing_ticked(ctx: Context) -> QDialog:
     dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.set_analysis_type("descriptive_statistics")
     dialog.deselect_all_button.click()
     return dialog
 
@@ -131,6 +135,21 @@ def _analyze_anova_dunnett(ctx: Context) -> QDialog:
     combo = dialog.forms["one_way_anova"].fields["posthoc"]
     assert isinstance(combo, QComboBox)
     combo.setCurrentIndex(combo.findData("dunnett"))
+    return dialog
+
+
+def _analyze_fit(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.set_analysis_type("hill_4pl")
+    return dialog
+
+
+def _analyze_fit_advanced(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.set_analysis_type("hill_4pl")
+    form = dialog.forms["hill_4pl"]
+    assert form.advanced is not None
+    form.advanced.set_expanded(True)
     return dialog
 
 
@@ -178,6 +197,8 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "analyze_nothing_ticked": _analyze_nothing_ticked,
     "analyze_t_test": _analyze_t_test,
     "analyze_anova_dunnett": _analyze_anova_dunnett,
+    "analyze_fit": _analyze_fit,
+    "analyze_fit_advanced": _analyze_fit_advanced,
     "constants": _constants,
     "constant_editor": _constant_editor,
     "settings": _settings,

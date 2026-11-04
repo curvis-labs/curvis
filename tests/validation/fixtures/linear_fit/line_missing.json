@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "analysis": "linear_fit",
+  "case": "line_missing",
+  "description": "Missing X and Y values, unequal replicates per row.",
+  "generated_by": {
+    "script": "validation/r/scripts/linear_fit.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [1, 2, "NaN", 4, 5, 6, 7, 8],
+    "y": [
+      [3.1000000000000001, 4.9000000000000004, 6, "NaN", 10.800000000000001, 13.199999999999999, 14.9, 17.100000000000001],
+      [2.7999999999999998, "NaN", 7.0999999999999996, 9.1999999999999993, 11.1, "NaN", 15.300000000000001, 16.800000000000001]
+    ],
+    "degree": 1,
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [1, 4.5, 8]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [11],
+    "df": [9],
+    "coefficients": [0.95989445910289994, 2.0118733509234836],
+    "se": [0.12646143140059071, 0.022949921395684827],
+    "ci_lower": [0.67381882624233991, 1.9599570218525795],
+    "ci_upper": [1.24597009196346, 2.0637896799943878],
+    "r_squared": [0.99883024389045527],
+    "sy_x": [0.19051073942231972],
+    "band_fit": [2.9717678100263836, 10.013324538258576, 17.054881266490767],
+    "band_lower": [2.7307873622840551, 9.8816593828584143, 16.848399237994663],
+    "band_upper": [3.2127482577687121, 10.144989693658738, 17.261363294986872]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "coefficients": "parameter",
+    "se": "parameter",
+    "ci_lower": "ci",
+    "ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "statistic",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

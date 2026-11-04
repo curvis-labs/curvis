@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "analysis": "nist_nls",
+  "case": "mgh10_start2",
+  "description": "NIST StRD nonlinear regression dataset MGH10 from starting values 2, certified values.",
+  "generated_by": {
+    "script": "validation/r/scripts/nist_strd.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0"
+    }
+  },
+  "inputs": {
+    "dataset": "MGH10",
+    "x": [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125],
+    "y": [34780, 28610, 23650, 19630, 16370, 13720, 11540, 9744, 8261, 7030, 6005, 5147, 4427, 3820, 3307, 2872],
+    "start": [0.02, 4000, 250],
+    "start_number": 2
+  },
+  "expected": {
+    "parameters": [0.0056096364709999997, 6181.3463462999998, 345.22363461999998],
+    "se": [0.00015687892471, 23.309021107, 0.78486103508000005],
+    "rss": 87.945855171000005,
+    "sy_x": 2.6009740065,
+    "df": 13
+  },
+  "kinds": {
+    "parameters": "parameter",
+    "se": "parameter",
+    "rss": "statistic",
+    "sy_x": "statistic",
+    "df": "exact"
+  }
+}

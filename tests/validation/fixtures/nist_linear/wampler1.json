@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "analysis": "nist_linear",
+  "case": "wampler1",
+  "description": "NIST StRD linear regression dataset Wampler1, degree 5, certified values. Exact fit: the certified SDs are 0 and are not compared.",
+  "generated_by": {
+    "script": "validation/r/scripts/nist_strd.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0"
+    }
+  },
+  "inputs": {
+    "dataset": "Wampler1",
+    "x": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+    "y": [1, 6, 63, 364, 1365, 3906, 9331, 19608, 37449, 66430, 111111, 177156, 271453, 402234, 579195, 813616, 1118481, 1508598, 2000719, 2613660, 3368421],
+    "degree": 5
+  },
+  "expected": {
+    "coefficients": [1, 1, 1, 1, 1, 1],
+    "r_squared": [1]
+  },
+  "kinds": {
+    "coefficients": "parameter",
+    "r_squared": "statistic"
+  }
+}

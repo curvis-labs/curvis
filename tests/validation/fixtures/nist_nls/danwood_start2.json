@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "analysis": "nist_nls",
+  "case": "danwood_start2",
+  "description": "NIST StRD nonlinear regression dataset DanWood from starting values 2, certified values.",
+  "generated_by": {
+    "script": "validation/r/scripts/nist_strd.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0"
+    }
+  },
+  "inputs": {
+    "dataset": "DanWood",
+    "x": [1.3089999999999999, 1.4710000000000001, 1.49, 1.5649999999999999, 1.611, 1.6799999999999999],
+    "y": [2.1379999999999999, 3.4209999999999998, 3.597, 4.3399999999999999, 4.8819999999999997, 5.6600000000000001],
+    "start": [0.69999999999999996, 4],
+    "start_number": 2
+  },
+  "expected": {
+    "parameters": [0.76886226176000005, 3.8604055870999998],
+    "se": [0.018281973859999998, 0.051726610913000001],
+    "rss": 0.0043173084083000003,
+    "sy_x": 0.032853114039,
+    "df": 4
+  },
+  "kinds": {
+    "parameters": "parameter",
+    "se": "parameter",
+    "rss": "statistic",
+    "sy_x": "statistic",
+    "df": "exact"
+  }
+}
