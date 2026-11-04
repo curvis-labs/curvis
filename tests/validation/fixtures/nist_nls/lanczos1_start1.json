@@ -2,7 +2,7 @@
   "schema_version": 1,
   "analysis": "nist_nls",
   "case": "lanczos1_start1",
-  "description": "NIST StRD nonlinear regression dataset Lanczos1 from starting values 1, certified values.",
+  "description": "NIST StRD nonlinear regression dataset Lanczos1 from starting values 1, certified values. Residuals at rounding level: the certified SDs, RSS and residual SD are not compared.",
   "generated_by": {
     "script": "validation/r/scripts/nist_strd.R",
     "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
@@ -20,16 +20,10 @@
   },
   "expected": {
     "parameters": [0.095100000027000003, 1.0000000001, 0.86070000013000003, 3.0000000002, 1.5575999998000001, 5.0000000001],
-    "se": [5.3347304234000002e-11, 2.7473038179000001e-10, 1.3576062225e-10, 3.3308253069e-10, 1.8815731448e-10, 1.1057500538e-10],
-    "rss": 1.4307867721e-25,
-    "sy_x": 8.9156129348999996e-14,
     "df": 18
   },
   "kinds": {
     "parameters": "parameter",
-    "se": "parameter",
-    "rss": "statistic",
-    "sy_x": "statistic",
     "df": "exact"
   }
 }
