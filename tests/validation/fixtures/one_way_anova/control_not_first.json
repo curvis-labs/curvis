@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "analysis": "one_way_anova",
+  "case": "control_not_first",
+  "description": "Dunnett's control is the third group.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [18.56554983467414, 21.253824680599106, 24.07603865458713, 19.691636817971013, 21.163014834678108],
+      [23.838584878251286, 19.86882132951418, 22.755016310100959, 22.817130138868951, 23.822059809866442, 27.300076115951647],
+      [21.289527245372632, 18.50642921123924, 18.239914959590479, 21.090890126214212, 20.669989596020972],
+      [23.933732916351438, 23.87751452911364, 27.093745886410492, 28.305598773546247, 25.662961363549314, 28.643323179362646, 27.194317641101204]
+    ],
+    "control": 2
+  },
+  "expected": {
+    "n": [5, 6, 5, 7],
+    "mean": [20.950012964501898, 23.400281430425579, 19.959350227687509, 26.387313469919285],
+    "df_between": 3,
+    "df_within": 19,
+    "ss_between": 148.4996667136015,
+    "ss_within": 77.370665276033591,
+    "ms_between": 49.499888904533833,
+    "ms_within": 4.0721402776859783,
+    "f": 12.155742565102027,
+    "p_value": 0.00011403714042390562
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "df_between": "exact",
+    "df_within": "exact",
+    "ss_between": "statistic",
+    "ss_within": "statistic",
+    "ms_between": "statistic",
+    "ms_within": "statistic",
+    "f": "statistic",
+    "p_value": "p_value"
+  }
+}

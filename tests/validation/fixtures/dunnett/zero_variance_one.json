@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "dunnett",
+  "case": "zero_variance_one",
+  "description": "One group is constant, the others are not.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "multcomp": "1.4.32",
+      "mvtnorm": "1.4.2",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [4, 4, 4, 4],
+      [5.0999999999999996, 6.2999999999999998, 5.7999999999999998, 6.5999999999999996],
+      [3.8999999999999999, 4.7999999999999998, 5.2000000000000002, 4.4000000000000004]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group": [1, 2],
+    "difference": [1.9499999999999993, 0.57500000000000018],
+    "se": [0.35099066147754482, 0.35099066147754482],
+    "t": [5.5557033676941678, 1.6382202238072556],
+    "p_value": [0.00066121178605213764, 0.22747354690547469],
+    "ci_lower": [1.0325334391753069, -0.34246656082469218],
+    "ci_upper": [2.8674665608246919, 1.4924665608246925]
+  },
+  "kinds": {
+    "group": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "one_way_anova",
+  "case": "missing",
+  "description": "Missing values in every group.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [5.2000000000000002, "NaN", 6.0999999999999996, 5.7999999999999998, 4.9000000000000004, "NaN"],
+      ["NaN", 7, 6.4000000000000004, 7.7000000000000002, 6.9000000000000004, 7.2000000000000002],
+      [5.5, 5.9000000000000004, "NaN", "NaN", 6.2999999999999998, 5]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [4, 5, 4],
+    "mean": [5.5, 7.04, 5.6749999999999998],
+    "df_between": 2,
+    "df_within": 10,
+    "ss_between": 6.5528076923076934,
+    "ss_within": 2.7194999999999987,
+    "ms_between": 3.2764038461538467,
+    "ms_within": 0.27194999999999986,
+    "f": 12.047817047817055,
+    "p_value": 0.0021702318939617804
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "df_between": "exact",
+    "df_within": "exact",
+    "ss_between": "statistic",
+    "ss_within": "statistic",
+    "ms_between": "statistic",
+    "ms_within": "statistic",
+    "f": "statistic",
+    "p_value": "p_value"
+  }
+}

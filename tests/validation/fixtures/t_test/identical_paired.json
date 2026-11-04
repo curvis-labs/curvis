@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "identical_paired",
+  "description": "Both groups hold the same values: every difference is 0, so the paired t is not defined (paired)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [3.2000000000000002, 4.7999999999999998, 5.0999999999999996, 6.2999999999999998, 2.8999999999999999],
+    "b": [3.2000000000000002, 4.7999999999999998, 5.0999999999999996, 6.2999999999999998, 2.8999999999999999],
+    "paired": true,
+    "welch": false
+  },
+  "expected": {
+    "n_pairs": [5],
+    "mean_a": [4.46],
+    "mean_b": [4.46],
+    "difference": [0],
+    "se": ["NaN"],
+    "t": ["NaN"],
+    "df": [4],
+    "p_value": ["NaN"],
+    "ci_lower": ["NaN"],
+    "ci_upper": ["NaN"]
+  },
+  "kinds": {
+    "n_pairs": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

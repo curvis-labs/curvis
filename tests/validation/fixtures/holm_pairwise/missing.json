@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "holm_pairwise",
+  "case": "missing",
+  "description": "Missing values in every group.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [5.2000000000000002, "NaN", 6.0999999999999996, 5.7999999999999998, 4.9000000000000004, "NaN"],
+      ["NaN", 7, 6.4000000000000004, 7.7000000000000002, 6.9000000000000004, 7.2000000000000002],
+      [5.5, 5.9000000000000004, "NaN", "NaN", 6.2999999999999998, 5]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [1.54, 0.17499999999999982, -1.3650000000000002],
+    "se": [0.34982495622811122, 0.36874788134984576, 0.34982495622811122],
+    "t": [4.4022016513762052, 0.47457899787624913, -3.9019514637198189],
+    "df": 10,
+    "p_unadjusted": [0.0013304944058801177, 0.64528079427821883, 0.0029516306811738818],
+    "p_value": [0.0039914832176403533, 0.64528079427821883, 0.0059032613623477637]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_unadjusted": "p_value",
+    "p_value": "p_value"
+  }
+}

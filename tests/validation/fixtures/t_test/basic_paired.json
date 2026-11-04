@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "basic_paired",
+  "description": "Ten normal values per group, different means and SDs. (paired)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [3.9843614381209242, 5.0915500459227756, 1.1087879858110656, 6.0376489836441589, 5.1405679013179801, 5.1486387022877125, 3.675028027322627, 3.9820893806680511, 4.1711647620904335, 4.7594000882207803],
+    "b": [5.0794505112153132, 6.8184830084358454, 8.4728048528102722, 9.5111951477564283, 7.123915156736607, 6.6321794448866198, 5.6361960683892551, 6.7339042864690937, 7.887705332072243, 6.9396860627250039],
+    "paired": true,
+    "welch": false
+  },
+  "expected": {
+    "n_pairs": [10],
+    "mean_a": [4.3099237315406507],
+    "mean_b": [7.0835519871496686],
+    "difference": [2.773628255609017],
+    "se": [0.57411955272712567],
+    "t": [4.8310987536202239],
+    "df": [9],
+    "p_value": [0.00093247931170518375],
+    "ci_lower": [1.4748795971048483],
+    "ci_upper": [4.0723769141131863]
+  },
+  "kinds": {
+    "n_pairs": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

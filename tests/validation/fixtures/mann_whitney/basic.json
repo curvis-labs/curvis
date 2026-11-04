@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "analysis": "mann_whitney",
+  "case": "basic",
+  "description": "Eight against ten values, no ties. (Wilcoxon rank sum exact test)",
+  "generated_by": {
+    "script": "validation/r/scripts/mann_whitney.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [7.9687228762418485, 10.183100091845551, 2.2175759716221313, 12.075297967288318, 10.28113580263596, 10.297277404575425, 7.350056054645254, 7.9641787613361021],
+    "b": [10.342329524180867, 11.518800176441561, 10.754945012461459, 12.687203342706495, 14.525338725344747, 15.679105719729364, 13.026572396374007, 12.480199383207355, 11.373551187099173, 12.593226984965659]
+  },
+  "expected": {
+    "n_a": 8,
+    "n_b": 10,
+    "u": 4,
+    "p_value": 0.00054847113670643082,
+    "exact": 1,
+    "median_a": 9.0759114840437007,
+    "median_b": 12.536713184086507
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "u": "exact",
+    "p_value": "p_value",
+    "exact": "exact",
+    "median_a": "statistic",
+    "median_b": "statistic"
+  }
+}

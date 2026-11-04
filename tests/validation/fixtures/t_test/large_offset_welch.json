@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "large_offset_welch",
+  "description": "Small spread on a large offset. (unpaired, Welch's correction)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [1000000000.11, 1000000000.25, 1000000000.3200001, 1000000000.1799999, 1000000000.29],
+    "b": [1000000000.41, 1000000000.36, 1000000000.52, 1000000000.47, 1000000000.39],
+    "paired": false,
+    "welch": true
+  },
+  "expected": {
+    "n_a": [5],
+    "n_b": [5],
+    "mean_a": [1000000000.23],
+    "mean_b": [1000000000.4299999],
+    "difference": [0.19999992847442627],
+    "se": [0.047749348690936111],
+    "t": [4.1885373090416769],
+    "df": [7.449164821072463],
+    "p_value": [0.0035657139561951425],
+    "ci_lower": [0.088456241739688427],
+    "ci_upper": [0.31154361520916413]
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

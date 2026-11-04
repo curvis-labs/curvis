@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "identical_student",
+  "description": "Both groups hold the same values: the difference is 0, P = 1. (unpaired, Student)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [3.2000000000000002, 4.7999999999999998, 5.0999999999999996, 6.2999999999999998, 2.8999999999999999],
+    "b": [3.2000000000000002, 4.7999999999999998, 5.0999999999999996, 6.2999999999999998, 2.8999999999999999],
+    "paired": false,
+    "welch": false
+  },
+  "expected": {
+    "n_a": [5],
+    "n_b": [5],
+    "mean_a": [4.46],
+    "mean_b": [4.46],
+    "difference": [0],
+    "se": [0.89061776312849272],
+    "t": [0],
+    "df": [8],
+    "p_value": [1],
+    "ci_lower": [-2.0537682446605889],
+    "ci_upper": [2.0537682446605889]
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

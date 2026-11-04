@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "analysis": "tukey_hsd",
+  "case": "n_small",
+  "description": "Three groups of n = 2 (df_within = 3).",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1.1000000000000001, 2.2999999999999998],
+      [3.5, 4.0999999999999996],
+      [2, 6.2000000000000002]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [2.0999999999999996, 2.3999999999999995, 0.29999999999999982],
+    "q": [1.6499158227686106, 1.8856180831641265, 0.23570226039551573],
+    "p_value": [0.54502794424532564, 0.47137839677007271, 0.98487990153209615],
+    "ci_lower": [-5.4216908528713113, -5.1216908528713114, -7.2216908528713111],
+    "ci_upper": [9.6216908528713105, 9.9216908528713113, 7.8216908528713107]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "q": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

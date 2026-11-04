@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "constant_both_paired",
+  "description": "Each group is constant (different values): no variation at all. (paired)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [2, 2, 2, 2],
+    "b": [3, 3, 3, 3],
+    "paired": true,
+    "welch": false
+  },
+  "expected": {
+    "n_pairs": [4],
+    "mean_a": [2],
+    "mean_b": [3],
+    "difference": [1],
+    "se": ["NaN"],
+    "t": ["NaN"],
+    "df": [3],
+    "p_value": ["NaN"],
+    "ci_lower": ["NaN"],
+    "ci_upper": ["NaN"]
+  },
+  "kinds": {
+    "n_pairs": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

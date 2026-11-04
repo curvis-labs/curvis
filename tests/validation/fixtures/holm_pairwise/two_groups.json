@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "analysis": "holm_pairwise",
+  "case": "two_groups",
+  "description": "Two groups: F = t^2 of Student's t test.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [-0.62645381074233242, 0.18364332422208224, -0.83562861241004716, 1.5952808021377916, 0.32950777181536051, -0.82046838411801526, 0.48742905242848528, 0.73832470512921733],
+      [1.5757813516534922, 0.69461161284364392, 2.511781168450848, 1.389843236411431, 0.37875941945819624, -1.2146998871774999, 2.1249309181431082, 0.9550663909847692, 0.98380973690105389]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0],
+    "group_j": [1],
+    "difference": [0.91297719368318708],
+    "se": [0.47772311242883236],
+    "t": [1.9111011586637345],
+    "df": 15,
+    "p_unadjusted": [0.07529323203067706],
+    "p_value": [0.07529323203067706]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_unadjusted": "p_value",
+    "p_value": "p_value"
+  }
+}

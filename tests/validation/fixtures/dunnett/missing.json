@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "dunnett",
+  "case": "missing",
+  "description": "Missing values in every group.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "multcomp": "1.4.32",
+      "mvtnorm": "1.4.2",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [5.2000000000000002, "NaN", 6.0999999999999996, 5.7999999999999998, 4.9000000000000004, "NaN"],
+      ["NaN", 7, 6.4000000000000004, 7.7000000000000002, 6.9000000000000004, 7.2000000000000002],
+      [5.5, 5.9000000000000004, "NaN", "NaN", 6.2999999999999998, 5]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group": [1, 2],
+    "difference": [1.54, 0.17499999999999982],
+    "se": [0.34982495622811122, 0.36874788134984576],
+    "t": [4.4022016513762052, 0.47457899787624913],
+    "p_value": [0.0024641935479593727, 0.85004552470454819],
+    "ci_lower": [0.64330733885515778, -0.77019705679175665],
+    "ci_upper": [2.4366926611448423, 1.1201970567917563]
+  },
+  "kinds": {
+    "group": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

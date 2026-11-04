@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "one_way_anova",
+  "case": "zero_variance_one",
+  "description": "One group is constant, the others are not.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [4, 4, 4, 4],
+      [5.0999999999999996, 6.2999999999999998, 5.7999999999999998, 6.5999999999999996],
+      [3.8999999999999999, 4.7999999999999998, 5.2000000000000002, 4.4000000000000004]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [4, 4, 4],
+    "mean": [4, 5.9499999999999993, 4.5750000000000002],
+    "df_between": 2,
+    "df_within": 9,
+    "ss_between": 8.0316666666666592,
+    "ss_within": 2.2175000000000002,
+    "ms_between": 4.0158333333333296,
+    "ms_within": 0.24638888888888891,
+    "f": 16.298759864712498,
+    "p_value": 0.0010192666832956241
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "df_between": "exact",
+    "df_within": "exact",
+    "ss_between": "statistic",
+    "ss_within": "statistic",
+    "ms_between": "statistic",
+    "ms_within": "statistic",
+    "f": "statistic",
+    "p_value": "p_value"
+  }
+}

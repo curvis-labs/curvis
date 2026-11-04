@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "n_one_student",
+  "description": "One value in group A: Student's test still has df = n_b - 1; Welch's needs 2. (unpaired, Student)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [7.5],
+    "b": [5.0999999999999996, 6.2000000000000002, 5.7999999999999998, 6.9000000000000004, 6],
+    "paired": false,
+    "welch": false
+  },
+  "expected": {
+    "n_a": [1],
+    "n_b": [5],
+    "mean_a": [7.5],
+    "mean_b": [6],
+    "difference": [-1.5],
+    "se": [0.71414284285428531],
+    "t": [-2.1004201260420139],
+    "df": [4],
+    "p_value": [0.10360414045532494],
+    "ci_lower": [-3.4827784004548175],
+    "ci_upper": [0.48277840045481735]
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

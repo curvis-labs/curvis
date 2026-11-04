@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "analysis": "mann_whitney",
+  "case": "missing",
+  "description": "Missing values in both groups. (Wilcoxon rank sum exact test)",
+  "generated_by": {
+    "script": "validation/r/scripts/mann_whitney.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [3.1000000000000001, "NaN", 4.4000000000000004, 2.7999999999999998, "NaN", 5, 3.8999999999999999],
+    "b": [4.9000000000000004, 5.5999999999999996, "NaN", 6.0999999999999996, 4.2000000000000002, 5.2999999999999998, "NaN", 6.7999999999999998]
+  },
+  "expected": {
+    "n_a": 5,
+    "n_b": 6,
+    "u": 3,
+    "p_value": 0.030303030303030304,
+    "exact": 1,
+    "median_a": 3.8999999999999999,
+    "median_b": 5.4499999999999993
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "u": "exact",
+    "p_value": "p_value",
+    "exact": "exact",
+    "median_a": "statistic",
+    "median_b": "statistic"
+  }
+}

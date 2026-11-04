@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "dunnett",
+  "case": "large_offset",
+  "description": "Small spread on a large offset.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "multcomp": "1.4.32",
+      "mvtnorm": "1.4.2",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1000000.12, 1000000.3100000001, 1000000.25, 1000000.1800000001],
+      [1000000.42, 1000000.37, 1000000.55, 1000000.49],
+      [1000000.2, 1000000.33, 1000000.29, 1000000.41]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group": [1, 2],
+    "difference": [0.24249999993480742, 0.092499999911524355],
+    "se": [0.058713049858850459, 0.058713049858850459],
+    "t": [4.1302572514592812, 1.5754589505041836],
+    "p_value": [0.0047199938061883249, 0.24906043753106458],
+    "ci_lower": [0.08902793973022427, -0.060972060293058794],
+    "ci_upper": [0.39597206013939057, 0.2459720601161075]
+  },
+  "kinds": {
+    "group": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

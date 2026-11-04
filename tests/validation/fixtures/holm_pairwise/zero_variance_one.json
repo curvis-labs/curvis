@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "holm_pairwise",
+  "case": "zero_variance_one",
+  "description": "One group is constant, the others are not.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [4, 4, 4, 4],
+      [5.0999999999999996, 6.2999999999999998, 5.7999999999999998, 6.5999999999999996],
+      [3.8999999999999999, 4.7999999999999998, 5.2000000000000002, 4.4000000000000004]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [1.9499999999999993, 0.57500000000000018, -1.3749999999999991],
+    "se": [0.35099066147754482, 0.35099066147754482, 0.35099066147754482],
+    "t": [5.5557033676941678, 1.6382202238072556, -3.917483143886912],
+    "df": 9,
+    "p_unadjusted": [0.00035382343254109866, 0.13579992400268562, 0.0035244251878705328],
+    "p_value": [0.0010614702976232959, 0.13579992400268562, 0.0070488503757410656]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_unadjusted": "p_value",
+    "p_value": "p_value"
+  }
+}

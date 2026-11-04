@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "analysis": "tukey_hsd",
+  "case": "constant_all",
+  "description": "Every group is constant (different values): no variation within groups.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1, 1, 1],
+      [2, 2, 2],
+      [4, 4, 4]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [1, 3, 2],
+    "q": ["NaN", "NaN", "NaN"],
+    "p_value": ["NaN", "NaN", "NaN"],
+    "ci_lower": ["NaN", "NaN", "NaN"],
+    "ci_upper": ["NaN", "NaN", "NaN"]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "q": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

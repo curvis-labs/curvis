@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "n_small_welch",
+  "description": "n = 2 per group. (unpaired, Welch's correction)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [1.2, 2.8999999999999999],
+    "b": [3.1000000000000001, 4.5999999999999996],
+    "paired": false,
+    "welch": true
+  },
+  "expected": {
+    "n_a": [2],
+    "n_b": [2],
+    "mean_a": [2.0499999999999998],
+    "mean_b": [3.8499999999999996],
+    "difference": [1.7999999999999998],
+    "se": [1.1335784048754634],
+    "t": [1.587891929008431],
+    "df": [1.9694661040955384],
+    "p_value": [0.25511623231314889],
+    "ci_lower": [-3.1505791802247942],
+    "ci_upper": [6.7505791802247934]
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

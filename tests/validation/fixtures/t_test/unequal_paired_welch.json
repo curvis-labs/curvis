@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "unequal_paired_welch",
+  "description": "Paired data with spread differences. (unpaired, Welch's correction)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [120, 135, 128, 141, 117, 133, 125, 139, 130, 122, 136, 127],
+    "b": [115, 131, 129, 132, 116, 125, 124, 130, 126, 121, 128, 120],
+    "paired": false,
+    "welch": true
+  },
+  "expected": {
+    "n_a": [12],
+    "n_b": [12],
+    "mean_a": [129.41666666666666],
+    "mean_b": [124.75],
+    "difference": [-4.6666666666666572],
+    "se": [2.7485074002616274],
+    "t": [-1.6978912504373982],
+    "df": [20.385053897473203],
+    "p_value": [0.10474296752929423],
+    "ci_lower": [-10.39301797649666],
+    "ci_upper": [1.0596846431633458]
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}
