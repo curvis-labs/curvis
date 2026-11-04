@@ -7,7 +7,7 @@ Widgets must only use palette roles, never fixed colours; every colour is set he
 
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, QRectF, QSize, Qt
+from PySide6.QtCore import QObject, QPointF, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QApplication,
@@ -265,6 +265,15 @@ class CurvisStyle(QProxyStyle):
             return
         if element == _E.PE_PanelButtonTool and _in_toolbar(widget):
             self._draw_tool_panel(option, painter)
+            return
+        if element == _E.PE_IndicatorToolBarSeparator:
+            # Fusion's separator is a shade of the window colour: invisible on dark.
+            rect = QRectF(option.rect)
+            x = rect.center().x()
+            painter.save()
+            painter.setPen(QPen(control_border(option.palette), 1))
+            painter.drawLine(QPointF(x, rect.top() + 5), QPointF(x, rect.bottom() - 5))
+            painter.restore()
             return
         super().drawPrimitive(element, option, painter, widget)
         if element in _OUTLINED or element == _E.PE_IndicatorRadioButton:
