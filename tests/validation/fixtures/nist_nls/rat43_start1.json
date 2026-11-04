@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "analysis": "nist_nls",
+  "case": "rat43_start1",
+  "description": "NIST StRD nonlinear regression dataset Rat43 from starting values 1, certified values.",
+  "generated_by": {
+    "script": "validation/r/scripts/nist_strd.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0"
+    }
+  },
+  "inputs": {
+    "dataset": "Rat43",
+    "x": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    "y": [16.079999999999998, 33.829999999999998, 65.799999999999997, 97.200000000000003, 191.55000000000001, 326.19999999999999, 386.87, 520.52999999999997, 590.02999999999997, 651.91999999999996, 724.92999999999995, 699.55999999999995, 689.96000000000004, 637.55999999999995, 717.40999999999997],
+    "start": [100, 10, 1, 1],
+    "start_number": 1
+  },
+  "expected": {
+    "parameters": [699.64151270000002, 5.2771253025, 0.75962938328999996, 1.2792483858999999],
+    "se": [16.302297816999999, 2.0828735829, 0.19566123451, 0.68761936385],
+    "rss": 8786.4049080000004,
+    "sy_x": 28.262414662000001,
+    "df": 11
+  },
+  "kinds": {
+    "parameters": "parameter",
+    "se": "parameter",
+    "rss": "statistic",
+    "sy_x": "statistic",
+    "df": "exact"
+  }
+}

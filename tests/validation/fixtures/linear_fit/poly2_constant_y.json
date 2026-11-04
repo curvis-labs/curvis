@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "linear_fit",
+  "case": "poly2_constant_y",
+  "description": "Every Y is -1.5: the curve is flat and exact.",
+  "generated_by": {
+    "script": "validation/r/scripts/linear_fit.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10],
+    "y": [
+      [-1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5, -1.5]
+    ],
+    "degree": 2,
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 5, 10]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [21],
+    "df": [18],
+    "coefficients": [-1.5, 0, 0],
+    "se": [0, 0, 0],
+    "ci_lower": [-1.5, 0, 0],
+    "ci_upper": [-1.5, 0, 0],
+    "r_squared": ["NaN"],
+    "sy_x": [0],
+    "band_fit": [-1.5, -1.5, -1.5],
+    "band_lower": [-1.5, -1.5, -1.5],
+    "band_upper": [-1.5, -1.5, -1.5]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "coefficients": "parameter",
+    "se": "parameter",
+    "ci_lower": "ci",
+    "ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "statistic",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

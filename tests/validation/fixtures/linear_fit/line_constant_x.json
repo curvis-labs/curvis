@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "linear_fit",
+  "case": "line_constant_x",
+  "description": "Every X is 3: no line can be fitted.",
+  "generated_by": {
+    "script": "validation/r/scripts/linear_fit.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [3, 3, 3, 3, 3],
+    "y": [
+      [1.2, 2.2999999999999998, 1.8999999999999999, 2.7999999999999998, 2]
+    ],
+    "degree": 1,
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [3]
+  },
+  "expected": {
+    "fit_ok": [false],
+    "n": [5],
+    "df": ["NaN"],
+    "coefficients": ["NaN", "NaN"],
+    "se": ["NaN", "NaN"],
+    "ci_lower": ["NaN", "NaN"],
+    "ci_upper": ["NaN", "NaN"],
+    "r_squared": ["NaN"],
+    "sy_x": ["NaN"],
+    "band_fit": ["NaN"],
+    "band_lower": ["NaN"],
+    "band_upper": ["NaN"]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "coefficients": "parameter",
+    "se": "parameter",
+    "ci_lower": "ci",
+    "ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "statistic",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

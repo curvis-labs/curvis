@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "analysis": "nist_linear",
+  "case": "wampler5",
+  "description": "NIST StRD linear regression dataset Wampler5, degree 5, certified values.",
+  "generated_by": {
+    "script": "validation/r/scripts/nist_strd.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0"
+    }
+  },
+  "inputs": {
+    "dataset": "Wampler5",
+    "x": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+    "y": [7590001, -20479994, 20480063, -20479636, 25231365, -20476094, 20489331, -20460392, 18417449, -20413570, 20591111, -20302844, 18651453, -20077766, 21059195, -19666384, 26348481, -18971402, 22480719, -17866340, 10958421],
+    "degree": 5
+  },
+  "expected": {
+    "coefficients": [1, 1, 1, 1, 1, 1],
+    "se": [21523262.467817001, 23635517.346968099, 7793435.2433158299, 1014755.0755034999, 56456.651217075203, 1123.2485467931201],
+    "sy_x": [23601450.2379268],
+    "r_squared": [0.0022466892157494002]
+  },
+  "kinds": {
+    "coefficients": "parameter",
+    "se": "parameter",
+    "sy_x": "statistic",
+    "r_squared": "statistic"
+  }
+}

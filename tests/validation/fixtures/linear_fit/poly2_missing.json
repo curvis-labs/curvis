@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "linear_fit",
+  "case": "poly2_missing",
+  "description": "Quadratic with missing values.",
+  "generated_by": {
+    "script": "validation/r/scripts/linear_fit.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [0, 1, 2, 3, "NaN", 5, 6, 7],
+    "y": [
+      [1.1000000000000001, "NaN", 5.2000000000000002, 10.1, 16.800000000000001, 26.300000000000001, "NaN", 50.200000000000003]
+    ],
+    "degree": 2,
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 3.5, 7]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [5],
+    "df": [2],
+    "coefficients": [1.0933149280220871, 0.043610727667124642, 0.9964602642476833],
+    "se": [0.086590229714844605, 0.056810815009750569, 0.0076527483694799501],
+    "ci_lower": [0.72074723976987798, -0.20082648061387035, 0.96353314558565462],
+    "ci_upper": [1.4658826162742962, 0.28804793594811962, 1.029387382909712],
+    "r_squared": [0.99998992954767696],
+    "sy_x": [0.090202340525317851],
+    "band_fit": [1.0933149280220871, 13.452590711891144, 50.22514296982844],
+    "band_lower": [0.72074723976987798, 13.19296990379733, 49.855376281263311],
+    "band_upper": [1.4658826162742962, 13.712211519984958, 50.594909658393568]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "coefficients": "parameter",
+    "se": "parameter",
+    "ci_lower": "ci",
+    "ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "statistic",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "analysis": "nist_nls",
+  "case": "misra1c_start1",
+  "description": "NIST StRD nonlinear regression dataset Misra1c from starting values 1, certified values.",
+  "generated_by": {
+    "script": "validation/r/scripts/nist_strd.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0"
+    }
+  },
+  "inputs": {
+    "dataset": "Misra1c",
+    "x": [77.599999999999994, 114.90000000000001, 141.09999999999999, 190.80000000000001, 239.90000000000001, 289, 332.80000000000001, 378.39999999999998, 434.80000000000001, 477.30000000000001, 536.79999999999995, 593.10000000000002, 689.10000000000002, 760],
+    "y": [10.07, 14.73, 17.940000000000001, 23.93, 29.609999999999999, 35.18, 40.020000000000003, 44.82, 50.759999999999998, 55.049999999999997, 61.009999999999998, 66.400000000000006, 75.469999999999999, 81.780000000000001],
+    "start": [500, 0.0001],
+    "start_number": 1
+  },
+  "expected": {
+    "parameters": [636.42725809000001, 0.00020813627256],
+    "se": [4.6638326572000004, 1.7728423155e-06],
+    "rss": 0.040966836971000002,
+    "sy_x": 0.058428615257000001,
+    "df": 12
+  },
+  "kinds": {
+    "parameters": "parameter",
+    "se": "parameter",
+    "rss": "statistic",
+    "sy_x": "statistic",
+    "df": "exact"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "linear_fit",
+  "case": "line_constant_y",
+  "description": "Every Y is 4.2: the line is flat and exact.",
+  "generated_by": {
+    "script": "validation/r/scripts/linear_fit.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "y": [
+      [4.2000000000000002, 4.2000000000000002, 4.2000000000000002, 4.2000000000000002, 4.2000000000000002, 4.2000000000000002, 4.2000000000000002, 4.2000000000000002, 4.2000000000000002, 4.2000000000000002]
+    ],
+    "degree": 1,
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 5, 10]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [10],
+    "df": [8],
+    "coefficients": [4.2000000000000002, 0],
+    "se": [0, 0],
+    "ci_lower": [4.2000000000000002, 0],
+    "ci_upper": [4.2000000000000002, 0],
+    "r_squared": ["NaN"],
+    "sy_x": [0],
+    "band_fit": [4.2000000000000002, 4.2000000000000002, 4.2000000000000002],
+    "band_lower": [4.2000000000000002, 4.2000000000000002, 4.2000000000000002],
+    "band_upper": [4.2000000000000002, 4.2000000000000002, 4.2000000000000002]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "coefficients": "parameter",
+    "se": "parameter",
+    "ci_lower": "ci",
+    "ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "statistic",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

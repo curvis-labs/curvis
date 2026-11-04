@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "linear_fit",
+  "case": "line_ties",
+  "description": "Repeated X and Y values.",
+  "generated_by": {
+    "script": "validation/r/scripts/linear_fit.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [1, 1, 2, 2, 3, 3, 4, 4],
+    "y": [
+      [2, 3, 3, 3, 5, 4, 6, 6]
+    ],
+    "degree": 1,
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [1, 2.5, 4]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [8],
+    "df": [6],
+    "coefficients": [0.99999999999999856, 1.2000000000000004],
+    "se": [0.44721359549995793, 0.16329931618554519],
+    "ci_lower": [-0.094292246822000769, 0.80042096794172046],
+    "ci_upper": [2.0942922468219978, 1.5995790320582803],
+    "r_squared": [0.90000000000000002],
+    "sy_x": [0.5163977794943222],
+    "band_fit": [2.1999999999999988, 3.9999999999999996, 5.7999999999999998],
+    "band_lower": [1.4524560815495766, 3.5532570609670588, 5.0524560815495771],
+    "band_upper": [2.9475439184504211, 4.4467429390329407, 6.5475439184504225]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "coefficients": "parameter",
+    "se": "parameter",
+    "ci_lower": "ci",
+    "ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "statistic",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}
