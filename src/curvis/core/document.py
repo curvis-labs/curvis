@@ -1,9 +1,10 @@
-"""The document: tables, calculations, analyses, constants and settings of a project, its
-change log and undo stack."""
+"""The document: tables, calculations, analyses, graphs, constants and settings of a
+project, its change log and undo stack."""
 
 from dataclasses import dataclass, field
 
 from curvis.analysis.base import Analysis
+from curvis.charts.spec import ChartSpec
 from curvis.core.calculations import Calculation
 from curvis.core.change_log import ChangeLog
 from curvis.core.commands import Command
@@ -22,6 +23,7 @@ class Document:
     constants: list[ProjectConstant] = field(default_factory=list)
     calculations: list[Calculation] = field(default_factory=list)
     analyses: list[Analysis] = field(default_factory=list)
+    graphs: list[ChartSpec] = field(default_factory=list)
     settings: dict[str, JsonValue] = field(default_factory=dict)
     change_log: ChangeLog = field(default_factory=ChangeLog)
     id: str = field(default_factory=new_id)
@@ -91,3 +93,14 @@ class Document:
     def analyses_of(self, table_id: str) -> list[Analysis]:
         """The analyses whose source is the table ``table_id``, in the order they were made."""
         return [a for a in self.analyses if a.table_id == table_id]
+
+    def graph(self, graph_id: str) -> ChartSpec:
+        """The graph with ``graph_id``; raises ``KeyError`` if there is none."""
+        for graph in self.graphs:
+            if graph.id == graph_id:
+                return graph
+        raise KeyError(graph_id)
+
+    def graphs_of(self, table_id: str) -> list[ChartSpec]:
+        """The graphs of the table ``table_id``, in the order they were made."""
+        return [g for g in self.graphs if g.table_id == table_id]

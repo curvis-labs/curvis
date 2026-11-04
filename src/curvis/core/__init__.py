@@ -46,6 +46,13 @@ from curvis.core.commands import (
 from curvis.core.constants import JsonValue, ProjectConstant
 from curvis.core.dependency_graph import CycleError, DependencyGraph
 from curvis.core.document import Document
+from curvis.core.graph_commands import (
+    SetGraph,
+    add_graph,
+    edit_graph,
+    remove_graph,
+    set_series_visible,
+)
 from curvis.core.undo_stack import UNDO_LIMIT, UndoEvent, UndoStack
 
 __all__ = [
@@ -84,13 +91,18 @@ __all__ = [
     "SetCellBlock",
     "SetCellValue",
     "SetColumnRole",
+    "SetGraph",
     "UndoEvent",
     "UndoStack",
     "UngroupColumns",
     "add_analysis",
     "add_calculation",
+    "add_graph",
     "constant_node",
     "edit_analysis",
     "edit_calculation",
+    "edit_graph",
     "remove_analysis",
+    "remove_graph",
+    "set_series_visible",
 ]

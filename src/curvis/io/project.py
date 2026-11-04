@@ -32,6 +32,7 @@ import pyarrow as pa
 from curvis import __version__
 from curvis.analysis import base as analysis_base
 from curvis.analysis.base import Analysis, params_from_json, params_to_json
+from curvis.charts.spec import ChartSpec, spec_from_json, spec_to_json
 from curvis.core.calculations import CalculatedColumn, Calculation, CalculationKind
 from curvis.core.change_log import ChangeLog, ChangeLogEntry
 from curvis.core.constants import JsonValue, ProjectConstant
@@ -47,7 +48,7 @@ from curvis.data import (
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -138,6 +139,15 @@ def _add_analyses(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+@register_migration(4)
+def _add_graphs(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 5 stores graphs (chart specs)."""
+    document = data.get("document")
+    if isinstance(document, dict):
+        document.setdefault("graphs", [])
+    return data
+
+
 # --- save --------------------------------------------------------------------------------
 
 
@@ -223,6 +233,7 @@ def _project_dict(document: Document, files: list[str]) -> dict[str, Any]:
             ],
             "calculations": [_calculation_dict(c) for c in document.calculations],
             "analyses": [_analysis_dict(a) for a in document.analyses],
+            "graphs": [spec_to_json(g) for g in document.graphs],
             "settings": document.settings,
         },
         "change_log": [
@@ -382,6 +393,11 @@ def _build_document(zf: zipfile.ZipFile, data: dict[str, Any]) -> Document:
         for i, a in enumerate(_list(doc_data.get("analyses"), "analyses"))
     ]
     _check_unique([a.id for a in analyses], "analysis ids")
+    graphs = [
+        _read_graph(g, f"graph {i + 1}", tables)
+        for i, g in enumerate(_list(doc_data.get("graphs"), "graphs"))
+    ]
+    _check_unique([g.id for g in graphs], "graph ids")
     settings: dict[str, JsonValue] = _obj(doc_data.get("settings"), "settings")
     change_log = ChangeLog()
     for i, e in enumerate(_list(data.get("change_log"), "change_log")):
@@ -392,6 +408,7 @@ def _build_document(zf: zipfile.ZipFile, data: dict[str, Any]) -> Document:
         constants=constants,
         calculations=calculations,
         analyses=analyses,
+        graphs=graphs,
         settings=settings,
         change_log=change_log,
         id=_str(doc_data.get("id"), "document id"),
@@ -562,6 +579,16 @@ def _read_analysis(value: Any, where: str, tables: list[Table]) -> Analysis:
         pairing=None if raw_pairing is None else _read_pairing(raw_pairing, where),
         id=_str(obj.get("id"), f"{where} id"),
     )
+
+
+def _read_graph(value: Any, where: str, tables: list[Table]) -> ChartSpec:
+    try:
+        graph = spec_from_json(value)
+    except ValueError as e:
+        raise _ContentError(f"{where}: {e}") from None
+    if not any(t.id == graph.table_id for t in tables):
+        raise _ContentError(f"{where} refers to a table that does not exist")
+    return graph
 
 
 def _read_log_entry(value: Any, where: str) -> ChangeLogEntry:
