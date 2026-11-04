@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=2.5.4",
     "polars>=1.30",
     "pyarrow>=26.0.0",
+    "pyqtgraph>=0.13.7",
     "pyside6>=6.8",
     "scipy>=1.14",
 ]
