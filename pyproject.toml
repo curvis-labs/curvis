@@ -71,6 +71,11 @@ module = [
     "curvis.formula.*",
     "curvis.analysis.*",
     "curvis.io.*",
+    "curvis.charts.spec",
+    "curvis.charts.colors",
+    "curvis.charts.builder",
+    "curvis.charts.data",
+    "curvis.charts.tooltips",
 ]
 strict = true
 
