@@ -1,5 +1,8 @@
 """The main and table toolbars (docs/DESIGN.md, section 7)."""
 
+from collections.abc import Iterator
+
+import pytest
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QColor, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QToolBar, QToolButton
@@ -15,10 +18,24 @@ from curvis.ui.main_window import (
     SELECT_TO_GROUP,
     MainWindow,
 )
-from curvis.ui.theme import dark_palette, light_palette
+from curvis.ui.theme import CurvisStyle, dark_palette, light_palette
 from curvis.ui.toolbar_icons import icon_colors, toolbar_icon
 from curvis.ui.toolbars import MAIN_BUTTONS, TABLE_BUTTONS
 from tests.unit.charts_tables import replicate_table
+
+
+@pytest.fixture(autouse=True)
+def curvis_style(qapp: QApplication) -> Iterator[None]:
+    """The app always runs with CurvisStyle and a Curvis palette (ThemeManager), which
+    size the buttons and draw the Plot arrow; tests must not depend on another test
+    having set them."""
+    old_style, old_palette = qapp.style().name(), qapp.palette()
+    qapp.setStyle(CurvisStyle())
+    qapp.setPalette(light_palette())
+    yield
+    qapp.setStyle(old_style)
+    qapp.setPalette(old_palette)
+
 
 MAIN_IDS = [b.action_id for b in MAIN_BUTTONS if b is not None]
 TABLE_IDS = [b.action_id for b in TABLE_BUTTONS if b is not None]
@@ -232,3 +249,29 @@ def _near(colors: list[QColor], target: QColor) -> bool:
         < 12
         for c in colors
     )
+
+
+def test_plot_arrow_sits_beside_the_text(window: MainWindow) -> None:
+    window.new_document()
+    QApplication.processEvents()
+    button = table_toolbar(window).widgetForAction(window.registry.action("graph.plot"))
+    image = button.grab().toImage()
+    arrow = button.palette().color(button.palette().ColorRole.PlaceholderText)
+    text_end = 6 + 20 + 4 + button.fontMetrics().horizontalAdvance("Plot")
+    marks = [
+        (x, y)
+        for x in range(text_end, image.width())
+        for y in range(image.height())
+        if _near([image.pixelColor(x, y)], arrow)
+    ]
+    assert marks, "no menu arrow in the secondary text colour after the text"
+    xs, ys = [x for x, _ in marks], [y for _, y in marks]
+    assert min(xs) <= text_end + 6  # just after "Plot"
+    assert abs((min(ys) + max(ys)) / 2 - image.height() / 2) <= 2  # vertically centred
+    background = image.pixelColor(1, 1)
+    corner = [
+        image.pixelColor(x, y)
+        for x in range(image.width() - 6, image.width())
+        for y in range(image.height() - 6, image.height())
+    ]
+    assert all(c == background for c in corner)  # not in the corner, as Fusion draws it

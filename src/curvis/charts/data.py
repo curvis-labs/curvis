@@ -163,6 +163,11 @@ class CategoryData:
     plot_box: BoxStats
     """``box`` in plot coordinates (log10 on a log Y axis)."""
     error_bars: ErrorBars
+    err_low: float = 0.0
+    err_high: float = 0.0
+    """How far a bar's error bar reaches below and above its mean. Bars show it only
+    away from zero (above a positive mean, below a negative one), as GraphPad Prism
+    does by default; 0 where there is none."""
 
 
 @dataclass(frozen=True)
@@ -371,9 +376,21 @@ def _categories(inputs: ChartInputs) -> tuple[CategoryData, ...]:
             plot_box = box_stats(np.log10(values[values > 0]))
         else:
             plot_box = box
+        size = error if math.isfinite(error) and math.isfinite(mean) else 0.0
+        err_low, err_high = (size, 0.0) if mean < 0 else (0.0, size)
         out.append(
             CategoryData(
-                s.source, s.name, position, mean, error, n, box, plot_box, style.error_bars
+                s.source,
+                s.name,
+                position,
+                mean,
+                error,
+                n,
+                box,
+                plot_box,
+                style.error_bars,
+                err_low,
+                err_high,
             )
         )
     return tuple(out)

@@ -346,15 +346,16 @@ class ChartView(QWidget):
             x=x, height=np.nan_to_num(heights), width=BAR_WIDTH, brushes=brushes, pen=pg.mkPen(ink)
         )
         plot.addItem(bar)
-        error = np.array([c.error for c in shown], dtype=np.float64)
-        keep = np.isfinite(error) & np.isfinite(heights)
+        top = np.array([c.err_high for c in shown], dtype=np.float64)
+        bottom = np.array([c.err_low for c in shown], dtype=np.float64)
+        keep = ((top > 0) | (bottom > 0)) & np.isfinite(heights)
         if np.any(keep):
             plot.addItem(
                 pg.ErrorBarItem(
                     x=x[keep],
                     y=heights[keep],
-                    top=error[keep],
-                    bottom=error[keep],
+                    top=top[keep],
+                    bottom=bottom[keep],
                     beam=BAR_WIDTH / 3,
                     pen=pg.mkPen(ink, width=1.5),
                 )
@@ -444,8 +445,8 @@ class ChartView(QWidget):
                 if b.n and b.min <= y <= b.max:
                     return describe_category(c, self.spec.variant)
             else:
-                top = c.mean + (c.error if math.isfinite(c.error) else 0.0)
-                if min(0.0, c.mean) <= y <= max(0.0, top):
+                low, high = c.mean - c.err_low, c.mean + c.err_high
+                if min(0.0, low) <= y <= max(0.0, high):
                     return describe_category(c, self.spec.variant)
         return None
 

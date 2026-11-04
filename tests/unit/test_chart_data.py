@@ -205,3 +205,16 @@ def test_category_tooltips() -> None:
         "Minimum: 1",
         "n: 4",
     ]
+
+
+def test_bar_error_bars_point_away_from_zero_only() -> None:
+    table = column_table()
+    negative = table.columns[1]
+    negative.values = np.array([-5.0, -7.0, NAN, NAN])
+    data = compute(gather(table, default_spec(table, ChartFamily.BAR), {}))
+    positive, below = data.categories
+    assert (positive.err_low, positive.err_high) == (0.0, positive.error)
+    assert (below.err_low, below.err_high) == (below.error, 0.0)
+    spec = default_spec(table, ChartFamily.BAR, error_bars=ErrorBars.NONE)
+    none = compute(gather(table, spec, {})).categories[0]
+    assert (none.err_low, none.err_high) == (0.0, 0.0)
