@@ -9,7 +9,15 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, QRectF, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPalette, QPen
-from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle, QStyleOption, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QProxyStyle,
+    QStyle,
+    QStyleOption,
+    QStyleOptionToolButton,
+    QToolBar,
+    QWidget,
+)
 
 from curvis.settings import Theme
 
@@ -86,6 +94,11 @@ BORDER_MIX = 0.6
 GRID_MIX = 0.22
 GRID_CONTRAST_MIN = 1.3
 BORDER_CONTRAST_MIN = 3.0
+# Toolbar buttons (DESIGN.md §7): a soft square of Text when hovered, stronger when
+# pressed or while their menu is open; 4 px between buttons.
+TOOL_HOVER_ALPHA = 0.14
+TOOL_PRESSED_ALPHA = 0.25
+TOOLBAR_SPACING = 4
 
 # Text and background pairs that must reach CONTRAST_MIN in both themes (WCAG AA).
 CONTRAST_MIN = 4.5
@@ -184,6 +197,36 @@ class CurvisStyle(QProxyStyle):
     def __init__(self) -> None:
         super().__init__("Fusion")
 
+    def pixelMetric(  # noqa: N802 (Qt API)
+        self,
+        metric: QStyle.PixelMetric,
+        option: QStyleOption | None = None,
+        widget: QWidget | None = None,
+    ) -> int:
+        if metric == QStyle.PixelMetric.PM_ToolBarItemSpacing:
+            return TOOLBAR_SPACING
+        return super().pixelMetric(metric, option, widget)
+
+    def drawControl(  # noqa: N802 (Qt API)
+        self,
+        element: QStyle.ControlElement,
+        option: QStyleOption,
+        painter: QPainter,
+        widget: QWidget | None = None,
+    ) -> None:
+        if (
+            element == QStyle.ControlElement.CE_ToolButtonLabel
+            and _in_toolbar(widget)
+            and isinstance(option, QStyleOptionToolButton)
+        ):
+            # Keep the icon's normal colours when hovered (Qt would use its Active
+            # mode, which the toolbar icons reserve for highlighted menu rows).
+            plain = QStyleOptionToolButton(option)
+            plain.state &= ~QStyle.StateFlag.State_MouseOver
+            super().drawControl(element, plain, painter, widget)
+            return
+        super().drawControl(element, option, painter, widget)
+
     def styleHint(  # noqa: N802 (Qt API)
         self,
         hint: QStyle.StyleHint,
@@ -206,6 +249,9 @@ class CurvisStyle(QProxyStyle):
     ) -> None:
         if element == _E.PE_IndicatorTabClose:
             self._draw_tab_close(option, painter)
+            return
+        if element == _E.PE_PanelButtonTool and _in_toolbar(widget):
+            self._draw_tool_panel(option, painter)
             return
         super().drawPrimitive(element, option, painter, widget)
         if element in _OUTLINED or element == _E.PE_IndicatorRadioButton:
@@ -233,6 +279,23 @@ class CurvisStyle(QProxyStyle):
             painter.drawRoundedRect(QRectF(option.rect).adjusted(0.5, 0.5, -1.5, -1.5), 2, 2)
             painter.restore()
 
+    def _draw_tool_panel(self, option: QStyleOption, painter: QPainter) -> None:
+        """A toolbar button's soft square: hovered, or pressed / menu open."""
+        state = option.state
+        if not state & QStyle.StateFlag.State_Enabled:
+            return
+        pressed = bool(state & (QStyle.StateFlag.State_Sunken | QStyle.StateFlag.State_On))
+        if not pressed and not state & QStyle.StateFlag.State_MouseOver:
+            return
+        fill = QColor(option.palette.color(QPalette.ColorRole.Text))
+        fill.setAlphaF(TOOL_PRESSED_ALPHA if pressed else TOOL_HOVER_ALPHA)
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(fill)
+        painter.drawRoundedRect(QRectF(option.rect), 3, 3)
+        painter.restore()
+
     def _draw_tab_close(self, option: QStyleOption, painter: QPainter) -> None:
         """A thin cross: secondary text colour, text colour on a soft square when hovered."""
         state = option.state
@@ -259,6 +322,10 @@ class CurvisStyle(QProxyStyle):
         painter.drawLine(cross.topLeft(), cross.bottomRight())
         painter.drawLine(cross.topRight(), cross.bottomLeft())
         painter.restore()
+
+
+def _in_toolbar(widget: QWidget | None) -> bool:
+    return widget is not None and isinstance(widget.parentWidget(), QToolBar)
 
 
 def system_is_dark() -> bool:

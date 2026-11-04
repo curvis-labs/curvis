@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication, QKeySequence
+from PySide6.QtGui import QAction, QCloseEvent, QCursor, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -19,9 +19,12 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QStackedWidget,
     QTabWidget,
+    QToolBar,
+    QToolButton,
     QWidget,
 )
 
+from curvis.charts.spec import ChartFamily
 from curvis.core import Document, UndoEvent
 from curvis.data import ColumnRole, Table
 from curvis.settings import Settings
@@ -29,6 +32,7 @@ from curvis.ui.actions import ActionRegistry
 from curvis.ui.document_tab import DocumentTab
 from curvis.ui.launcher import LauncherWidget
 from curvis.ui.table import TableView
+from curvis.ui.toolbars import build_main_toolbar, build_table_toolbar, set_tooltips
 
 if TYPE_CHECKING:
     from curvis.compute import JobError, Scheduler
@@ -61,9 +65,25 @@ TABLE_ACTIONS = (
     "table.move_right",
     "table.calculate",
     "table.edit_calculation",
+    "table.add_column",
     "analyze.analyze",
+    "graph.plot",
+    "view.results",
+    "view.graph",
 )
 """Actions that need a table view in the current tab."""
+
+FAMILY_ACTIONS = {f"graph.new.{family.value}": family for family in ChartFamily}
+"""The chart families of the Plot menu."""
+
+NO_PROJECT = "Open or create a project first"
+NO_TABLE = "Show a table first"
+NOTHING_TO_UNDO = "Nothing to undo"
+NOTHING_TO_REDO = "Nothing to redo"
+SELECT_TO_GROUP = "Select columns to group"
+SELECT_FOR_CATEGORY = "Select columns to set their category"
+NO_GRAPH = "There is no graph to delete"
+NO_ANALYSIS = "There is no analysis to change"
 
 ANALYSIS_ACTIONS = ("analyze.edit", "analyze.delete")
 """Actions that need an analysis shown in the Results panel."""
@@ -119,6 +139,8 @@ class MainWindow(QMainWindow):
 
         self._create_actions()
         self._create_menus()
+        self.main_toolbar = build_main_toolbar(self, self.registry)
+        self.table_toolbar: QToolBar | None = None
 
         self.launcher.new_requested.connect(self.new_document)
         self.launcher.open_requested.connect(self.open_document)
@@ -335,6 +357,41 @@ class MainWindow(QMainWindow):
             category="Table",
         )
         r.register(
+            "table.add_column",
+            "&Add column",
+            self._table_call(TableView.add_column),
+            category="Table",
+        )
+        for action_id, family in FAMILY_ACTIONS.items():
+            r.register(
+                action_id,
+                f"&{family.label}",
+                self._plot_call(family),
+                category="Plot",
+            )
+        plot = r.register("graph.plot", "&Plot", self.show_plot_menu, category="Graph")
+        self.plot_menu = QMenu("&Plot", self)
+        self.plot_menu.addActions([r.action(a) for a in FAMILY_ACTIONS])
+        plot.setMenu(self.plot_menu)
+        r.register(
+            "graph.delete",
+            "&Delete graph",
+            self._tab_call(DocumentTab.delete_graph),
+            category="Graph",
+        )
+        r.register(
+            "view.results",
+            "&Results panel",
+            self._tab_call(DocumentTab.show_results),
+            category="View",
+        )
+        r.register(
+            "view.graph",
+            "&Graph panel",
+            self._tab_call(DocumentTab.show_graph),
+            category="View",
+        )
+        r.register(
             "analyze.analyze",
             "&Analyze…",
             self._tab_call(DocumentTab.analyze),
@@ -361,6 +418,7 @@ class MainWindow(QMainWindow):
         self.menuBar().insertMenu(self._view_menu.menuAction(), table_menu)
         table_menu.addActions(
             [
+                a("table.add_column"),
                 a("table.insert_column_left"),
                 a("table.insert_column_right"),
                 a("table.rename_column"),
@@ -392,6 +450,16 @@ class MainWindow(QMainWindow):
         analyze_menu.addAction(a("analyze.analyze"))
         analyze_menu.addSeparator()
         analyze_menu.addActions([a("analyze.edit"), a("analyze.delete")])
+        graph_menu = QMenu("&Graph", self)
+        self.menuBar().insertMenu(self._view_menu.menuAction(), graph_menu)
+        graph_menu.addAction(a("graph.plot"))
+        graph_menu.addSeparator()
+        graph_menu.addAction(a("graph.delete"))
+        self._view_menu.insertActions(
+            self._view_menu.actions()[0], [a("view.results"), a("view.graph")]
+        )
+        self._view_menu.insertSeparator(a("view.command_palette"))
+        self.table_toolbar = build_table_toolbar(self, self.registry)
 
     # --- documents --------------------------------------------------------------------
 
@@ -659,6 +727,23 @@ class MainWindow(QMainWindow):
 
         return call
 
+    def _plot_call(self, family: ChartFamily) -> Callable[[], None]:
+        def call() -> None:
+            tab = self.current_tab
+            if tab is not None:
+                tab.plot(family)
+
+        return call
+
+    def show_plot_menu(self) -> None:
+        """Open the chart-family menu under the Plot button (or at the pointer)."""
+        toolbar = self.table_toolbar
+        button = toolbar.widgetForAction(self.registry.action("graph.plot")) if toolbar else None
+        if isinstance(button, QToolButton) and button.isVisible():
+            button.showMenu()
+        else:
+            self.plot_menu.popup(QCursor.pos())
+
     def _tab_call(self, method: Callable[..., object]) -> Callable[[], None]:
         """A callback that runs ``method`` on the current document tab, if any."""
 
@@ -739,16 +824,16 @@ class MainWindow(QMainWindow):
         """Enable actions and set the window title for the current tab."""
         a = self.registry.action
         tab = self.current_tab
+        reasons: dict[str, str] = {}
         for action_id in ("file.save", "file.save_as", "file.close"):
             a(action_id).setEnabled(tab is not None)
+            reasons[action_id] = NO_PROJECT
         has_table = tab is not None and tab.table_view is not None
         if self._table_actions_created:
-            for action_id in TABLE_ACTIONS:
-                a(action_id).setEnabled(has_table)
-            has_analysis = has_table and tab is not None and tab.current_analysis_id is not None
-            for action_id in ANALYSIS_ACTIONS:
-                a(action_id).setEnabled(has_analysis)
+            self._update_table_actions(tab, reasons)
         stack = tab.document.undo_stack if tab is not None else None
+        reasons["edit.undo"] = NOTHING_TO_UNDO if stack is not None else NO_PROJECT
+        reasons["edit.redo"] = NOTHING_TO_REDO if stack is not None else NO_PROJECT
         undo, redo = a("edit.undo"), a("edit.redo")
         undo.setEnabled(stack is not None and stack.can_undo)
         redo.setEnabled(stack is not None and stack.can_redo)
@@ -762,6 +847,40 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(f"{tab.title}[*] — Curvis")
             self.setWindowModified(tab.is_modified)
             self.setWindowFilePath(str(tab.path) if tab.path else "")
+        if self.table_toolbar is not None:
+            self.table_toolbar.setVisible(has_table)
+        set_tooltips(self.registry, reasons)
+
+    def _update_table_actions(self, tab: DocumentTab | None, reasons: dict[str, str]) -> None:
+        """Enable the table, analysis and graph actions, and say why when they are not."""
+        from curvis.charts.builder import family_problem
+
+        a = self.registry.action
+        view = tab.table_view if tab is not None else None
+        for action_id in TABLE_ACTIONS:
+            a(action_id).setEnabled(view is not None)
+            reasons[action_id] = NO_TABLE
+        has_analysis = view is not None and tab is not None and tab.current_analysis_id
+        for action_id in ANALYSIS_ACTIONS:
+            a(action_id).setEnabled(bool(has_analysis))
+            reasons[action_id] = NO_ANALYSIS
+        has_graph = view is not None and tab is not None and tab.current_graph_id is not None
+        a("graph.delete").setEnabled(has_graph)
+        reasons["graph.delete"] = NO_GRAPH
+        if view is not None:
+            selected = bool(view.selected_columns())
+            a("table.group").setEnabled(selected)
+            reasons["table.group"] = SELECT_TO_GROUP
+            a("table.set_category").setEnabled(selected)
+            reasons["table.set_category"] = SELECT_FOR_CATEGORY
+        table = tab.document.table(view.model().table_id) if tab and view else None
+        for action_id, family in FAMILY_ACTIONS.items():
+            problem = family_problem(table, family) if table is not None else NO_TABLE
+            action = a(action_id)
+            action.setEnabled(problem is None)
+            label = f"&{family.label}"
+            action.setText(label if problem is None else f"{label}\t{problem}")
+            reasons[action_id] = problem or ""
 
     # --- dialogs (tests replace these) ---------------------------------------------------
 

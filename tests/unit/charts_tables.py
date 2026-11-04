@@ -1,5 +1,7 @@
 """Tables shared by the chart tests."""
 
+import numpy as np
+
 from curvis.analysis.base import Analysis
 from curvis.analysis.fit.analyses import Hill4Params, LinearParams
 from curvis.data import Column, ColumnRole, ReplicateGroup, Table
@@ -55,3 +57,16 @@ def hill_fit(table: Table, *, x_is_log: bool = False) -> Analysis:
 def linear_fit(table: Table) -> Analysis:
     inputs = tuple(g.id for g in table.replicate_groups)
     return Analysis("linear_regression", table.id, inputs, LinearParams())
+
+
+def sigmoid_table() -> Table:
+    """Like :func:`replicate_table`, with dose-response values a 4PL fits well."""
+    table = replicate_table()
+    for i, column in enumerate(table.columns[1:]):
+        bottom = 10.0 if i < 3 else 30.0
+        noise = (-1.5, 0.5, 1.0, -0.5, 1.5, -1.0)
+        column.values = np.array(
+            [bottom + 80 / (1 + 0.5 / x) + noise[(k + i) % 6] for k, x in enumerate(DOSES)]
+        )
+        column.values.flags.writeable = False
+    return table
