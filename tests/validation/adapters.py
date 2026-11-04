@@ -15,7 +15,7 @@ type Adapter = Callable[[Mapping[str, Any]], Mapping[str, npt.ArrayLike]]
 
 ADAPTERS: dict[str, Adapter] = {}
 
-AWAITING_FIXTURES = frozenset({"box_stats"})
+AWAITING_FIXTURES: frozenset[str] = frozenset()
 """Adapters whose R script is written and reviewed but whose fixtures have not been
 generated with R 4.6.1 yet. Remove a name once its fixtures are committed."""
 
