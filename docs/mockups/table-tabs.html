@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Curvis table tabs</title>
 <!--
-  Mockup of several tables per project, shown as table tabs inside the project tab. Four
-  versions of where the table tabs sit (A-D), then the parts they share: New table in the
-  File menu and the main toolbar, the warning when a table is closed, renaming, and a
-  project without tables. Drawn at 1:1 with the theme palette (DESIGN.md section 3).
+  Mockup of several tables per project, shown as sheet tabs along the bottom of the project
+  tab (version A, approved; B-D, a second row on top, tabs above the table only and a
+  vertical list, were not chosen). Also: New table, the warning when a table is closed,
+  renaming, and the last table. Drawn at 1:1 with the theme palette (DESIGN.md section 3).
 -->
 <style>
   :root, :root[data-theme="light"] {
@@ -112,6 +112,7 @@
   .btab { padding: 4px 12px; border: 1px solid var(--border); border-top: none; border-radius: 0 0 3px 3px;
           background: var(--button); margin-right: 2px; display: flex; gap: 8px; align-items: center; margin-top: -1px; }
   .btab.on { background: var(--base); border-top: 1px solid var(--base); font-weight: 600; }
+  .btab.hover { background: var(--hover); }
   .btabs .plus { margin-top: 2px; }
 
   /* B and C: flat tabs with a teal underline */
@@ -171,7 +172,7 @@
 <body>
 <header class="page">
   <h1>Curvis table tabs</h1>
-  <p>A project holds several tables, each in its own tab inside the project tab. The Results and Graph panels stay at the right and show the analyses and graphs of the table that is selected. Versions A to D differ only in where the table tabs sit; boards 5 to 8 apply to all of them. Orange numbers point to the notes.</p>
+  <p>A project holds several tables, each in its own tab inside the project tab. The Results and Graph panels stay at the right and show the analyses and graphs of the table that is selected. Orange numbers point to the notes.</p>
   <div class="switch" role="group" aria-label="Theme">
     <button type="button" data-set="light">Light</button>
     <button type="button" data-set="dark">Dark</button>
@@ -179,89 +180,37 @@
 </header>
 
 <section class="board">
-  <h2>A · Sheet tabs along the bottom, like a spreadsheet</h2>
+  <h2>1 · Main window: table tabs along the bottom</h2>
   <div class="row">
     <div class="win" id="va" style="width:1040px;height:420px"></div>
     <div class="notes">
       <ol>
-        <li>Table tabs under the table and the side panel, as in Excel, LibreOffice and Prism. The selected tab joins the table above it.</li>
-        <li><b>+</b> at the end of the row is New table (Ctrl+Shift+N).</li>
-        <li>Each tab has a close button. Closing deletes the table, after a warning (board 6).</li>
+        <li>Table tabs sit under the table and the side panel, as in a spreadsheet. The selected tab joins the table above it. The Results and Graph panels show the analyses and graphs of the selected table.</li>
+        <li><b>+</b> at the end of the row is New table (Ctrl+Shift+N). There is no toolbar button for it; the + is always visible.</li>
+        <li>Each tab has a close button. Closing deletes the table, after a warning (board 3).</li>
       </ol>
-      <p class="pro">Familiar to anyone who uses a spreadsheet; the two rows of tabs never sit next to each other.</p>
-      <p class="pro">The table gets the full height under the toolbars.</p>
-      <p class="con">Far from the toolbar and the project tabs, so it is easy to miss which table Import data or Analyze will act on.</p>
+      <p>Import data, Add column, Calculate, Plot and Analyze act on the selected table.</p>
     </div>
   </div>
 </section>
 
 <section class="board">
-  <h2>B · A second tab row on top, under the project tabs</h2>
+  <h2>2 · New table in the File menu (Ctrl+Shift+N)</h2>
   <div class="row">
-    <div class="win" id="vb" style="width:1040px;height:420px"></div>
-    <div class="notes">
-      <ol>
-        <li>Project tabs (unchanged) above, table tabs under them across the full width. The table tabs are flat with a teal line under the selected one, so the two rows do not look the same.</li>
-        <li>A small table icon in front of each name says these are tables.</li>
-        <li><b>+</b> is New table.</li>
-      </ol>
-      <p class="pro">Reads top-down: project › table › its data and results. The table that Import data acts on is right under the toolbar.</p>
-      <p class="pro">The side panel is visibly inside the selected table, which matches “analyses and graphs belong to their table”.</p>
-      <p class="con">Two rows of tabs take about 32 px more height.</p>
-    </div>
-  </div>
-</section>
-
-<section class="board">
-  <h2>C · Table tabs above the table only; the side panel keeps its own tabs</h2>
-  <div class="row">
-    <div class="win" id="vc" style="width:1040px;height:420px"></div>
-    <div class="notes">
-      <ol>
-        <li>The table tabs sit over the table column only. The Results / Graph tabs share the same row at the right.</li>
-        <li><b>+</b> is New table.</li>
-      </ol>
-      <p class="pro">No extra row: the same height as today.</p>
-      <p class="con">Table tabs and Results / Graph tabs look alike and sit side by side, so it is less clear that the side panel changes with the table.</p>
-      <p class="con">Many tables run out of room sooner, because the row is only as wide as the table.</p>
-    </div>
-  </div>
-</section>
-
-<section class="board">
-  <h2>D · Vertical tabs at the left</h2>
-  <div class="row">
-    <div class="win" id="vd" style="width:1040px;height:420px"></div>
-    <div class="notes">
-      <ol>
-        <li>A list of tables at the left edge, with the number of analyses and graphs of each table beside its name. The close button shows on hover.</li>
-        <li><b>+</b> in the list's header is New table.</li>
-      </ol>
-      <p class="pro">Long names and many tables fit without scrolling sideways.</p>
-      <p class="con">Takes about 170 px of width from the table, on top of the 300 px side panel.</p>
-      <p class="con">Looks like a project tree (Prism's navigator), which may suggest that graphs and analyses can be listed there too.</p>
-    </div>
-  </div>
-</section>
-
-<section class="board">
-  <h2>5 · New table: File menu, main toolbar and Ctrl+Shift+N (shown with version B)</h2>
-  <div class="row">
-    <div class="win" id="v5" style="width:760px;height:400px;overflow:visible"></div>
+    <div class="win" id="v5" style="width:760px;height:420px;overflow:visible"></div>
     <div class="notes">
       <ol>
         <li><b>New table</b> in the File menu, right under New project, with Ctrl+Shift+N (not used yet, and not a platform standard key). It is also in the command palette.</li>
-        <li>In the <b>main toolbar</b>, next to New project: a table with a teal plus, the same two tones as the other icons. Tooltip “New table (Ctrl+Shift+N)”. It is in the main toolbar rather than the table toolbar, because the table toolbar hides when the project has no table (board 8).</li>
-        <li><b>Close table…</b> asks first (board 6). Ctrl+W keeps closing the project; its menu text becomes “Close project” so the two are told apart.</li>
+        <li><b>Close table…</b> asks first (board 3). Ctrl+W keeps closing the project; its menu text becomes “Close project” so the two are told apart.</li>
       </ol>
       <p>The new table is named “Table 2”, “Table 3” …, added after the selected tab and selected. One undo step.</p>
-      <p><b>Import data</b> always goes into the selected table, as now. The status bar names it: “Imported 96 rows and 4 columns from plate.csv into Viability.”</p>
+      <p><b>Import data</b> always goes into the selected table. The status bar names it: “Imported 96 rows and 4 columns from plate.csv into Viability.”</p>
     </div>
   </div>
 </section>
 
 <section class="board">
-  <h2>6 · Closing a table deletes it, after a warning</h2>
+  <h2>3 · Closing a table deletes it, after a warning</h2>
   <div class="row">
     <div class="dialog" id="v6"></div>
     <div class="notes">
@@ -272,15 +221,15 @@
         <li>The verb button is <b>Delete table</b>. Cancel has the default focus, so Enter does not delete by accident.</li>
       </ol>
       <p>Closing an empty table (no data, no analyses, no graphs) does not ask.</p>
-      <p>If a calculated column in another table reads this table, the dialog says so and lists it, and those columns show their error until the table is restored.</p>
+      <p>Formulas read only columns of their own table, so the table's calculated columns go with it. A calculated column whose source column is gone shows its error (⚠ in the header, “Unknown column …”), as it does today when a column is deleted.</p>
     </div>
   </div>
 </section>
 
 <section class="board">
-  <h2>7 · Tab menu and renaming (shown with version B)</h2>
+  <h2>4 · Tab menu and renaming</h2>
   <div class="row">
-    <div class="win" id="v7" style="width:620px;height:260px;overflow:visible"></div>
+    <div class="win" id="v7" style="width:640px;height:300px;overflow:visible"></div>
     <div class="notes">
       <ol>
         <li>Double-click a tab to rename it in place. Enter keeps the name, Esc cancels. A name that is taken shows a message in the status bar and keeps the old name.</li>
@@ -292,12 +241,15 @@
 </section>
 
 <section class="board">
-  <h2>8 · A project with no tables</h2>
+  <h2>5 · The last table cannot be closed</h2>
   <div class="row">
-    <div class="win" id="v8" style="width:760px;height:300px"></div>
+    <div class="win" id="v8" style="width:760px;height:330px;overflow:visible"></div>
     <div class="notes">
-      <p>After the last table is closed, the project shows the empty state (DESIGN.md section 5) instead of an empty tab row. The table toolbar hides; New table in the main toolbar, the File menu and Ctrl+Shift+N still work. Import data makes a new table, as now.</p>
-      <p>The alternative is not to allow closing the last table (its close button hidden). That needs a decision.</p>
+      <ol>
+        <li>A project always has at least one table. With one table left, its tab has no close button.</li>
+        <li>Close table… is disabled, and says why: “A project needs at least one table.” (DESIGN.md: a disabled action always says why.)</li>
+      </ol>
+      <p>A new project starts with one blank table, as now. A project file without tables opens with one blank table added.</p>
     </div>
   </div>
 </section>
@@ -342,7 +294,6 @@
       '<div class="menubar">' + menu + '<span><u>E</u>dit</span><span><u>T</u>able</span><span><u>V</u>iew</span></div>' +
       '<div class="toolbars">' +
         '<span class="tb icon">' + svg("new") + '</span>' +
-        '<span class="tb icon' + (opts.hoverNew ? ' hover' : '') + '">' + svg("table") + '</span>' +
         '<span class="tb icon">' + svg("open") + '</span>' +
         '<span class="tb icon">' + svg("save") + '</span><span class="sep"></span>' +
         '<span class="tb icon">' + svg("undo") + '</span>' +
@@ -369,48 +320,26 @@
   }
   function status(t) { return '<div class="status">' + (t || 'Ready') + '</div>'; }
 
-  // A: bottom
-  (function () {
-    var tabs = TABLES.map(function (t, i) { return '<div class="btab' + (i === 0 ? ' on' : '') + '">' + t + ' <span class="x">✕</span></div>'; }).join('');
-    document.getElementById("va").innerHTML = chrome() +
-      '<div class="content">' + grid() + side() + '</div>' +
-      '<div class="btabs">' + m(1, "left:-26px;bottom:34px") + tabs + '<span class="plus hover" title="New table (Ctrl+Shift+N)">+</span>' + '</div>' +
-      '<span class="m abs" style="left:380px;bottom:34px">2</span><span class="m abs" style="left:116px;bottom:6px">3</span>' +
-      '<div class="tip" style="left:340px;bottom:56px">New table (Ctrl+Shift+N)</div>' + status();
-  })();
-
-  function ttabs(selected, extra) {
-    return TABLES.map(function (t, i) {
-      return '<div class="ttab' + (i === selected ? ' on' : '') + (extra && extra[i] ? ' ' + extra[i] : '') + '"><span class="ico">' + svg("tab") + '</span>' + t + ' <span class="x">✕</span></div>';
-    }).join('') + '<span class="plus">+</span>';
+  function btabs(names, selected, opts) {
+    opts = opts || {};
+    return '<div class="btabs">' + names.map(function (t, i) {
+      var label = (opts.edit === i) ? '<span class="edit">' + opts.editText + '</span>' : t;
+      var close = names.length > 1 && opts.edit !== i ? ' <span class="x">✕</span>' : '';
+      return '<div class="btab' + (i === selected ? ' on' : '') + (opts.hover === i ? ' hover' : '') + '">' + label + close + '</div>';
+    }).join('') + '<span class="plus' + (opts.plusHover ? ' hover' : '') + '">+</span></div>';
   }
 
-  // B: second row on top
-  document.getElementById("vb").innerHTML = chrome() +
-    '<div class="ttabs">' + ttabs(0) + '</div>' +
-    '<div class="content">' + grid() + side() + '</div>' + status() +
-    m(1, "left:-26px;top:112px") + m(2, "left:-26px;top:146px") + m(3, "left:410px;top:150px");
+  // 1: main window
+  document.getElementById("va").innerHTML = chrome() +
+    '<div class="content">' + grid() + side() + '</div>' +
+    btabs(TABLES, 0, { plusHover: true }) + status() +
+    m(1, "left:-26px;bottom:34px") + m(2, "left:380px;bottom:34px") + m(3, "left:116px;bottom:6px") +
+    '<div class="tip" style="left:340px;bottom:56px">New table (Ctrl+Shift+N)</div>';
 
-  // C: above the table only
-  document.getElementById("vc").innerHTML = chrome() +
-    '<div class="content"><div class="leftcol"><div class="ttabs">' + ttabs(0) + '</div>' + grid() + '</div>' + side("c") + '</div>' + status() +
-    m(1, "left:-26px;top:142px") + m(2, "left:410px;top:150px");
-
-  // D: vertical
-  (function () {
-    var counts = ["2 analyses · 1 graph", "1 analysis", "—"];
-    var list = TABLES.map(function (t, i) {
-      return '<div class="vtab' + (i === 0 ? ' on' : '') + '"><span class="ico">' + svg("tab") + '</span><span>' + t + '<br><span class="count" style="margin:0">' + counts[i] + '</span></span>' + (i === 0 ? '<span class="x">✕</span>' : '') + '</div>';
-    }).join('');
-    document.getElementById("vd").innerHTML = chrome() +
-      '<div class="content"><div class="vtabs"><div class="head">Tables<span class="plus">+</span></div>' + list + '</div>' + grid() + side() + '</div>' + status() +
-      m(1, "left:-26px;top:180px") + m(2, "left:172px;top:142px");
-  })();
-
-  // 5: File menu
-  document.getElementById("v5").innerHTML = chrome({ fileOpen: true, hoverNew: true }) +
-    '<div class="ttabs">' + ttabs(1) + '</div>' +
-    '<div class="content">' + grid() + '</div>' + status() +
+  // 2: File menu
+  document.getElementById("v5").innerHTML = chrome({ fileOpen: true }) +
+    '<div class="content">' + grid() + '</div>' + btabs(TABLES, 1) +
+    status('Imported 96 rows and 4 columns from plate.csv into Viability.') +
     '<div class="menu" style="left:4px;top:58px">' +
       '<div>' + svg("new") + 'New project<small>Ctrl+N</small></div>' +
       '<div class="hl">' + svg("table") + 'New table<small>Ctrl+Shift+N</small></div>' +
@@ -424,10 +353,9 @@
       '<div class="noicon">Close project<small>Ctrl+W</small></div>' +
       '<div class="noicon">Quit<small>Ctrl+Q</small></div>' +
     '</div>' +
-    m(1, "left:-26px;top:96px") + m(2, "left:50px;top:52px") + m(3, "left:-26px;top:326px") +
-    '<div class="tip" style="left:300px;top:96px">New table (Ctrl+Shift+N)</div>';
+    m(1, "left:-26px;top:96px") + m(2, "left:-26px;top:258px");
 
-  // 6: dialog
+  // 3: dialog
   document.getElementById("v6").innerHTML =
     '<div class="titlebar">Close table</div>' +
     '<div class="body"><svg class="warn" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4 30 28H2z" fill="#f5b400" stroke="#8a6500" stroke-width="1"/><path d="M16 12v8" stroke="#1d1d1d" stroke-width="2.5" stroke-linecap="round"/><circle cx="16" cy="24" r="1.6" fill="#1d1d1d"/></svg>' +
@@ -437,21 +365,27 @@
     '<div class="buttons"><span class="btn">Delete table</span><span class="btn def">Cancel</span></div>' +
     m(1, "left:-26px;top:6px") + m(2, "left:-26px;top:90px") + m(3, "left:-26px;top:150px") + m(4, "left:-26px;bottom:14px");
 
-  // 7: rename and context menu
+  // 4: rename and context menu
   document.getElementById("v7").innerHTML = chrome({ noTable: true }).replace(/<div class="toolbars">[\s\S]*?<\/div>/, '') +
-    '<div class="ttabs">' +
-      '<div class="ttab"><span class="ico">' + svg("tab") + '</span>Dose response <span class="x">✕</span></div>' +
-      '<div class="ttab on"><span class="ico">' + svg("tab") + '</span><span class="edit">Viability 24 h</span></div>' +
-      '<div class="ttab hover"><span class="ico">' + svg("tab") + '</span>Survival <span class="x">✕</span></div><span class="plus">+</span>' +
-    '</div>' + '<div class="content">' + grid() + '</div>' +
-    '<div class="menu" style="left:300px;top:132px;min-width:200px">' +
+    '<div class="content">' + grid() + '</div>' +
+    btabs(["Dose response", "Viability", "Survival"], 1, { edit: 1, editText: "Viability 24 h", hover: 2 }) + status() +
+    '<div class="menu" style="left:250px;bottom:56px;min-width:200px">' +
       '<div class="hl noicon">Rename</div><div class="noicon">Close table…</div><div class="ms"></div>' +
       '<div>' + svg("table") + 'New table<small>Ctrl+Shift+N</small></div></div>' +
-    m(1, "left:-26px;top:96px") + m(2, "left:492px;top:136px") + m(3, "left:-26px;top:6px");
+    m(1, "left:-26px;bottom:34px") + m(2, "left:458px;bottom:150px") + m(3, "left:-26px;top:6px");
 
-  // 8: empty
-  document.getElementById("v8").innerHTML = chrome({ noTable: true }) +
-    '<div class="empty">This project has no tables. Click New table (Ctrl+Shift+N) to add one,<br>or Import data to make one from a file.</div>' + status();
+  // 5: last table
+  document.getElementById("v8").innerHTML = chrome({ fileOpen: true }) +
+    '<div class="content">' + grid() + '</div>' + btabs(["Table 1"], 0) + status() +
+    '<div class="menu" style="left:4px;top:58px">' +
+      '<div>' + svg("new") + 'New project<small>Ctrl+N</small></div>' +
+      '<div>' + svg("table") + 'New table<small>Ctrl+Shift+N</small></div>' +
+      '<div class="ms"></div>' +
+      '<div class="noicon dis" style="color:var(--disabled)">Close table…</div>' +
+      '<div class="noicon">Close project<small>Ctrl+W</small></div>' +
+    '</div>' +
+    '<div class="tip" style="left:240px;top:126px">A project needs at least one table.</div>' +
+    m(1, "left:-26px;bottom:34px") + m(2, "left:-26px;top:140px");
 
   (function () {
     var root = document.documentElement, buttons = document.querySelectorAll(".switch button");
