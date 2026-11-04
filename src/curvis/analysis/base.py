@@ -39,7 +39,12 @@ if TYPE_CHECKING:  # curvis.core imports this module
 type FloatArray = npt.NDArray[np.float64]
 type Weight = Literal["light", "heavy"]
 
-BUILTIN_MODULES = ("curvis.analysis.descriptive",)
+BUILTIN_MODULES = (
+    "curvis.analysis.descriptive",
+    "curvis.analysis.compare.ttest_analysis",
+    "curvis.analysis.compare.anova_analysis",
+    "curvis.analysis.compare.mann_whitney_analysis",
+)
 """Modules that register the built-in analysis types when imported."""
 
 
@@ -96,6 +101,12 @@ class ParamInfo:
     """(value, label) pairs for a text parameter picked from a list."""
     minimum: float | None = None
     maximum: float | None = None
+    from_inputs: bool = False
+    """A text parameter picked from the ticked inputs (e.g. a control group): the value
+    is an input id, and "" means the first ticked input."""
+    enabled_when: tuple[str, str] | None = None
+    """(other parameter, value): the field is enabled only while the other parameter has
+    that value."""
 
 
 PARAM_INFO = "curvis.param"
@@ -109,10 +120,23 @@ def param(
     choices: Sequence[tuple[str, str]] = (),
     minimum: float | None = None,
     maximum: float | None = None,
+    from_inputs: bool = False,
+    enabled_when: tuple[str, str] | None = None,
 ) -> Any:
     """A parameters dataclass field with its default and how the dialog shows it."""
-    info = ParamInfo(label, advanced, tuple(choices), minimum, maximum)
+    if from_inputs and (not isinstance(default, str) or choices):
+        raise TypeError("a parameter picked from the inputs is text without fixed choices")
+    info = ParamInfo(label, advanced, tuple(choices), minimum, maximum, from_inputs, enabled_when)
     return field(default=default, metadata={PARAM_INFO: info})
+
+
+def input_param(params: Params, name: str, inputs: Sequence[str]) -> str | None:
+    """The input id that parameter ``name`` (declared with ``from_inputs``) selects among
+    ``inputs``: its value, or the first input when the value is "" or not among them."""
+    value = getattr(params, name)
+    if value in inputs:
+        return str(value)
+    return inputs[0] if inputs else None
 
 
 def param_fields(params_type: type[Params]) -> list[tuple[dataclasses.Field[Any], ParamInfo]]:

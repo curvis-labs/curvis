@@ -77,7 +77,10 @@ _N_COLUMN = 1
 class ParamsForm(QWidget):
     """The options of one analysis type: a form generated from its parameters dataclass.
 
-    Parameters marked ``advanced`` go in a collapsed Advanced section at the bottom.
+    Parameters marked ``advanced`` go in a collapsed Advanced section at the bottom. A
+    parameter picked ``from_inputs`` is a list of the ticked series
+    (:meth:`set_inputs`), and one with ``enabled_when`` is enabled only while the other
+    parameter has the given value.
     """
 
     changed = Signal()
@@ -86,6 +89,9 @@ class ParamsForm(QWidget):
         super().__init__(parent)
         self.analysis_type = analysis_type
         self.fields: dict[str, QWidget] = {}
+        self.labels: dict[str, QLabel] = {}
+        self.infos = {f.name: info for f, info in param_fields(analysis_type.params_type)}
+        self._wanted: dict[str, str] = {}  # value of each from_inputs field, kept while unticked
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         main = form_layout()
@@ -95,13 +101,20 @@ class ParamsForm(QWidget):
         defaults = analysis_type.default_params()
         for f, info in param_fields(analysis_type.params_type):
             widget = self._field_widget(f, info.label, info.choices, info.minimum, info.maximum)
+            if info.from_inputs:
+                assert isinstance(widget, QComboBox)
+                widget.currentIndexChanged.connect(lambda _i, n=f.name: self._remember(n))
             self.fields[f.name] = widget
             form = advanced_form if info.advanced else main
             if isinstance(widget, QCheckBox):
                 form.addRow(widget)
             else:
-                form.addRow(buddy_label(info.label, widget), widget)
+                label = buddy_label(info.label, widget)
+                self.labels[f.name] = label
+                form.addRow(label, widget)
             self._set(f.name, getattr(defaults, f.name))
+        self.changed.connect(self._update_enabled)
+        self._update_enabled()
         if advanced_form.rowCount():
             self.advanced = CollapsibleSection(parent=self)
             self.advanced.content_layout.addLayout(advanced_form)
@@ -119,7 +132,11 @@ class ParamsForm(QWidget):
     ) -> QWidget:
         default = f.default
         widget: QWidget
-        if isinstance(default, bool):
+        if self.infos[f.name].from_inputs:
+            combo = QComboBox()
+            combo.currentIndexChanged.connect(self.changed)
+            widget = combo
+        elif isinstance(default, bool):
             check = QCheckBox(label)
             check.toggled.connect(self.changed)
             widget = check
@@ -151,8 +168,43 @@ class ParamsForm(QWidget):
         widget.setObjectName(f"param_{f.name}")
         return widget
 
+    def set_inputs(self, choices: Sequence[tuple[str, str]]) -> None:
+        """The ticked series as (id, name), for the parameters picked from the inputs.
+        Each keeps its value while that series is ticked, else shows the first one."""
+        for name, info in self.infos.items():
+            if not info.from_inputs:
+                continue
+            combo = self.fields[name]
+            assert isinstance(combo, QComboBox)
+            current = [combo.itemData(i) for i in range(combo.count())]
+            if current == [value for value, _text in choices]:
+                continue
+            with QSignalBlocker(combo):
+                combo.clear()
+                for value, text in choices:
+                    combo.addItem(text, value)
+                combo.setCurrentIndex(max(0, combo.findData(self._wanted.get(name, ""))))
+
+    def _remember(self, name: str) -> None:
+        combo = self.fields[name]
+        assert isinstance(combo, QComboBox)
+        if combo.count():
+            self._wanted[name] = combo.currentData()
+
+    def _update_enabled(self) -> None:
+        for name, info in self.infos.items():
+            if info.enabled_when is None:
+                continue
+            other, value = info.enabled_when
+            enabled = self._get(other) == value
+            self.fields[name].setEnabled(enabled)
+            if name in self.labels:
+                self.labels[name].setEnabled(enabled)
+
     def _set(self, name: str, value: Any) -> None:
         widget = self.fields[name]
+        if self.infos[name].from_inputs:
+            self._wanted[name] = str(value)
         with QSignalBlocker(widget):
             if isinstance(widget, QCheckBox):
                 widget.setChecked(bool(value))
@@ -168,7 +220,8 @@ class ParamsForm(QWidget):
         if isinstance(widget, QCheckBox):
             return widget.isChecked()
         if isinstance(widget, QComboBox):
-            return widget.currentData()
+            data = widget.currentData()
+            return "" if data is None else data
         if isinstance(widget, QSpinBox | QDoubleSpinBox):
             return widget.value()
         assert isinstance(widget, QLineEdit)
@@ -177,6 +230,7 @@ class ParamsForm(QWidget):
     def set_params(self, params: Params) -> None:
         for f, _info in param_fields(self.analysis_type.params_type):
             self._set(f.name, getattr(params, f.name))
+        self._update_enabled()
 
     def params(self) -> Params:
         values = {
@@ -527,12 +581,14 @@ class AnalyzeDialog(QDialog):
             if self.family is not None:
                 self.skeleton.set_problem("Choose an analysis.")
             return
+        inputs = self.checked_inputs()
+        form = self.forms[kind.id]
+        form.set_inputs([(c.id, c.name) for c in kind.selected(self.table, inputs)])
         try:
-            params = self.forms[kind.id].params()
+            params = form.params()
         except ValueError as exc:
             self.skeleton.set_problem(f"{str(exc).capitalize()}.")
             return
-        inputs = self.checked_inputs()
         problem = kind.problem(self.table) or kind.check(self.table, inputs, params)
         self.summary.setText(kind.describe(self.table, inputs, params) if not problem else "")
         self.skeleton.set_problem(problem)
