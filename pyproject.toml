@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=2.5.4",
     "polars>=1.30",
     "pyarrow>=26.0.0",
+    "pyqtgraph>=0.13.7",
     "pyside6>=6.8",
     "scipy>=1.14",
 ]
@@ -70,11 +71,16 @@ module = [
     "curvis.formula.*",
     "curvis.analysis.*",
     "curvis.io.*",
+    "curvis.charts.spec",
+    "curvis.charts.colors",
+    "curvis.charts.builder",
+    "curvis.charts.data",
+    "curvis.charts.tooltips",
 ]
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["pyarrow", "scipy", "scipy.*", "lmfit"]
+module = ["pyarrow", "scipy", "scipy.*", "lmfit", "pyqtgraph"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

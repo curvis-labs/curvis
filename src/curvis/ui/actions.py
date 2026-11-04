@@ -20,8 +20,10 @@ class RegisteredAction:
 
     @property
     def text(self) -> str:
-        """Action text without the ``&`` mnemonic markers and trailing dots."""
-        return self.action.text().replace("&&", "\0").replace("&", "").replace("\0", "&")
+        """Action text without the ``&`` mnemonic markers, and without what a menu shows
+        after a tab (the reason a chart family is disabled)."""
+        text = self.action.text().split("\t", 1)[0]
+        return text.replace("&&", "\0").replace("&", "").replace("\0", "&")
 
     @property
     def shortcut(self) -> str:

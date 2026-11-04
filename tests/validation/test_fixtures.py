@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.validation.adapters import ADAPTERS, run_descriptive_analysis
+from tests.validation.adapters import ADAPTERS, AWAITING_FIXTURES, run_descriptive_analysis
 from tests.validation.harness import (
     FIXTURE_DIR,
     REPO_ROOT,
@@ -53,7 +53,17 @@ def test_there_are_fixtures() -> None:
 
 def test_every_adapter_has_fixtures() -> None:
     analyses = {path.parent.name for path in FIXTURES}
-    assert set(ADAPTERS) <= analyses, f"adapters without fixtures: {set(ADAPTERS) - analyses}"
+    expected = set(ADAPTERS) - AWAITING_FIXTURES
+    assert expected <= analyses, f"adapters without fixtures: {expected - analyses}"
+
+
+def test_awaiting_fixtures_list_is_current() -> None:
+    """A name stays in AWAITING_FIXTURES only until its fixtures are committed."""
+    analyses = {path.parent.name for path in FIXTURES}
+    assert not (AWAITING_FIXTURES & analyses), (
+        f"fixtures exist now; remove from AWAITING_FIXTURES: {AWAITING_FIXTURES & analyses}"
+    )
+    assert set(ADAPTERS) >= AWAITING_FIXTURES
 
 
 def test_tolerance_exceptions_are_documented() -> None:

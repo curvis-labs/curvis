@@ -76,6 +76,7 @@ class CommandPalette(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, entry)
             if not entry.action.isEnabled():
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+                item.setToolTip(entry.action.toolTip())  # why it is disabled
             self.list.addItem(item)
         first_enabled = next(
             (

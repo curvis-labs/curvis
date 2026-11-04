@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "analysis": "box_stats",
+  "case": "n_small",
+  "description": "n = 0, 1, 2, 3 and 4, where the quartiles fall on or outside the values.",
+  "generated_by": {
+    "script": "validation/r/scripts/box_stats.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [],
+      [4.2000000000000002],
+      [5, 7],
+      [-1, 3, 8],
+      [1, 2, 4, 8]
+    ]
+  },
+  "expected": {
+    "n": [0, 1, 2, 3, 4],
+    "min": ["NaN", 4.2000000000000002, 5, -1, 1],
+    "q1": ["NaN", 4.2000000000000002, 5, -1, 1.25],
+    "median": ["NaN", 4.2000000000000002, 6, 3, 3],
+    "q3": ["NaN", 4.2000000000000002, 7, 8, 7],
+    "max": ["NaN", 4.2000000000000002, 7, 8, 8]
+  },
+  "kinds": {
+    "n": "exact",
+    "min": "exact",
+    "q1": "statistic",
+    "median": "statistic",
+    "q3": "statistic",
+    "max": "exact"
+  }
+}

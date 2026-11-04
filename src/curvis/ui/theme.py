@@ -7,9 +7,18 @@ Widgets must only use palette roles, never fixed colours; every colour is set he
 
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, QRectF, Qt
-from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPalette, QPen
-from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle, QStyleOption, QWidget
+from PySide6.QtCore import QObject, QPointF, QRectF, QSize, Qt
+from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPalette, QPen, QPolygonF
+from PySide6.QtWidgets import (
+    QApplication,
+    QProxyStyle,
+    QStyle,
+    QStyleOption,
+    QStyleOptionComplex,
+    QStyleOptionToolButton,
+    QToolBar,
+    QWidget,
+)
 
 from curvis.settings import Theme
 
@@ -86,6 +95,15 @@ BORDER_MIX = 0.6
 GRID_MIX = 0.22
 GRID_CONTRAST_MIN = 1.3
 BORDER_CONTRAST_MIN = 3.0
+# Toolbar buttons (DESIGN.md §7): a soft square of Text when hovered, stronger when
+# pressed or while their menu is open; 4 px between buttons.
+TOOL_HOVER_ALPHA = 0.14
+TOOL_PRESSED_ALPHA = 0.25
+TOOLBAR_SPACING = 4
+TOOL_BUTTON_HEIGHT = 28
+MENU_ARROW_WIDTH = 10
+MENU_ARROW_GAP = 3
+"""Room after a toolbar button's text for its menu arrow (Plot ▾)."""
 
 # Text and background pairs that must reach CONTRAST_MIN in both themes (WCAG AA).
 CONTRAST_MIN = 4.5
@@ -184,6 +202,102 @@ class CurvisStyle(QProxyStyle):
     def __init__(self) -> None:
         super().__init__("Fusion")
 
+    def pixelMetric(  # noqa: N802 (Qt API)
+        self,
+        metric: QStyle.PixelMetric,
+        option: QStyleOption | None = None,
+        widget: QWidget | None = None,
+    ) -> int:
+        if metric == QStyle.PixelMetric.PM_ToolBarItemSpacing:
+            return TOOLBAR_SPACING
+        return super().pixelMetric(metric, option, widget)
+
+    def sizeFromContents(  # noqa: N802 (Qt API)
+        self,
+        contents: QStyle.ContentsType,
+        option: QStyleOption,
+        size: QSize,
+        widget: QWidget | None = None,
+    ) -> QSize:
+        result = super().sizeFromContents(contents, option, size, widget)  # type: ignore[arg-type]
+        if contents == QStyle.ContentsType.CT_ToolButton and _in_toolbar(widget):
+            result.setHeight(max(result.height(), TOOL_BUTTON_HEIGHT))
+            if _menu_arrow_beside(option):
+                result.setWidth(result.width() + MENU_ARROW_WIDTH)
+        return result
+
+    def drawComplexControl(  # noqa: N802 (Qt API)
+        self,
+        control: QStyle.ComplexControl,
+        option: QStyleOptionComplex,
+        painter: QPainter,
+        widget: QWidget | None = None,
+    ) -> None:
+        if (
+            control == QStyle.ComplexControl.CC_ToolButton
+            and _in_toolbar(widget)
+            and isinstance(option, QStyleOptionToolButton)
+            and _menu_arrow_beside(option)
+        ):
+            self._draw_menu_tool_button(option, painter, widget)
+            return
+        super().drawComplexControl(control, option, painter, widget)
+
+    def _draw_menu_tool_button(
+        self, option: QStyleOptionToolButton, painter: QPainter, widget: QWidget | None
+    ) -> None:
+        """A toolbar button that opens a menu: its label, then a small ▾ beside the text
+        (DESIGN.md §7), instead of Fusion's arrow in the corner."""
+        plain = QStyleOptionToolButton(option)
+        plain.features &= ~QStyleOptionToolButton.ToolButtonFeature.HasMenu
+        self.drawPrimitive(_E.PE_PanelButtonTool, plain, painter, widget)
+        # The same inset as Fusion gives the other buttons' labels (measured: 1 px more
+        # than the frame width), so the icons line up.
+        inset = self.pixelMetric(QStyle.PixelMetric.PM_DefaultFrameWidth, option, widget) + 1
+        label = QStyleOptionToolButton(plain)
+        label.rect = plain.rect.adjusted(inset, inset, -inset - MENU_ARROW_WIDTH, -inset)
+        self.drawControl(QStyle.ControlElement.CE_ToolButtonLabel, label, painter, widget)
+        enabled = bool(option.state & QStyle.StateFlag.State_Enabled)
+        palette = option.palette
+        color = (
+            palette.color(QPalette.ColorRole.PlaceholderText)
+            if enabled
+            else palette.color(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText)
+        )
+        # Qt puts the text 4 px after the icon; the arrow follows the text closely.
+        text_end = label.rect.left() + option.iconSize.width() + 4
+        text_end += option.fontMetrics.horizontalAdvance(option.text)
+        center = QPointF(text_end + MENU_ARROW_GAP + 3.5, QRectF(option.rect).center().y() + 1)
+        arrow = QPolygonF(
+            [center + QPointF(-3.5, -2), center + QPointF(3.5, -2), center + QPointF(0, 2)]
+        )
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(color)
+        painter.drawPolygon(arrow)
+        painter.restore()
+
+    def drawControl(  # noqa: N802 (Qt API)
+        self,
+        element: QStyle.ControlElement,
+        option: QStyleOption,
+        painter: QPainter,
+        widget: QWidget | None = None,
+    ) -> None:
+        if (
+            element == QStyle.ControlElement.CE_ToolButtonLabel
+            and _in_toolbar(widget)
+            and isinstance(option, QStyleOptionToolButton)
+        ):
+            # Keep the icon's normal colours when hovered (Qt would use its Active
+            # mode, which the toolbar icons reserve for highlighted menu rows).
+            plain = QStyleOptionToolButton(option)
+            plain.state &= ~QStyle.StateFlag.State_MouseOver
+            super().drawControl(element, plain, painter, widget)
+            return
+        super().drawControl(element, option, painter, widget)
+
     def styleHint(  # noqa: N802 (Qt API)
         self,
         hint: QStyle.StyleHint,
@@ -206,6 +320,18 @@ class CurvisStyle(QProxyStyle):
     ) -> None:
         if element == _E.PE_IndicatorTabClose:
             self._draw_tab_close(option, painter)
+            return
+        if element == _E.PE_PanelButtonTool and _in_toolbar(widget):
+            self._draw_tool_panel(option, painter)
+            return
+        if element == _E.PE_IndicatorToolBarSeparator:
+            # Fusion's separator is a shade of the window colour: invisible on dark.
+            rect = QRectF(option.rect)
+            x = rect.center().x()
+            painter.save()
+            painter.setPen(QPen(control_border(option.palette), 1))
+            painter.drawLine(QPointF(x, rect.top() + 5), QPointF(x, rect.bottom() - 5))
+            painter.restore()
             return
         super().drawPrimitive(element, option, painter, widget)
         if element in _OUTLINED or element == _E.PE_IndicatorRadioButton:
@@ -233,6 +359,23 @@ class CurvisStyle(QProxyStyle):
             painter.drawRoundedRect(QRectF(option.rect).adjusted(0.5, 0.5, -1.5, -1.5), 2, 2)
             painter.restore()
 
+    def _draw_tool_panel(self, option: QStyleOption, painter: QPainter) -> None:
+        """A toolbar button's soft square: hovered, or pressed / menu open."""
+        state = option.state
+        if not state & QStyle.StateFlag.State_Enabled:
+            return
+        pressed = bool(state & (QStyle.StateFlag.State_Sunken | QStyle.StateFlag.State_On))
+        if not pressed and not state & QStyle.StateFlag.State_MouseOver:
+            return
+        fill = QColor(option.palette.color(QPalette.ColorRole.Text))
+        fill.setAlphaF(TOOL_PRESSED_ALPHA if pressed else TOOL_HOVER_ALPHA)
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(fill)
+        painter.drawRoundedRect(QRectF(option.rect), 3, 3)
+        painter.restore()
+
     def _draw_tab_close(self, option: QStyleOption, painter: QPainter) -> None:
         """A thin cross: secondary text colour, text colour on a soft square when hovered."""
         state = option.state
@@ -259,6 +402,18 @@ class CurvisStyle(QProxyStyle):
         painter.drawLine(cross.topLeft(), cross.bottomRight())
         painter.drawLine(cross.topRight(), cross.bottomLeft())
         painter.restore()
+
+
+def _in_toolbar(widget: QWidget | None) -> bool:
+    return widget is not None and isinstance(widget.parentWidget(), QToolBar)
+
+
+def _menu_arrow_beside(option: QStyleOption | None) -> bool:
+    """True for a tool button that opens its menu when clicked (Plot)."""
+    if not isinstance(option, QStyleOptionToolButton):
+        return False
+    feature = QStyleOptionToolButton.ToolButtonFeature
+    return bool(option.features & feature.HasMenu) and not option.features & feature.MenuButtonPopup
 
 
 def system_is_dark() -> bool:

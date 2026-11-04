@@ -15,6 +15,10 @@ type Adapter = Callable[[Mapping[str, Any]], Mapping[str, npt.ArrayLike]]
 
 ADAPTERS: dict[str, Adapter] = {}
 
+AWAITING_FIXTURES: frozenset[str] = frozenset()
+"""Adapters whose R script is written and reviewed but whose fixtures have not been
+generated with R 4.6.1 yet. Remove a name once its fixtures are committed."""
+
 
 def adapter(analysis: str) -> Callable[[Adapter], Adapter]:
     def register(function: Adapter) -> Adapter:
@@ -328,3 +332,19 @@ def _differs_from_nist(inputs: Mapping[str, Any], out: Mapping[str, Any]) -> boo
 
     case = f"{inputs['dataset'].lower()}_start{inputs['start_number']}"
     return bool(compare(load_fixture(FIXTURE_DIR / "nist_nls" / f"{case}.json"), out))
+
+
+@adapter("box_stats")
+def box_stats(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/box_stats.R: five-number summary of each group (box plots)."""
+    from curvis.charts.data import box_stats as five_numbers
+
+    found = [five_numbers(group) for group in inputs["groups"]]
+    return {
+        "n": [b.n for b in found],
+        "min": [b.min for b in found],
+        "q1": [b.q1 for b in found],
+        "median": [b.median for b in found],
+        "q3": [b.q3 for b in found],
+        "max": [b.max for b in found],
+    }

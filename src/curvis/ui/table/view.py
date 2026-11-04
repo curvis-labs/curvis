@@ -146,6 +146,8 @@ class TableView(QTableView):
     calculate_requested = Signal()
     edit_calculation_requested = Signal(str)
     """Id of a calculated column whose calculation should be edited."""
+    selection_changed = Signal()
+    """The selection or the current cell changed (what the table actions can act on)."""
 
     def __init__(self, model: TableModel, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -187,6 +189,8 @@ class TableView(QTableView):
         columns.customContextMenuRequested.connect(self._show_header_menu)
 
         self.setModel(model)
+        self.selectionModel().selectionChanged.connect(lambda *_: self.selection_changed.emit())
+        self.selectionModel().currentChanged.connect(lambda *_: self.selection_changed.emit())
         model.error.connect(self.error)
         model.bands_changed.connect(self._on_bands_changed)
         self.setCurrentIndex(model.index(0, 0))
@@ -470,6 +474,11 @@ class TableView(QTableView):
         cols = self.selected_columns()
         position = cols[-1] + 1 if cols else self.model().n_data_columns
         return self._insert_column(position, cols[-1] if cols else None)
+
+    def add_column(self) -> bool:
+        """Add a Y column after the last column of the table."""
+        model = self.model()
+        return self._insert_column(model.n_data_columns, None)
 
     def _insert_column(self, position: int, beside: int | None) -> bool:
         if not self.model().insert_column(position, beside=beside):

@@ -220,7 +220,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 4
+    assert data["schema_version"] == SCHEMA_VERSION == 5
     assert set(data["document"]) == {
         "id",
         "name",
@@ -228,6 +228,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         "constants",
         "calculations",
         "analyses",
+        "graphs",
         "settings",
     }
     assert data["change_log"] == []
@@ -389,7 +390,7 @@ def test_newer_version(tmp_path: Path) -> None:
 
 
 def test_migrations_cover_every_older_version() -> None:
-    assert SCHEMA_VERSION == 4
+    assert SCHEMA_VERSION == 5
     assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
@@ -447,11 +448,9 @@ def test_version_1_files_get_the_default_category_factor(tmp_path: Path) -> None
 def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "old.cvp"
     save(Document(), path)
-    monkeypatch.setattr(project, "SCHEMA_VERSION", 5)
-    monkeypatch.setattr(
-        project, "MIGRATIONS", {1: lambda data: data, 2: lambda data: data, 3: lambda data: data}
-    )
-    with pytest.raises(ProjectFileError, match="from format 4"):
+    monkeypatch.setattr(project, "SCHEMA_VERSION", 6)
+    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 5)})
+    with pytest.raises(ProjectFileError, match="from format 5"):
         load(path)
 
 
@@ -614,6 +613,63 @@ def test_version_3_files_have_no_analyses(tmp_path: Path) -> None:
 
     _rewrite(path, to_v3)
     assert load(path).analyses == []
+
+
+def test_version_4_files_have_no_graphs(tmp_path: Path) -> None:
+    """Format 5 added graphs."""
+    path = tmp_path / "v4.cvp"
+    save(Document(tables=[Table("T", [Column.new("a", "Y", [1.0])])]), path)
+
+    def to_v4(data: dict[str, Any]) -> None:
+        data["schema_version"] = 4
+        del data["document"]["graphs"]
+
+    _rewrite(path, to_v4)
+    assert load(path).graphs == []
+
+
+def _graph_document() -> Document:
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily
+
+    table = Table("T", [Column.new("x", "X", [1.0, 2.0]), Column.new("a", "Y", [3.0, 4.0])])
+    hidden = default_spec(table, ChartFamily.XY).with_series_visible(table.columns[1].id, False)
+    return Document(tables=[table], graphs=[hidden, default_spec(table, ChartFamily.BAR)])
+
+
+def test_graphs_round_trip(tmp_path: Path) -> None:
+    document = _graph_document()
+    save(document, tmp_path / "g.cvp")
+    assert load(tmp_path / "g.cvp").graphs == document.graphs
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda g: g.update(table_id="gone"), "table that does not exist"),
+        (lambda g: g.update(family="pie"), "family cannot be 'pie'"),
+        (lambda g: g.update(series="a"), "series must be a list"),
+    ],
+)
+def test_bad_graphs_are_rejected(tmp_path: Path, change: Any, message: str) -> None:
+    path = tmp_path / "g.cvp"
+    save(_graph_document(), path)
+    _rewrite(path, lambda data: change(data["document"]["graphs"][0]))
+    with pytest.raises(ProjectFileError, match=message):
+        load(path)
+
+
+def test_duplicate_graph_ids_are_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "g.cvp"
+    save(_graph_document(), path)
+
+    def duplicate(data: dict[str, Any]) -> None:
+        graphs = data["document"]["graphs"]
+        graphs[1]["id"] = graphs[0]["id"]
+
+    _rewrite(path, duplicate)
+    with pytest.raises(ProjectFileError, match="graph ids"):
+        load(path)
 
 
 @pytest.mark.parametrize(
