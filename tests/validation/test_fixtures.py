@@ -63,7 +63,7 @@ def test_awaiting_fixtures_list_is_current() -> None:
     assert not (AWAITING_FIXTURES & analyses), (
         f"fixtures exist now; remove from AWAITING_FIXTURES: {AWAITING_FIXTURES & analyses}"
     )
-    assert AWAITING_FIXTURES <= set(ADAPTERS)
+    assert set(ADAPTERS) >= AWAITING_FIXTURES
 
 
 def test_tolerance_exceptions_are_documented() -> None:
