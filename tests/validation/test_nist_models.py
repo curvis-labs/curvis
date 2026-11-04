@@ -23,6 +23,10 @@ def test_certified_parameters_give_the_certified_rss(path: Path) -> None:
     x, y = fixture.inputs["x"], fixture.inputs["y"]
     certified = fixture.expected["parameters"]
     model = NistModel(fixture.inputs["dataset"], len(certified))
-    rss = float(np.sum((y - model.f(x, certified)) ** 2))
+    residuals = y - model.f(x, certified)
+    if "rss" not in fixture.expected:  # residuals at rounding level (Lanczos1)
+        assert np.max(np.abs(residuals)) < 1e-10 * np.max(np.abs(y))
+        return
+    rss = float(np.sum(residuals**2))
     # The certified parameters are rounded to 11 digits, so RSS can differ slightly.
     assert rss == pytest.approx(float(fixture.expected["rss"]), rel=1e-7)

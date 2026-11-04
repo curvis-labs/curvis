@@ -249,6 +249,10 @@ def nist_linear(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
 
 
 NIST_EXACT_LINEAR = {"Wampler1", "Wampler2"}
+NIST_ROUNDING_LEVEL = {"Lanczos1"}
+"""NIST nonlinear datasets whose residuals (~1e-13) are at rounding level, so their SDs,
+RSS and residual SD cannot be reproduced in double precision; nist_strd.R compares only
+their parameters and df (approved by the project owner, step 2.4)."""
 
 
 @adapter("dose_response")
@@ -310,7 +314,10 @@ def nist_nls(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
     start = inputs["start"]
     model = NistModel(inputs["dataset"], len(start))
     f = fit_model(model, Points(inputs["x"], inputs["y"]), start=start)
-    out = {"parameters": f.values, "se": f.se, "rss": f.rss, "sy_x": f.sy_x, "df": f.df}
+    out: dict[str, Any] = {"parameters": f.values, "df": f.df}
+    # nist_strd.R leaves these out where the residuals are at rounding level.
+    if inputs["dataset"] not in NIST_ROUNDING_LEVEL:
+        out.update(se=f.se, rss=f.rss, sy_x=f.sy_x)
     if inputs["start_number"] == 1 and not f.ok and _differs_from_nist(inputs, out):
         pytest.xfail(f"{inputs['dataset']} from start 1: {f.status.value}: {f.message}")
     return out

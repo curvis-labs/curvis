@@ -21,6 +21,15 @@
 # is left out). One fixture per dataset and NIST starting point ("start1" is far from
 # the solution, "start2" close). Outputs: parameters (b1, b2, ...), their certified SDs,
 # the residual sum of squares and residual SD, and df.
+#
+# Lanczos1's residuals are ~1e-13 (its data are the model's values to 13 digits), so its
+# RSS (~1e-25) is at the level of double-precision rounding: evaluating the model alone
+# changes it by ~0.2%, and the SDs, which scale with sqrt(RSS), by ~0.1%. Its se, rss and
+# sy_x cannot be reproduced to the tolerances in double precision and are left out
+# (approved by the project owner, step 2.4); its parameters and df are compared.
+
+# Datasets whose residuals are at rounding level: only parameters and df are compared.
+NIST_ROUNDING_LEVEL <- c("Lanczos1")
 
 NIST_DIR <- file.path(r_project_dir(), "nist")
 NIST_URL <- "https://www.itl.nist.gov/div898/strd/%s/data/LINKS/DATA/%s.dat"
@@ -149,18 +158,27 @@ nist_nls_ <- function(name) {
     message(sprintf("  %s.dat states %g degrees of freedom; n - p = RSS / SD^2 = %d is used",
                     name, stated_df, df))
   }
+  expected <- list(parameters = v[, 3], se = v[, 4], rss = scalar(rss),
+                   sy_x = scalar(sy_x), df = scalar(as.integer(df)))
+  kinds <- c(parameters = "parameter", se = "parameter", rss = "statistic",
+             sy_x = "statistic", df = "exact")
+  note <- ""
+  if (name %in% NIST_ROUNDING_LEVEL) {
+    expected <- expected[c("parameters", "df")]
+    kinds <- kinds[c("parameters", "df")]
+    note <- paste0(" Residuals at rounding level: the certified SDs, RSS and residual SD",
+                   " are not compared.")
+  }
   for (s in 1:2) {
     write_fixture(
       analysis = "nist_nls",
       case = paste0(tolower(name), "_start", s),
       description = paste0("NIST StRD nonlinear regression dataset ", name,
-                           " from starting values ", s, ", certified values."),
+                           " from starting values ", s, ", certified values.", note),
       inputs = list(dataset = name, x = d[, "x"], y = d[, "y"], start = v[, s],
                     start_number = scalar(as.integer(s))),
-      expected = list(parameters = v[, 3], se = v[, 4], rss = scalar(rss),
-                      sy_x = scalar(sy_x), df = scalar(as.integer(df))),
-      kinds = c(parameters = "parameter", se = "parameter", rss = "statistic",
-                sy_x = "statistic", df = "exact")
+      expected = expected,
+      kinds = kinds
     )
   }
 }
