@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "analysis": "tukey_hsd",
+  "case": "identical",
+  "description": "Three groups with the same values: F = 0, P = 1.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [2.5, 3.1000000000000001, 4.7000000000000002, 3.8999999999999999],
+      [2.5, 3.1000000000000001, 4.7000000000000002, 3.8999999999999999],
+      [2.5, 3.1000000000000001, 4.7000000000000002, 3.8999999999999999]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [0, 0, 0],
+    "q": [0, 0, 0],
+    "p_value": [1, 1, 1],
+    "ci_lower": [-1.8901967351773854, -1.8901967351773854, -1.8901967351773854],
+    "ci_upper": [1.8901967351773854, 1.8901967351773854, 1.8901967351773854]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "q": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

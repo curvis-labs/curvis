@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "one_way_anova",
+  "case": "ties",
+  "description": "Repeated values within and across groups.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [3, 3, 4, 4, 5],
+      [4, 4, 5, 5, 5],
+      [5, 6, 6, 6, 7]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [5, 5, 5],
+    "mean": [3.7999999999999998, 4.5999999999999996, 6],
+    "df_between": 2,
+    "df_within": 12,
+    "ss_between": 12.400000000000002,
+    "ss_within": 6,
+    "ms_between": 6.2000000000000011,
+    "ms_within": 0.5,
+    "f": 12.400000000000002,
+    "p_value": 0.0012022659966259939
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "df_between": "exact",
+    "df_within": "exact",
+    "ss_between": "statistic",
+    "ss_within": "statistic",
+    "ms_between": "statistic",
+    "ms_within": "statistic",
+    "f": "statistic",
+    "p_value": "p_value"
+  }
+}

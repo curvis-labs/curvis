@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "analysis": "mann_whitney",
+  "case": "ties_exact_large",
+  "description": "45 against 40 rounded values: exact with many ties. (Wilcoxon rank sum exact test)",
+  "generated_by": {
+    "script": "validation/r/scripts/mann_whitney.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [2, 6, 3, 8, 7, 2, 5, 6, 5, 5, 3, 4, 6, 3, 1, 5, 6, 5, 4, 2, 3, 3, 7, 3, 4, 1, 5, 7, 3, 4, 8, 4, 9, 2, 4, 3, 5, 6, 6, 4, 6, 2, 6, 4, 5],
+    "b": [3, 3, 3, 7, 3, 5, 7, 6, 8, 6, 5, 8, 4, 5, 6, 10, 4, 7, 6, 6, 6, 8, 7, 5, 3, 8, 6, 10, 5, 3, 6, 8, 3, 4, 7, 5, 5, 6, 7, 5]
+  },
+  "expected": {
+    "n_a": 45,
+    "n_b": 40,
+    "u": 587,
+    "p_value": 0.0049156005964241392,
+    "exact": 1,
+    "median_a": 4,
+    "median_b": 6
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "u": "exact",
+    "p_value": "p_value",
+    "exact": "exact",
+    "median_a": "statistic",
+    "median_b": "statistic"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "large_offset_paired",
+  "description": "Small spread on a large offset. (paired)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [1000000000.11, 1000000000.25, 1000000000.3200001, 1000000000.1799999, 1000000000.29],
+    "b": [1000000000.41, 1000000000.36, 1000000000.52, 1000000000.47, 1000000000.39],
+    "paired": true,
+    "welch": false
+  },
+  "expected": {
+    "n_pairs": [5],
+    "mean_a": [1000000000.23],
+    "mean_b": [1000000000.4299999],
+    "difference": [0.20000000000000001],
+    "se": [0.04254409342740563],
+    "t": [4.7010050958370169],
+    "df": [4],
+    "p_value": [0.0093014701036884927],
+    "ci_lower": [0.081878660048402024],
+    "ci_upper": [0.31812133995159797]
+  },
+  "kinds": {
+    "n_pairs": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

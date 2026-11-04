@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "unequal_paired_paired",
+  "description": "Paired data with spread differences. (paired)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [120, 135, 128, 141, 117, 133, 125, 139, 130, 122, 136, 127],
+    "b": [115, 131, 129, 132, 116, 125, 124, 130, 126, 121, 128, 120],
+    "paired": true,
+    "welch": false
+  },
+  "expected": {
+    "n_pairs": [12],
+    "mean_a": [129.41666666666666],
+    "mean_b": [124.75],
+    "difference": [-4.666666666666667],
+    "se": [1.0249414863810764],
+    "t": [-4.5531054491159368],
+    "df": [11],
+    "p_value": [0.00082592085648425565],
+    "ci_lower": [-6.9225476681536824],
+    "ci_upper": [-2.4107856651796511]
+  },
+  "kinds": {
+    "n_pairs": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

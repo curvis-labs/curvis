@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "zero_variance_one_welch",
+  "description": "Group A is constant, group B is not. (unpaired, Welch's correction)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [5, 5, 5, 5, 5, 5],
+    "b": [4.2000000000000002, 5.9000000000000004, 6.0999999999999996, 5.2999999999999998, 7, 6.5999999999999996],
+    "paired": false,
+    "welch": true
+  },
+  "expected": {
+    "n_a": [6],
+    "n_b": [6],
+    "mean_a": [5],
+    "mean_b": [5.8499999999999996],
+    "difference": [0.84999999999999964],
+    "se": [0.40722639076235384],
+    "t": [2.0872910481286473],
+    "df": [5],
+    "p_value": [0.091213121785443635],
+    "ci_lower": [-0.19680876308544268],
+    "ci_upper": [1.896808763085442]
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

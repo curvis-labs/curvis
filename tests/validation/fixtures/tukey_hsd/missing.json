@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "analysis": "tukey_hsd",
+  "case": "missing",
+  "description": "Missing values in every group.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [5.2000000000000002, "NaN", 6.0999999999999996, 5.7999999999999998, 4.9000000000000004, "NaN"],
+      ["NaN", 7, 6.4000000000000004, 7.7000000000000002, 6.9000000000000004, 7.2000000000000002],
+      [5.5, 5.9000000000000004, "NaN", "NaN", 6.2999999999999998, 5]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [1.54, 0.17499999999999982, -1.3650000000000002],
+    "q": [6.2256532796774655, 0.67115605521402377, 5.5181926797141179],
+    "p_value": [0.0034552566316878625, 0.88462711087816115, 0.0075537760893191284],
+    "ci_lower": [0.58102655146102145, -0.83584677100314786, -2.3239734485389789],
+    "ci_upper": [2.4989734485389787, 1.1858467710031475, -0.40602655146102162]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "q": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

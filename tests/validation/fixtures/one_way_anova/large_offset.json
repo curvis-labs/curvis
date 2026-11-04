@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "one_way_anova",
+  "case": "large_offset",
+  "description": "Small spread on a large offset.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1000000.12, 1000000.3100000001, 1000000.25, 1000000.1800000001],
+      [1000000.42, 1000000.37, 1000000.55, 1000000.49],
+      [1000000.2, 1000000.33, 1000000.29, 1000000.41]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [4, 4, 4],
+    "mean": [1000000.2150000001, 1000000.4575, 1000000.3075],
+    "df_between": 2,
+    "df_within": 9,
+    "ss_between": 0.11981666661199804,
+    "ss_within": 0.062050000027101482,
+    "ms_between": 0.059908333305999019,
+    "ms_within": 0.0068944444474557205,
+    "f": 8.6893634088395899,
+    "p_value": 0.0079149660474879778
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "df_between": "exact",
+    "df_within": "exact",
+    "ss_between": "statistic",
+    "ss_within": "statistic",
+    "ms_between": "statistic",
+    "ms_within": "statistic",
+    "f": "statistic",
+    "p_value": "p_value"
+  }
+}

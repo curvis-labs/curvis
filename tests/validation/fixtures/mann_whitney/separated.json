@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "analysis": "mann_whitney",
+  "case": "separated",
+  "description": "Complete separation, 12 against 12: the smallest exact P. (Wilcoxon rank sum exact test)",
+  "generated_by": {
+    "script": "validation/r/scripts/mann_whitney.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5],
+    "b": [13.5, 14.5, 15.5, 16.5, 17.5, 18.5, 19.5, 20.5, 21.5, 22.5, 23.5, 24.5]
+  },
+  "expected": {
+    "n_a": 12,
+    "n_b": 12,
+    "u": 0,
+    "p_value": 7.39602301050679e-07,
+    "exact": 1,
+    "median_a": 7,
+    "median_b": 19
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "u": "exact",
+    "p_value": "p_value",
+    "exact": "exact",
+    "median_a": "statistic",
+    "median_b": "statistic"
+  }
+}

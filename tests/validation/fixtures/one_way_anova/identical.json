@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "one_way_anova",
+  "case": "identical",
+  "description": "Three groups with the same values: F = 0, P = 1.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [2.5, 3.1000000000000001, 4.7000000000000002, 3.8999999999999999],
+      [2.5, 3.1000000000000001, 4.7000000000000002, 3.8999999999999999],
+      [2.5, 3.1000000000000001, 4.7000000000000002, 3.8999999999999999]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [4, 4, 4],
+    "mean": [3.5499999999999998, 3.5499999999999998, 3.5499999999999998],
+    "df_between": 2,
+    "df_within": 9,
+    "ss_between": 0,
+    "ss_within": 8.2500000000000018,
+    "ms_between": 0,
+    "ms_within": 0.91666666666666685,
+    "f": 0,
+    "p_value": 1
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "df_between": "exact",
+    "df_within": "exact",
+    "ss_between": "statistic",
+    "ss_within": "statistic",
+    "ms_between": "statistic",
+    "ms_within": "statistic",
+    "f": "statistic",
+    "p_value": "p_value"
+  }
+}

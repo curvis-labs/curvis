@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "analysis": "mann_whitney",
+  "case": "ties",
+  "description": "Ties within and across groups, small n: exact with ties. (Wilcoxon rank sum exact test)",
+  "generated_by": {
+    "script": "validation/r/scripts/mann_whitney.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [1, 2, 2, 3, 3, 3, 5],
+    "b": [2, 3, 4, 4, 5, 5, 6, 6]
+  },
+  "expected": {
+    "n_a": 7,
+    "n_b": 8,
+    "u": 10.5,
+    "p_value": 0.045376845376845373,
+    "exact": 1,
+    "median_a": 3,
+    "median_b": 4.5
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "u": "exact",
+    "p_value": "p_value",
+    "exact": "exact",
+    "median_a": "statistic",
+    "median_b": "statistic"
+  }
+}

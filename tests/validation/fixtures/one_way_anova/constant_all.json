@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "one_way_anova",
+  "case": "constant_all",
+  "description": "Every group is constant (different values): no variation within groups.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1, 1, 1],
+      [2, 2, 2],
+      [4, 4, 4]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [3, 3, 3],
+    "mean": [1, 2, 4],
+    "df_between": 2,
+    "df_within": 6,
+    "ss_between": 14,
+    "ss_within": 0,
+    "ms_between": 7,
+    "ms_within": 0,
+    "f": "NaN",
+    "p_value": "NaN"
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "df_between": "exact",
+    "df_within": "exact",
+    "ss_between": "statistic",
+    "ss_within": "statistic",
+    "ms_between": "statistic",
+    "ms_within": "statistic",
+    "f": "statistic",
+    "p_value": "p_value"
+  }
+}

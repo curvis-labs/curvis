@@ -385,6 +385,132 @@
           "median": 0.0019680679999964923
         }
       ]
+    },
+    {
+      "name": "test_t_test_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_t_test_10k_points",
+      "stats": {
+        "min": 0.00012573141251463011
+      },
+      "runs": [
+        {
+          "min": 0.00012573141251463011,
+          "median": 0.00013462472866288626
+        },
+        {
+          "min": 0.0001259880246160091,
+          "median": 0.00014049923587450703
+        },
+        {
+          "min": 0.0001272331116633057,
+          "median": 0.00015280760669727426
+        }
+      ]
+    },
+    {
+      "name": "test_one_way_anova_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_one_way_anova_10k_points",
+      "stats": {
+        "min": 0.00013664788966125745
+      },
+      "runs": [
+        {
+          "min": 0.00013679708172832352,
+          "median": 0.00014555786077830894
+        },
+        {
+          "min": 0.00013664788966125745,
+          "median": 0.00015069562846477594
+        },
+        {
+          "min": 0.00013919471356834724,
+          "median": 0.0001637935885331791
+        }
+      ]
+    },
+    {
+      "name": "test_one_way_anova_with_tukey_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_one_way_anova_with_tukey_10k_points",
+      "stats": {
+        "min": 0.07290712576844764
+      },
+      "runs": [
+        {
+          "min": 0.07290712576844764,
+          "median": 0.09449407414544897
+        },
+        {
+          "min": 0.0789072338002954,
+          "median": 0.08555016794553606
+        },
+        {
+          "min": 0.07968141325059405,
+          "median": 0.11030526058433301
+        }
+      ]
+    },
+    {
+      "name": "test_one_way_anova_with_dunnett_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_one_way_anova_with_dunnett_10k_points",
+      "stats": {
+        "min": 0.17396222421853028
+      },
+      "runs": [
+        {
+          "min": 0.1752102325169711,
+          "median": 0.1789406005936557
+        },
+        {
+          "min": 0.18891913892287282,
+          "median": 0.19141110199562822
+        },
+        {
+          "min": 0.17396222421853028,
+          "median": 0.17841570991927047
+        }
+      ]
+    },
+    {
+      "name": "test_one_way_anova_with_holm_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_one_way_anova_with_holm_10k_points",
+      "stats": {
+        "min": 0.0003126102542392041
+      },
+      "runs": [
+        {
+          "min": 0.0003126102542392041,
+          "median": 0.00034555003038781555
+        },
+        {
+          "min": 0.00048607017890976847,
+          "median": 0.0006300805695473268
+        },
+        {
+          "min": 0.0004163480402708671,
+          "median": 0.00043518949677471994
+        }
+      ]
+    },
+    {
+      "name": "test_mann_whitney_exact_49_by_49",
+      "fullname": "tests/bench/test_stats.py::test_mann_whitney_exact_49_by_49",
+      "stats": {
+        "min": 0.0849514162373045
+      },
+      "runs": [
+        {
+          "min": 0.08559703294349948,
+          "median": 0.08942140352783365
+        },
+        {
+          "min": 0.0849514162373045,
+          "median": 0.10777181666500155
+        },
+        {
+          "min": 0.08757994127437364,
+          "median": 0.09485477840883375
+        }
+      ]
     }
   ]
 }

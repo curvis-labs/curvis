@@ -10,7 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QDialog
+from PySide6.QtWidgets import QApplication, QComboBox, QDialog
 
 from curvis.compute import Scheduler
 from curvis.core import AddConstant, AddTable, Calculation, CalculationKind, Document
@@ -119,6 +119,21 @@ def _analyze_nothing_ticked(ctx: Context) -> QDialog:
     return dialog
 
 
+def _analyze_t_test(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.set_analysis_type("t_test")
+    return dialog
+
+
+def _analyze_anova_dunnett(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.set_analysis_type("one_way_anova")
+    combo = dialog.forms["one_way_anova"].fields["posthoc"]
+    assert isinstance(combo, QComboBox)
+    combo.setCurrentIndex(combo.findData("dunnett"))
+    return dialog
+
+
 def _import(ctx: Context) -> QDialog:
     dialog = ImportDialog(CSV, ctx.scheduler)
     dialog.header_row.setValue(3)
@@ -161,6 +176,8 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "analyze": _analyze,
     "analyze_advanced": _analyze_advanced,
     "analyze_nothing_ticked": _analyze_nothing_ticked,
+    "analyze_t_test": _analyze_t_test,
+    "analyze_anova_dunnett": _analyze_anova_dunnett,
     "constants": _constants,
     "constant_editor": _constant_editor,
     "settings": _settings,

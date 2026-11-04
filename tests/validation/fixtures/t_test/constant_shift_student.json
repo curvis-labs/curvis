@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "constant_shift_student",
+  "description": "B = A + 1 exactly: the paired differences have no variation. (unpaired, Student)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [1.5, 2.5, 4, 7, 11],
+    "b": [2.5, 3.5, 5, 8, 12],
+    "paired": false,
+    "welch": false
+  },
+  "expected": {
+    "n_a": [5],
+    "n_b": [5],
+    "mean_a": [5.2000000000000002],
+    "mean_b": [6.2000000000000002],
+    "difference": [1],
+    "se": [2.435159132377184],
+    "t": [0.41065078117659093],
+    "df": [8],
+    "p_value": [0.69210732171674016],
+    "ci_lower": [-4.6154870291419758],
+    "ci_upper": [6.6154870291419758]
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

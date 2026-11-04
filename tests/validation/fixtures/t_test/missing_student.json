@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "missing_student",
+  "description": "Missing values in both groups; paired drops incomplete pairs. (unpaired, Student)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [4.0999999999999996, "NaN", 5.2999999999999998, 6, 4.7999999999999998, "NaN", 5.5, 5.9000000000000004, 4.4000000000000004, 5],
+    "b": [5, 5.7999999999999998, "NaN", 6.9000000000000004, 5.0999999999999996, 6.4000000000000004, "NaN", 6.2000000000000002, 5.5999999999999996, 5.7999999999999998],
+    "paired": false,
+    "welch": false
+  },
+  "expected": {
+    "n_a": [8],
+    "n_b": [8],
+    "mean_a": [5.125],
+    "mean_b": [5.8499999999999996],
+    "difference": [0.72499999999999964],
+    "se": [0.33044882897572597],
+    "t": [2.1939856837963148],
+    "df": [14],
+    "p_value": [0.045611412081798579],
+    "ci_lower": [0.016257750574835476],
+    "ci_upper": [1.4337422494251637]
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

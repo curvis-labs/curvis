@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "analysis": "t_test",
+  "case": "n_small_paired",
+  "description": "n = 2 per group. (paired)",
+  "generated_by": {
+    "script": "validation/r/scripts/t_test.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [1.2, 2.8999999999999999],
+    "b": [3.1000000000000001, 4.5999999999999996],
+    "paired": true,
+    "welch": false
+  },
+  "expected": {
+    "n_pairs": [2],
+    "mean_a": [2.0499999999999998],
+    "mean_b": [3.8499999999999996],
+    "difference": [1.7999999999999998],
+    "se": [0.1000000000000002],
+    "t": [17.999999999999961],
+    "df": [1],
+    "p_value": [0.035331445776269343],
+    "ci_lower": [0.52937952638252772],
+    "ci_upper": [3.0706204736174718]
+  },
+  "kinds": {
+    "n_pairs": "exact",
+    "mean_a": "statistic",
+    "mean_b": "statistic",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

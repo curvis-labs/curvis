@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "holm_pairwise",
+  "case": "large_offset",
+  "description": "Small spread on a large offset.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1000000.12, 1000000.3100000001, 1000000.25, 1000000.1800000001],
+      [1000000.42, 1000000.37, 1000000.55, 1000000.49],
+      [1000000.2, 1000000.33, 1000000.29, 1000000.41]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [0.24249999993480742, 0.092499999911524355, -0.15000000002328306],
+    "se": [0.058713049858850459, 0.058713049858850459, 0.058713049858850459],
+    "t": [4.1302572514592812, 1.5754589505041836, -2.5547983009550972],
+    "df": 9,
+    "p_unadjusted": [0.0025585067005893529, 0.14960385642808616, 0.030950132532891497],
+    "p_value": [0.0076755201017680592, 0.14960385642808616, 0.061900265065782993]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_unadjusted": "p_value",
+    "p_value": "p_value"
+  }
+}

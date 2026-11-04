@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "dunnett",
+  "case": "n_small",
+  "description": "Three groups of n = 2 (df_within = 3).",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "multcomp": "1.4.32",
+      "mvtnorm": "1.4.2",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1.1000000000000001, 2.2999999999999998],
+      [3.5, 4.0999999999999996],
+      [2, 6.2000000000000002]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group": [1, 2],
+    "difference": [2.0999999999999996, 2.3999999999999995],
+    "se": [1.8, 1.8],
+    "t": [1.1666666666666665, 1.333333333333333],
+    "p_value": [0.48669294315278189, 0.41512168546789974],
+    "ci_lower": [-4.8597178235222627, -4.5597178235222628],
+    "ci_upper": [9.0597178235222628, 9.3597178235222618]
+  },
+  "kinds": {
+    "group": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

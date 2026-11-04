@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "analysis": "mann_whitney",
+  "case": "large_ties",
+  "description": "60 against 70 rounded values: normal approximation with ties. (Wilcoxon rank sum test with continuity correction)",
+  "generated_by": {
+    "script": "validation/r/scripts/mann_whitney.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "a": [6, 6, 6, 9, 3, 6, 4, 5, 4, 6, 4, 3, 7, 7, 7, 2, 6, 6, 1, 4, 6, 5, 4, 4, 6, 3, 5, 7, 6, 7, 1, 8, 2, 10, 6, 3, -0, 9, 6, 6, 6, 6, 5, 5, 4, 7, 6, 6, 6, 7, 7, 7, 6, 7, 5, 4, 6, 3, 2, 2],
+    "b": [9, 4, 6, 7, 5, 6, 3, 8, 8, 7, 2, 6, 11, 1, 3, 7, 8, 2, 6, 9, 6, 4, 4, 8, 7, 8, 2, 6, 6, 5, 6, 8, 3, 9, 9, 7, 7, 5, 5, 7, 4, 7, 6, 6, 6, 8, 5, 5, 5, 6, 6, 7, 5, 3, 3, 6, 7, 5, 7, 6, 6, 6, 9, 4, 7, 6, 9, 4, 5, 9]
+  },
+  "expected": {
+    "n_a": 60,
+    "n_b": 70,
+    "u": 1688,
+    "p_value": 0.050540449685300727,
+    "exact": 0,
+    "median_a": 6,
+    "median_b": 6
+  },
+  "kinds": {
+    "n_a": "exact",
+    "n_b": "exact",
+    "u": "exact",
+    "p_value": "p_value",
+    "exact": "exact",
+    "median_a": "statistic",
+    "median_b": "statistic"
+  }
+}

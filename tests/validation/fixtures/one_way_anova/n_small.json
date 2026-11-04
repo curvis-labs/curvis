@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "analysis": "one_way_anova",
+  "case": "n_small",
+  "description": "Three groups of n = 2 (df_within = 3).",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1.1000000000000001, 2.2999999999999998],
+      [3.5, 4.0999999999999996],
+      [2, 6.2000000000000002]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [2, 2, 2],
+    "mean": [1.7, 3.7999999999999998, 4.0999999999999996],
+    "df_between": 2,
+    "df_within": 3,
+    "ss_between": 6.839999999999999,
+    "ss_within": 9.7199999999999989,
+    "ms_between": 3.4199999999999995,
+    "ms_within": 3.2399999999999998,
+    "f": 1.0555555555555556,
+    "p_value": 0.44968551516168659
+  },
+  "kinds": {
+    "n": "exact",
+    "mean": "statistic",
+    "df_between": "exact",
+    "df_within": "exact",
+    "ss_between": "statistic",
+    "ss_within": "statistic",
+    "ms_between": "statistic",
+    "ms_within": "statistic",
+    "f": "statistic",
+    "p_value": "p_value"
+  }
+}

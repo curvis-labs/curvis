@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "holm_pairwise",
+  "case": "identical",
+  "description": "Three groups with the same values: F = 0, P = 1.",
+  "generated_by": {
+    "script": "validation/r/scripts/one_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [2.5, 3.1000000000000001, 4.7000000000000002, 3.8999999999999999],
+      [2.5, 3.1000000000000001, 4.7000000000000002, 3.8999999999999999],
+      [2.5, 3.1000000000000001, 4.7000000000000002, 3.8999999999999999]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [0, 0, 0],
+    "se": [0.67700320038633011, 0.67700320038633011, 0.67700320038633011],
+    "t": [0, 0, 0],
+    "df": 9,
+    "p_unadjusted": [1, 1, 1],
+    "p_value": [1, 1, 1]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_unadjusted": "p_value",
+    "p_value": "p_value"
+  }
+}
