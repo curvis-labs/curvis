@@ -406,12 +406,13 @@ Build src/curvis/charts:
 Make a plan first. When done, report what you built and the redraw benchmark.
 ```
 
-### Step 2.6 — Several tables per project
+### Step 2.6 — Several tables per project, renaming in place
 
 **Done when**
 - [ ] A project shows its tables as tabs along the bottom; New table (File menu, +, Ctrl+Shift+N) adds one, and tabs can be renamed and reordered.
 - [ ] Closing a table deletes it with its calculated columns, analyses and graphs after the warning, as one undo step; the last table cannot be closed.
 - [ ] The Results and Graph panels, Import data and the table toolbar follow the selected table; a project with several tables saves and opens unchanged.
+- [ ] Column, replicate group and category names are renamed in place in the header; Tab and Shift+Tab move to the next and previous header.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.6 in docs/PHASES.md.
@@ -423,7 +424,8 @@ Build several tables per project, following docs/DESIGN.md section 8 and docs/mo
 - The Close table warning built from src/curvis/ui/dialogs.py, with Cancel as the default button; an empty table closes without asking. Disabled Close table says why.
 - Import data goes into the selected table; the status message names it.
 - Double-click rename in place and a tab context menu (Rename, Close table…, New table); drag to reorder.
-- Tests: unit tests for the commands (remove with analyses and graphs, undo, last-table refusal, move), a save/open round trip with three tables, and pytest-qt tests for the main paths (new, switch, rename, close with warning, close the last table refused, import into the selected table, panels follow the table). Check the graph redraw benchmark does not regress.
+- Renaming in the column header, following docs/DESIGN.md section 9 and board 6 of the mockup: double-click a column name or Rename column (Ctrl+Shift+R, no longer a dialog) opens a field over the name; Enter or a click elsewhere keeps it, Esc cancels, Tab / Shift+Tab keep it and edit the next / previous header, stopping at the last column. Group and category bands use the same editor (Tab moves within their row). One RenameColumn (or group/category rename) per changed name; invalid names keep the field open with the reason in the status bar. Share the in-place editor with the table tab rename.
+- Tests: unit tests for the commands (remove with analyses and graphs, undo, last-table refusal, move), a save/open round trip with three tables, and pytest-qt tests for the main paths (new, switch, rename, close with warning, close the last table refused, import into the selected table, panels follow the table, header rename with Enter, Esc, Tab across several headers, Shift+Tab, the last column, an invalid name, undo per name). Check the graph redraw benchmark does not regress.
 
 Make a plan first. When done, report what you built, the tests and benchmarks, and anything open.
 ```

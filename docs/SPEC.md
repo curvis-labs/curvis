@@ -29,6 +29,7 @@ Columns can be organized further:
 
 - **Replicate groups** combine several Y columns into one series, from which mean, SD and SEM are calculated.
 - **Category groups** define a second factor for two-way ANOVA and grouped charts.
+- **Renaming in place.** Double-clicking a column name in the header edits it in place; Tab keeps the name and moves to the next column header on the right (Shift+Tab to the left), so a row of names can be typed in one go. Replicate group and category names in the header edit the same way.
 - **Bulk rename** relabels many columns and groups in one step.
 
 Columns and column groups are movable by drag and drop.

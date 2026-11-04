@@ -8,7 +8,7 @@
   Mockup of several tables per project, shown as sheet tabs along the bottom of the project
   tab (version A, approved; B-D, a second row on top, tabs above the table only and a
   vertical list, were not chosen). Also: New table, the warning when a table is closed,
-  renaming, and the last table. Drawn at 1:1 with the theme palette (DESIGN.md section 3).
+  renaming, the last table, and renaming a column in its header. Drawn at 1:1 with the theme palette (DESIGN.md section 3).
 -->
 <style>
   :root, :root[data-theme="light"] {
@@ -254,6 +254,23 @@
   </div>
 </section>
 
+<section class="board">
+  <h2>6 · Renaming a column in its header</h2>
+  <div class="row">
+    <div class="win" id="v9" style="width:760px;height:250px;overflow:visible"></div>
+    <div class="notes">
+      <ol>
+        <li>Double-click a column name (or Rename column, Ctrl+Shift+R) edits it in place, with the text selected. The role line (X, Y, ƒ Y …) stays visible under it.</li>
+        <li><b>Tab</b> keeps the name and edits the next column header to the right; <b>Shift+Tab</b> the one to the left. Tab on the last column keeps the name and stops (it adds no column).</li>
+        <li>Enter or a click elsewhere keeps the name; Esc cancels the header being edited (names already kept with Tab stay).</li>
+      </ol>
+      <p>Each changed name is one undo step (“Rename column 'Drug' to 'Drug A'”); a name left unchanged adds none.</p>
+      <p>An empty name or one already used in the table keeps the editor open and says why in the status bar: “Enter a column name.” / “'Control' is already used in this table. Enter another name.”</p>
+      <p>Replicate group and category names in the bands above work the same way (double-click, Enter, Esc); Tab moves to the next band in the same row. Bulk rename stays for many names at once.</p>
+    </div>
+  </div>
+</section>
+
 <script>
   var ICONS = {
       "new": "<path d=\"M17.25 10.75V7.25a1 1 0 0 0-1-1H10L8.25 4.25h-4.5a1 1 0 0 0-1 1v10.5a1 1 0 0 0 1 1H11\"/><path class=\"a\" d=\"M15 12.75v5M12.5 15.25h5\"/>",
@@ -386,6 +403,17 @@
     '</div>' +
     '<div class="tip" style="left:240px;top:126px">A project needs at least one table.</div>' +
     m(1, "left:-26px;bottom:34px") + m(2, "left:-26px;top:140px");
+
+  // 6: rename a header in place
+  (function () {
+    var g = grid()
+      .replace('<th>Drug<small>Y</small></th>', '<th style="padding:1px 3px"><span class="edit" style="display:block;text-align:center">Drug A</span><small>Y</small></th>')
+      .replace('<th>Drug norm<small>ƒ Y</small></th>', '<th style="position:relative">Drug norm<small>ƒ Y</small></th>');
+    document.getElementById("v9").innerHTML = chrome({ noTable: true }).replace(/<div class="toolbars">[\s\S]*?<\/div>/, '') +
+      '<div class="content">' + g + '</div>' + btabs(TABLES, 0) + status() +
+      '<div class="tip" style="left:400px;top:92px">Tab › Drug norm · Shift+Tab ‹ Control</div>' +
+      m(1, "left:298px;top:70px") + m(2, "left:376px;top:94px") + m(3, "left:-26px;top:94px");
+  })();
 
   (function () {
     var root = document.documentElement, buttons = document.querySelectorAll(".switch button");

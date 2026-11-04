@@ -186,6 +186,7 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   | Ctrl+, | Settings |
   | Ctrl+Shift+I | Import data |
   | Ctrl+Shift+N | New table |
+  | Ctrl+Shift+R | Rename column (in the header) |
   | Ctrl+Page Down / Ctrl+Page Up | Next / previous table |
   | Ctrl+Shift+K | Calculate |
   | Ctrl+Shift+E | Edit calculation |
@@ -270,3 +271,22 @@ Mockup: `docs/mockups/table-tabs.html`.
   cancels, and a name already used keeps the old name and says so in the status bar. The
   context menu has *Rename*, *Close table…* and *New table*. Tabs can be dragged to reorder.
 - **Keyboard.** Ctrl+Page Down and Ctrl+Page Up select the next and previous table.
+
+## 9. Renaming in the column header
+
+Mockup: `docs/mockups/table-tabs.html`, board 6.
+
+- **Start.** Double-click a column name, or use *Rename column* (Ctrl+Shift+R) on the current
+  column: a field opens over the name in the header with the text selected. The role line
+  under it (X, Y, ƒ Y …) stays visible. *Rename column* opens no dialog, so its menu text has
+  no ellipsis.
+- **Keys.** Enter or a click elsewhere keeps the name. Esc cancels the header being edited.
+  Tab keeps the name and edits the next column header to the right, Shift+Tab the one to the
+  left. Tab on the last column keeps the name and stops; it never adds a column.
+- **Undo.** Each changed name is one undo step (“Rename column 'Drug' to 'Drug A'”). A name
+  left unchanged adds none, and names kept with Tab stay when a later header is cancelled.
+- **Invalid names.** An empty name or one already used in the table keeps the field open and
+  says why in the status bar: “Enter a column name.” or “'Control' is already used in this
+  table. Enter another name.” Esc gives up and keeps the old name.
+- **Group and category bands** rename the same way (double-click, Enter, Esc), instead of a
+  dialog; Tab moves to the next band in the same row. Bulk rename stays for many names at once.
