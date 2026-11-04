@@ -27,7 +27,8 @@
 #   analytic Jacobian finish it (polish()), and the script checks that the result is a
 #   minimum and that drc found the same one.
 # - SE: asymptotic, sqrt(diag(s² (JᵀJ)⁻¹)) with the analytic Jacobian J at the optimum
-#   and s² = RSS / df, df = n - number of fitted parameters (checked against drc's vcov).
+#   and s² = RSS / df, df = n - number of fitted parameters (checked against nlsLM's
+#   vcov; drc's vcov uses the Hessian of the RSS instead, see fit_logistic()).
 # - CI of a parameter: estimate -/+ qt(0.975, df) * SE.
 # - EC50 = 10^logEC50 and its CI is 10^(CI of logEC50) (asymmetric).
 # - R² = 1 - RSS / TSS; Sy.x = sqrt(RSS / df).
@@ -46,6 +47,10 @@
 # A fit with df = 0 has no SE, CI, Sy.x or band limits (NaN).
 
 LN10 <- log(10)
+
+# Relative differences between Curvis' Hill slope SE and drc's, printed at the end.
+.drc_se <- new.env()
+.drc_se$diff <- double()
 
 # The model and its gradient in (bottom, top, log_ec50, hill_slope). At X' = -Inf
 # (concentration 0) they take their limits.
@@ -122,21 +127,23 @@ fit_logistic <- function(xl, y, model) {
     cosine <- abs(crossprod(jac, r)) / (sqrt(colSums(jac^2)) * sqrt(rss))
     if (max(cosine) > 1e-7) stop("nlsLM stopped short of the minimum (cosine ", max(cosine), ")")
   }
-  # SEs agree with drc's (b, c, d, e) covariance, converted by the delta method.
+  # SEs agree with nlsLM's (s² (JᵀJ)⁻¹ too, with a numerical Jacobian, at its own end
+  # point). drc's vcov() is not comparable: it inverts the numerical Hessian of the RSS,
+  # which also holds the residuals' second-order term, so its SEs differ by a few % for
+  # noisy data. That difference is only printed.
   if (df > 0) {
-    se_drc <- sqrt(diag(vcov(drm_fit)))
-    names(se_drc) <- names(cf)  # drc's vcov() has no dimnames; same order as coef()
     se <- sqrt(diag(rss / df * inv))
     names(se) <- free
-    e <- cf[["e:(Intercept)"]]
-    # drc's upper limit d is Curvis' Top unless canonical() swapped Top and Bottom.
-    top_drc <- if (model == "4pl" && cf[["d:(Intercept)"]] < cf[["c:(Intercept)"]])
-                 "c:(Intercept)" else "d:(Intercept)"
-    stopifnot(
-      isTRUE(all.equal(se[["hill_slope"]], se_drc[["b:(Intercept)"]], tolerance = 1e-2)),
-      isTRUE(all.equal(se[["top"]], se_drc[[top_drc]], tolerance = 1e-2)),
-      isTRUE(all.equal(se[["log_ec50"]], se_drc[["e:(Intercept)"]] / (e * LN10),
-                       tolerance = 1e-2)))
+    se_nls <- sqrt(diag(vcov(nls_fit)))
+    # canonical() may have swapped Top and Bottom (their SEs swap with them).
+    if (model == "4pl" && est[["top"]] < est[["bottom"]]) {
+      se_nls[c("bottom", "top")] <- se_nls[c("top", "bottom")]
+    }
+    stopifnot(isTRUE(all.equal(se[free], se_nls[free], tolerance = 1e-3)))
+    se_drc <- sqrt(diag(vcov(drm_fit)))
+    names(se_drc) <- names(cf)  # drc's vcov() has no dimnames; same order as coef()
+    drc_diff <- abs(se[["hill_slope"]] / se_drc[["b:(Intercept)"]] - 1)
+    .drc_se$diff <- c(.drc_se$diff, drc_diff)
   }
   list(p = p, free = free, rss = rss, df = df, jtj = jtj, n = n)
 }
@@ -327,3 +334,7 @@ logistic_fixture("steep", "A steep curve (Hill slope 3.5) with points on both pl
 logistic_fixture("no_plateaus",
                  "An exact straight line in log(concentration): the 4PL fit has no minimum.",
                  conc, list(50 + 8 * (log10(conc) + 6.5)), "4pl", at_conc, expect_fit = FALSE)
+
+d <- .drc_se$diff
+message(sprintf("  dose_response: Hill slope SE vs. drc's Hessian-based vcov, rel. diff median %.1e, max %.1e (%d fits)",
+                median(d), max(d), length(d)))

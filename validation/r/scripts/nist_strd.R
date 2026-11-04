@@ -140,8 +140,15 @@ nist_nls_ <- function(name) {
   cert <- section(lines, "Certified Values")
   rss <- labelled_value(cert, "Residual Sum of Squares:")
   sy_x <- labelled_value(cert, "Residual Standard Deviation:")
-  df <- labelled_value(cert, "Degrees of Freedom:")
-  stopifnot(df == nrow(d) - nrow(v))
+  # df = n - p. The file's own df line is only checked: Rat43.dat states 9 where its
+  # certified RSS and residual SD give RSS / SD² = 11 = 15 - 4.
+  df <- nrow(d) - nrow(v)
+  stopifnot(abs(rss / sy_x^2 / df - 1) < 1e-8)
+  stated_df <- labelled_value(cert, "Degrees of Freedom:")
+  if (stated_df != df) {
+    message(sprintf("  %s.dat states %g degrees of freedom; n - p = RSS / SD^2 = %d is used",
+                    name, stated_df, df))
+  }
   for (s in 1:2) {
     write_fixture(
       analysis = "nist_nls",
