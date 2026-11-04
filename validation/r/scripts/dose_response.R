@@ -125,6 +125,7 @@ fit_logistic <- function(xl, y, model) {
   # SEs agree with drc's (b, c, d, e) covariance, converted by the delta method.
   if (df > 0) {
     se_drc <- sqrt(diag(vcov(drm_fit)))
+    names(se_drc) <- names(cf)  # drc's vcov() has no dimnames; same order as coef()
     se <- sqrt(diag(rss / df * inv))
     names(se) <- free
     e <- cf[["e:(Intercept)"]]

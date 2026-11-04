@@ -34,29 +34,36 @@ nist_lines <- function(kind, name) {
   sub("\r$", "", readLines(path, warn = FALSE))
 }
 
-# The line range of a section, from the header line "<label> (lines a to b)".
-section <- function(lines, label) {
+# The line numbers of a section, from the header line "<label> (lines a to b)".
+section_range <- function(lines, label) {
   hit <- grep(paste0(label, "\\s*\\(lines\\s+\\d+\\s+to\\s+\\d+\\)"), lines, value = TRUE,
               ignore.case = TRUE)
-  stopifnot(length(hit) == 1L)
+  if (length(hit) != 1L) stop("no single '", label, " (lines a to b)' line in the header")
   m <- regmatches(hit, regexec("lines\\s+(\\d+)\\s+to\\s+(\\d+)", hit))[[1]]
-  lines[as.integer(m[2]):as.integer(m[3])]
+  as.integer(m[2]):as.integer(m[3])
 }
+
+section <- function(lines, label) lines[section_range(lines, label)]
 
 numbers <- function(line) {
   tokens <- strsplit(trimws(line), "\\s+")[[1]]
   as.double(tokens[grepl("^[-+]?[0-9.]+([EeDd][-+]?[0-9]+)?$", tokens)])
 }
 
-# The data section: numeric rows; the column names come from the "Data:" line above.
+# The data section: numeric rows. The column names are on the last non-blank line
+# above the first data row ("Data:   y   x" in the StRD files; the "Data:" is optional).
 nist_data <- function(lines) {
-  rows <- section(lines, "Data")
+  range <- section_range(lines, "Data")
+  rows <- lines[range]
   rows <- rows[nzchar(trimws(rows))]
   m <- do.call(rbind, lapply(rows, numbers))
-  header <- grep("^\\s*Data:", lines, value = TRUE)
-  stopifnot(length(header) == 1L)
+  above <- which(nzchar(trimws(lines[seq_len(range[1] - 1L)])))
+  header <- lines[max(above)]
   cols <- strsplit(trimws(sub("^\\s*Data:", "", header)), "\\s+")[[1]]
-  stopifnot(ncol(m) == length(cols))
+  if (ncol(m) != length(cols)) {
+    stop("data columns: ", ncol(m), " numbers per row, but the line above the data reads '",
+         trimws(header), "'")
+  }
   colnames(m) <- tolower(cols)
   m
 }
@@ -73,6 +80,12 @@ labelled_value <- function(lines, label) {
 # --- Linear --------------------------------------------------------------------------
 
 nist_linear <- function(name, degree) {
+  withCallingHandlers(nist_linear_(name, degree), error = function(e) {
+    message("While reading ", name, ".dat (NIST StRD linear)")
+  })
+}
+
+nist_linear_ <- function(name, degree) {
   lines <- nist_lines("lls", name)
   d <- nist_data(lines)
   stopifnot(identical(colnames(d), c("y", "x")))
@@ -111,6 +124,12 @@ for (i in 1:5) nist_linear(paste0("Wampler", i), 5L)
 # --- Nonlinear -----------------------------------------------------------------------
 
 nist_nls <- function(name) {
+  withCallingHandlers(nist_nls_(name), error = function(e) {
+    message("While reading ", name, ".dat (NIST StRD nonlinear)")
+  })
+}
+
+nist_nls_ <- function(name) {
   lines <- nist_lines("nls", name)
   d <- nist_data(lines)
   stopifnot(identical(colnames(d), c("y", "x")))
