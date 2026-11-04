@@ -132,7 +132,8 @@ def toolbar_buttons() -> dict[str, Button]:
 
 def set_tooltips(registry: ActionRegistry, reasons: Mapping[str, str]) -> None:
     """Give each toolbar action its tooltip: why it is disabled (``reasons``), or its
-    name and shortcut ("Save project (Ctrl+S)")."""
+    name and shortcut ("Save project (Ctrl+S)"). Unchanged tooltips are left alone,
+    since setting one makes the action's toolbar button lay itself out again."""
     buttons = toolbar_buttons()
     for entry in registry.entries():
         button = buttons.get(entry.id)
@@ -140,7 +141,9 @@ def set_tooltips(registry: ActionRegistry, reasons: Mapping[str, str]) -> None:
             continue
         action = entry.action
         if not action.isEnabled():
-            action.setToolTip(reasons.get(entry.id, ""))
-            continue
-        name = button_name(entry, button)
-        action.setToolTip(f"{name} ({entry.shortcut})" if entry.shortcut else name)
+            tip = reasons.get(entry.id, "")
+        else:
+            name = button_name(entry, button)
+            tip = f"{name} ({entry.shortcut})" if entry.shortcut else name
+        if action.toolTip() != tip:
+            action.setToolTip(tip)

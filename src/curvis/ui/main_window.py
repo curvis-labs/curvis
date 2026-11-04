@@ -10,7 +10,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QCloseEvent, QCursor, QGuiApplication, QKeySequence
+from PySide6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QCursor,
+    QGuiApplication,
+    QKeySequence,
+    QShowEvent,
+)
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -139,7 +146,7 @@ class MainWindow(QMainWindow):
 
         self._create_actions()
         self._create_menus()
-        self.main_toolbar = build_main_toolbar(self, self.registry)
+        self.main_toolbar: QToolBar | None = None
         self.table_toolbar: QToolBar | None = None
 
         self.launcher.new_requested.connect(self.new_document)
@@ -151,6 +158,18 @@ class MainWindow(QMainWindow):
 
         self._refresh_recent()
         self._update_state()
+
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 (Qt API)
+        # The main toolbar is made when the window is first shown, not with the shell,
+        # so building the window stays quick; it is in place before the first paint.
+        self._ensure_main_toolbar()
+        super().showEvent(event)
+
+    def _ensure_main_toolbar(self) -> QToolBar:
+        """The main toolbar, made on first use (first show, or the table toolbar)."""
+        if self.main_toolbar is None:
+            self.main_toolbar = build_main_toolbar(self, self.registry)
+        return self.main_toolbar
 
     # --- actions and menus ----------------------------------------------------------
 
@@ -459,6 +478,7 @@ class MainWindow(QMainWindow):
             self._view_menu.actions()[0], [a("view.results"), a("view.graph")]
         )
         self._view_menu.insertSeparator(a("view.command_palette"))
+        self._ensure_main_toolbar()  # first in the row
         self.table_toolbar = build_table_toolbar(self, self.registry)
 
     # --- documents --------------------------------------------------------------------

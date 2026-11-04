@@ -10,6 +10,7 @@ from pytestqt.qtbot import QtBot
 
 from curvis.charts.builder import NEEDS_SURVIVAL, NEEDS_TWO_WAY, NEEDS_X
 from curvis.core import AddTable, SetCellValue
+from curvis.settings import Settings
 from curvis.ui.main_window import (
     NO_PROJECT,
     NOTHING_TO_REDO,
@@ -275,3 +276,24 @@ def test_plot_arrow_sits_beside_the_text(window: MainWindow) -> None:
         for y in range(image.height() - 6, image.height())
     ]
     assert all(c == background for c in corner)  # not in the corner, as Fusion draws it
+
+
+def test_main_toolbar_is_made_at_first_show_and_comes_first(
+    qtbot: QtBot, settings: Settings
+) -> None:
+    """Building the window shell stays quick: the main toolbar is made when the window
+    is first shown (before its first paint), and stays left of the table toolbar even
+    when a table toolbar was made first."""
+    hidden = MainWindow(settings)
+    qtbot.addWidget(hidden)
+    assert hidden.main_toolbar is None
+    hidden.new_document()  # makes the table toolbar before the window is shown
+    hidden.show()
+    qtbot.waitExposed(hidden)
+    main, table = hidden.main_toolbar, hidden.table_toolbar
+    assert main is not None and table is not None
+    assert main.isVisible()
+    assert main.geometry().left() < table.geometry().left()
+    assert [a.objectName() for a in buttons(main)] == MAIN_IDS
+    if hidden._scheduler is not None:
+        hidden._scheduler.shutdown()
