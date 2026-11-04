@@ -4,7 +4,7 @@ from collections.abc import Iterator
 
 import pytest
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QColor, QIcon
+from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence
 from PySide6.QtWidgets import QApplication, QMenu, QToolBar, QToolButton
 from pytestqt.qtbot import QtBot
 
@@ -46,6 +46,10 @@ def buttons(toolbar: QToolBar) -> list[QAction]:
     return [a for a in toolbar.actions() if not a.isSeparator()]
 
 
+def native(action: QAction) -> str:
+    return action.shortcut().toString(QKeySequence.SequenceFormat.NativeText)
+
+
 def table_toolbar(window: MainWindow) -> QToolBar:
     assert window.table_toolbar is not None
     return window.table_toolbar
@@ -79,9 +83,13 @@ def test_toolbars_are_fixed_and_out_of_the_tab_order(window: MainWindow) -> None
 def test_labels_and_tooltips(window: MainWindow) -> None:
     window.new_document()
     a = window.registry.action
-    assert a("file.save").toolTip() == f"Save project ({a('file.save').shortcut().toString()})"
+    # Shortcuts in the platform's own notation: "Ctrl+S" here, "⌘S" on macOS.
+    assert a("file.save").toolTip() == f"Save project ({native(a('file.save'))})"
     assert a("table.group").iconText() == "Group as replicates"  # no "&" or "…"
-    assert a("table.calculate").toolTip() == "Calculate (Ctrl+Shift+K)"
+    assert a("table.calculate").toolTip() == f"Calculate ({native(a('table.calculate'))})"
+    assert native(a("table.calculate")) == QKeySequence("Ctrl+Shift+K").toString(
+        QKeySequence.SequenceFormat.NativeText
+    )
     assert a("file.import").iconText() == "Import data"
     assert [a(i).iconText() for i in TABLE_IDS] == [
         "Import data",
