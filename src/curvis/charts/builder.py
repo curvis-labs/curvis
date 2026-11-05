@@ -7,6 +7,10 @@
   concentrations.
 - **Bar**: one bar per series, the mean of all its values with SD error bars.
 
+New XY graphs show a legend; bar graphs name their bars on the X axis and show one only
+when the table has category groups. :func:`with_variant` changes the type of a graph
+(Scatter, Line, Bar, Box), keeping its series and their style.
+
 :func:`family_problem` says why a table cannot be drawn in a family; the Plot menu
 shows it next to the disabled family.
 """
@@ -163,6 +167,7 @@ def default_spec(
             aspect_ratio=aspect_ratio,
             text_size=text_size,
             overlays=tuple(FitOverlay(a.id) for a in fits),
+            show_legend=True,
         )
     return ChartSpec(
         table_id=table.id,
@@ -176,7 +181,56 @@ def default_spec(
         title=table.name,
         aspect_ratio=aspect_ratio,
         text_size=text_size,
+        show_legend=bool(table.category_groups),
     )
+
+
+GRAPH_TYPES = (ChartVariant.SCATTER, ChartVariant.LINE, ChartVariant.BAR, ChartVariant.BOX)
+"""The types a graph can be changed to (Change graph type)."""
+
+
+def variant_problem(table: Table, variant: ChartVariant) -> str | None:
+    """Why a graph of ``table`` cannot be changed to ``variant`` (no full stop), or None."""
+    if variant not in GRAPH_TYPES:
+        return "This chart type cannot be drawn yet"
+    return family_problem(table, variant.family)
+
+
+def with_variant(spec: ChartSpec, variant: ChartVariant, table: Table) -> ChartSpec:
+    """``spec`` drawn as ``variant``, keeping its series, their style, the title, size,
+    text and legend. Moving to the bar family turns Error-column bars into SD and makes
+    the X axis the categories; moving to XY puts the table's X column on the X axis and
+    uses the Error column of a Y column that has one. Fit overlays are kept, so they come
+    back when the graph is XY again.
+
+    Raises ``ValueError`` with :func:`variant_problem`'s reason.
+    """
+    problem = variant_problem(table, variant)
+    if problem is not None:
+        raise ValueError(f"{problem}.")
+    family = variant.family
+    if family is spec.family:
+        return replace(spec, variant=variant)
+    if family is ChartFamily.BAR:
+        series = tuple(
+            replace(s, error_bars=ErrorBars.SD, error_column=None)
+            if s.error_bars is ErrorBars.ERROR_COLUMN
+            else s
+            for s in spec.series
+        )
+        return replace(spec, family=family, variant=variant, series=series, x_axis=AxisSpec())
+    x_id = x_column_id(table)
+    assert x_id is not None
+    styled: list[SeriesSpec] = []
+    for s in spec.series:
+        error = None
+        if any(c.id == s.source for c in table.columns):
+            error = error_column_of(table, s.source)
+        if error is not None:
+            s = replace(s, error_bars=ErrorBars.ERROR_COLUMN, error_column=error.id)
+        styled.append(s)
+    x_axis = AxisSpec(title=column_title(table.column(x_id)))
+    return replace(spec, family=family, variant=variant, series=tuple(styled), x_axis=x_axis)
 
 
 def with_fit(spec: ChartSpec, analysis: Analysis) -> ChartSpec:

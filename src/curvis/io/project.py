@@ -32,7 +32,7 @@ import pyarrow as pa
 from curvis import __version__
 from curvis.analysis import base as analysis_base
 from curvis.analysis.base import Analysis, params_from_json, params_to_json
-from curvis.charts.spec import ChartSpec, spec_from_json, spec_to_json
+from curvis.charts.spec import OLD_ASPECTS, ChartSpec, spec_from_json, spec_to_json
 from curvis.core.calculations import CalculatedColumn, Calculation, CalculationKind
 from curvis.core.change_log import ChangeLog, ChangeLogEntry
 from curvis.core.constants import JsonValue, ProjectConstant
@@ -48,7 +48,7 @@ from curvis.data import (
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -145,6 +145,22 @@ def _add_graphs(data: dict[str, Any]) -> dict[str, Any]:
     document = data.get("document")
     if isinstance(document, dict):
         document.setdefault("graphs", [])
+    return data
+
+
+@register_migration(5)
+def _page_presets_and_legends(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 6 sizes graphs with the Tall, Wide and Square pages instead of ratios, and
+    stores whether a graph shows its legend (format 5 showed one on XY graphs only)."""
+    document = data.get("document")
+    graphs = document.get("graphs") if isinstance(document, dict) else None
+    for graph in graphs if isinstance(graphs, list) else []:
+        if not isinstance(graph, dict):
+            continue
+        ratio = graph.get("aspect_ratio")
+        if isinstance(ratio, str) and ratio in OLD_ASPECTS:
+            graph["aspect_ratio"] = OLD_ASPECTS[ratio]
+        graph.setdefault("show_legend", graph.get("family") == "xy")
     return data
 
 

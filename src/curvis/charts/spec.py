@@ -63,6 +63,10 @@ class ChartVariant(StrEnum):
     def family(self) -> ChartFamily:
         return _VARIANT_FAMILY[self]
 
+    @property
+    def label(self) -> str:
+        return self.value.replace("_", " ").capitalize()
+
 
 _VARIANT_FAMILY = {
     ChartVariant.SCATTER: ChartFamily.XY,
@@ -123,16 +127,17 @@ class Scale(StrEnum):
     LOG = "log"
 
 
-ASPECT_RATIOS: dict[str, tuple[float, float]] = {
-    "4:3": (4.0, 3.0),
-    "16:9": (16.0, 9.0),
-    "1:1": (1.0, 1.0),
-    "3:4": (3.0, 4.0),
-    "3:2": (3.0, 2.0),
+ASPECT_PRESETS: dict[str, tuple[float, float]] = {
+    "tall": (4.0, 6.0),
+    "wide": (9.0, 6.0),
+    "square": (6.0, 6.0),
 }
-"""Aspect ratio presets (width : height). "custom" uses :attr:`ChartSpec.custom_size`."""
+"""Page size presets: (width, height) in cm. "custom" uses :attr:`ChartSpec.custom_size`."""
 CUSTOM_ASPECT = "custom"
-DEFAULT_ASPECT = "4:3"
+ASPECT_LABELS = {"tall": "Tall", "wide": "Wide", "square": "Square", CUSTOM_ASPECT: "Custom"}
+DEFAULT_ASPECT = "wide"
+OLD_ASPECTS = {"4:3": "wide", "16:9": "wide", "3:2": "wide", "3:4": "tall", "1:1": "square"}
+"""The ratios of project format 5 and the preset each became (format 6)."""
 DEFAULT_TEXT_SIZE = 10.0
 """Chart text size in points."""
 MIN_TEXT_SIZE, MAX_TEXT_SIZE = 4.0, 72.0
@@ -161,6 +166,8 @@ class SeriesSpec:
     error_column: str | None = None
     visible: bool = True
     """False when the series is toggled off (legend click)."""
+    in_legend: bool = True
+    """Listed in the legend (when the graph shows one)."""
 
 
 @dataclass(frozen=True)
@@ -201,6 +208,7 @@ class ChartSpec:
     color_scheme: str = "curvis"
     text_size: float = DEFAULT_TEXT_SIZE
     overlays: tuple[FitOverlay, ...] = ()
+    show_legend: bool = True
     id: str = field(default_factory=new_id)
 
     def __post_init__(self) -> None:
@@ -209,12 +217,16 @@ class ChartSpec:
             raise ValueError(problem)
 
     @property
+    def page_size_cm(self) -> tuple[float, float]:
+        """(width, height) of the graph's page in cm: what an export measures."""
+        if self.aspect_ratio == CUSTOM_ASPECT and self.custom_size is not None:
+            return self.custom_size
+        return ASPECT_PRESETS[self.aspect_ratio]
+
+    @property
     def aspect(self) -> float:
         """Width divided by height."""
-        if self.aspect_ratio == CUSTOM_ASPECT and self.custom_size is not None:
-            width, height = self.custom_size
-        else:
-            width, height = ASPECT_RATIOS[self.aspect_ratio]
+        width, height = self.page_size_cm
         return width / height
 
     def series_for(self, source: str) -> SeriesSpec | None:
@@ -263,7 +275,7 @@ def spec_problem(spec: ChartSpec) -> str | None:
         size = spec.custom_size
         if size is None or not (_positive(size[0]) and _positive(size[1])):
             return "a custom size needs a positive width and height"
-    elif spec.aspect_ratio not in ASPECT_RATIOS:
+    elif spec.aspect_ratio not in ASPECT_PRESETS:
         return f"unknown aspect ratio {spec.aspect_ratio!r}"
     if not (MIN_TEXT_SIZE <= spec.text_size <= MAX_TEXT_SIZE):
         return f"text size must be from {MIN_TEXT_SIZE:g} to {MAX_TEXT_SIZE:g} points"
@@ -298,6 +310,7 @@ def spec_to_json(spec: ChartSpec) -> dict[str, Any]:
         "overlays": [
             {"analysis_id": o.analysis_id, "show_band": o.show_band} for o in spec.overlays
         ],
+        "show_legend": spec.show_legend,
     }
 
 
@@ -312,6 +325,7 @@ def _series_to_json(s: SeriesSpec) -> dict[str, Any]:
         "error_bars": s.error_bars.value,
         "error_column": s.error_column,
         "visible": s.visible,
+        "in_legend": s.in_legend,
     }
 
 
@@ -341,10 +355,11 @@ def spec_from_json(data: Any) -> ChartSpec:
             if len(size) != 2:
                 raise ValueError("custom_size must be [width, height]")
             custom_size = (_num(size[0], "custom_size"), _num(size[1], "custom_size"))
+        family = _enum(ChartFamily, obj.get("family"), "family")
         return ChartSpec(
             id=_str(obj.get("id"), "id"),
             table_id=_str(obj.get("table_id"), "table_id"),
-            family=_enum(ChartFamily, obj.get("family"), "family"),
+            family=family,
             variant=_enum(ChartVariant, obj.get("variant"), "variant"),
             series=series,
             x_axis=_axis_from_json(obj.get("x_axis", {}), "x_axis"),
@@ -360,6 +375,9 @@ def spec_from_json(data: Any) -> ChartSpec:
                     _bool(_obj(o, "overlay").get("show_band", False), "overlay show_band"),
                 )
                 for o in _list(obj.get("overlays", []), "overlays")
+            ),
+            show_legend=_bool(
+                obj.get("show_legend", family is ChartFamily.XY), "show_legend"
             ),
         )
     except TypeError as exc:  # pragma: no cover - guarded by the checks above
@@ -380,6 +398,7 @@ def _series_from_json(data: Any) -> SeriesSpec:
         error_bars=_enum(ErrorBars, obj.get("error_bars", default.error_bars), "error_bars"),
         error_column=None if error_column is None else _str(error_column, "error_column"),
         visible=_bool(obj.get("visible", True), "visible"),
+        in_legend=_bool(obj.get("in_legend", True), "in_legend"),
     )
 
 

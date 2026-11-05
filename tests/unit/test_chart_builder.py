@@ -147,3 +147,61 @@ def test_every_table_gives_a_spec_or_a_reason(
             assert spec.family is family and spec.table_id == table.id
         else:
             assert problem and not problem.endswith(".")
+
+
+# --- legends and graph types ---------------------------------------------------------------
+
+
+def test_new_graphs_show_a_legend_on_xy_and_on_bars_with_categories() -> None:
+    from dataclasses import replace
+
+    from curvis.data import CategoryGroup
+
+    table = replicate_table()
+    assert default_spec(table, ChartFamily.XY).show_legend is True
+    assert default_spec(table, ChartFamily.BAR).show_legend is False
+    categorised = replace(table, category_groups=[CategoryGroup("Day 1")])
+    assert default_spec(categorised, ChartFamily.BAR).show_legend is True
+
+
+def test_graph_type_within_a_family_keeps_everything_else() -> None:
+    from dataclasses import replace
+
+    from curvis.charts.builder import with_variant
+
+    spec = replace(default_spec(replicate_table(), ChartFamily.BAR), title="Kept")
+    box = with_variant(spec, ChartVariant.BOX, replicate_table())
+    assert box == replace(spec, variant=ChartVariant.BOX)
+
+
+def test_graph_type_across_families_keeps_series_and_style() -> None:
+    from dataclasses import replace
+
+    from curvis.charts.builder import with_variant
+
+    table = error_table()
+    xy = default_spec(table, ChartFamily.XY)
+    xy = replace(xy, series=tuple(replace(s, size=11.0) for s in xy.series), title="T")
+    bar = with_variant(xy, ChartVariant.BOX, table)
+    assert bar.family is ChartFamily.BAR and bar.variant is ChartVariant.BOX
+    assert [s.source for s in bar.series] == [s.source for s in xy.series]
+    assert {s.size for s in bar.series} == {11.0} and bar.title == "T"
+    assert {s.error_bars for s in bar.series} <= {ErrorBars.SD, ErrorBars.NONE}
+    assert bar.x_axis == AxisSpec()
+    back = with_variant(bar, ChartVariant.LINE, table)
+    assert back.variant is ChartVariant.LINE
+    first = back.series[0]
+    assert first.error_bars is ErrorBars.ERROR_COLUMN and first.error_column == table.columns[2].id
+    assert back.x_axis.title == "X"
+
+
+def test_graph_type_needs_what_the_family_needs() -> None:
+    from curvis.charts.builder import variant_problem, with_variant
+
+    table = column_table()
+    bar = default_spec(table, ChartFamily.BAR)
+    assert variant_problem(table, ChartVariant.SCATTER) == NEEDS_X
+    assert variant_problem(table, ChartVariant.BOX) is None
+    assert variant_problem(table, ChartVariant.VIOLIN) == "This chart type cannot be drawn yet"
+    with pytest.raises(ValueError, match=NEEDS_X):
+        with_variant(bar, ChartVariant.SCATTER, table)

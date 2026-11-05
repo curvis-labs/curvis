@@ -29,7 +29,12 @@ def full_spec() -> ChartSpec:
         series=(
             SeriesSpec("g1", "#1d3557", Symbol.SQUARE, 9.0, LineStyle.DASH, 2.0, ErrorBars.SEM),
             SeriesSpec(
-                "c2", "#00a6a6", error_bars=ErrorBars.ERROR_COLUMN, error_column="e3", visible=False
+                "c2",
+                "#00a6a6",
+                error_bars=ErrorBars.ERROR_COLUMN,
+                error_column="e3",
+                visible=False,
+                in_legend=False,
             ),
         ),
         x_axis=AxisSpec("Dose (µM)", 0.001, 100.0, True, Scale.LOG),
@@ -39,6 +44,7 @@ def full_spec() -> ChartSpec:
         custom_size=(12.0, 8.5),
         text_size=12.0,
         overlays=(FitOverlay("a1", show_band=True),),
+        show_legend=False,
     )
 
 
@@ -58,7 +64,10 @@ def test_json_fills_in_missing_style_keys() -> None:
     }
     spec = spec_from_json(data)
     assert spec.series[0] == SeriesSpec("s", "#123456")
-    assert spec.aspect_ratio == "4:3" and spec.x_axis == AxisSpec()
+    assert spec.aspect_ratio == "wide" and spec.x_axis == AxisSpec()
+    assert spec.show_legend is False  # a bar graph saved before legends were stored
+    data["family"], data["variant"] = "xy", "scatter"
+    assert spec_from_json(data).show_legend is True
 
 
 @pytest.mark.parametrize(
@@ -69,6 +78,8 @@ def test_json_fills_in_missing_style_keys() -> None:
         ("text_size", "big", "text_size must be a number"),
         ("text_size", 1.0, "text size must be from"),
         ("aspect_ratio", "5:4", "unknown aspect ratio"),
+        ("aspect_ratio", "4:3", "unknown aspect ratio"),
+        ("show_legend", "yes", "true or false"),
         ("series", [{"source": "s", "color": "red"}], "not #rrggbb"),
         ("x_axis", {"minimum": 5, "maximum": 1}, "below its maximum"),
         ("x_axis", {"minimum": 0, "maximum": 1, "scale": "log"}, "above 0"),
@@ -108,6 +119,17 @@ def test_helpers_return_changed_copies() -> None:
     assert spec.with_overlay(FitOverlay("a2")).overlays[-1] == FitOverlay("a2")
 
 
-def test_aspect() -> None:
+def test_page_sizes() -> None:
+    assert full_spec().page_size_cm == (12.0, 8.5)
     assert full_spec().aspect == pytest.approx(12 / 8.5)
-    assert replace(full_spec(), aspect_ratio="16:9", custom_size=None).aspect == 16 / 9
+    sizes = {
+        name: replace(full_spec(), aspect_ratio=name, custom_size=None).page_size_cm
+        for name in ("tall", "wide", "square")
+    }
+    assert sizes == {"tall": (4.0, 6.0), "wide": (9.0, 6.0), "square": (6.0, 6.0)}
+    assert replace(full_spec(), aspect_ratio="tall").aspect == pytest.approx(4 / 6)
+
+
+def test_variant_labels() -> None:
+    assert ChartVariant.SCATTER.label == "Scatter"
+    assert ChartVariant.HORIZONTAL_BAR.label == "Horizontal bar"

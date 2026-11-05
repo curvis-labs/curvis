@@ -462,7 +462,8 @@ Make a plan first. When done, report what you built, the tests and benchmarks, a
 Read CLAUDE.md, docs/SPEC.md and step 2.8 in docs/PHASES.md.
 
 Build:
-- Format dialog editing the ChartSpec only (one undoable command per OK): graph title, aspect ratio presets (4:3, 16:9, 1:1, 3:4, 3:2) and custom size, each axis (title, range, label, linear/log), each series (symbol, size, line style, width, color, error-bar type), color scheme and chart text size. Changes preview live. Follow docs/DESIGN.md and the Format dialog mockup approved in step 1.6.
+- Format dialog editing the ChartSpec only (one undoable command per OK): graph title, size presets (Tall 4 × 6 cm, Wide 9 × 6 cm, Square 6 × 6 cm) and custom size, show legend, each axis (title, range, label, linear/log), each series (symbol, size, line style, width, color, error-bar type, show in legend; add, remove, reorder), color scheme and chart text size. Changes preview live. Follow docs/DESIGN.md and the Format dialog mockup approved in step 1.6.
+- Graph panel toolbar (docs/mockups/graph-panel.html): Change graph type (scatter, line, bar, box), Format graph, Delete graph, Export graph.
 - render_mpl: Matplotlib renderer from the same ChartSpec for XY, bar and box; export to PNG (choose dpi), SVG and PDF with embedded fonts.
 - Image-diff tests comparing render_qt and render_mpl output for every variant in light and dark theme, with a documented threshold; an export benchmark.
 
