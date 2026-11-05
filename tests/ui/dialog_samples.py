@@ -204,6 +204,60 @@ def _close_table_plain(_ctx: Context) -> QDialog:
     return CloseTableDialog("Viability")
 
 
+def graph_document(family_name: str = "xy") -> tuple[Document, str]:
+    """The grouped sample document with one graph; returns it and the graph's id."""
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily
+    from curvis.core import add_graph
+
+    doc = grouped_document()
+    spec = default_spec(doc.table("t"), ChartFamily(family_name))
+    doc.execute(add_graph(doc, spec))
+    doc.undo_stack.clear()
+    return doc, spec.id
+
+
+def _format(section: int) -> Callable[[Context], QDialog]:
+    def make(ctx: Context) -> QDialog:
+        from curvis.ui.format_dialog import FormatDialog
+
+        doc, graph_id = graph_document()
+        dialog = FormatDialog(doc, graph_id, scheduler=ctx.scheduler)
+        dialog.set_section(section)
+        return dialog
+
+    return make
+
+
+def _format_bar_series(ctx: Context) -> QDialog:
+    from curvis.ui.format_dialog import SERIES, FormatDialog
+
+    doc, graph_id = graph_document("bar")
+    dialog = FormatDialog(doc, graph_id, scheduler=ctx.scheduler)
+    dialog.set_section(SERIES)
+    dialog.select_series([s.source for s in dialog.spec.series])
+    return dialog
+
+
+def _format_bad_range(ctx: Context) -> QDialog:
+    from curvis.ui.format_dialog import AXES, FormatDialog
+
+    doc, graph_id = graph_document()
+    dialog = FormatDialog(doc, graph_id, scheduler=ctx.scheduler)
+    dialog.set_section(AXES)
+    dialog.axis_from.setText("10")
+    dialog.axis_to.setText("1")
+    dialog.axis_from.textEdited.emit("10")
+    return dialog
+
+
+def _export(_ctx: Context) -> QDialog:
+    from curvis.ui.export_dialog import ExportDialog
+
+    doc, graph_id = graph_document()
+    return ExportDialog(doc.graph(graph_id))
+
+
 SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "import": _import,
     "bulk_rename": _bulk_rename,
@@ -223,6 +277,13 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "settings": _settings,
     "close_table": _close_table,
     "close_table_plain": _close_table_plain,
+    "format_graph": _format(0),
+    "format_axes": _format(1),
+    "format_series": _format(2),
+    "format_colors": _format(3),
+    "format_bar_series": _format_bar_series,
+    "format_bad_range": _format_bad_range,
+    "export_graph": _export,
 }
 
 

@@ -12,7 +12,7 @@ from weakref import WeakKeyDictionary
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QDialog, QLabel, QSplitter, QTabWidget, QVBoxLayout, QWidget
 
-from curvis.charts.spec import ChartFamily
+from curvis.charts.spec import ChartFamily, ChartSpec, ChartVariant
 from curvis.core import (
     LAST_TABLE,
     AddTable,
@@ -36,6 +36,7 @@ from curvis.ui.table_tabs import TableTabs
 
 if TYPE_CHECKING:
     from curvis.analysis.base import Analysis
+    from curvis.charts.render_mpl.export import ExportFormat
     from curvis.compute import Scheduler
     from curvis.compute.analysis_engine import AnalysisEngine
     from curvis.compute.calc_engine import CalcEngine
@@ -89,7 +90,13 @@ class DocumentTab(QWidget):
         self.engine: CalcEngine | None = None
         self.analysis_engine: AnalysisEngine | None = None
         self.graph_engine: GraphEngine | None = None
+        self.scheduler = scheduler
+        self._pending_exports: dict[str, Path] = {}
+        self._export_settings: tuple[str, int] = ("png", 300)
+        self._export_folder: Path | None = path.parent if path is not None else None
         if scheduler is not None:
+            scheduler.finished.connect(self._on_job_finished)
+            scheduler.failed.connect(self._on_job_failed)
             from curvis.compute.analysis_engine import AnalysisEngine
             from curvis.compute.calc_engine import CalcEngine
             from curvis.compute.graph_engine import GraphEngine
@@ -114,6 +121,7 @@ class DocumentTab(QWidget):
         self.graph_panel = GraphPanel(document, self.graph_engine, self.side_tabs)
         self.graph_panel.current_changed.connect(self.state_changed)
         self.graph_panel.toggle_requested.connect(self._toggle_series)
+        self.graph_panel.format_requested.connect(self.format_graph)
         self.side_tabs.addTab(self.results_panel, "Results")
         self.side_tabs.addTab(self.graph_panel, "Graph")
         self.side_tabs.currentChanged.connect(lambda _i: self.state_changed.emit())
@@ -157,6 +165,10 @@ class DocumentTab(QWidget):
 
     def close_engine(self) -> None:
         """Stop recomputing (the tab is closing)."""
+        if self.scheduler is not None:
+            self.scheduler.finished.disconnect(self._on_job_finished)
+            self.scheduler.failed.disconnect(self._on_job_failed)
+            self.scheduler = None
         if self.graph_engine is not None:
             self.graph_engine.close()
             self.graph_engine = None
@@ -372,6 +384,140 @@ class DocumentTab(QWidget):
             return False
         return True
 
+    def change_graph_type(self, variant: ChartVariant, graph_id: str | None = None) -> bool:
+        """Draw the graph ``graph_id`` (default: the one shown) as ``variant``, keeping its
+        series and style; one undo step."""
+        from curvis.charts.builder import with_variant
+        from curvis.core import edit_graph
+
+        graph_id = graph_id or self.current_graph_id
+        if graph_id is None:
+            return False
+        spec = self.document.graph(graph_id)
+        if spec.variant is variant:
+            return False
+        try:
+            changed = with_variant(spec, variant, self.document.table(spec.table_id))
+            summary = f"Change graph type to {variant.label.lower()}"
+            self.document.execute(edit_graph(self.document, changed, summary))
+        except (ValueError, CommandError) as exc:
+            self.message.emit(str(exc))
+            return False
+        return True
+
+    def format_graph(self, graph_id: str | None = None) -> bool:
+        """Open the Format dialog for ``graph_id`` (default: the one shown); Apply stores
+        the changes as one undo step."""
+        from curvis.core import edit_graph
+        from curvis.ui.format_dialog import FormatDialog
+
+        graph_id = graph_id or self.current_graph_id
+        if graph_id is None:
+            return False
+        engine = self.graph_engine
+        dialog = FormatDialog(
+            self.document,
+            graph_id,
+            scheduler=self.scheduler,
+            results=self.analysis_engine.results if self.analysis_engine is not None else {},
+            data=engine.data.get(graph_id) if engine is not None else None,
+            parent=self,
+        )
+        try:
+            if not self._exec_dialog(dialog) or not dialog.changed:
+                return False
+            try:
+                self.document.execute(edit_graph(self.document, dialog.spec, "Format graph"))
+            except CommandError as exc:
+                self.message.emit(str(exc))
+                return False
+            return True
+        finally:
+            dialog.deleteLater()
+
+    def export_graph(self, graph_id: str | None = None) -> bool:
+        """Ask for a format and a file, then export ``graph_id`` (default: the one shown)
+        in a worker process."""
+        from curvis.charts.render_mpl.export import ExportFormat
+        from curvis.ui.export_dialog import ExportDialog
+
+        graph_id = graph_id or self.current_graph_id
+        if graph_id is None:
+            return False
+        spec = self.document.graph(graph_id)
+        fmt, dpi = self._export_settings
+        dialog = ExportDialog(spec, fmt=ExportFormat(fmt), dpi=dpi, parent=self)
+        try:
+            if not self._exec_dialog(dialog):
+                return False
+            chosen, dpi = dialog.export_format, dialog.dpi.value()
+        finally:
+            dialog.deleteLater()
+        self._export_settings = (chosen.value, dpi)
+        path = self._ask_export_path(spec, chosen)
+        if path is None:
+            return False
+        self._export_folder = path.parent
+        return self.start_export(graph_id, path, chosen, dpi)
+
+    def start_export(self, graph_id: str, path: Path, fmt: ExportFormat, dpi: int) -> bool:
+        """Write the graph ``graph_id`` to ``path``, off the UI thread when there is a
+        scheduler. The status bar says when it is done."""
+        from curvis.charts.data import compute, gather
+        from curvis.charts.render_mpl.export import export_graph
+
+        spec = self.document.graph(graph_id)
+        engine = self.graph_engine
+        data = engine.data.get(graph_id) if engine is not None else None
+        if data is None or (engine is not None and engine.is_stale(graph_id)):
+            results = self.analysis_engine.results if self.analysis_engine is not None else {}
+            data = compute(gather(self.document.table(spec.table_id), spec, results))
+        if self.scheduler is None:
+            try:
+                export_graph(spec, data, str(path), fmt, dpi)
+            except (OSError, ValueError) as exc:
+                self.message.emit(f"Could not export {path.name}: {exc}")
+                return False
+            self.message.emit(f"Exported {path.name}.")
+            return True
+        from curvis.compute import Job
+
+        node = f"export:{path}"
+        self._pending_exports[node] = path
+        self.message.emit(f"Exporting {path.name}…")
+        job = Job(export_graph, (spec, data, str(path), fmt.value, dpi))
+        self.scheduler.submit(node, job, weight="heavy", delay_ms=0)
+        return True
+
+    def _ask_export_path(self, spec: ChartSpec, fmt: ExportFormat) -> Path | None:
+        """Ask where to save the export (tests replace this)."""
+        from PySide6.QtWidgets import QFileDialog
+
+        name = _file_name(spec.title or self.document.table(spec.table_id).name)
+        folder = self._export_folder or Path.home()
+        start = str(folder / f"{name}.{fmt.value}")
+        filters = f"{fmt.label} (*.{fmt.value})"
+        chosen, _filter = QFileDialog.getSaveFileName(self, "Export graph", start, filters)
+        if not chosen:
+            return None
+        path = Path(chosen)
+        return (
+            path
+            if path.suffix.lower() == f".{fmt.value}"
+            else path.with_name(f"{path.name}.{fmt.value}")
+        )
+
+    def _on_job_finished(self, node: str, _result: object) -> None:
+        path = self._pending_exports.pop(node, None)
+        if path is not None:
+            self.message.emit(f"Exported {path.name}.")
+
+    def _on_job_failed(self, node: str, error: object) -> None:
+        path = self._pending_exports.pop(node, None)
+        if path is not None:
+            reason = getattr(error, "message", str(error))
+            self.message.emit(f"Could not export {path.name}: {reason}")
+
     def show_results(self) -> None:
         self.side_tabs.setCurrentIndex(RESULTS_TAB)
 
@@ -578,3 +724,9 @@ def _table_to_select(event: UndoEvent) -> str | None:
         if isinstance(c, RemoveTable) and event.kind == "undo":
             return c.table_id
     return None
+
+
+def _file_name(name: str) -> str:
+    """``name`` without the characters a file name cannot hold."""
+    cleaned = "".join("_" if c in '<>:"/\\|?*' or ord(c) < 32 else c for c in name).strip(" .")
+    return cleaned or "Graph"

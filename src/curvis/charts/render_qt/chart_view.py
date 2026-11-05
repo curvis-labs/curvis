@@ -143,11 +143,12 @@ class LegendSample(pg.ItemSample):  # type: ignore[misc]
             painter.drawLine(QPointF(0, middle), QPointF(self._width, middle))
         symbol = opts.get("symbol")
         if symbol is not None:
-            scatter = self.item.scatter.opts
+            # The item's own options: a series without values has no scatter style yet.
+            size = opts["symbolSize"]
             painter.translate(self._width / 2, middle)
-            painter.scale(scatter["size"], scatter["size"])
-            painter.setPen(pg.mkPen(scatter["pen"]))
-            painter.setBrush(pg.mkBrush(scatter["brush"]))
+            painter.scale(size, size)
+            painter.setPen(pg.mkPen(opts["symbolPen"]))
+            painter.setBrush(pg.mkBrush(opts["symbolBrush"]))
             from pyqtgraph.graphicsItems.ScatterPlotItem import Symbols
 
             path = Symbols[symbol]
