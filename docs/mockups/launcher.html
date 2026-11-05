@@ -5,10 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Curvis launcher</title>
 <!--
-  Mockup of the launcher (SPEC.md: blank project, Open button, recent projects with relative
-  timestamps; PHASES.md step 2.8 adds sample data). Three versions (A-C), then each one on
-  first start, with no recent projects. Drawn at 1:1 with the theme palette (DESIGN.md
-  section 3); the logo is src/curvis/ui/icons/curvis_transparent.svg.
+  Mockup of the launcher (SPEC.md: blank project, sample projects, Open button, recent
+  projects with relative timestamps). Approved: the start gallery (version C of three),
+  without logo, version or tagline. Drawn at 1:1 with the theme palette (DESIGN.md section 3).
 -->
 <style>
   :root, :root[data-theme="light"] {
@@ -75,8 +74,6 @@
        font: 700 11px/18px system-ui, sans-serif; text-align: center; position: absolute; z-index: 4;
        box-shadow: 0 0 0 2px var(--window); }
   .muted { color: var(--secondary); }
-  .logo { flex: none; color: var(--text); }
-  .logo .axes { stroke: var(--secondary); }
   .kbd { color: var(--secondary); font-size: 12px; }
   .link { color: var(--link); }
 
@@ -93,21 +90,11 @@
   .recent .r .grow { min-width: 0; flex: 1; }
   .fileico { width: 28px; height: 28px; flex: none; color: var(--secondary); }
   .gone .fileico { color: var(--disabled); }
-  .rm { color: var(--link); font-size: 12px; margin-left: 8px; }
   .listhead { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; }
   .listhead h3 { font-size: 13px; margin: 0; font-weight: 600; }
   .listhead .right { margin-left: auto; }
 
-  /* table-style recent list (B) */
-  table.rt { width: 100%; border-collapse: collapse; }
-  table.rt th { text-align: left; font-weight: 600; color: var(--secondary); font-size: 12px; padding: 6px 12px; border-bottom: 1px solid var(--border); }
-  table.rt td { padding: 8px 12px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
-  table.rt td.p { color: var(--secondary); overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
-  table.rt td.w { color: var(--secondary); text-align: right; }
-  table.rt tr.hover td { background: var(--hover); }
-  table.rt tr.gone td { color: var(--disabled); }
-  table.rt td .nm { display: flex; gap: 8px; align-items: center; font-weight: 600; }
-
+  
   /* buttons */
   .btn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px;
          background: var(--button); color: var(--text); white-space: nowrap; }
@@ -116,31 +103,8 @@
   .btn .kbd { margin-left: auto; padding-left: 16px; }
   .btn.primary .kbd { color: var(--hl-text); opacity: .8; }
 
-  /* A */
-  .a-col { width: 620px; margin: 0 auto; padding: 36px 0 24px; display: flex; flex-direction: column; }
-  .a-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
-  .a-brand h1 { font-size: 26px; margin: 0; line-height: 1.1; }
-  .a-tiles { display: flex; gap: 12px; margin-bottom: 28px; }
-  .tile { flex: 1; display: flex; gap: 12px; align-items: center; padding: 14px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--base); }
-  .tile.hover { background: var(--hover); border-color: var(--highlight); }
-  .tile svg.i { width: 28px; height: 28px; }
-  .tile b { display: block; }
-  .tile .kbd { display: block; }
-  .a-foot { margin-top: 14px; color: var(--secondary); }
-
-  /* B */
-  .b-side { width: 260px; flex: none; background: var(--panel); border-right: 1px solid var(--border); padding: 28px 20px; display: flex; flex-direction: column; gap: 8px; }
-  .b-side .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-  .b-side h1 { font-size: 20px; margin: 0; line-height: 1.1; }
-  .b-side h4 { margin: 18px 0 2px; font-size: 12px; color: var(--secondary); font-weight: 600; }
-  .b-side .lnk { padding: 4px 0; color: var(--link); }
-  .b-main { flex: 1; padding: 28px 28px; min-width: 0; display: flex; flex-direction: column; }
-  .b-main .recent { flex: 1; }
-
   /* C */
-  .c-col { width: 760px; margin: 0 auto; padding: 24px 0; display: flex; flex-direction: column; }
-  .c-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-  .c-brand h1 { font-size: 20px; margin: 0; }
+  .c-col { width: 760px; margin: 0 auto; padding: 32px 0 24px; display: flex; flex-direction: column; }
   .c-tiles { display: flex; gap: 12px; margin-bottom: 22px; }
   .ctile { width: 178px; display: flex; flex-direction: column; gap: 6px; }
   .ctile .thumb { height: 104px; border: 1px solid var(--border); border-radius: 6px; background: var(--base); display: flex; align-items: center; justify-content: center; }
@@ -172,7 +136,7 @@
 <body>
 <header class="page">
   <h1>Curvis launcher</h1>
-  <p>Three versions of the start screen, shown when no project is open: New project, Open, recent projects with relative times, and the sample projects planned for step 2.8. Board 4 shows each one on first start. Orange numbers point to the notes.</p>
+  <p>The start screen, shown when no project is open: a blank project and the sample projects as tiles, Open project…, and recent projects with relative times. Orange numbers point to the notes.</p>
   <div class="switch" role="group" aria-label="Theme">
     <button type="button" data-set="light">Light</button>
     <button type="button" data-set="dark">Dark</button>
@@ -180,64 +144,29 @@
 </header>
 
 <section class="board">
-  <h2>A · Centred welcome: two action tiles, recent projects under them</h2>
-  <div class="row">
-    <div class="win" id="va" style="width:1000px;height:640px"></div>
-    <div class="notes">
-      <ol>
-        <li>Logo, name and one line on what Curvis does. Calm and centred, 620 px wide at any window size.</li>
-        <li>Two large tiles: <b>New project</b> and <b>Open project…</b>, each with its shortcut. New project has the focus, so Enter starts one.</li>
-        <li>Recent projects as a list of rows: name, folder (shortened in the middle when long), and when it was last opened at the right. One click opens. The hovered row is shaded.</li>
-        <li>A missing file is dimmed, says “File not found” and offers <b>Remove</b>.</li>
-        <li>Sample projects as plain links in one line at the bottom (step 2.8).</li>
-      </ol>
-      <p class="pro">Simple, looks finished, works the same at any width.</p>
-      <p class="con">The samples are easy to overlook.</p>
-    </div>
-  </div>
-</section>
-
-<section class="board">
-  <h2>B · Side panel with actions, recent projects as a full-height table</h2>
-  <div class="row">
-    <div class="win" id="vb" style="width:1000px;height:640px"></div>
-    <div class="notes">
-      <ol>
-        <li>A panel at the left holds the logo, the version and the actions as stacked buttons. <b>New project</b> is the filled (primary) button.</li>
-        <li>Sample projects as links under their own heading.</li>
-        <li>Recent projects fill the rest as a table: name, folder, last opened. The folder column is what tells two files with the same name apart.</li>
-        <li>Right-click a row: Open, Remove from list. A missing file shows “File not found” in the last column.</li>
-      </ol>
-      <p class="pro">Familiar from IDEs; the list gets the most room, good for people with many projects.</p>
-      <p class="con">More like a tool than a welcome; a bit busy for the first start (board 4).</p>
-    </div>
-  </div>
-</section>
-
-<section class="board">
-  <h2>C · Start gallery: a blank project and the samples as tiles, recent projects below</h2>
+  <h2>1 · Launcher with recent projects</h2>
   <div class="row">
     <div class="win" id="vc" style="width:1000px;height:640px"></div>
     <div class="notes">
       <ol>
-        <li>A row of tiles: <b>Blank project</b> first (with its shortcut), then the three sample projects, each with a small picture of its graph.</li>
-        <li><b>Open project…</b> sits at the right of the Recent heading, next to the list it belongs with.</li>
-        <li>Recent projects as in A.</li>
+        <li>A row of tiles: <b>Blank project</b> first (with its shortcut), then the sample projects, each with a small picture of its graph (the samples come with step 2.9). Click a tile to start; a sample opens as a new, untitled copy.</li>
+        <li><b>Open project…</b> sits at the right of the Recent projects heading, next to the list it belongs with.</li>
+        <li>Recent projects, newest first: name, folder (shortened in the middle when long) and when it was last opened. One click opens. The hovered row is shaded.</li>
+        <li>Right-click a row: <b>Open</b>, <b>Remove from list</b>. Removing never touches the file. A missing file is dimmed and says “File not found”; clicking it does nothing.</li>
       </ol>
-      <p class="pro">Shows at a glance what Curvis makes; the samples invite a first try, which helps new users most.</p>
-      <p class="con">The tiles use height that the recent list could use. Needs the sample projects (step 2.8) to look complete; until then only Blank project shows.</p>
+      <p>No logo, version or tagline: the window title already says Curvis, and the page is about starting work.</p>
+      <p>The column is 760 px wide and centred; in a narrower window it fills the width with the 12 px margin, and the tiles that do not fit wrap to a second row.</p>
     </div>
   </div>
 </section>
 
 <section class="board">
-  <h2>4 · First start: no recent projects yet (shown smaller)</h2>
+  <h2>2 · First start and before the samples exist (shown smaller)</h2>
   <div class="thumbs">
-    <div class="holder"><div class="win" id="ea" style="width:1000px;height:620px"></div><div class="cap">A</div></div>
-    <div class="holder"><div class="win" id="eb" style="width:1000px;height:620px"></div><div class="cap">B</div></div>
-    <div class="holder"><div class="win" id="ec" style="width:1000px;height:620px"></div><div class="cap">C</div></div>
+    <div class="holder"><div class="win" id="ec" style="width:1000px;height:620px"></div><div class="cap">First start: no recent projects</div></div>
+    <div class="holder"><div class="win" id="ed" style="width:1000px;height:620px"></div><div class="cap">Until step 2.9: Blank project only</div></div>
   </div>
-  <p style="margin-top:40px;max-width:900px">The recent list is replaced by one centred sentence (DESIGN.md section 5): “Projects you open or save will appear here.” Keyboard in every version: Tab moves between the actions and the list; arrow keys move in the list, Enter opens, Delete removes the selected entry from the list (the file is not touched).</p>
+  <p style="margin-top:40px;max-width:900px">With no recent projects the list is replaced by one centred sentence (DESIGN.md section 5): “Projects you open or save will appear here.” Keyboard: Blank project has the focus, so Enter starts one; Ctrl+N and Ctrl+O work as everywhere. Tab moves from the tiles to Open project… and the list; arrow keys move along the tiles and in the list, Enter opens, and the menu key or Shift+F10 opens the row's menu.</p>
 </section>
 
 <script>
@@ -251,14 +180,6 @@
   };
   function svg(name) {
     return '<svg class="i" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
-  }
-  function logo(size) {
-    return '<svg class="logo" width="' + size + '" height="' + size + '" viewBox="44 12 118 118" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path class="axes" d="M 52.51,20.74 V 120.02 H 153.86" stroke-width="10.58"/>' +
-      '<path d="M 70.91,102.11 C 123.81,103.55 91.79,27.79 148.45,26.79" stroke="currentColor" stroke-width="10.58"/>' +
-      '<circle cx="73.30" cy="81.42" r="5.29" fill="#00a6a6"/><circle cx="86.06" cy="56.41" r="10.58" fill="#00a6a6"/>' +
-      '<circle cx="123.11" cy="93.93" r="7.94" fill="#00a6a6"/><circle cx="139.76" cy="62.81" r="10.58" fill="#00a6a6"/>' +
-      '<circle cx="104.50" cy="25.54" r="6.61" fill="#00a6a6"/></svg>';
   }
   function m(n, style) { return '<span class="m" style="' + style + '">' + n + '</span>'; }
   function chrome() {
@@ -284,39 +205,8 @@
       var gone = r[2] === "File not found";
       return '<div class="r' + (gone ? ' gone' : '') + (i === 1 ? ' hover' : '') + '"><span class="fileico">' + svg("file").replace('class="i"', 'class="i" style="width:28px;height:28px"') + '</span>' +
         '<div class="grow"><div class="name">' + r[0] + '</div><div class="path">' + r[1] + '</div></div>' +
-        '<div class="when">' + r[2] + (gone ? '<span class="rm">Remove</span>' : '') + '</div></div>';
+        '<div class="when">' + r[2] + '' + '</div></div>';
     }).join('') + '</div>';
-  }
-
-  function versionA(opts) {
-    opts = opts || {};
-    return chrome() + '<div class="body"><div class="a-col">' +
-      '<div class="a-brand">' + logo(56) + '<div><h1>Curvis</h1><div class="muted">Analyze and plot scientific data</div></div></div>' +
-      '<div class="a-tiles">' +
-        '<div class="tile">' + svg("new") + '<div><b>New project</b><span class="kbd">Ctrl+N</span></div></div>' +
-        '<div class="tile' + (opts.empty ? '' : ' hover') + '">' + svg("open") + '<div><b>Open project…</b><span class="kbd">Ctrl+O</span></div></div>' +
-      '</div>' +
-      '<div class="listhead"><h3>Recent projects</h3></div>' + recentList(opts) +
-      '<div class="a-foot">Try a sample project: ' + SAMPLES.map(function (s) { return '<span class="link">' + s + '</span>'; }).join(' · ') + '</div>' +
-    '</div></div>';
-  }
-
-  function versionB(opts) {
-    opts = opts || {};
-    var list = opts.empty ? EMPTY :
-      '<div class="recent" style="flex:1"><table class="rt"><tr><th>Name</th><th>Folder</th><th style="text-align:right">Last opened</th></tr>' +
-      RECENT.map(function (r, i) {
-        var gone = r[2] === "File not found";
-        return '<tr class="' + (gone ? 'gone' : '') + (i === 1 ? ' hover' : '') + '"><td><span class="nm">' + svg("file") + r[0] + '</span></td><td class="p">' + r[1] + '</td><td class="w">' + r[2] + '</td></tr>';
-      }).join('') + '</table></div>';
-    return chrome() + '<div class="body">' +
-      '<div class="b-side"><div class="brand">' + logo(40) + '<div><h1>Curvis</h1><div class="muted" style="font-size:12px">Version 0.1.0</div></div></div>' +
-        '<span class="btn primary block">' + svg("new") + 'New project<span class="kbd">Ctrl+N</span></span>' +
-        '<span class="btn block">' + svg("open") + 'Open project…<span class="kbd">Ctrl+O</span></span>' +
-        '<h4>Sample projects</h4>' + SAMPLES.map(function (s) { return '<div class="lnk">' + s + '</div>'; }).join('') +
-      '</div>' +
-      '<div class="b-main"><div class="listhead"><h3>Recent projects</h3></div>' + list + '</div>' +
-    '</div>';
   }
 
   var THUMBS = {
@@ -329,25 +219,18 @@
     opts = opts || {};
     var tiles = [["blank", "Blank project", "Ctrl+N"], ["bars", "Group comparison", "Sample"], ["dose", "Dose-response", "Sample"], ["xy", "XY with replicates", "Sample"]];
     return chrome() + '<div class="body"><div class="c-col">' +
-      '<div class="c-brand">' + logo(32) + '<h1>Curvis</h1></div>' +
-      '<div class="c-tiles">' + tiles.map(function (t, i) {
+      '<div class="c-tiles">' + (opts.noSamples ? tiles.slice(0, 1) : tiles).map(function (t, i) {
         return '<div class="ctile' + (i === 2 && !opts.empty ? ' hover' : '') + '"><div class="thumb">' + THUMBS[t[0]] + '</div><b>' + t[1] + '</b><span class="kbd">' + t[2] + '</span></div>';
       }).join('') + '</div>' +
       '<div class="listhead"><h3>Recent projects</h3><span class="right btn">' + svg("open") + 'Open project…<span class="kbd" style="padding-left:8px">Ctrl+O</span></span></div>' + recentList(opts) +
     '</div></div>';
   }
 
-  document.getElementById("va").innerHTML = versionA() +
-    m(1, "left:162px;top:112px") + m(2, "left:162px;top:232px") + m(3, "left:162px;top:308px") + m(4, "left:842px;top:546px") + m(5, "left:162px;top:596px");
-  document.getElementById("vb").innerHTML = versionB() +
-    m(1, "left:6px;top:112px") + m(2, "left:6px;top:296px") + m(3, "left:268px;top:112px") + m(4, "left:268px;top:336px") +
-    '<div class="menu" style="left:420px;top:200px"><div class="hl">Open</div><div>Remove from list</div></div>';
   document.getElementById("vc").innerHTML = versionC() +
-    m(1, "left:92px;top:144px") + m(2, "left:914px;top:342px") + m(3, "left:92px;top:400px");
-  document.getElementById("ea").innerHTML = versionA({ empty: true });
-  document.getElementById("eb").innerHTML = versionB({ empty: true });
+    m(1, "left:92px;top:110px") + m(2, "left:914px;top:300px") + m(3, "left:92px;top:360px") + m(4, "left:470px;top:446px") +
+    '<div class="menu" style="left:500px;top:440px"><div class="hl">Open</div><div>Remove from list</div></div>';
   document.getElementById("ec").innerHTML = versionC({ empty: true });
-
+  document.getElementById("ed").innerHTML = versionC({ noSamples: true });
   (function () {
     var root = document.documentElement, buttons = document.querySelectorAll(".switch button");
     function show(theme) {

@@ -67,7 +67,7 @@ Inner layouts (pages, rows) have zero margins; only the dialog has a margin.
 
 | Dialog | Default size | Minimum size |
 | --- | --- | --- |
-| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 (to be confirmed for Format in step 2.7) |
+| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 (to be confirmed for Format in step 2.8) |
 | Bulk rename | 720 × 520 | 600 × 420 |
 | Constants | 560 × 420 | 460 × 340 |
 | Simple dialog (Settings, constant editor) | its size hint | its size hint, at least 360 wide |
@@ -290,3 +290,27 @@ Mockup: `docs/mockups/table-tabs.html`, board 6.
   table. Enter another name.” Esc gives up and keeps the old name.
 - **Group and category bands** rename the same way (double-click, Enter, Esc), instead of a
   dialog; Tab moves to the next band in the same row. Bulk rename stays for many names at once.
+
+## 10. Launcher
+
+Mockup: `docs/mockups/launcher.html`.
+
+- **Layout.** One centred column, 760 px wide (narrower windows: the full width with the
+  12 px margin). From the top: a row of tiles, then the *Recent projects* heading with the
+  *Open project…* button (Ctrl+O) at its right, then the recent list. No logo, version or
+  tagline; the window title already says Curvis.
+- **Tiles.** 178 px wide: a framed picture 104 px high on `Base`, the name under it, and a
+  secondary line (*Ctrl+N* for Blank project, *Sample* for a sample). *Blank project* comes
+  first and has the focus, so Enter starts a project. Sample tiles show a small picture of
+  their graph drawn with `Link` and `PlaceholderText`. Hover and focus outline the picture in
+  `Highlight`. Tiles that do not fit wrap to a second row.
+- **Recent list.** Rows of about 48 px on `Base`: a file icon, the name (semibold) with the
+  folder under it in `PlaceholderText` (elided in the middle), and the relative time at the
+  right. The hovered row is shaded with `Text` at 7 %. One click or Enter opens. A missing file
+  uses the disabled text colour, says *File not found* in place of the time, and does not open.
+- **Context menu** (right-click, the menu key or Shift+F10): *Open*, *Remove from list*.
+  Removing never touches the file and adds no undo step.
+- **Empty list**: the centred sentence “Projects you open or save will appear here.”
+  (`EmptyState`).
+- **Keyboard.** Tab order: tiles → *Open project…* → list. Arrow keys move along the tiles
+  and in the list.
