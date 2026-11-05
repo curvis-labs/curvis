@@ -506,7 +506,7 @@ class FormatDialog(QDialog):
         layout = QVBoxLayout(box)
         self.preview: ChartView = ChartView()
         self.preview.setAccessibleName("Preview of the graph")
-        self.preview.setMinimumHeight(120)
+        self.preview.setMinimumHeight(100)
         self.preview.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(self.preview, 1)
         return box

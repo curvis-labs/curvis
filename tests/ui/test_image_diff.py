@@ -105,7 +105,9 @@ def test_export_matches_the_screen(graph: str, legend: bool, theme: str) -> None
     print(report)
     if diff.plot > PLOT_THRESHOLD or diff.page > PAGE_THRESHOLD:
         path = save_pair(diff, FAILED, name)
-        pytest.fail(f"{report} (thresholds {PLOT_THRESHOLD}, {PAGE_THRESHOLD}); see {path}")
+        pytest.fail(
+            f"{report} (thresholds {PLOT_THRESHOLD}, {PAGE_THRESHOLD}); see {path}\n" + diff.details
+        )
 
 
 @pytest.mark.parametrize("graph", GRAPHS)

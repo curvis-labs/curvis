@@ -57,6 +57,9 @@ class Diff:
     """Largest miss of a key colour on the whole page."""
     screen: Image.Image
     export: Image.Image
+    details: str = ""
+    """Plot areas and, per colour, where its pixels are: for a failure on another
+    machine, where the pictures cannot be looked at."""
 
 
 def qimage_to_pil(image: QImage) -> Image.Image:
@@ -168,7 +171,58 @@ def compare(spec: ChartSpec, data: ChartData | None) -> Diff:
     plot_export = crop(export, export_box)
     plot = miss(plot_screen, plot_export, colors, PLOT_RADIUS, page_color)
     page = miss(screen, export, colors, PAGE_RADIUS, page_color)
-    return Diff(plot, page, screen, export)
+    details = [f"plot area: screen {_box(screen_box)}, export {_box(export_box)}"]
+    details += _color_details(screen, export, colors, page_color)
+    details.append(_screen_details())
+    return Diff(plot, page, screen, export, "\n".join(details))
+
+
+def _box(box: Box) -> str:
+    return "({:.0f}, {:.0f}, {:.0f} x {:.0f})".format(*box)
+
+
+def _extent(mask: npt.NDArray[np.bool_]) -> str:
+    rows, cols = np.nonzero(mask)
+    if len(rows) == 0:
+        return "none"
+    return f"x {cols.min()}-{cols.max()}, y {rows.min()}-{rows.max()}, {len(rows)} px"
+
+
+def _color_details(
+    screen: Image.Image,
+    export: Image.Image,
+    colors: list[tuple[int, int, int]],
+    page: tuple[int, int, int],
+) -> list[str]:
+    colors = list(dict.fromkeys(colors))
+    lines = []
+    for color, a, b in zip(
+        colors, _masks(screen, colors, page), _masks(export, colors, page), strict=True
+    ):
+        only_a = a & ~_grow(b, PAGE_RADIUS)
+        only_b = b & ~_grow(a, PAGE_RADIUS)
+        lines.append(
+            f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}: screen {_extent(a)}; "
+            f"export {_extent(b)}; only on screen {_extent(only_a)}; "
+            f"only in export {_extent(only_b)}"
+        )
+    return lines
+
+
+def _screen_details() -> str:
+    from PySide6.QtGui import QFontInfo
+    from PySide6.QtWidgets import QApplication
+
+    from curvis.charts.render_qt.chart_view import chart_font_family
+
+    app = QApplication.instance()
+    screen = app.primaryScreen() if isinstance(app, QApplication) else None
+    dpi = f"{screen.logicalDotsPerInchY():g}" if screen is not None else "?"
+    from PySide6.QtGui import QFont
+
+    family = chart_font_family()
+    resolved = QFontInfo(QFont(family)).family()
+    return f"screen dpi {dpi}; chart font {family!r} resolves to {resolved!r}"
 
 
 def save_pair(diff: Diff, folder: Path, name: str) -> Path:
