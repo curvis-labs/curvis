@@ -204,6 +204,27 @@ def _close_table_plain(_ctx: Context) -> QDialog:
     return CloseTableDialog("Viability")
 
 
+def _delete_analysis(_ctx: Context) -> QDialog:
+    from curvis.ui.close_table_dialog import DeleteDialog
+
+    return DeleteDialog(
+        "Delete analysis",
+        "Deleting “4PL dose-response” removes the analysis and its results from the project.",
+        "Delete analysis",
+        ["Its fitted curves on 2 graphs"],
+    )
+
+
+def _delete_graph(_ctx: Context) -> QDialog:
+    from curvis.ui.close_table_dialog import DeleteDialog
+
+    return DeleteDialog(
+        "Delete graph",
+        "Deleting “XY graph · Assay” removes the graph from the project.",
+        "Delete graph",
+    )
+
+
 def graph_document(family_name: str = "xy") -> tuple[Document, str]:
     """The grouped sample document with one graph; returns it and the graph's id."""
     from curvis.charts.builder import default_spec
@@ -277,6 +298,8 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "settings": _settings,
     "close_table": _close_table,
     "close_table_plain": _close_table_plain,
+    "delete_analysis": _delete_analysis,
+    "delete_graph": _delete_graph,
     "format_graph": _format(0),
     "format_axes": _format(1),
     "format_series": _format(2),

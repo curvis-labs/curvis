@@ -117,6 +117,7 @@ class DocumentTab(QWidget):
         self.side_tabs.setMinimumWidth(260)
         self.results_panel = ResultsPanel(document, self.analysis_engine, self.side_tabs)
         self.results_panel.edit_requested.connect(self.edit_analysis)
+        self.results_panel.delete_requested.connect(self.delete_analysis)
         self.results_panel.current_changed.connect(self.state_changed)
         self.graph_panel = GraphPanel(document, self.graph_engine, self.side_tabs)
         self.graph_panel.current_changed.connect(self.state_changed)
@@ -278,11 +279,34 @@ class DocumentTab(QWidget):
         return self._run_analyze_dialog(dialog, editing=True)
 
     def delete_analysis(self, analysis_id: str | None = None) -> bool:
-        """Delete ``analysis_id`` (default: the one shown), as an undoable step."""
-        from curvis.core import remove_analysis
+        """Delete ``analysis_id`` (default: the one shown) after a warning, as an
+        undoable step. Its fitted curves leave the graphs that show them."""
+        from curvis.core import overlaid_on, remove_analysis
+        from curvis.ui.close_table_dialog import DeleteDialog
 
         analysis_id = analysis_id or self.current_analysis_id
         if analysis_id is None:
+            return False
+        try:
+            analysis = self.document.analysis(analysis_id)
+        except KeyError:
+            return False
+        try:
+            name = analysis.analysis_type.name
+        except KeyError:
+            name = analysis.type
+        graphs = len(overlaid_on(self.document, analysis_id))
+        items = (
+            [f"Its fitted curves on {graphs} graph{'s' if graphs > 1 else ''}"] if graphs else []
+        )
+        dialog = DeleteDialog(
+            "Delete analysis",
+            f"Deleting “{name}” removes the analysis and its results from the project.",
+            "Delete analysis",
+            items,
+            self,
+        )
+        if not self._confirm(dialog):
             return False
         try:
             self.document.execute(remove_analysis(self.document, analysis_id))
@@ -371,11 +395,22 @@ class DocumentTab(QWidget):
         return True
 
     def delete_graph(self, graph_id: str | None = None) -> bool:
-        """Delete ``graph_id`` (default: the one shown), as an undoable step."""
+        """Delete ``graph_id`` (default: the one shown) after a warning, as an undoable
+        step."""
         from curvis.core import remove_graph
+        from curvis.ui.close_table_dialog import DeleteDialog
 
         graph_id = graph_id or self.current_graph_id
         if graph_id is None:
+            return False
+        name = self.graph_panel.name_of(graph_id)
+        dialog = DeleteDialog(
+            "Delete graph",
+            f"Deleting “{name}” removes the graph from the project.",
+            "Delete graph",
+            parent=self,
+        )
+        if not self._confirm(dialog):
             return False
         try:
             self.document.execute(remove_graph(self.document, graph_id))
@@ -531,6 +566,13 @@ class DocumentTab(QWidget):
             self.document.execute(set_series_visible(self.document, graph_id, source, visible))
         except CommandError as exc:
             self.message.emit(str(exc))
+
+    def _confirm(self, dialog: QDialog) -> bool:
+        """Show the warning ``dialog``; True if the user chose to go on."""
+        try:
+            return bool(self._exec_dialog(dialog) == QDialog.DialogCode.Accepted)
+        finally:
+            dialog.deleteLater()
 
     def _exec_dialog(self, dialog: QDialog) -> int:
         """Show ``dialog`` modally (tests replace this)."""

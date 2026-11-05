@@ -13,6 +13,7 @@ from curvis.analysis.base import Analysis
 from curvis.core.commands import Command, CommandError
 
 if TYPE_CHECKING:
+    from curvis.charts.spec import ChartSpec
     from curvis.core.document import Document
 
 
@@ -108,7 +109,13 @@ def edit_analysis(doc: Document, analysis: Analysis) -> Command:
 
 
 def remove_analysis(doc: Document, analysis_id: str) -> Command:
-    """A command that removes the analysis ``analysis_id``."""
+    """A command that removes the analysis ``analysis_id``, and its fitted curves from
+    the graphs that show them, as one undo step."""
+    from dataclasses import replace
+
+    from curvis.core.commands import CommandGroup
+    from curvis.core.graph_commands import SetGraph
+
     try:
         analysis = doc.analysis(analysis_id)
     except KeyError:
@@ -117,4 +124,21 @@ def remove_analysis(doc: Document, analysis_id: str) -> Command:
         name = analysis.analysis_type.name
     except KeyError:
         name = "analysis"
-    return SetAnalysis(analysis, f"Delete analysis ({name.lower()})", remove=True)
+    summary = f"Delete analysis ({name.lower()})"
+    command: Command = SetAnalysis(analysis, summary, remove=True)
+    overlaid = overlaid_on(doc, analysis_id)
+    if not overlaid:
+        return command
+    graphs = [
+        SetGraph(
+            replace(g, overlays=tuple(o for o in g.overlays if o.analysis_id != analysis_id)),
+            "Remove fit",
+        )
+        for g in overlaid
+    ]
+    return CommandGroup(summary, [*graphs, command])
+
+
+def overlaid_on(doc: Document, analysis_id: str) -> list[ChartSpec]:
+    """The graphs that draw the fitted curves of ``analysis_id``."""
+    return [g for g in doc.graphs if any(o.analysis_id == analysis_id for o in g.overlays)]

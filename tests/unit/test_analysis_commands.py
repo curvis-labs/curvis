@@ -79,3 +79,22 @@ def test_editing_or_removing_a_missing_analysis_is_refused() -> None:
         edit_analysis(doc, analysis())
     with pytest.raises(CommandError, match="no such analysis"):
         remove_analysis(doc, "A1")
+
+
+def test_removing_a_fit_takes_its_curves_off_graphs_in_one_step() -> None:
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily, FitOverlay
+    from curvis.core import add_graph, overlaid_on
+
+    doc = document()
+    doc.execute(add_analysis(doc, analysis()))
+    spec = default_spec(doc.table("T"), ChartFamily.BAR)
+    spec = dataclasses.replace(spec, overlays=(FitOverlay("A1"), FitOverlay("other")))
+    doc.execute(add_graph(doc, spec))
+    assert overlaid_on(doc, "A1") == [spec]
+    doc.execute(remove_analysis(doc, "A1"))
+    assert doc.analyses == []
+    assert doc.graphs[0].overlays == (FitOverlay("other"),)
+    assert doc.change_log[-1].summary == "Delete analysis (descriptive statistics)"
+    doc.undo()
+    assert doc.analysis("A1") == analysis() and doc.graphs[0] == spec

@@ -1,4 +1,5 @@
-"""The warning shown before a table is closed (docs/DESIGN.md section 8).
+"""The warnings shown before a table, a graph or an analysis is deleted (docs/DESIGN.md
+section 8).
 
 Closing a table deletes it from the project, with its analyses and graphs. The dialog
 says so, lists what goes with it and that Undo brings it back. Its buttons are
@@ -8,6 +9,7 @@ by accident.
 
 from __future__ import annotations
 
+import html
 from collections import Counter
 from collections.abc import Sequence
 
@@ -51,19 +53,22 @@ def belongings(analyses: Sequence[Analysis], graphs: Sequence[ChartSpec]) -> lis
     return lines
 
 
-class CloseTableDialog(QDialog):
-    """Asks whether to delete the table ``name`` with its ``analyses`` and ``graphs``."""
+class DeleteDialog(QDialog):
+    """Asks before something is deleted (docs/DESIGN.md section 8): a warning icon,
+    ``lead`` (what is deleted), the ``items`` that go with it, and that Undo brings it
+    back. The buttons are ``delete_text`` and *Cancel*; Cancel has the default focus."""
 
     def __init__(
         self,
-        name: str,
-        analyses: Sequence[Analysis] = (),
-        graphs: Sequence[ChartSpec] = (),
+        title: str,
+        lead: str,
+        delete_text: str,
+        items: Sequence[str] = (),
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Close table")
-        self.skeleton = DialogSkeleton(self, "Delete table")
+        self.setWindowTitle(title)
+        self.skeleton = DialogSkeleton(self, delete_text)
         row = QHBoxLayout()
         row.setSpacing(2 * SPACING)
         icon = QLabel(self)
@@ -74,15 +79,15 @@ class CloseTableDialog(QDialog):
         row.addWidget(icon, 0)
         text = QVBoxLayout()
         text.setSpacing(SPACING)
-        self.lead = QLabel(f"Closing “{name}” deletes the table from the project.", self)
+        self.lead = QLabel(lead, self)
         self.lead.setTextFormat(Qt.TextFormat.PlainText)
         self.lead.setWordWrap(True)
         width = self.lead.fontMetrics().horizontalAdvance(self.lead.text()) + 2
         self.lead.setMinimumWidth(min(width, LEAD_MAX_WIDTH))
         text.addWidget(self.lead)
-        self.items = belongings(analyses, graphs)
+        self.items = list(items)
         if self.items:
-            listed = "".join(f"<li>{line}</li>" for line in self.items)
+            listed = "".join(f"<li>{html.escape(line)}</li>" for line in self.items)
             self.also = QLabel(
                 f"This also deletes what belongs to it:<ul style='margin: 0'>{listed}</ul>", self
             )
@@ -104,9 +109,34 @@ class CloseTableDialog(QDialog):
         self.cancel_button.setDefault(True)
         self.cancel_button.setFocus()
         size_simple(self)
+        # A long lead wraps: keep room for all its lines.
+        layout = self.layout()
+        if layout is not None and layout.hasHeightForWidth():
+            height = layout.totalHeightForWidth(self.width())
+            self.setMinimumHeight(height)
+            self.resize(self.width(), max(self.height(), height))
 
     @property
     def delete_button(self) -> QWidget:
         ok = self.skeleton.ok_button
         assert ok is not None
         return ok
+
+
+class CloseTableDialog(DeleteDialog):
+    """Asks whether to delete the table ``name`` with its ``analyses`` and ``graphs``."""
+
+    def __init__(
+        self,
+        name: str,
+        analyses: Sequence[Analysis] = (),
+        graphs: Sequence[ChartSpec] = (),
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(
+            "Close table",
+            f"Closing “{name}” deletes the table from the project.",
+            "Delete table",
+            belongings(analyses, graphs),
+            parent,
+        )

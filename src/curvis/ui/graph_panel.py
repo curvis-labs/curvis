@@ -132,6 +132,11 @@ class GraphPanel(QWidget):
         self.table_id = table_id
         self.refresh_list()
 
+    def name_of(self, graph_id: str) -> str:
+        """The graph's name as the combo box lists it ("XY graph 2 · Title")."""
+        index = self.combo.findData(graph_id)
+        return self.combo.itemText(index) if index >= 0 else "graph"
+
     def set_current(self, graph_id: str) -> None:
         index = self.combo.findData(graph_id)
         if index >= 0:

@@ -14,6 +14,7 @@ from curvis.analysis.descriptive import DescriptiveParams
 from curvis.core import AddTable, Document, GroupColumns, RemoveColumn, SetCellValue
 from curvis.data import Column, Table
 from curvis.ui.analyze_dialog import AnalyzeDialog
+from curvis.ui.close_table_dialog import DeleteDialog
 from curvis.ui.document_tab import DocumentTab
 from curvis.ui.main_window import MainWindow
 from curvis.ui.results_panel import EMPTY_TEXT, RECALCULATING, ResultGrid
@@ -297,18 +298,54 @@ def test_an_analysis_that_cannot_run_says_what_to_change(
     assert "Click Edit…" in tab.analysis_engine.errors[tab.document.analyses[0].id]  # type: ignore[union-attr]
 
 
+def answer_delete(monkeypatch: pytest.MonkeyPatch, accept: bool = True) -> list[QDialog]:
+    """Make the tab answer its delete warnings with Delete (or Cancel)."""
+    shown: list[QDialog] = []
+
+    def exec_dialog(self: DocumentTab, dialog: QDialog) -> int:
+        assert isinstance(dialog, DeleteDialog)
+        shown.append(dialog)
+        return QDialog.DialogCode.Accepted if accept else QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(DocumentTab, "_exec_dialog", exec_dialog)
+    return shown
+
+
 def test_delete_analysis_is_undoable(
     tab: DocumentTab, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch, window: MainWindow
 ) -> None:
     run_dialog(monkeypatch)
     tab.analyze()
     settle(qtbot, tab)
+    shown = answer_delete(monkeypatch)
     window.registry.action("analyze.delete").trigger()
+    assert [d.windowTitle() for d in shown] == ["Delete analysis"]
     assert tab.results_panel.current_id is None
     assert not window.registry.action("analyze.edit").isEnabled()
     tab.document.undo()
     settle(qtbot, tab)
     assert tab.results_panel.current_id == tab.document.analyses[0].id
+
+
+def test_delete_asks_first_and_cancel_keeps_the_analysis(
+    tab: DocumentTab, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dialog(monkeypatch)
+    tab.analyze()
+    settle(qtbot, tab)
+    shown = answer_delete(monkeypatch, accept=False)
+    panel = tab.results_panel
+    assert panel.delete_button.isEnabled()
+    panel.delete_button.click()
+    assert len(shown) == 1 and len(tab.document.analyses) == 1
+    dialog = shown[0]
+    assert isinstance(dialog, DeleteDialog)
+    assert dialog.lead.text().startswith("Deleting “Descriptive statistics”")
+    assert dialog.delete_button.text() == "Delete analysis"
+    answer_delete(monkeypatch)
+    panel.delete_button.click()
+    assert tab.document.analyses == []
+    assert not panel.delete_button.isEnabled()
 
 
 def test_the_combo_box_switches_between_analyses(

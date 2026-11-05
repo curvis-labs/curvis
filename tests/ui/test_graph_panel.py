@@ -6,6 +6,7 @@ from dataclasses import replace
 import numpy as np
 import pytest
 from PySide6.QtCore import QPointF, Qt
+from PySide6.QtWidgets import QDialog
 from pytestqt.qtbot import QtBot
 
 from curvis.analysis.base import Analysis
@@ -13,6 +14,7 @@ from curvis.analysis.fit.analyses import Hill4Params
 from curvis.charts.render_qt.chart_view import BoxItem, ChartView
 from curvis.charts.spec import ChartFamily, ChartVariant, FitOverlay, Scale
 from curvis.core import AddTable, SetCellValue, add_analysis, edit_graph
+from curvis.ui.close_table_dialog import DeleteDialog
 from curvis.ui.document_tab import GRAPH_TAB, RESULTS_TAB, DocumentTab
 from curvis.ui.graph_panel import EMPTY_TEXT
 from curvis.ui.main_window import MainWindow
@@ -188,14 +190,27 @@ def test_a_new_fit_is_overlaid_on_the_xy_graphs(window: MainWindow, qtbot: QtBot
     assert tab.document.analyses == [] and tab.document.graphs[0].overlays == ()
 
 
-def test_delete_graph_and_switch_panels(window: MainWindow, tab: DocumentTab, qtbot: QtBot) -> None:
+def test_delete_graph_and_switch_panels(
+    window: MainWindow, tab: DocumentTab, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[str] = []
+
+    def exec_dialog(self: DocumentTab, dialog: QDialog) -> int:
+        assert isinstance(dialog, DeleteDialog)
+        asked.append(dialog.lead.text())
+        return QDialog.DialogCode.Accepted if len(asked) > 1 else QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(DocumentTab, "_exec_dialog", exec_dialog)
     tab.plot(ChartFamily.XY)
     settle(qtbot, tab)
     window.registry.action("view.results").trigger()
     assert tab.side_tabs.currentIndex() == RESULTS_TAB
     window.registry.action("view.graph").trigger()
     assert tab.side_tabs.currentIndex() == GRAPH_TAB
-    window.registry.action("graph.delete").trigger()
+    window.registry.action("graph.delete").trigger()  # Cancel
+    assert len(tab.document.graphs) == 1
+    assert asked == ["Deleting “XY graph · Assay” removes the graph from the project."]
+    window.registry.action("graph.delete").trigger()  # Delete graph
     assert tab.document.graphs == []
     assert tab.graph_panel.stack.currentWidget() is tab.graph_panel.empty
     assert not window.registry.action("graph.delete").isEnabled()
