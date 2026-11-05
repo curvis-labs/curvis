@@ -17,6 +17,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from curvis.analysis.base import Analysis
+from curvis.charts.spec import LabelAngle
 from curvis.core import ChangeLogEntry, Document, JsonValue, ProjectConstant, RenameTable
 from curvis.data import CategoryGroup, Column, ColumnRole, ReplicateGroup, Table, normalized_order
 from curvis.io import project
@@ -220,7 +221,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 6
+    assert data["schema_version"] == SCHEMA_VERSION == 7
     assert set(data["document"]) == {
         "id",
         "name",
@@ -390,7 +391,7 @@ def test_newer_version(tmp_path: Path) -> None:
 
 
 def test_migrations_cover_every_older_version() -> None:
-    assert SCHEMA_VERSION == 6
+    assert SCHEMA_VERSION == 7
     assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
@@ -448,9 +449,9 @@ def test_version_1_files_get_the_default_category_factor(tmp_path: Path) -> None
 def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "old.cvp"
     save(Document(), path)
-    monkeypatch.setattr(project, "SCHEMA_VERSION", 7)
-    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 6)})
-    with pytest.raises(ProjectFileError, match="from format 6"):
+    monkeypatch.setattr(project, "SCHEMA_VERSION", 8)
+    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 7)})
+    with pytest.raises(ProjectFileError, match="from format 7"):
         load(path)
 
 
@@ -710,3 +711,20 @@ def test_version_5_graphs_get_page_presets_and_legends(tmp_path: Path) -> None:
     assert (xy.aspect_ratio, bar.aspect_ratio) == ("wide", "tall")
     assert (xy.show_legend, bar.show_legend) == (True, False)
     assert all(s.in_legend for s in xy.series)
+
+
+def test_version_6_axes_get_auto_label_angles(tmp_path: Path) -> None:
+    """Format 7 stores how each axis turns its tick labels; older graphs get Auto."""
+    path = tmp_path / "v6.cvp"
+    save(_graph_document(), path)
+
+    def to_v6(data: dict[str, Any]) -> None:
+        data["schema_version"] = 6
+        for graph in data["document"]["graphs"]:
+            for key in ("x_axis", "y_axis"):
+                del graph[key]["label_angle"]
+
+    _rewrite(path, to_v6)
+    for graph in load(path).graphs:
+        assert graph.x_axis.label_angle is LabelAngle.AUTO
+        assert graph.y_axis.label_angle is LabelAngle.AUTO

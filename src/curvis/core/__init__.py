@@ -4,6 +4,7 @@ from curvis.core.analysis_commands import (
     SetAnalysis,
     add_analysis,
     edit_analysis,
+    overlaid_on,
     remove_analysis,
 )
 from curvis.core.calculation_commands import (
@@ -108,6 +109,7 @@ __all__ = [
     "edit_calculation",
     "edit_graph",
     "new_table_name",
+    "overlaid_on",
     "remove_analysis",
     "remove_graph",
     "set_series_visible",

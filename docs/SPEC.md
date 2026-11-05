@@ -85,11 +85,16 @@ Graphs are drawn directly from a data table. You pick a chart family from the to
 The Format dialog controls:
 
 - Graph title, size (Tall 4 × 6 cm, Wide 9 × 6 cm, Square 6 × 6 cm, or a custom width and height) and whether the graph shows a legend
-- Each axis: title, range, label, and linear or log scale
+- Each axis: title, range, label, linear or log scale, and the angle of the X tick labels (Auto, horizontal, 45° or 90°; Auto turns them when they do not fit side by side)
 - Each series: symbol, symbol size, line style, line width, color, error-bar type and whether it is listed in the legend; series can be added, removed and reordered
+- Fitted curves laid over the graph, listed with the series; they can be removed
 - Color scheme and chart text size
 
+The graph's page leaves room for everything it shows: tick labels that reach past the plot get a margin, turned labels too long for the page are shortened with "…", and a legend too wide for the right of the plot goes under it.
+
 The Graph panel has a small toolbar to change the graph type (scatter, line, bar or box), format, delete and export the graph shown.
+
+Deleting a graph or an analysis asks first (the Results panel has *Delete…* next to *Edit…*) and can be undone. Deleting a curve fit also removes its curves from the graphs that show them.
 
 Clicking a legend entry on XY and survival charts toggles that series on or off. Graphs export as PNG (at a chosen resolution), SVG or PDF, at the graph's size.
 

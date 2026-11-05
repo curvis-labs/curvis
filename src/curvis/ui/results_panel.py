@@ -1,7 +1,8 @@
 """The Results panel, docked to the right of the table (mockup: docs/mockups/index.html).
 
-The combo box switches between the analyses of the shown table, and *Edit…* reopens
-the Analyze dialog with the stored parameters. A result shows, in this order: its
+The combo box switches between the analyses of the shown table, *Edit…* reopens
+the Analyze dialog with the stored parameters and *Delete…* deletes the analysis after a
+warning. A result shows, in this order: its
 plain-language reading, its assumption warnings (with the warning icon), then its
 numbers in tables with exact method names, and the star thresholds. An analysis that
 cannot run shows the error and what to change instead. While an analysis reruns, a
@@ -198,6 +199,8 @@ class ResultsPanel(QWidget):
 
     edit_requested = Signal(str)
     """The user asked to edit the analysis with this id."""
+    delete_requested = Signal(str)
+    """The user asked to delete the analysis with this id."""
     current_changed = Signal()
 
     def __init__(
@@ -234,10 +237,13 @@ class ResultsPanel(QWidget):
         self.badge.hide()
         self.edit_button = QPushButton("Ed&it…", self)
         self.edit_button.setToolTip("Change the data or options of this analysis")
+        self.delete_button = QPushButton("De&lete…", self)
+        self.delete_button.setToolTip("Delete this analysis and its results")
         header.addWidget(title)
         header.addWidget(self.combo, 1)
         header.addWidget(self.badge)
         header.addWidget(self.edit_button)
+        header.addWidget(self.delete_button)
         layout.addLayout(header)
 
         self.empty = secondary_label(EMPTY_TEXT, self)
@@ -253,6 +259,7 @@ class ResultsPanel(QWidget):
 
         self.combo.currentIndexChanged.connect(lambda _i: self._on_current_changed())
         self.edit_button.clicked.connect(self._on_edit)
+        self.delete_button.clicked.connect(self._on_delete)
         if engine is not None:
             engine.analyses_changed.connect(self.refresh_list)
             engine.state_changed.connect(self._on_state_changed)
@@ -320,6 +327,10 @@ class ResultsPanel(QWidget):
         if self.current_id is not None:
             self.edit_requested.emit(self.current_id)
 
+    def _on_delete(self) -> None:
+        if self.current_id is not None:
+            self.delete_requested.emit(self.current_id)
+
     def _show(self) -> None:
         analysis_id = self.current_id
         has_analysis = analysis_id is not None
@@ -327,6 +338,7 @@ class ResultsPanel(QWidget):
         self.scroll_area.setVisible(has_analysis)
         self.combo.setEnabled(has_analysis)
         self.edit_button.setEnabled(has_analysis)
+        self.delete_button.setEnabled(has_analysis)
         if analysis_id is None:
             self.badge.hide()
             self._set_content(None, None)

@@ -12,6 +12,7 @@ from curvis.charts.spec import (
     ChartVariant,
     ErrorBars,
     FitOverlay,
+    LabelAngle,
     LineStyle,
     Scale,
     SeriesSpec,
@@ -37,7 +38,7 @@ def full_spec() -> ChartSpec:
                 in_legend=False,
             ),
         ),
-        x_axis=AxisSpec("Dose (µM)", 0.001, 100.0, True, Scale.LOG),
+        x_axis=AxisSpec("Dose (µM)", 0.001, 100.0, True, Scale.LOG, LabelAngle.VERTICAL),
         y_axis=AxisSpec("Response", None, 120.0, False),
         title="Assay",
         aspect_ratio="custom",
@@ -84,6 +85,7 @@ def test_json_fills_in_missing_style_keys() -> None:
         ("x_axis", {"minimum": 5, "maximum": 1}, "below its maximum"),
         ("x_axis", {"minimum": 0, "maximum": 1, "scale": "log"}, "above 0"),
         ("overlays", [{"analysis_id": "a"}, {"analysis_id": "a"}], "overlaid twice"),
+        ("x_axis", {"label_angle": "30"}, "label_angle cannot be '30'"),
     ],
 )
 def test_json_rejects_bad_values(key: str, value: object, message: str) -> None:

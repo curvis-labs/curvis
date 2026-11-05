@@ -24,18 +24,20 @@ pyqtgraph is slow to import, so this module is only imported when a graph is sho
 from __future__ import annotations
 
 import functools
+import html
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QPointF, QRect, QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
     QFontDatabase,
+    QFontMetricsF,
     QImage,
     QPainter,
     QPen,
@@ -55,6 +57,7 @@ from curvis.charts.axes import (
     ERROR_BAR_WIDTH_PT,
     FONT_FAMILY,
     LEGEND_BORDER_EM,
+    LEGEND_COLUMN_GAP_EM,
     LEGEND_GAP_EM,
     LEGEND_ROW_EM,
     LEGEND_SAMPLE_EM,
@@ -66,6 +69,7 @@ from curvis.charts.axes import (
     AxisLayout,
     axes_layout,
     chart_font_path,
+    legend_columns,
     page_px,
     points_to_px,
 )
@@ -194,6 +198,148 @@ class LegendSample(pg.ItemSample):  # type: ignore[misc]
             painter.drawPath(path)
 
 
+LABEL_PAD_PT = 4.0
+"""Space between the tick labels and the axis title, as Matplotlib's ``labelpad``."""
+
+
+class ChartAxis(pg.AxisItem):  # type: ignore[misc]
+    """An axis laid out like the export's.
+
+    - The axis title is centred on the axis (pyqtgraph appends a space to it, which
+      moves it off centre) and sits inside the axis' own area, so the page edge does
+      not cut it.
+    - X tick labels can be turned by :attr:`label_angle` degrees, ending under their
+      tick, as Matplotlib draws them with ``rotation_mode="anchor"``.
+    - :attr:`overflow` says how far the tick labels reach past the ends of the axis
+      (pixels before and after); :attr:`on_overflow` is called when it changes, so the
+      chart can give the page room for them.
+    """
+
+    # Class defaults: pyqtgraph lays the axis out while it is being made.
+    label_angle = 0.0
+    label_gap = 0.0
+    """Pixels between the tick labels and the axis title."""
+    overflow = (0.0, 0.0)
+    on_overflow: Callable[[], None] | None = None
+
+    def __init__(self, orientation: str) -> None:
+        super().__init__(orientation)
+        self._turned: list[tuple[QPointF, float, float, str]] = []
+        self.label.document().setDocumentMargin(0)
+
+    def labelString(self) -> str:  # noqa: N802 (pyqtgraph API)
+        style = ";".join(f"{k}: {v}" for k, v in self.labelStyle.items())
+        return f"<span style='{style}'>{html.escape(self.labelText)}</span>"
+
+    def resizeEvent(self, ev: Any = None) -> None:  # noqa: N802 (Qt API)
+        super().resizeEvent(ev)
+        if self.label is None:
+            return
+        br = self.label.boundingRect()
+        size = self.size()
+        if self.orientation == "left":
+            self.label.setPos(QPointF(0, size.height() / 2 + br.width() / 2))
+        elif self.orientation == "bottom":
+            self.label.setPos(
+                QPointF(size.width() / 2 - br.width() / 2, size.height() - br.height())
+            )
+
+    def _title_room(self) -> float:
+        if not self.label.isVisible():
+            return 0.0
+        return float(self.label.boundingRect().height()) + self.label_gap
+
+    def _updateWidth(self) -> None:  # noqa: N802 (pyqtgraph API)
+        if self.orientation != "left" or self.fixedWidth is not None or not self.isVisible():
+            super()._updateWidth()
+            return
+        shown = self.style["showValues"]
+        w = (self.textWidth + self.style["tickTextOffset"][0]) if shown else 0
+        w += max(0, self.style["tickLength"]) + self._title_room()
+        self.setMaximumWidth(w)
+        self.setMinimumWidth(w)
+
+    def _updateHeight(self) -> None:  # noqa: N802 (pyqtgraph API)
+        if self.orientation != "bottom" or self.fixedHeight is not None or not self.isVisible():
+            super()._updateHeight()
+            return
+        shown = self.style["showValues"]
+        h = (self.textHeight + self.style["tickTextOffset"][1]) if shown else 0
+        h += max(0, self.style["tickLength"]) + self._title_room()
+        self.setMaximumHeight(h)
+        self.setMinimumHeight(h)
+        self.picture = None
+
+    def generateDrawSpecs(self, p: QPainter) -> Any:  # noqa: N802 (pyqtgraph API)
+        specs = super().generateDrawSpecs(p)
+        self._turned = []
+        if specs is None:
+            return specs
+        axis_spec, tick_specs, text_specs = specs
+        bounds = self.mapRectFromParent(self.geometry())
+        if self.orientation == "bottom" and self.label_angle and text_specs:
+            text_specs = self._turn(text_specs, bounds)
+        if self.orientation == "left":
+            before = max((bounds.top() - r.top() for r, _f, _t in text_specs), default=0.0)
+            after = max((r.bottom() - bounds.bottom() for r, _f, _t in text_specs), default=0.0)
+        elif self._turned:
+            before, after = self._turned_reach(bounds)
+        else:
+            before = max((bounds.left() - r.left() for r, _f, _t in text_specs), default=0.0)
+            after = max((r.right() - bounds.right() for r, _f, _t in text_specs), default=0.0)
+        overflow = (max(0.0, before), max(0.0, after))
+        if any(abs(a - b) > 0.5 for a, b in zip(overflow, self.overflow, strict=True)):
+            self.overflow = overflow
+            if self.on_overflow is not None:
+                QTimer.singleShot(0, self.on_overflow)
+        return axis_spec, tick_specs, text_specs
+
+    def _turn(self, text_specs: list[Any], bounds: QRectF) -> list[Any]:
+        """Turn the labels: each ends under its tick, centred on the line through it."""
+        font = self.style["tickFont"] or QFont()
+        metrics = QFontMetricsF(font)
+        angle = math.radians(self.label_angle)
+        top = bounds.top() + max(0, self.style["tickLength"]) + self.style["tickTextOffset"][1]
+        deepest = 0.0
+        for rect, _flags, text in text_specs:
+            w, h = metrics.horizontalAdvance(text), metrics.height()
+            self._turned.append((QPointF(rect.center().x(), top), w, h, text))
+            deepest = max(deepest, w * math.sin(angle) + h / 2 * math.cos(angle))
+        self._updateMaxTextSize(math.ceil(deepest))
+        return []
+
+    def _turned_reach(self, bounds: QRectF) -> tuple[float, float]:
+        angle = math.radians(self.label_angle)
+        before = after = 0.0
+        for anchor, w, h, _text in self._turned:
+            left = anchor.x() - w * math.cos(angle) - h / 2 * math.sin(angle)
+            right = anchor.x() + h / 2 * math.sin(angle)
+            before = max(before, bounds.left() - left)
+            after = max(after, right - bounds.right())
+        return before, after
+
+    def drawPicture(  # noqa: N802 (pyqtgraph API)
+        self,
+        p: QPainter,
+        axis_spec: Any,
+        tick_specs: Any,
+        text_specs: Any,
+    ) -> None:
+        super().drawPicture(p, axis_spec, tick_specs, text_specs)
+        if not self._turned:
+            return
+        if self.style["tickFont"] is not None:
+            p.setFont(self.style["tickFont"])
+        p.setPen(self.textPen())
+        flags = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        for anchor, w, h, text in self._turned:
+            p.save()
+            p.translate(anchor)
+            p.rotate(-self.label_angle)
+            p.drawText(QRectF(-w, -h / 2, w, h), int(flags), text)
+            p.restore()
+
+
 @dataclass
 class _XYParts:
     """The items of an XY graph, kept between renders so a data change only updates
@@ -274,7 +420,9 @@ class ChartView(QWidget):
         # The plot and, to its right, the legend (outside the data, like Prism).
         self.plot_widget = pg.GraphicsLayoutWidget(self)
         self.plot_widget.setAccessibleName("Graph")
-        self.plot_item: pg.PlotItem = pg.PlotItem()
+        self.plot_item: pg.PlotItem = pg.PlotItem(
+            axisItems={"bottom": ChartAxis("bottom"), "left": ChartAxis("left")}
+        )
         self.plot_item.setMenuEnabled(False)
         self.plot_item.hideButtons()
         self.plot_item.vb.setMouseEnabled(False, False)
@@ -294,6 +442,10 @@ class ChartView(QWidget):
         self.message = ""
         """Why nothing is drawn (an unsupported variant), or ""."""
         self._drawn = _Drawn()
+        self._margins = (0.0, 0.0, 0.0)
+        self._legend_below = False
+        for name in ("bottom", "left"):
+            self._axis(name).on_overflow = self._update_margins
         self.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
         self.plot_widget.scene().sigMouseClicked.connect(self._on_scene_clicked)
 
@@ -368,14 +520,14 @@ class ChartView(QWidget):
                 self._draw_categories(spec, data, colors)
             else:
                 self.message = UNSUPPORTED
+        self._place_legend()
         self._apply_layout(spec, self.layout_)
 
     def _style(self, spec: ChartSpec, colors: ColorScheme) -> None:
         widget, plot = self.plot_widget, self.plot_item
         ink = QColor(colors.ink)
         widget.setBackground(QColor(colors.page))
-        pad = self._px(PAGE_PAD_PT)
-        widget.ci.setContentsMargins(pad, pad, pad, pad)
+        self._set_margins()
         widget.ci.setSpacing(0)
         font = chart_font(self.family)
         font.setPointSizeF(self._font_pt(spec.text_size))
@@ -395,6 +547,7 @@ class ChartView(QWidget):
                 color=colors.ink,
                 **{"font-size": size, "font-family": self.family},
             )
+            axis.label_gap = self._px(LABEL_PAD_PT)
             axis.setLogMode(False)  # plot coordinates are log10 already; ticks come from us
             axis._curvis_ticks = None
             axis.setStyle(
@@ -410,6 +563,38 @@ class ChartView(QWidget):
         self.legend.opts["labelTextSize"] = size
         self.legend.setLabelTextColor(colors.ink)
 
+    def _axis(self, name: str) -> ChartAxis:
+        axis = self.plot_item.getAxis(name)
+        assert isinstance(axis, ChartAxis)
+        return axis
+
+    def _set_margins(self) -> None:
+        """The page padding, plus room for tick labels that reach past the plot where
+        nothing else (the Y axis, the legend, the title) gives them room."""
+        pad = self._px(PAGE_PAD_PT)
+        left, top, right = self._margins
+        self.plot_widget.ci.setContentsMargins(pad + left, pad + top, pad + right, pad)
+
+    def _update_margins(self) -> None:
+        if self.spec is None:
+            return
+        bottom, left_axis = self._axis("bottom"), self._axis("left")
+        before, after = bottom.overflow
+        legend = self.legend.width() if self._legend_shown and not self._legend_below else 0.0
+        title = self.plot_item.titleLabel
+        above = title.height() if title.isVisible() else 0.0
+        wanted = (
+            max(0.0, before - left_axis.width()),
+            max(0.0, left_axis.overflow[0] - above),
+            max(0.0, after - legend),
+        )
+        # Grow at once, shrink only by more than a pixel: the room changes the plot's
+        # width, which moves the labels a little.
+        if all(abs(a - b) <= 1.0 for a, b in zip(wanted, self._margins, strict=True)):
+            return
+        self._margins = wanted
+        self._set_margins()
+
     def _legend_wanted(self, spec: ChartSpec) -> bool:
         return spec.show_legend and any(s.in_legend for s in spec.series)
 
@@ -424,10 +609,33 @@ class ChartView(QWidget):
         label.setText(name, size=self.legend.opts["labelTextSize"])
         self.legend.layout.setHorizontalSpacing(LEGEND_GAP_EM * em)
         self.legend.layout.setVerticalSpacing(0)
-        # As Matplotlib's layout: padding on both sides of the gap after the plot, and
-        # the legend's own border left and right.
-        border = LEGEND_BORDER_EM * em
-        self.legend.layout.setContentsMargins(2 * self._px(PAGE_PAD_PT) + border, 0, border, 0)
+
+    def _place_legend(self) -> None:
+        """Put the legend right of the plot, or under it in columns when the page is
+        too narrow (curvis.charts.axes.legend_columns), as on export."""
+        if not self._legend_shown or self.spec is None:
+            return
+        columns = legend_columns(self.spec, self.legend_names())
+        em = self._px(self.spec.text_size)
+        border, pad = LEGEND_BORDER_EM * em, self._px(PAGE_PAD_PT)
+        layout = self.plot_widget.ci
+        layout.removeItem(self.legend)
+        self.legend.setColumnCount(max(columns, 1))
+        if columns:
+            # Matplotlib's column spacing sits between a name and the next sample.
+            for column in range(1, 2 * columns, 2):
+                if column < 2 * columns - 1:
+                    self.legend.layout.setColumnSpacing(column, LEGEND_COLUMN_GAP_EM * em)
+            self.legend.layout.setContentsMargins(border, 2 * pad, border, 0)
+            layout.addItem(self.legend, 1, 0)
+            layout.layout.setAlignment(self.legend, Qt.AlignmentFlag.AlignHCenter)
+        else:
+            # As Matplotlib's layout: padding on both sides of the gap after the plot,
+            # and the legend's own border left and right.
+            self.legend.layout.setContentsMargins(2 * pad + border, 0, border, 0)
+            layout.addItem(self.legend, 0, 1)
+            layout.layout.setAlignment(self.legend, Qt.AlignmentFlag.AlignTop)
+        self._legend_below = bool(columns)
         self.legend.updateSize()
 
     def _draw_xy(self, spec: ChartSpec, data: ChartData, colors: ColorScheme) -> None:
@@ -583,11 +791,15 @@ class ChartView(QWidget):
         lay out the axis text again, which costs more than the rest of a data redraw."""
         plot = self.plot_item
         for name, axis_layout in (("bottom", layout.x), ("left", layout.y)):
-            axis = plot.getAxis(name)
+            axis = self._axis(name)
             ticks = _ticks(axis_layout)
             if getattr(axis, "_curvis_ticks", None) != ticks:
                 axis.setTicks(ticks)
                 axis._curvis_ticks = ticks
+            if axis.label_angle != axis_layout.label_angle:
+                axis.label_angle = axis_layout.label_angle
+                axis.picture = None
+                axis.update()
         ranges = ((layout.x.low, layout.x.high), (layout.y.low, layout.y.high))
         if plot.vb.viewRange() != [list(r) for r in ranges]:
             plot.vb.setRange(xRange=ranges[0], yRange=ranges[1], padding=0)
@@ -703,9 +915,17 @@ def render_page(
     view.show()
     view.render_chart(spec, data)
     app = QApplication.instance()
-    for _ in range(3):
+    # Painting lays the axes out, which can give the tick labels more room; a few
+    # rounds settle it.
+    for _ in range(4):
         if app is not None:
             app.processEvents()
+        scratch = QImage(view.plot_widget.size(), QImage.Format.Format_ARGB32)
+        painter = QPainter(scratch)
+        view.plot_widget.render(painter)
+        painter.end()
+    if app is not None:
+        app.processEvents()
     image = QImage(view.plot_widget.size(), QImage.Format.Format_ARGB32)
     image.fill(QColor(scheme(spec.color_scheme).page))
     painter = QPainter(image)
@@ -754,6 +974,7 @@ def _nan_to_edge(limit: Any, fit: Any) -> Any:
 
 __all__ = (
     "BoxItem",
+    "ChartAxis",
     "ChartView",
     "LegendSample",
     "chart_font",
