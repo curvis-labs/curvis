@@ -377,6 +377,8 @@ def _build_document(zf: zipfile.ZipFile, data: dict[str, Any]) -> Document:
         for i, t in enumerate(_list(doc_data.get("tables"), "tables"))
     ]
     _check_unique([t.id for t in tables], "table ids")
+    if not tables:
+        tables.append(Table.blank())  # a project always has at least one table
     constants = [
         _read_constant(c, f"constant {i + 1}")
         for i, c in enumerate(_list(doc_data.get("constants"), "constants"))

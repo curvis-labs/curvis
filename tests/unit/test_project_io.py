@@ -108,7 +108,7 @@ def project_tables(draw: st.DrawFn) -> Table:
 def project_documents(draw: st.DrawFn) -> Document:
     doc = Document(
         name=draw(TEXT),
-        tables=draw(st.lists(project_tables(), max_size=3)),
+        tables=draw(st.lists(project_tables(), min_size=1, max_size=3)),
         constants=[
             ProjectConstant(draw(TEXT), draw(st.floats(allow_nan=False, allow_infinity=False)))
             for _ in range(draw(st.integers(0, 3)))
@@ -553,7 +553,7 @@ def test_constants_must_be_finite() -> None:
 
 
 def test_timestamps_keep_their_offset(tmp_path: Path) -> None:
-    doc = Document()
+    doc = Document(tables=[Table("T")])
     stamp = datetime(2024, 5, 6, 7, 8, 9, 123456, tzinfo=timezone(timedelta(hours=5, minutes=30)))
     doc.change_log.append(ChangeLogEntry(stamp, "AddTable", "Add table 'A'"))
     doc.change_log.append(ChangeLogEntry(datetime(2024, 1, 1, tzinfo=UTC), "X", "y"))

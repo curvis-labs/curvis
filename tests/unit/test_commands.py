@@ -101,7 +101,7 @@ def test_remove_table(doc: Document) -> None:
     command = RemoveTable(removed.id)
     check_round_trip(doc, command)
     assert [t.name for t in doc.tables] == ["Other"]
-    assert command.summary == "Remove table 'Data'"
+    assert command.summary == "Delete table 'Data'"
     doc.undo()
     assert doc.tables[0] is removed
 
