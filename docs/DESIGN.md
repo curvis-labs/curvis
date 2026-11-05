@@ -186,12 +186,12 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   | Ctrl+, | Settings |
   | Ctrl+Shift+I | Import data |
   | Ctrl+Shift+N | New table |
-  | Ctrl+Shift+R | Rename column (in the header) |
+  | Ctrl+Shift+R | Bulk rename |
   | Ctrl+Page Down / Ctrl+Page Up | Next / previous table |
   | Ctrl+Shift+K | Calculate |
   | Ctrl+Shift+E | Edit calculation |
   | Ctrl+Shift+A | Analyze |
-  | — | Bulk rename, Constants, Edit analysis, Delete analysis, Close table (menu and palette only) |
+  | — | Rename column, Constants, Edit analysis, Delete analysis, Close table (menu and palette only) |
 
   Reserved for later steps: Ctrl+Shift+F *Format graph*, Ctrl+Shift+X
   *Export graph*. A new shortcut must not clash with these or with platform standard keys.
@@ -276,8 +276,8 @@ Mockup: `docs/mockups/table-tabs.html`.
 
 Mockup: `docs/mockups/table-tabs.html`, board 6.
 
-- **Start.** Double-click a column name, or use *Rename column* (Ctrl+Shift+R) on the current
-  column: a field opens over the name in the header with the text selected. The role line
+- **Start.** Double-click a column name, or use *Rename column* (menu, header context menu
+  and command palette) on the current column: a field opens over the name in the header with the text selected. The role line
   under it (X, Y, ƒ Y …) stays visible. *Rename column* opens no dialog, so its menu text has
   no ellipsis.
 - **Keys.** Enter or a click elsewhere keeps the name. Esc cancels the header being edited.

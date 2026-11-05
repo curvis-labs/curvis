@@ -22,6 +22,7 @@ from curvis.core.calculations import (
 )
 from curvis.core.change_log import ChangeLog, ChangeLogEntry
 from curvis.core.commands import (
+    LAST_TABLE,
     AddColumn,
     AddTable,
     BulkRename,
@@ -31,6 +32,7 @@ from curvis.core.commands import (
     GroupColumns,
     ImportColumns,
     MoveColumn,
+    MoveTable,
     RemoveColumn,
     RemoveTable,
     RenameCategoryFactor,
@@ -42,6 +44,7 @@ from curvis.core.commands import (
     SetCellValue,
     SetColumnRole,
     UngroupColumns,
+    new_table_name,
 )
 from curvis.core.constants import JsonValue, ProjectConstant
 from curvis.core.dependency_graph import CycleError, DependencyGraph
@@ -56,6 +59,7 @@ from curvis.core.graph_commands import (
 from curvis.core.undo_stack import UNDO_LIMIT, UndoEvent, UndoStack
 
 __all__ = [
+    "LAST_TABLE",
     "UNDO_LIMIT",
     "AddColumn",
     "AddConstant",
@@ -77,6 +81,7 @@ __all__ = [
     "ImportColumns",
     "JsonValue",
     "MoveColumn",
+    "MoveTable",
     "ProjectConstant",
     "RemoveColumn",
     "RemoveConstant",
@@ -102,6 +107,7 @@ __all__ = [
     "edit_analysis",
     "edit_calculation",
     "edit_graph",
+    "new_table_name",
     "remove_analysis",
     "remove_graph",
     "set_series_visible",

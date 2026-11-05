@@ -21,6 +21,7 @@ from curvis.data import Column, ColumnRole, Pairing, Table
 from curvis.settings import Settings
 from curvis.ui.analyze_dialog import AnalyzeDialog
 from curvis.ui.calculate_dialog import CalculateDialog
+from curvis.ui.close_table_dialog import CloseTableDialog
 from curvis.ui.constants_dialog import ConstantEditor, ConstantsDialog
 from curvis.ui.import_dialog import ImportDialog
 from curvis.ui.settings_dialog import SettingsDialog
@@ -185,6 +186,24 @@ def _settings(ctx: Context) -> QDialog:
     return SettingsDialog(ctx.settings)
 
 
+def _close_table(_ctx: Context) -> QDialog:
+    from curvis.analysis.base import Analysis
+    from curvis.analysis.compare.ttest_analysis import TTestParams
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily
+
+    doc = grouped_document()
+    table = doc.tables[0]
+    group_ids = tuple(g.id for g in table.replicate_groups[:2])
+    analysis = Analysis("t_test", table.id, group_ids, TTestParams())
+    graph = default_spec(table, ChartFamily.BAR)
+    return CloseTableDialog(table.name, [analysis], [graph])
+
+
+def _close_table_plain(_ctx: Context) -> QDialog:
+    return CloseTableDialog("Viability")
+
+
 SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "import": _import,
     "bulk_rename": _bulk_rename,
@@ -202,6 +221,8 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "constants": _constants,
     "constant_editor": _constant_editor,
     "settings": _settings,
+    "close_table": _close_table,
+    "close_table_plain": _close_table_plain,
 }
 
 

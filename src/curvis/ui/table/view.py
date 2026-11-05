@@ -8,6 +8,8 @@
 - Delete or Backspace clears the selected cells.
 - Right-clicking a column header adds, deletes and renames columns, sets their role,
   groups them as replicates or into categories, and opens bulk rename.
+- Column, group and category names are renamed in place in the header (double-click or
+  Rename column); Tab and Shift+Tab move to the next and previous name.
 - Groups are shown above their columns; columns and groups move by drag and drop
   (see :mod:`curvis.ui.table.header`).
 
@@ -28,6 +30,7 @@ from PySide6.QtCore import (
     QPoint,
     QRect,
     Qt,
+    QTimer,
     Signal,
 )
 from PySide6.QtGui import (
@@ -173,9 +176,6 @@ class TableView(QTableView):
             lambda start, end: self.select_columns(start, end - 1)
         )
         self.grouped_header.move_requested.connect(self._on_move_requested)
-        self.grouped_header.rename_requested.connect(
-            lambda kind, node_id: self.rename_band(NodeKind(kind), node_id)
-        )
 
         rows = self.verticalHeader()
         rows.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)  # needed for fast scrolling
@@ -493,22 +493,24 @@ class TableView(QTableView):
         return self.model().remove_columns(self.selected_columns())
 
     def rename_current_column(self) -> bool:
-        cols = self.selected_columns()
-        if not cols:
-            return False
-        column = self.model().column_at(cols[0])
-        assert column is not None
-        name = self._ask_column_name(column.name)
-        if name is None:
-            return False
-        return self.model().rename_column(cols[0], name)
+        """Edit the name of the current column in place, in the header.
+
+        The field opens once the event loop is idle: this runs from menus and the
+        command palette, whose closing gives the focus back to where it was, which
+        would close a field opened right away. Returns False if there is no column.
+        """
+        model = self.model()
+        section = self.currentIndex().column()
+        if model.column_at(section) is None:
+            cols = self.selected_columns()
+            if not cols:
+                return False
+            section = cols[0]
+        self._rename_section(section)
+        return True
 
     def set_role_of_selected(self, role: ColumnRole) -> bool:
         return self.model().set_role(self.selected_columns(), role)
-
-    def _ask_column_name(self, current: str) -> str | None:
-        """Ask for a new column name (tests replace this)."""
-        return self._ask_text("Rename column", "Column name:", current)
 
     def _ask_text(self, title: str, label: str, current: str) -> str | None:
         """Ask for a line of text (tests replace this)."""
@@ -569,16 +571,8 @@ class TableView(QTableView):
         return name is not None and model.rename_category_factor(name)
 
     def rename_band(self, kind: NodeKind, node_id: str) -> bool:
-        """Rename a replicate group or category (asks for the name)."""
-        table = self.model().table
-        if kind is NodeKind.GROUP:
-            title, current = "Rename replicate group", table.replicate_group(node_id).name
-        else:
-            title, current = "Rename category", table.category_group(node_id).name
-        name = self._ask_text(title, "Name:", current)
-        if name is None or name == current:
-            return False
-        return self.model().rename_band(kind, node_id, name)
+        """Edit the name of a replicate group or category in place, in the header."""
+        return self.grouped_header.edit_band(kind, node_id) is not None
 
     def bulk_rename(self) -> bool:
         """Open the bulk rename dialog; the result is one undoable command."""
@@ -650,7 +644,7 @@ class TableView(QTableView):
             menu.addAction("Insert column &right", self.insert_column_right)
         else:
             menu.addAction("&Add column", self.insert_column_right)
-        rename = menu.addAction("Re&name column…", self.rename_current_column)
+        rename = menu.addAction("Re&name column", lambda: self._rename_section(section))
         rename.setEnabled(len(cols) == 1)
         label = "&Delete column" if len(cols) <= 1 else f"&Delete {len(cols)} columns"
         delete = menu.addAction(label, self.delete_selected_columns)
@@ -688,6 +682,10 @@ class TableView(QTableView):
         menu.addAction("Move righ&t", self.move_selected_right).setEnabled(has_columns)
         menu.addAction("&Bulk rename…", self.bulk_rename)
         return menu
+
+    def _rename_section(self, section: int) -> None:
+        """Open the name field of ``section`` after the menu that asked for it is gone."""
+        QTimer.singleShot(0, self, lambda: self.grouped_header.edit_column(section))
 
     def current_calculated_column(self) -> str | None:
         """Id of the calculated column of the current cell, or None."""

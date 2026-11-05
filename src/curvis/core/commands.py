@@ -32,6 +32,8 @@ from curvis.data.layout import column_category
 from curvis.data.names import name_key, unique_name
 
 if TYPE_CHECKING:
+    from curvis.analysis.base import Analysis
+    from curvis.charts.spec import ChartSpec
     from curvis.core.calculations import Calculation
     from curvis.core.document import Document
 
@@ -244,34 +246,109 @@ class AddTable(Command):
         return _table_nodes(self.table)
 
 
+LAST_TABLE = "A project needs at least one table."
+"""Why the last table of a project cannot be removed."""
+
+
+def new_table_name(doc: Document) -> str:
+    """The name for a new table: "Table 2", "Table 3", … (the first free number)."""
+    taken = {name_key(t.name) for t in doc.tables}
+    n = 2
+    while name_key(f"Table {n}") in taken:
+        n += 1
+    return f"Table {n}"
+
+
+def _count(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
 class RemoveTable(Command):
-    """Remove a table."""
+    """Remove a table with everything that belongs to it: its calculated columns, its
+    analyses and its graphs. Undo brings all of them back. The last table of a document
+    cannot be removed."""
 
     def __init__(self, table_id: str) -> None:
         self.table_id = table_id
         self._table: Table | None = None
         self._at = 0
         self._calculations: list[Calculation] = []
+        self._analyses: list[Analysis] = []
+        self._graphs: list[ChartSpec] = []
+        self._n_analyses = 0
+        self._n_graphs = 0
 
     def do(self, doc: Document) -> None:
-        self._table = _get_table(doc, self.table_id)
+        table = _get_table(doc, self.table_id)
+        if len(doc.tables) <= 1:
+            raise CommandError(LAST_TABLE)
+        self._table = table
         self._at = doc.table_index(self.table_id)
         self._calculations = doc.calculations
+        self._analyses = doc.analyses
+        self._graphs = doc.graphs
+        self._n_analyses = sum(a.table_id == self.table_id for a in doc.analyses)
+        self._n_graphs = sum(g.table_id == self.table_id for g in doc.graphs)
         del doc.tables[self._at]
         _drop_calculated(doc, set(), self.table_id)
+        doc.analyses = [a for a in doc.analyses if a.table_id != self.table_id]
+        doc.graphs = [g for g in doc.graphs if g.table_id != self.table_id]
 
     def undo(self, doc: Document) -> None:
         assert self._table is not None
         doc.tables.insert(self._at, self._table)
         doc.calculations = self._calculations
+        doc.analyses = self._analyses
+        doc.graphs = self._graphs
 
     @property
     def summary(self) -> str:
-        return f"Remove table '{self._table.name}'" if self._table else "Remove table"
+        if self._table is None:
+            return "Delete table"
+        text = f"Delete table '{self._table.name}'"
+        parts = []
+        if self._n_analyses:
+            parts.append(_count(self._n_analyses, "analysis", "analyses"))
+        if self._n_graphs:
+            parts.append(_count(self._n_graphs, "graph", "graphs"))
+        return f"{text} with {' and '.join(parts)}" if parts else text
 
     @property
     def touched_nodes(self) -> tuple[str, ...]:
         return _table_nodes(self._table) if self._table else (self.table_id,)
+
+
+class MoveTable(Command):
+    """Move a table to position ``index`` in the list of tables."""
+
+    def __init__(self, table_id: str, index: int) -> None:
+        self.table_id = table_id
+        self.index = index
+        self._from = 0
+        self._name = ""
+
+    def do(self, doc: Document) -> None:
+        table = _get_table(doc, self.table_id)
+        if not 0 <= self.index < len(doc.tables):
+            raise CommandError(
+                f"Position {self.index} is out of range (0 to {len(doc.tables) - 1})."
+            )
+        self._from = doc.table_index(self.table_id)
+        self._name = table.name
+        del doc.tables[self._from]
+        doc.tables.insert(self.index, table)
+
+    def undo(self, doc: Document) -> None:
+        table = doc.tables.pop(self.index)
+        doc.tables.insert(self._from, table)
+
+    @property
+    def summary(self) -> str:
+        return f"Move table '{self._name}'"
+
+    @property
+    def touched_nodes(self) -> tuple[str, ...]:
+        return (self.table_id,)
 
 
 class RenameTable(Command):

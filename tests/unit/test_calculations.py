@@ -324,6 +324,7 @@ def test_removing_a_calculated_column_updates_its_calculation() -> None:
 
 def test_removing_a_table_removes_its_calculations() -> None:
     doc, _table = lab_document()
+    doc.execute(AddTable(Table("U")))
     calc = one_calc(doc)
     doc.execute(RemoveTable("T"))
     assert doc.calculations == []
