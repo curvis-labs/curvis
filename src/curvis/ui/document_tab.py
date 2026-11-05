@@ -1,5 +1,6 @@
-"""One open document: its model, file path and the widget shown in its tab (the table,
-with the Results and Graph panels to its right, one at a time)."""
+"""One open document: its model, file path and the widget shown in its tab (the selected
+table, with the Results and Graph panels to its right, one at a time, and the table
+tabs along the bottom)."""
 
 from __future__ import annotations
 
@@ -11,12 +12,26 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QDialog, QLabel, QSplitter, QTabWidget, QVBoxLayout, QWidget
 
 from curvis.charts.spec import ChartFamily
-from curvis.core import Command, CommandError, Document, UndoEvent
+from curvis.core import (
+    LAST_TABLE,
+    AddTable,
+    Command,
+    CommandError,
+    CommandGroup,
+    Document,
+    MoveTable,
+    RemoveTable,
+    RenameTable,
+    UndoEvent,
+    new_table_name,
+)
 from curvis.core.constants import ProjectConstant
+from curvis.data import Table
 from curvis.settings.store import DECIMAL_PLACES_DEFAULT
 from curvis.ui.graph_panel import GraphPanel
 from curvis.ui.results_panel import ResultsPanel
 from curvis.ui.table import TableModel, TableView
+from curvis.ui.table_tabs import TableTabs
 
 if TYPE_CHECKING:
     from curvis.analysis.base import Analysis
@@ -33,7 +48,12 @@ RESULTS_TAB, GRAPH_TAB = 0, 1
 
 
 class DocumentTab(QWidget):
-    """The tab of one document: the view of its first table, or a placeholder.
+    """The tab of one document: the view of its selected table, or a placeholder.
+
+    The table tabs along the bottom select the table. The table view, the Results and
+    the Graph panel and every table action follow the selected table. Commands keep the
+    selection; when the selected table is removed its neighbour is selected, and a table
+    that is added (or brought back by undo) is selected.
 
     ``message`` sends short notes for the status bar, such as why an edit was refused.
     With a ``scheduler``, the tab keeps the document's calculated columns and analyses up
@@ -99,9 +119,20 @@ class DocumentTab(QWidget):
         self.splitter.setStretchFactor(0, 1)
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.addWidget(self.placeholder)
-        self._layout.addWidget(self.splitter)
-        self._show_first_table()
+        self._layout.setSpacing(0)
+        self.table_tabs = TableTabs(self)
+        self.table_tabs.current_changed.connect(self.select_table)
+        self.table_tabs.new_requested.connect(self.new_table)
+        self.table_tabs.rename_requested.connect(self.rename_table)
+        self.table_tabs.close_requested.connect(self.close_table)
+        self.table_tabs.move_requested.connect(self.move_table)
+        self._layout.addWidget(self.placeholder, 1)
+        self._layout.addWidget(self.splitter, 1)
+        self._layout.addWidget(self.table_tabs, 0)
+        self._table_id: str | None = None
+        self._table_index = 0
+        self._side_width = RESULTS_PANEL_WIDTH
+        self._show_table(document.tables[0].id if document.tables else None)
         self._unsubscribe = document.undo_stack.subscribe(self._on_undo_event)
         self.destroyed.connect(lambda *_: self._unsubscribe())
 
@@ -361,24 +392,135 @@ class DocumentTab(QWidget):
 
     # --- table view ------------------------------------------------------------------------
 
+    @property
+    def current_table_id(self) -> str | None:
+        """The selected table."""
+        return self._table_id
+
+    @property
+    def current_table(self) -> Table | None:
+        return self.document.table(self._table_id) if self._table_id is not None else None
+
     def _shown_table_id(self) -> str | None:
         return self.table_view.model().table_id if self.table_view is not None else None
 
-    def _on_undo_event(self, _event: UndoEvent) -> None:
-        first = self.document.tables[0].id if self.document.tables else None
-        if first != self._shown_table_id():
-            self._show_first_table()
+    def select_table(self, table_id: str) -> None:
+        """Show the table ``table_id``."""
+        if table_id != self._table_id:
+            self._show_table(table_id)
 
-    def _show_first_table(self) -> None:
+    def select_next_table(self, step: int = 1) -> None:
+        """Select the next (``step`` 1) or previous (-1) table; stops at the ends."""
+        tables = self.document.tables
+        if self._table_id is None or not tables:
+            return
+        index = self.document.table_index(self._table_id) + step
+        if 0 <= index < len(tables):
+            self.select_table(tables[index].id)
+
+    def new_table(self) -> bool:
+        """Add a blank table after the selected one and select it (one undo step)."""
+        index = (
+            self.document.table_index(self._table_id) + 1
+            if self._table_id is not None
+            else len(self.document.tables)
+        )
+        table = Table.blank(new_table_name(self.document))
+        return self._execute(AddTable(table, index))
+
+    def close_table(self, table_id: str | None = None) -> bool:
+        """Delete ``table_id`` (default: the selected table), with its calculated
+        columns, analyses and graphs, after the warning; an empty table goes without
+        asking. The last table cannot be closed."""
+        table_id = table_id or self._table_id
+        if table_id is None:
+            return False
+        if len(self.document.tables) <= 1:
+            self.message.emit(LAST_TABLE)
+            return False
+        table = self.document.table(table_id)
+        analyses = self.document.analyses_of(table_id)
+        graphs = self.document.graphs_of(table_id)
+        if not (is_empty_table(table) and not analyses and not graphs):
+            from curvis.ui.close_table_dialog import CloseTableDialog
+
+            dialog = CloseTableDialog(table.name, analyses, graphs, self)
+            try:
+                if self._exec_dialog(dialog) != QDialog.DialogCode.Accepted:
+                    return False
+            finally:
+                dialog.deleteLater()
+        return self._execute(RemoveTable(table_id))
+
+    def rename_table(self, table_id: str | None = None) -> bool:
+        """Edit the name of ``table_id`` (default: the selected table) in its tab."""
+        table_id = table_id or self._table_id
+        if table_id is None:
+            return False
+
+        def commit(text: str) -> bool:
+            name = text.strip()
+            table = self.document.table(table_id)
+            if not name:
+                self.message.emit("Enter a table name. The old name was kept.")
+            elif name != table.name:
+                other = self.document.table_by_name(name)
+                if other is not None and other.id != table_id:
+                    self.message.emit(
+                        f"'{other.name}' is already used in this project. The old name was kept."
+                    )
+                else:
+                    self._execute(RenameTable(table_id, name))
+            return True
+
+        return self.table_tabs.edit_name(table_id, commit, self.table_view) is not None
+
+    def move_table(self, table_id: str, index: int) -> bool:
+        """Move ``table_id`` to position ``index`` (a dragged tab)."""
+        ok = self._execute(MoveTable(table_id, index))
+        if not ok:
+            self._sync_tabs()
+        return ok
+
+    def _execute(self, command: Command) -> bool:
+        try:
+            self.document.execute(command)
+        except CommandError as exc:
+            self.message.emit(str(exc))
+            return False
+        return True
+
+    def _on_undo_event(self, event: UndoEvent) -> None:
+        ids = [t.id for t in self.document.tables]
+        wanted = _table_to_select(event)
+        if wanted is None or wanted not in ids:
+            wanted = self._table_id
+        if wanted not in ids:
+            # the selected table is gone: select its neighbour
+            wanted = ids[min(self._table_index, len(ids) - 1)] if ids else None
+        if wanted != self._shown_table_id():
+            self._show_table(wanted)
+        else:
+            self._sync_tabs()
+
+    def _sync_tabs(self) -> None:
+        tables = self.document.tables
+        if self._table_id is not None:
+            self._table_index = self.document.table_index(self._table_id)
+        self.table_tabs.set_tables([(t.id, t.name) for t in tables], self._table_id)
+
+    def _show_table(self, table_id: str | None) -> None:
         if self.table_view is not None:
+            sizes = self.splitter.sizes()
+            if len(sizes) == 2 and sizes[1] > 0:
+                self._side_width = sizes[1]  # the side panel keeps its width
             self.table_view.model().detach()
             self.table_view.setParent(None)
             self.table_view.deleteLater()
             self.table_view = None
-        if self.document.tables:
-            model = TableModel(
-                self.document, self.document.tables[0].id, decimal_places=self._decimal_places
-            )
+        self._table_id = table_id
+        if table_id is not None:
+            model = TableModel(self.document, table_id, decimal_places=self._decimal_places)
             if self.engine is not None:
                 model.set_calculation_errors(self.engine.errors.get)
             self.table_view = TableView(model, self)
@@ -390,9 +532,39 @@ class DocumentTab(QWidget):
             self.splitter.insertWidget(0, self.table_view)
             self.splitter.setStretchFactor(0, 1)
             self.splitter.setStretchFactor(1, 0)
-            total = max(self.width(), 2 * RESULTS_PANEL_WIDTH)
-            self.splitter.setSizes([total - RESULTS_PANEL_WIDTH, RESULTS_PANEL_WIDTH])
+            total = max(self.width(), 2 * self._side_width)
+            self.splitter.setSizes([total - self._side_width, self._side_width])
         self.placeholder.setVisible(self.table_view is None)
         self.splitter.setVisible(self.table_view is not None)
-        self.results_panel.set_table(self._shown_table_id())
-        self.graph_panel.set_table(self._shown_table_id())
+        self.table_tabs.setVisible(self.table_view is not None)
+        self._sync_tabs()
+        self.results_panel.set_table(table_id)
+        self.graph_panel.set_table(table_id)
+        self.state_changed.emit()
+
+
+def is_empty_table(table: Table) -> bool:
+    """True for a table without values in any column (it closes without asking)."""
+    import numpy as np
+
+    for column in table.columns:
+        if column.role.is_numeric:
+            if not bool(np.isnan(column.values).all()):
+                return False
+        elif any(v not in (None, "") for v in column.values):
+            return False
+    return True
+
+
+def _table_to_select(event: UndoEvent) -> str | None:
+    """The table a command adds, or that undo brings back: it becomes the selected one."""
+    command = event.command
+    if command is None:
+        return None
+    commands = command.commands if isinstance(command, CommandGroup) else [command]
+    for c in commands:
+        if isinstance(c, AddTable) and event.kind in ("do", "redo"):
+            return c.table.id
+        if isinstance(c, RemoveTable) and event.kind == "undo":
+            return c.table_id
+    return None

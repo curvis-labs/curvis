@@ -249,7 +249,10 @@ def test_import_without_a_project_makes_one(
         ("Label", ColumnRole.TEXT),
     ]
     assert tab.table_view.model().rowCount() >= 3
-    assert window.statusBar().currentMessage() == "Imported 3 rows and 3 columns from basic.csv."
+    assert (
+        window.statusBar().currentMessage()
+        == "Imported 3 rows and 3 columns from basic.csv into Data 1."
+    )
     assert tab.document.undo_stack.undo_text == "Import 'basic.csv'"
 
     window.undo()

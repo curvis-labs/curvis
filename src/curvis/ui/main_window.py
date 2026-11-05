@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from curvis.charts.spec import ChartFamily
-from curvis.core import Document, UndoEvent
+from curvis.core import LAST_TABLE, Document, UndoEvent
 from curvis.data import ColumnRole, Table
 from curvis.settings import Settings
 from curvis.ui.actions import ActionRegistry
@@ -91,6 +91,8 @@ SELECT_TO_GROUP = "Select columns to group"
 SELECT_FOR_CATEGORY = "Select columns to set their category"
 NO_GRAPH = "There is no graph to delete"
 NO_ANALYSIS = "There is no analysis to change"
+LAST_TABLE_SELECTED = "This is the last table"
+FIRST_TABLE_SELECTED = "This is the first table"
 
 ANALYSIS_ACTIONS = ("analyze.edit", "analyze.delete")
 """Actions that need an analysis shown in the Results panel."""
@@ -128,8 +130,8 @@ class MainWindow(QMainWindow):
         self.registry = ActionRegistry(self)
         self._scheduler: Scheduler | None = None
         self._pending_opens: dict[str, Path] = {}  # scheduler node -> file
-        # scheduler node -> (file, tab to import into; None for a new project)
-        self._pending_imports: dict[str, tuple[Path, DocumentTab | None]] = {}
+        # scheduler node -> (file, tab and table to import into; None for a new project)
+        self._pending_imports: dict[str, tuple[Path, DocumentTab | None, str | None]] = {}
         self._untitled_count = 0
         self._table_actions_created = False
 
@@ -194,7 +196,13 @@ class MainWindow(QMainWindow):
             category="File",
             shortcut="Ctrl+Shift+S",
         )
-        r.register("file.close", "&Close", self.close_current, category="File", shortcut="Ctrl+W")
+        r.register(
+            "file.close",
+            "&Close project",
+            self.close_current,
+            category="File",
+            shortcut="Ctrl+W",
+        )
         r.register(
             "file.quit",
             "&Quit",
@@ -224,11 +232,13 @@ class MainWindow(QMainWindow):
     def _create_menus(self) -> None:
         a = self.registry.action
         file_menu = self.menuBar().addMenu("&File")
+        file_menu.setToolTipsVisible(True)  # why Close table… is disabled
         file_menu.addActions([a("file.new"), a("file.open"), a("file.import")])
         file_menu.addSeparator()
         file_menu.addActions([a("file.save"), a("file.save_as")])
         file_menu.addSeparator()
         file_menu.addActions([a("file.close"), a("file.quit")])
+        self._file_menu = file_menu
         edit_menu = self.menuBar().addMenu("&Edit")
         edit_menu.addActions([a("edit.undo"), a("edit.redo")])
         edit_menu.addSeparator()
@@ -236,6 +246,7 @@ class MainWindow(QMainWindow):
         self._settings_separator = edit_menu.addSeparator()
         edit_menu.addAction(a("edit.settings"))
         view_menu = self.menuBar().addMenu("&View")
+        view_menu.setToolTipsVisible(True)
         view_menu.addAction(a("view.command_palette"))
         self._view_menu = view_menu
 
@@ -285,7 +296,7 @@ class MainWindow(QMainWindow):
         )
         r.register(
             "table.rename_column",
-            "Re&name column…",
+            "Re&name column",
             self._table_call(TableView.rename_current_column),
             category="Table",
             shortcut="Ctrl+Shift+R",
@@ -430,6 +441,33 @@ class MainWindow(QMainWindow):
             self._tab_call(DocumentTab.delete_analysis),
             category="Analyze",
         )
+        r.register(
+            "table.new",
+            "New &table",
+            self._tab_call(DocumentTab.new_table),
+            category="File",
+            shortcut="Ctrl+Shift+N",
+        )
+        r.register(
+            "table.close",
+            "Close ta&ble…",
+            self._tab_call(DocumentTab.close_table),
+            category="File",
+        )
+        r.register(
+            "table.next",
+            "&Next table",
+            self._tab_call(functools.partial(DocumentTab.select_next_table, step=1)),
+            category="View",
+            shortcut="Ctrl+PgDown",
+        )
+        r.register(
+            "table.previous",
+            "Pre&vious table",
+            self._tab_call(functools.partial(DocumentTab.select_next_table, step=-1)),
+            category="View",
+            shortcut="Ctrl+PgUp",
+        )
         a = self.registry.action
         self._edit_menu.insertActions(
             self._settings_separator, [a("edit.copy"), a("edit.paste"), a("edit.clear")]
@@ -479,6 +517,12 @@ class MainWindow(QMainWindow):
             self._view_menu.actions()[0], [a("view.results"), a("view.graph")]
         )
         self._view_menu.insertSeparator(a("view.command_palette"))
+        self._view_menu.insertActions(
+            a("view.command_palette"), [a("table.next"), a("table.previous")]
+        )
+        self._view_menu.insertSeparator(a("view.command_palette"))
+        self._file_menu.insertAction(a("file.open"), a("table.new"))
+        self._file_menu.insertAction(a("file.close"), a("table.close"))
         self._ensure_main_toolbar()  # first in the row
         self.table_toolbar = build_table_toolbar(self, self.registry)
 
@@ -554,7 +598,7 @@ class MainWindow(QMainWindow):
 
     def _on_job_failed(self, node: str, error: JobError) -> None:
         if node in self._pending_imports:
-            source, _tab = self._pending_imports.pop(node)
+            source, _tab, _table = self._pending_imports.pop(node)
             self._show_error(
                 "Cannot import data", f"'{source.name}' could not be imported.\n\n{error.message}"
             )
@@ -607,7 +651,7 @@ class MainWindow(QMainWindow):
             dialog.deleteLater()
 
     def start_import(self, path: Path, options: CsvOptions) -> None:
-        """Read ``path`` in a worker process, then put it into the current table.
+        """Read ``path`` in a worker process, then put it into the selected table.
 
         The columns fill the table's empty columns first and are added at the end
         otherwise, as one undo step. Without an open project, a new one is made.
@@ -616,25 +660,33 @@ class MainWindow(QMainWindow):
         from curvis.io.importers import read_csv
 
         node = f"import:{_file_key(path)}"
-        self._pending_imports[node] = (path, self.current_tab)
+        tab = self.current_tab
+        table_id = tab.current_table_id if tab is not None else None
+        self._pending_imports[node] = (path, tab, table_id)
         self._show_status(f"Importing {path.name}…")
         job = Job(read_csv, (str(path), options))
         self.scheduler.submit(node, job, weight="heavy", delay_ms=0)
 
-    def _finish_import(self, path: Path, tab: DocumentTab | None, result: object) -> None:
+    def _finish_import(
+        self, path: Path, tab: DocumentTab | None, table_id: str | None, result: object
+    ) -> None:
         from curvis.core import AddTable, CommandError, CommandGroup, ImportColumns
         from curvis.io.importers import CsvData
 
         assert isinstance(result, CsvData)
         if tab is None or tab not in self.document_tabs():
             tab = self.new_document()
+            table_id = None
         document = tab.document
+        if table_id is None or all(t.id != table_id for t in document.tables):
+            table_id = tab.current_table_id
         source = f"'{path.name}'"
         command: Command
-        if tab.table_view is not None:
-            command = ImportColumns(tab.table_view.model().table_id, result.columns, source)
+        if table_id is not None:
+            command = ImportColumns(table_id, result.columns, source)
         else:
             table = Table.blank()
+            table_id = table.id
             command = CommandGroup(
                 f"Import {source}",
                 [AddTable(table), ImportColumns(table.id, result.columns, source)],
@@ -645,10 +697,13 @@ class MainWindow(QMainWindow):
             self._show_error("Cannot import data", f"'{path.name}' could not be imported.\n\n{exc}")
             return
         self.tabs.setCurrentWidget(tab)
+        tab.select_table(table_id)
         rows = f"{result.n_rows:,} row{'s' if result.n_rows != 1 else ''}"
         columns = len(result.columns)
+        into = document.table(table_id).name
         self._show_status(
-            f"Imported {rows} and {columns} column{'s' if columns != 1 else ''} from {path.name}."
+            f"Imported {rows} and {columns} column{'s' if columns != 1 else ''} "
+            f"from {path.name} into {into}."
         )
 
     def save_current(self) -> bool:
@@ -851,6 +906,7 @@ class MainWindow(QMainWindow):
             reasons[action_id] = NO_PROJECT
         has_table = tab is not None and tab.table_view is not None
         if self._table_actions_created:
+            self._update_table_tab_actions(tab, reasons)
             self._update_table_actions(tab, reasons)
         stack = tab.document.undo_stack if tab is not None else None
         reasons["edit.undo"] = NOTHING_TO_UNDO if stack is not None else NO_PROJECT
@@ -871,6 +927,27 @@ class MainWindow(QMainWindow):
         if self.table_toolbar is not None:
             self.table_toolbar.setVisible(has_table)
         set_tooltips(self.registry, reasons)
+
+    def _update_table_tab_actions(self, tab: DocumentTab | None, reasons: dict[str, str]) -> None:
+        """Enable New table, Close table and Next / Previous table, and say why when
+        they are not."""
+        a = self.registry.action
+        a("table.new").setEnabled(tab is not None)
+        reasons["table.new"] = NO_PROJECT
+        tables = tab.document.tables if tab is not None else []
+        selected = tab.current_table_id if tab is not None else None
+        # -1 while the selected table is being removed (before the tab selects another)
+        index = next((i for i, t in enumerate(tables) if t.id == selected), -1)
+        states = {
+            "table.close": (len(tables) > 1, LAST_TABLE),
+            "table.next": (0 <= index < len(tables) - 1, LAST_TABLE_SELECTED),
+            "table.previous": (index > 0, FIRST_TABLE_SELECTED),
+        }
+        for action_id, (enabled, reason) in states.items():
+            action = a(action_id)
+            action.setEnabled(enabled)
+            # Menu and palette only (no toolbar button): the tooltip says why it is off.
+            action.setToolTip("" if enabled else (reason if tab is not None else NO_PROJECT))
 
     def _update_table_actions(self, tab: DocumentTab | None, reasons: dict[str, str]) -> None:
         """Enable the table, analysis and graph actions, and say why when they are not."""
@@ -894,7 +971,9 @@ class MainWindow(QMainWindow):
             reasons["table.group"] = SELECT_TO_GROUP
             a("table.set_category").setEnabled(selected)
             reasons["table.set_category"] = SELECT_FOR_CATEGORY
-        table = tab.document.table(view.model().table_id) if tab and view else None
+        shown = view.model().table_id if view is not None else None
+        tables = tab.document.tables if tab is not None else []
+        table = next((t for t in tables if t.id == shown), None)  # None while it is removed
         for action_id, family in FAMILY_ACTIONS.items():
             problem = family_problem(table, family) if table is not None else NO_TABLE
             action = a(action_id)
