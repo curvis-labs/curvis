@@ -455,8 +455,8 @@ Make a plan first. When done, report what you built, the tests and benchmarks, a
 ### Step 2.8 — Format dialog and export
 
 **Done when**
-- [ ] The Format dialog changes everything listed in SPEC.md that applies to XY, bar and box.
-- [ ] PNG, SVG and PDF exports match the on-screen graph (image-diff tests pass); 300 dpi export under 1 s.
+- [x] The Format dialog changes everything listed in SPEC.md that applies to XY, bar and box.
+- [x] PNG, SVG and PDF exports match the on-screen graph (image-diff tests pass); 300 dpi export under 1 s.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.8 in docs/PHASES.md.
