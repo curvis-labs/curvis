@@ -673,6 +673,90 @@
           "median": 0.01103888900001948
         }
       ]
+    },
+    {
+      "name": "test_export_bar_pdf_300_dpi",
+      "fullname": "tests/bench/test_export.py::test_export_bar_pdf_300_dpi",
+      "stats": {
+        "min": 0.16626987391001563
+      },
+      "runs": [
+        {
+          "min": 0.20435324416944436,
+          "median": 0.21763149283743896
+        },
+        {
+          "min": 0.16626987391001563,
+          "median": 0.21543780738986243
+        },
+        {
+          "min": 0.22174483984109136,
+          "median": 0.27355382220221036
+        }
+      ]
+    },
+    {
+      "name": "test_export_bar_png_300_dpi",
+      "fullname": "tests/bench/test_export.py::test_export_bar_png_300_dpi",
+      "stats": {
+        "min": 0.13246242307155384
+      },
+      "runs": [
+        {
+          "min": 0.13246242307155384,
+          "median": 0.1515688831984174
+        },
+        {
+          "min": 0.15742500470959256,
+          "median": 0.17236914903349154
+        },
+        {
+          "min": 0.14330185094968392,
+          "median": 0.14597864793322124
+        }
+      ]
+    },
+    {
+      "name": "test_export_xy_pdf_300_dpi",
+      "fullname": "tests/bench/test_export.py::test_export_xy_pdf_300_dpi",
+      "stats": {
+        "min": 0.3784538600290725
+      },
+      "runs": [
+        {
+          "min": 0.4047536193275854,
+          "median": 0.4801001507957349
+        },
+        {
+          "min": 0.40983106291545246,
+          "median": 0.5757606912645574
+        },
+        {
+          "min": 0.3784538600290725,
+          "median": 0.39229251778598556
+        }
+      ]
+    },
+    {
+      "name": "test_export_xy_png_300_dpi",
+      "fullname": "tests/bench/test_export.py::test_export_xy_png_300_dpi",
+      "stats": {
+        "min": 0.2009286807693114
+      },
+      "runs": [
+        {
+          "min": 0.26814498075102045,
+          "median": 0.3326706831017478
+        },
+        {
+          "min": 0.25929221944486286,
+          "median": 0.3106799380237864
+        },
+        {
+          "min": 0.2009286807693114,
+          "median": 0.2564403055010013
+        }
+      ]
     }
   ]
 }

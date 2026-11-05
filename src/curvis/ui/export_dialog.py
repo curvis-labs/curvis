@@ -1,8 +1,8 @@
 """The Export graph dialog: the file format and, for PNG, the resolution.
 
 A simple dialog (docs/DESIGN.md §1). The graph is exported at the size of its page
-(Format graph, Graph tab); the dialog says what size that is, and for PNG how many pixels it
-makes. Clicking *Export…* asks where to save the file.
+(Format graph, Graph tab); the dialog says what size that is, and for PNG how many
+pixels it makes. Clicking *Export…* asks where to save the file.
 """
 
 from __future__ import annotations
@@ -65,6 +65,8 @@ class ExportDialog(QDialog):
         self.format_combo.setCurrentIndex(self.format_combo.findData(fmt))
         self._update()
         size_simple(self)
+        # The hints wrap: keep the height they need at the narrowest width.
+        self.setMinimumHeight(self.sizeHint().height())
         self.format_combo.setFocus()
 
     @property

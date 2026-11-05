@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pytest
 
 from curvis.analysis.result import FittedCurve, Result
 from curvis.charts.builder import default_spec
@@ -63,12 +62,26 @@ GRAPHS: dict[str, Callable[[], tuple[ChartSpec, ChartData]]] = {
 }
 
 
-@pytest.mark.parametrize("fmt", [ExportFormat.PNG, ExportFormat.PDF])
-@pytest.mark.parametrize("graph", GRAPHS)
-def test_export_300_dpi(benchmark: Any, tmp_path: Path, graph: str, fmt: ExportFormat) -> None:
+def run_export(benchmark: Any, tmp_path: Path, graph: str, fmt: ExportFormat) -> None:
     spec, data = GRAPHS[graph]()
     path = str(tmp_path / f"graph.{fmt.value}")
     export_graph(spec, data, path, fmt, DPI)  # imports Matplotlib, as a worker's first export
     benchmark.pedantic(export_graph, args=(spec, data, path, fmt, DPI), rounds=10, warmup_rounds=1)
     assert Path(path).stat().st_size > 0
     assert benchmark.stats.stats.min < EXPORT_TARGET_S
+
+
+def test_export_xy_png_300_dpi(benchmark: Any, tmp_path: Path) -> None:
+    run_export(benchmark, tmp_path, "xy", ExportFormat.PNG)
+
+
+def test_export_xy_pdf_300_dpi(benchmark: Any, tmp_path: Path) -> None:
+    run_export(benchmark, tmp_path, "xy", ExportFormat.PDF)
+
+
+def test_export_bar_png_300_dpi(benchmark: Any, tmp_path: Path) -> None:
+    run_export(benchmark, tmp_path, "bar", ExportFormat.PNG)
+
+
+def test_export_bar_pdf_300_dpi(benchmark: Any, tmp_path: Path) -> None:
+    run_export(benchmark, tmp_path, "bar", ExportFormat.PDF)

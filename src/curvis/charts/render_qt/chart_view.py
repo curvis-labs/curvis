@@ -32,7 +32,16 @@ from typing import Any
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import QPointF, QRect, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QPainter, QPen, QResizeEvent
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QFontDatabase,
+    QImage,
+    QPainter,
+    QPen,
+    QResizeEvent,
+    QTransform,
+)
 from PySide6.QtWidgets import QApplication, QSizePolicy, QToolTip, QWidget
 
 from curvis.charts.axes import (
@@ -103,12 +112,27 @@ def chart_font_family() -> str:
 
 
 class CrispErrorBars(pg.ErrorBarItem):  # type: ignore[misc]
-    """Error bars drawn without antialiasing: they are only horizontal and vertical
-    lines, and antialiasing thousands of them costs most of a redraw."""
+    """Error bars drawn without antialiasing, with a 1 px cosmetic pen: they are only
+    horizontal and vertical lines, and Qt draws thin lines on its fast path. A bar
+    ``width`` pixels wide is drawn in passes moved by a device pixel sideways and up and
+    down; a wide pen would take Qt's slow path (about 25 times slower for thousands of
+    bars)."""
+
+    width = 1
 
     def paint(self, painter: QPainter, *args: Any) -> None:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-        super().paint(painter, *args)
+        if self.width <= 1:
+            super().paint(painter, *args)
+            return
+        base = painter.worldTransform()
+        offsets = [i - (self.width - 1) / 2 for i in range(self.width)]
+        # Moving sideways thickens the vertical lines, moving up and down the caps.
+        moves = {(dx, 0.0) for dx in offsets} | {(0.0, dy) for dy in offsets}
+        for dx, dy in sorted(moves):
+            painter.setWorldTransform(base * QTransform.fromTranslate(dx, dy))
+            super().paint(painter, *args)
+        painter.setWorldTransform(base)
 
 
 class LegendSample(pg.ItemSample):  # type: ignore[misc]
@@ -356,6 +380,7 @@ class ChartView(QWidget):
                 **{"font-size": size, "font-family": self.family},
             )
             axis.setLogMode(False)  # plot coordinates are log10 already; ticks come from us
+            axis._curvis_ticks = None
             axis.setStyle(
                 showValues=axis_spec.show_labels,
                 tickLength=tick,
@@ -412,9 +437,9 @@ class ChartView(QWidget):
         for series in data.xy:
             style = styles[series.source]
             item = pg.PlotDataItem(name=series.name, **self._point_style(spec, style))
-            bars = CrispErrorBars(
-                pen=pg.mkPen(QColor(style.color), width=max(1.0, self._px(ERROR_BAR_WIDTH_PT)))
-            )
+            bars = CrispErrorBars(pen=pg.mkPen(QColor(style.color), width=1))
+            # Whole device pixels, rounded down (1 px until the page is zoomed to 2x).
+            bars.width = max(1, math.floor(self._px(ERROR_BAR_WIDTH_PT) + 1e-6))
             plot.addItem(item)
             plot.addItem(bars)
             self._drawn.legend_sources[id(item)] = series.source
@@ -535,12 +560,18 @@ class ChartView(QWidget):
             )
 
     def _apply_layout(self, spec: ChartSpec, layout: AxesLayout) -> None:
+        """Set the ticks and ranges, only where they changed: new ticks make pyqtgraph
+        lay out the axis text again, which costs more than the rest of a data redraw."""
         plot = self.plot_item
         for name, axis_layout in (("bottom", layout.x), ("left", layout.y)):
-            plot.getAxis(name).setTicks(_ticks(axis_layout))
-        plot.vb.setRange(
-            xRange=(layout.x.low, layout.x.high), yRange=(layout.y.low, layout.y.high), padding=0
-        )
+            axis = plot.getAxis(name)
+            ticks = _ticks(axis_layout)
+            if getattr(axis, "_curvis_ticks", None) != ticks:
+                axis.setTicks(ticks)
+                axis._curvis_ticks = ticks
+        ranges = ((layout.x.low, layout.x.high), (layout.y.low, layout.y.high))
+        if plot.vb.viewRange() != [list(r) for r in ranges]:
+            plot.vb.setRange(xRange=ranges[0], yRange=ranges[1], padding=0)
 
     # --- legend, clicks and tooltips ---------------------------------------------------
 

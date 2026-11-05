@@ -154,7 +154,6 @@ def _axis_ticks(ax: Axes, which: str, axis: AxisLayout, show_labels: bool) -> No
 
 
 def _draw_xy(ax: Axes, spec: ChartSpec, data: ChartData, layout: AxesLayout) -> None:
-    from matplotlib.collections import LineCollection
 
     styles = {s.source: s for s in spec.series}
     for curve in data.curves:
@@ -190,17 +189,19 @@ def _draw_xy(ax: Axes, spec: ChartSpec, data: ChartData, layout: AxesLayout) -> 
             **_marker(style),
         )
         _dashes(ax.lines[-1], line, style.line_width)
-        segments = _error_segments(series, cap)
-        if segments:
-            ax.add_collection(
-                LineCollection(
-                    segments,
-                    colors=style.color,
-                    linewidths=ERROR_BAR_WIDTH_PT,
-                    capstyle="butt",
-                    zorder=4 + 2 * z,
-                ),
-                autolim=False,
+        xs, ys = _error_lines(series, cap)
+        if len(xs):
+            # One line with gaps, not a collection of segments: a PDF writes it in one
+            # go, where 12,000 separate segments take seconds.
+            ax.plot(
+                xs,
+                ys,
+                color=style.color,
+                linewidth=ERROR_BAR_WIDTH_PT,
+                solid_capstyle="butt",
+                zorder=4 + 2 * z,
+                scalex=False,
+                scaley=False,
             )
 
 
@@ -221,19 +222,20 @@ def _dashes(line: Any, style: LineStyle, width: float) -> None:
         line.set_dash_capstyle("butt")
 
 
-def _error_segments(series: XYSeriesData, cap: float) -> list[list[tuple[float, float]]]:
-    """The error bars of ``series`` as line segments: a vertical line and its caps."""
-    segments: list[list[tuple[float, float]]] = []
+def _error_lines(series: XYSeriesData, cap: float) -> tuple[np.ndarray, np.ndarray]:
+    """The error bars of ``series`` as one line broken by NaN: per point, the vertical
+    bar and its two caps."""
+    low = np.where(np.isfinite(series.err_low), series.err_low, 0.0)
+    high = np.where(np.isfinite(series.err_high), series.err_high, 0.0)
+    keep = np.isfinite(series.err_low) | np.isfinite(series.err_high)
+    x, y = series.px[keep], series.py[keep]
+    top, bottom = y + high[keep], y - low[keep]
     half = cap / 2
-    for x, y, low, high in zip(series.px, series.py, series.err_low, series.err_high, strict=True):
-        if not (math.isfinite(low) or math.isfinite(high)):
-            continue
-        top = y + (high if math.isfinite(high) else 0.0)
-        bottom = y - (low if math.isfinite(low) else 0.0)
-        segments.append([(x, bottom), (x, top)])
-        segments.append([(x - half, top), (x + half, top)])
-        segments.append([(x - half, bottom), (x + half, bottom)])
-    return segments
+    gap = np.full(len(x), np.nan)
+    # Per point: bar (2 vertices), gap, top cap (2), gap, bottom cap (2), gap.
+    xs = np.column_stack([x, x, gap, x - half, x + half, gap, x - half, x + half, gap])
+    ys = np.column_stack([bottom, top, gap, top, top, gap, bottom, bottom, gap])
+    return xs.ravel(), ys.ravel()
 
 
 # --- bars and boxes --------------------------------------------------------------------

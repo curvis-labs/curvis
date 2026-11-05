@@ -1068,7 +1068,8 @@ class MainWindow(QMainWindow):
 
         spec = None
         if tab is not None and tab.current_graph_id is not None:
-            spec = tab.document.graph(tab.current_graph_id)
+            # The panel can still name a graph that a command just removed.
+            spec = next((g for g in tab.document.graphs if g.id == tab.current_graph_id), None)
         for action_id, (variant, text, _icon) in TYPE_ACTIONS.items():
             action = self.registry.action(action_id)
             problem = NO_GRAPH_TO_CHANGE
