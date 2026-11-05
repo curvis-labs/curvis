@@ -11,6 +11,8 @@ from curvis.charts.axes import (
     PADDING,
     axes_layout,
     chart_font_path,
+    column_major,
+    legend_columns,
     linear_ticks,
     log_ticks,
     nice_step,
@@ -18,7 +20,7 @@ from curvis.charts.axes import (
 )
 from curvis.charts.builder import default_spec
 from curvis.charts.data import compute, gather
-from curvis.charts.spec import AxisSpec, ChartFamily, ChartVariant, Scale
+from curvis.charts.spec import AxisSpec, ChartFamily, ChartVariant, LabelAngle, Scale
 from tests.unit.charts_tables import DOSES, column_table, replicate_table
 
 
@@ -143,3 +145,67 @@ def test_unused_axis_spec_fields_do_not_matter() -> None:
     spec, data = xy()
     titled = replace(spec, x_axis=replace(spec.x_axis, title="Other"), y_axis=AxisSpec("Y"))
     assert axes_layout(titled, data).x == axes_layout(spec, data).x
+
+
+# --- tick label angles, shortened labels and the legend's place --------------------------
+
+
+def long_bars(names: list[str], **spec_changes: object):  # type: ignore[no-untyped-def]
+    from curvis.data import Column, ColumnRole, Table
+
+    table = Table("T", [Column.new(n, ColumnRole.Y, [1.0, 2.0, 3.0]) for n in names])
+    spec = replace(default_spec(table, ChartFamily.BAR), **spec_changes)  # type: ignore[arg-type]
+    return spec, compute(gather(table, spec, {}))
+
+
+def test_short_category_labels_stay_horizontal() -> None:
+    spec, data = long_bars(["A", "B", "C"])
+    assert axes_layout(spec, data).x.label_angle == 0.0
+
+
+def test_long_category_labels_turn_when_they_do_not_fit() -> None:
+    names = [f"Treatment {i}" for i in range(6)]
+    spec, data = long_bars(names)
+    layout = axes_layout(spec, data)
+    assert layout.x.label_angle in (45.0, 90.0)
+    assert [t.label for t in layout.x.major] == names  # they fit turned: not shortened
+
+
+def test_the_label_angle_can_be_chosen() -> None:
+    spec, data = long_bars(["A", "B", "C"])
+    for angle, degrees in ((LabelAngle.ANGLED, 45.0), (LabelAngle.VERTICAL, 90.0)):
+        chosen = replace(spec, x_axis=replace(spec.x_axis, label_angle=angle))
+        assert axes_layout(chosen, data).x.label_angle == degrees
+    names = [f"Treatment {i}" for i in range(6)]
+    spec, data = long_bars(names)
+    level = replace(spec, x_axis=replace(spec.x_axis, label_angle=LabelAngle.HORIZONTAL))
+    assert axes_layout(level, data).x.label_angle == 0.0
+
+
+def test_turned_labels_too_long_for_the_page_are_shortened() -> None:
+    name = "A very long treatment name that cannot fit on a small page"
+    spec, data = long_bars(
+        [name, name + " 2", name + " 3"], aspect_ratio="custom", custom_size=(5.0, 4.0)
+    )
+    labels = [t.label for t in axes_layout(spec, data).x.major]
+    assert all(label.endswith("…") and len(label) < len(name) for label in labels)
+
+
+def test_numbers_on_an_xy_axis_stay_horizontal() -> None:
+    spec, data = xy()
+    assert axes_layout(spec, data).x.label_angle == 0.0
+
+
+def test_a_legend_too_wide_for_the_right_goes_under_the_plot() -> None:
+    spec = default_spec(replicate_table(), ChartFamily.XY)  # Wide, 9 cm
+    assert legend_columns(spec, ["Control", "Drug"]) == 0
+    tall = replace(spec, aspect_ratio="tall")  # 4 cm wide
+    columns = legend_columns(tall, ["Control", "Drug"])
+    assert columns >= 1
+    assert legend_columns(tall, []) == 0
+
+
+def test_column_major_puts_matplotlib_entries_where_rows_put_them() -> None:
+    assert column_major(5, 3) == [0, 3, 1, 4, 2]
+    assert column_major(4, 2) == [0, 2, 1, 3]
+    assert column_major(3, 3) == [0, 1, 2]

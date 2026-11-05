@@ -48,7 +48,7 @@ from curvis.data import (
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -161,6 +161,22 @@ def _page_presets_and_legends(data: dict[str, Any]) -> dict[str, Any]:
         if isinstance(ratio, str) and ratio in OLD_ASPECTS:
             graph["aspect_ratio"] = OLD_ASPECTS[ratio]
         graph.setdefault("show_legend", graph.get("family") == "xy")
+    return data
+
+
+@register_migration(6)
+def _tick_label_angles(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 7 stores how each axis turns its tick labels (``label_angle``). Graphs of
+    format 6 get Auto, which turns X labels only when they do not fit side by side."""
+    document = data.get("document")
+    graphs = document.get("graphs") if isinstance(document, dict) else None
+    for graph in graphs if isinstance(graphs, list) else []:
+        if not isinstance(graph, dict):
+            continue
+        for key in ("x_axis", "y_axis"):
+            axis = graph.get(key)
+            if isinstance(axis, dict):
+                axis.setdefault("label_angle", "auto")
     return data
 
 

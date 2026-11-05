@@ -127,6 +127,28 @@ class Scale(StrEnum):
     LOG = "log"
 
 
+class LabelAngle(StrEnum):
+    """How the tick labels of an axis are turned. Auto turns them by 45° when they do
+    not fit side by side (and by 90° when even that is too tight)."""
+
+    AUTO = "auto"
+    HORIZONTAL = "0"
+    ANGLED = "45"
+    VERTICAL = "90"
+
+    @property
+    def label(self) -> str:
+        return _ANGLE_LABELS[self]
+
+
+_ANGLE_LABELS = {
+    LabelAngle.AUTO: "Auto",
+    LabelAngle.HORIZONTAL: "Horizontal",
+    LabelAngle.ANGLED: "Angled (45°)",
+    LabelAngle.VERTICAL: "Vertical (90°)",
+}
+
+
 ASPECT_PRESETS: dict[str, tuple[float, float]] = {
     "tall": (4.0, 6.0),
     "wide": (9.0, 6.0),
@@ -180,6 +202,8 @@ class AxisSpec:
     show_labels: bool = True
     """Show the tick labels (numbers or category names)."""
     scale: Scale = Scale.LINEAR
+    label_angle: LabelAngle = LabelAngle.AUTO
+    """How the tick labels are turned (the X axis; Y labels are always horizontal)."""
 
 
 @dataclass(frozen=True)
@@ -336,6 +360,7 @@ def _axis_to_json(axis: AxisSpec) -> dict[str, Any]:
         "maximum": axis.maximum,
         "show_labels": axis.show_labels,
         "scale": axis.scale.value,
+        "label_angle": axis.label_angle.value,
     }
 
 
@@ -413,6 +438,9 @@ def _axis_from_json(data: Any, where: str) -> AxisSpec:
         maximum=limit("maximum"),
         show_labels=_bool(obj.get("show_labels", True), f"{where} show_labels"),
         scale=_enum(Scale, obj.get("scale", Scale.LINEAR), f"{where} scale"),
+        label_angle=_enum(
+            LabelAngle, obj.get("label_angle", LabelAngle.AUTO), f"{where} label_angle"
+        ),
     )
 
 

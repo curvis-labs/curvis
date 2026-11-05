@@ -32,6 +32,7 @@ from curvis.charts.axes import (
     ERROR_BAR_WIDTH_PT,
     FONT_FAMILY,
     LEGEND_BORDER_EM,
+    LEGEND_COLUMN_GAP_EM,
     LEGEND_GAP_EM,
     LEGEND_ROW_EM,
     LEGEND_SAMPLE_EM,
@@ -42,6 +43,8 @@ from curvis.charts.axes import (
     AxesLayout,
     AxisLayout,
     axes_layout,
+    column_major,
+    legend_columns,
 )
 from curvis.charts.colors import ColorScheme, scheme
 from curvis.charts.data import ChartData, XYSeriesData
@@ -146,6 +149,13 @@ def _axis_ticks(ax: Axes, which: str, axis: AxisLayout, show_labels: bool) -> No
     if which == "x":
         ax.set_xticks(values, labels)
         ax.set_xticks(list(axis.minor), minor=True)
+        if axis.label_angle:
+            # Turned about the end of the label, which sits under its tick.
+            for text in ax.get_xticklabels():
+                text.set_rotation(axis.label_angle)
+                text.set_rotation_mode("anchor")
+                text.set_horizontalalignment("right")
+                text.set_verticalalignment("center")
     else:
         ax.set_yticks(values, labels)
         ax.set_yticks(list(axis.minor), minor=True)
@@ -367,11 +377,18 @@ def _legend(
     if handles:
         figure = ax.get_figure()
         assert figure is not None
-        # Right of the plot, at the top of the page, as in the Graph panel.
+        # Right of the plot, at the top of the page, as in the Graph panel; under the
+        # plot, row by row, when the page is too narrow for that.
+        columns = legend_columns(spec, names)
+        if columns:
+            order = column_major(len(names), columns)
+            handles, names = [handles[i] for i in order], [names[i] for i in order]
         figure.legend(
             handles,
             names,
-            loc="outside right upper",
+            loc="outside lower center" if columns else "outside right upper",
+            ncols=max(columns, 1),
+            columnspacing=LEGEND_COLUMN_GAP_EM,
             frameon=False,
             fontsize=spec.text_size,
             labelcolor=colors.ink,

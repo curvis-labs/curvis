@@ -26,15 +26,16 @@ Pure functions, no Qt and no Matplotlib: the renderers and the tests import it f
 from __future__ import annotations
 
 import importlib.util
+import itertools
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
 
 from curvis.charts.data import ChartData
-from curvis.charts.spec import AxisSpec, ChartFamily, ChartSpec, ChartVariant, Scale
+from curvis.charts.spec import AxisSpec, ChartFamily, ChartSpec, ChartVariant, LabelAngle, Scale
 
 SCREEN_DPI = 96.0
 """Pixels per inch of a page drawn at scale 1 (Qt's logical dpi, and the image diffs)."""
@@ -93,6 +94,8 @@ class AxisLayout:
     high: float
     major: tuple[Tick, ...]
     minor: tuple[float, ...] = ()
+    label_angle: float = 0.0
+    """Degrees the tick labels are turned (counter-clockwise; X axis only)."""
 
 
 @dataclass(frozen=True)
@@ -154,11 +157,113 @@ def shown_categories(spec: ChartSpec, data: ChartData | None) -> list[str]:
 def axes_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
     """The ranges and ticks of ``spec`` drawing ``data`` (None: the frame only)."""
     if spec.family is ChartFamily.BAR:
-        return _category_layout(spec, data)
-    x_low, x_high, y_low, y_high = _xy_bounds(spec, data)
-    x = _axis(spec.x_axis, _pad(x_low, x_high), room=_room(spec, horizontal=True))
-    y = _axis(spec.y_axis, _pad(y_low, y_high), room=_room(spec, horizontal=False))
+        x = _category_axis(spec, data)
+    else:
+        bounds = _xy_bounds(spec, data)
+        x = _axis(spec.x_axis, _pad(bounds[0], bounds[1]), room=_room(spec, horizontal=True))
+    x_room = _room(spec, horizontal=True)
+    angle = label_angle(spec.x_axis, x, x_room)
+    x = _shorten(replace(x, label_angle=angle), x_room, spec.page_size_cm[1] / CM_PER_INCH * 72)
+    y_room = _room(spec, horizontal=False)
+    y_room = replace(y_room, length=max(0.0, y_room.length - _label_depth(x, x_room)))
+    if spec.family is ChartFamily.BAR:
+        y, positions = _category_y(spec, data, y_room)
+        return AxesLayout(x, y, positions)
+    y = _axis(spec.y_axis, _pad(bounds[2], bounds[3]), room=y_room)
     return AxesLayout(x, y, {})
+
+
+def _label_depth(axis: AxisLayout, room: Room) -> float:
+    """How much further down turned tick labels reach than level ones, in points."""
+    if not axis.label_angle:
+        return 0.0
+    widest = max((len(t.label) for t in axis.major), default=0) * CHAR_WIDTH_EM * room.text_size
+    return max(0.0, widest * math.sin(math.radians(axis.label_angle)) - room.text_size)
+
+
+LEGEND_RIGHT_SHARE = 0.45
+"""A legend wider than this share of the page goes under the plot instead."""
+LEGEND_COLUMN_GAP_EM = 1.0
+"""Space between the columns of a legend under the plot, in ems."""
+LABEL_DEPTH_SHARE = 0.45
+"""Turned tick labels may take at most this share of the page height; longer ones are
+shortened with an ellipsis."""
+
+
+def legend_entry_width(name: str, text_size: float) -> float:
+    """Rough width of one legend entry (sample, gap and name), in points."""
+    return (LEGEND_SAMPLE_EM + LEGEND_GAP_EM + len(name) * CHAR_WIDTH_EM) * text_size
+
+
+def legend_columns(spec: ChartSpec, names: Sequence[str]) -> int:
+    """Where the legend goes: 0 to the right of the plot (one column), otherwise under
+    the plot in this many columns. It goes under the plot when, at the right, it would
+    take more than :data:`LEGEND_RIGHT_SHARE` of the page width."""
+    if not names:
+        return 0
+    width = spec.page_size_cm[0] / CM_PER_INCH * 72.0
+    text = spec.text_size
+    entry = max(legend_entry_width(n, text) for n in names)
+    if entry + 2 * LEGEND_BORDER_EM * text <= LEGEND_RIGHT_SHARE * width:
+        return 0
+    gap = LEGEND_COLUMN_GAP_EM * text
+    fit = max(1, int((width - 2 * LEGEND_BORDER_EM * text + gap) // (entry + gap)))
+    columns = min(len(names), fit)
+    rows = math.ceil(len(names) / columns)
+    return math.ceil(len(names) / rows)  # balanced: no column shorter by more than one
+
+
+def column_major(count: int, columns: int) -> list[int]:
+    """The entries ``0 … count − 1`` laid out row by row in ``columns`` columns, in the
+    order of a column-by-column layout (Matplotlib's legend) that puts them in the same
+    places."""
+    rows = math.ceil(count / columns) if columns else 0
+    order = []
+    for column in range(columns):
+        for row in range(rows):
+            index = row * columns + column
+            if index < count:
+                order.append(index)
+    return order
+
+
+def _shorten(axis: AxisLayout, room: Room, height: float) -> AxisLayout:
+    """Turned labels that would reach deeper than :data:`LABEL_DEPTH_SHARE` of the page
+    ``height`` (points), shortened with an ellipsis."""
+    if not axis.label_angle:
+        return axis
+    reach = math.sin(math.radians(axis.label_angle)) * CHAR_WIDTH_EM * room.text_size
+    longest = max(3, int(LABEL_DEPTH_SHARE * height / reach))
+    if all(len(t.label) <= longest for t in axis.major):
+        return axis
+    ticks = tuple(
+        Tick(t.value, t.label if len(t.label) <= longest else t.label[: longest - 1] + "…")
+        for t in axis.major
+    )
+    return replace(axis, major=ticks)
+
+
+ANGLED_PITCH_EM = 1.6
+"""Space along the axis that a label turned by 45° needs, in ems of the text size."""
+
+
+def label_angle(axis: AxisSpec, layout: AxisLayout, room: Room) -> float:
+    """Degrees to turn the X tick labels: the axis' choice, or for Auto 0° when the
+    labels fit side by side, 45° when they do not and 90° when even that is too tight."""
+    if axis.label_angle is not LabelAngle.AUTO:
+        return float(axis.label_angle.value)
+    labels = [t.label for t in layout.major if t.label]
+    if not axis.show_labels or len(labels) < 2:
+        return 0.0
+    span = layout.high - layout.low
+    values = sorted(t.value for t in layout.major)
+    gap = min(b - a for a, b in itertools.pairwise(values))
+    pitch = room.length * gap / span if span > 0 else room.length
+    text = room.text_size
+    widest = max(len(label) for label in labels) * CHAR_WIDTH_EM * text
+    if widest + 0.5 * text <= pitch:
+        return 0.0
+    return 45.0 if ANGLED_PITCH_EM * text <= pitch else 90.0
 
 
 def _room(spec: ChartSpec, *, horizontal: bool) -> Room:
@@ -183,25 +288,26 @@ def _fits(ticks: Sequence[Tick], room: Room | None) -> bool:
     return (len(ticks) - 1) * need <= room.length
 
 
-def _category_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
+def _category_axis(spec: ChartSpec, data: ChartData | None) -> AxisLayout:
     sources = shown_categories(spec, data)
-    positions = {source: i for i, source in enumerate(sources)}
     names = {c.source: c.name for c in data.categories} if data is not None else {}
     n = max(len(sources), 1)
-    x = AxisLayout(
-        -0.6, n - 0.4, tuple(Tick(float(i), names.get(s, "")) for s, i in positions.items())
+    return AxisLayout(
+        -0.6, n - 0.4, tuple(Tick(float(i), names.get(s, "")) for i, s in enumerate(sources))
     )
+
+
+def _category_y(
+    spec: ChartSpec, data: ChartData | None, room: Room
+) -> tuple[AxisLayout, dict[str, int]]:
+    sources = shown_categories(spec, data)
+    positions = {source: i for i, source in enumerate(sources)}
     shown = [c for c in data.categories if c.source in positions] if data is not None else []
     if spec.variant is ChartVariant.BOX:
         values = [v for c in shown if c.plot_box.n for v in (c.plot_box.min, c.plot_box.max)]
         low, high = _bounds(values)
-        y = _axis(
-            spec.y_axis,
-            _pad(low, high),
-            log=spec.y_axis.scale is Scale.LOG,
-            room=_room(spec, horizontal=False),
-        )
-        return AxesLayout(x, y, positions)
+        y = _axis(spec.y_axis, _pad(low, high), log=spec.y_axis.scale is Scale.LOG, room=room)
+        return y, positions
     values = []
     for c in shown:
         if math.isfinite(c.mean):
@@ -210,8 +316,7 @@ def _category_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
     bottom = min([0.0, *values])
     auto = (bottom, top + PADDING * ((top - bottom) or 1.0))
     # Bars start at 0, which a log axis cannot show: the Format dialog keeps bars linear.
-    y = _axis(spec.y_axis, auto, log=False, room=_room(spec, horizontal=False))
-    return AxesLayout(x, y, positions)
+    return _axis(spec.y_axis, auto, log=False, room=room), positions
 
 
 def _xy_bounds(spec: ChartSpec, data: ChartData | None) -> tuple[float, float, float, float]:
