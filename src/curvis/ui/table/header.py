@@ -4,7 +4,10 @@ Above the column names the header draws one band row for category groups and one
 replicate groups (each only when the table has any). A band is drawn as one header
 box spanning its columns. A column without a band above it has a taller box instead.
 
-- Clicking a band selects its columns; double-clicking it renames the group.
+- Clicking a band selects its columns.
+- Double-clicking a column name or a band edits the name in place
+  (:class:`~curvis.ui.inline_edit.InlineEditor`). Tab and Shift+Tab keep the name and
+  edit the next or previous name in the same row; they stop at the last one.
 - Dragging a band moves the whole group or category.
 - Dragging the header of a column that is already selected moves that column. A drag
   that starts on an unselected column selects a range of columns, as before.
@@ -16,11 +19,13 @@ where the item will land.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QHelpEvent, QMouseEvent, QPainter, QPaintEvent, QPalette
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QHeaderView,
     QStyle,
@@ -30,6 +35,7 @@ from PySide6.QtWidgets import (
 )
 
 from curvis.data import NodeKind
+from curvis.ui.inline_edit import InlineEditor
 from curvis.ui.table.model import Band, TableModel
 
 DROP_LINE_WIDTH = 3
@@ -52,12 +58,12 @@ class GroupedHeader(QHeaderView):
     """A band was clicked: select columns ``start`` to ``end - 1``."""
     move_requested = Signal(str, str, int)
     """Drop: move the (kind, id) to column boundary ``boundary``."""
-    rename_requested = Signal(str, str)
-    """A band was double-clicked: rename the (kind, id)."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(Qt.Orientation.Horizontal, parent)
         self._drag: _Drag | None = None
+        self.editor: InlineEditor | None = None
+        """The field of the name being edited, if any."""
         self.setSectionsClickable(True)
 
     def table_model(self) -> TableModel | None:
@@ -235,13 +241,122 @@ class GroupedHeader(QHeaderView):
         event.accept()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:  # noqa: N802 (Qt API)
-        band = self.band_at(event.position().toPoint())
-        if band is not None and event.button() == Qt.MouseButton.LeftButton:
-            self._drag = None
-            self.rename_requested.emit(band.kind.value, band.id)
+        model = self.table_model()
+        if model is None or event.button() != Qt.MouseButton.LeftButton:
+            super().mouseDoubleClickEvent(event)
+            return
+        pos = event.position().toPoint()
+        self._drag = None
+        band = self.band_at(pos)
+        if band is not None:
+            self.edit_band(band.kind, band.id)
+            event.accept()
+            return
+        section = self.logicalIndexAt(pos.x())
+        if 0 <= section < model.n_data_columns:
+            self.edit_column(section)
             event.accept()
             return
         super().mouseDoubleClickEvent(event)
+
+    # --- renaming in place --------------------------------------------------------------
+
+    def name_rect(self, section: int) -> QRect:
+        """Where the name of the column at ``section`` is drawn (above its role line)."""
+        top = self.band_count * self.band_height
+        line = self.fontMetrics().lineSpacing()
+        name_top = top + max((self.height() - top - 2 * line) // 2, 0)
+        left = self.sectionViewportPosition(section)
+        return QRect(left + 2, max(name_top - 1, top), self.sectionSize(section) - 4, line + 2)
+
+    def role_line_top(self) -> int:
+        """Where the role line (X, Y, ƒ Y …) under the column names starts."""
+        top = self.band_count * self.band_height
+        line = self.fontMetrics().lineSpacing()
+        return top + max((self.height() - top - 2 * line) // 2, 0) + line
+
+    def edit_column(self, section: int) -> InlineEditor | None:
+        """Edit the name of the column at ``section`` in place."""
+        model = self.table_model()
+        column = model.column_at(section) if model is not None else None
+        if model is None or column is None:
+            return None
+        self._scroll_to(section)
+        column_id = column.id
+
+        def commit(text: str, step: int) -> bool:
+            problem = model.column_name_problem(column_id, text)
+            if problem is not None:
+                model.error.emit(problem)
+                return False
+            position = model.table.column_index(column_id)
+            model.rename_column(position, text.strip())
+            target = position + step
+            if step and 0 <= target < model.n_data_columns:
+                self.edit_column(target)
+            return True
+
+        return self._open_editor(self.name_rect(section), column.name, commit)
+
+    def edit_band(self, kind: NodeKind, node_id: str) -> InlineEditor | None:
+        """Edit the name of a replicate group or category in place."""
+        model = self.table_model()
+        found = self._find_band(kind, node_id)
+        if model is None or found is None:
+            return None
+        row, band = found
+        self._scroll_to(band.start)
+
+        def commit(text: str, step: int) -> bool:
+            problem = model.band_name_problem(kind, node_id, text)
+            if problem is not None:
+                model.error.emit(problem)
+                return False
+            if text.strip() != band.name:
+                model.rename_band(kind, node_id, text)
+            following = self._neighbour_band(kind, node_id, step) if step else None
+            if following is not None:
+                self.edit_band(following.kind, following.id)
+            return True
+
+        rect = self.band_rect(band, row).adjusted(2, 2, -2, -2)
+        return self._open_editor(rect, band.name, commit)
+
+    def _open_editor(
+        self, rect: QRect, text: str, commit: Callable[[str, int], bool]
+    ) -> InlineEditor:
+        self.editor = InlineEditor(
+            self.viewport(), rect, text, commit, restore_focus=self.parentWidget()
+        )
+        return self.editor
+
+    def _find_band(self, kind: NodeKind, node_id: str) -> tuple[int, Band] | None:
+        model = self.table_model()
+        if model is None:
+            return None
+        for row, bands in enumerate(model.bands()):
+            for band in bands:
+                if band is not None and band.kind is kind and band.id == node_id:
+                    return row, band
+        return None
+
+    def _neighbour_band(self, kind: NodeKind, node_id: str, step: int) -> Band | None:
+        """The next (``step`` 1) or previous (-1) band in the same row, or None."""
+        model = self.table_model()
+        found = self._find_band(kind, node_id)
+        if model is None or found is None:
+            return None
+        row, band = found
+        bands = model.bands()[row]
+        positions = range(band.end, len(bands)) if step > 0 else range(band.start - 1, -1, -1)
+        return next((bands[i] for i in positions if bands[i] is not None), None)
+
+    def _scroll_to(self, section: int) -> None:
+        view = self.parentWidget()
+        model = self.table_model()
+        if isinstance(view, QAbstractItemView) and model is not None:
+            row = max(view.currentIndex().row(), 0)
+            view.scrollTo(model.index(row, section))
 
     def viewportEvent(self, event: QEvent) -> bool:  # noqa: N802 (Qt API)
         if event.type() == QEvent.Type.ToolTip:

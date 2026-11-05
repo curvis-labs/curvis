@@ -42,7 +42,14 @@ from curvis.core import (
     UngroupColumns,
 )
 from curvis.data import CellValue, Column, ColumnRole, NodeKind, Table
-from curvis.data.layout import column_category, find_node, layout_tree, moved_order, snap_boundary
+from curvis.data.layout import (
+    column_category,
+    find_node,
+    layout_tree,
+    moved_order,
+    name_error,
+    snap_boundary,
+)
 from curvis.data.names import name_key, next_column_names
 from curvis.ui.table.format import cell_text, fitted_number_text
 
@@ -475,6 +482,30 @@ class TableModel(QAbstractTableModel):
             if category_id is not None:
                 return table.category_group(category_id).name
         return None
+
+    def column_name_problem(self, column_id: str, name: str) -> str | None:
+        """Why ``name`` cannot be the name of the column ``column_id``, or None."""
+        name = name.strip()
+        if not name:
+            return "Enter a column name."
+        key = name_key(name)
+        for column in self.table.columns:
+            if column.id != column_id and name_key(column.name) == key:
+                return f"'{column.name}' is already used in this table. Enter another name."
+        return None
+
+    def band_name_problem(self, kind: NodeKind, node_id: str, name: str) -> str | None:
+        """Why ``name`` cannot be the name of the group or category ``node_id``, or None."""
+        name = name.strip()
+        if kind is NodeKind.GROUP:
+            if not name:
+                return "Enter a group name."
+            error = name_error(self.table, group_names={node_id: name})
+        else:
+            if not name:
+                return "Enter a category name."
+            error = name_error(self.table, category_names={node_id: name})
+        return None if error is None else f"{error} Enter another name."
 
     def rename_band(self, kind: NodeKind, node_id: str, name: str) -> bool:
         """Rename a replicate group or category group."""

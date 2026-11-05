@@ -146,14 +146,16 @@ def test_clicking_a_band_selects_its_columns(qtbot: QtBot, grouped: TableView) -
     assert grouped.selected_columns() == [1, 2, 3, 4, 5]
 
 
-def test_double_clicking_a_band_renames_it(
-    qtbot: QtBot, grouped: TableView, doc: Document, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    asked = answer(grouped, monkeypatch, "Vehicle", "Male")
-    target = grouped.grouped_header.viewport()
+def test_double_clicking_a_band_renames_it(qtbot: QtBot, grouped: TableView, doc: Document) -> None:
+    header = grouped.grouped_header
+    target = header.viewport()
     qtbot.mouseDClick(target, Qt.MouseButton.LeftButton, pos=section_center(grouped, 2, 1))
+    assert header.editor is not None
+    qtbot.keyClicks(header.editor, "Vehicle")
+    qtbot.keyClick(header.editor, Qt.Key.Key_Return)
     qtbot.mouseDClick(target, Qt.MouseButton.LeftButton, pos=section_center(grouped, 2, 0))
-    assert asked == ["Rename replicate group", "Rename category"]
+    qtbot.keyClicks(header.editor, "Male")
+    qtbot.keyClick(header.editor, Qt.Key.Key_Return)
     t = doc.tables[0]
     assert [g.name for g in t.replicate_groups] == ["Vehicle", "Treated"]
     assert t.category_groups[0].name == "Male"

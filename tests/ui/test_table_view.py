@@ -417,24 +417,27 @@ def test_header_menu_on_a_spare_column_adds_a_column(view: TableView, doc: Docum
     assert [c.name for c in doc.tables[0].columns] == ["Dose", "Resp", "Label", "A"]
 
 
-def test_header_menu_renames_a_column(
-    view: TableView, doc: Document, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(view, "_ask_column_name", lambda current: "Response")
-    menu_action(view, 1, "Rename column…")
+def test_header_menu_renames_a_column(qtbot: QtBot, view: TableView, doc: Document) -> None:
+    menu_action(view, 1, "Rename column")
+    editor = view.grouped_header.editor
+    assert editor is not None and editor.isVisible() and editor.text() == "Resp"
+    qtbot.keyClicks(editor, "Response")
+    qtbot.keyClick(editor, Qt.Key.Key_Return)
     assert header(view, 1) == "Response\nY"
     doc.undo()
     assert header(view, 1) == "Resp\nY"
 
 
-def test_rename_to_a_taken_name_is_refused(
-    view: TableView, doc: Document, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_rename_to_a_taken_name_is_refused(qtbot: QtBot, view: TableView, doc: Document) -> None:
     messages: list[str] = []
     view.error.connect(messages.append)
-    monkeypatch.setattr(view, "_ask_column_name", lambda current: "dose")
-    menu_action(view, 1, "Rename column…")
-    assert messages == ["There is already a column called 'Dose'."]
+    menu_action(view, 1, "Rename column")
+    editor = view.grouped_header.editor
+    assert editor is not None
+    qtbot.keyClicks(editor, "dose")
+    qtbot.keyClick(editor, Qt.Key.Key_Return)
+    assert messages == ["'Dose' is already used in this table. Enter another name."]
+    assert not editor.is_closed
     assert header(view, 1) == "Resp\nY"
 
 
