@@ -111,6 +111,17 @@ def chart_font_family() -> str:
     return FONT_FAMILY
 
 
+def chart_font(family: str) -> QFont:
+    """The chart font, antialiased in grey as Matplotlib draws it. Subpixel (LCD)
+    antialiasing, which some systems use for screen text, gives text coloured fringes
+    that no export has."""
+    font = QFont(family)
+    font.setStyleStrategy(
+        QFont.StyleStrategy.PreferAntialias | QFont.StyleStrategy.NoSubpixelAntialias
+    )
+    return font
+
+
 class CrispErrorBars(pg.ErrorBarItem):  # type: ignore[misc]
     """Error bars drawn without antialiasing, with a 1 px cosmetic pen: they are only
     horizontal and vertical lines, and Qt draws thin lines on its fast path. A bar
@@ -264,7 +275,7 @@ class ChartView(QWidget):
         self.plot_item.hideButtons()
         self.plot_item.vb.setMouseEnabled(False, False)
         self.plot_item.vb.disableAutoRange()
-        self.plot_item.titleLabel.item.setFont(QFont(self.family))
+        self.plot_item.titleLabel.item.setFont(chart_font(self.family))
         self.plot_widget.ci.addItem(self.plot_item, 0, 0)
         self.legend = pg.LegendItem()
         self.legend.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
@@ -362,7 +373,7 @@ class ChartView(QWidget):
         pad = self._px(PAGE_PAD_PT)
         widget.ci.setContentsMargins(pad, pad, pad, pad)
         widget.ci.setSpacing(0)
-        font = QFont(self.family)
+        font = chart_font(self.family)
         font.setPointSizeF(self._font_pt(spec.text_size))
         size = f"{self._font_pt(spec.text_size):.3f}pt"
         title_size = f"{self._font_pt(spec.text_size * TITLE_SCALE):.3f}pt"
@@ -374,6 +385,7 @@ class ChartView(QWidget):
             axis.setPen(pen)
             axis.setTextPen(pg.mkPen(ink))
             axis.setTickFont(font)
+            axis.label.setFont(chart_font(self.family))
             axis.setLabel(
                 axis_spec.title or None,
                 color=colors.ink,
@@ -403,7 +415,7 @@ class ChartView(QWidget):
         sample = LegendSample(item, LEGEND_SAMPLE_EM * em, LEGEND_ROW_EM * em, patch)
         self.legend.addItem(sample, name)
         _sample, label = self.legend.items[-1]
-        label.item.setFont(QFont(self.family))
+        label.item.setFont(chart_font(self.family))
         label.item.document().setDocumentMargin(0)
         label.setText(name, size=self.legend.opts["labelTextSize"])
         self.legend.layout.setHorizontalSpacing(LEGEND_GAP_EM * em)
@@ -723,4 +735,11 @@ def _nan_to_edge(limit: Any, fit: Any) -> Any:
     return np.where(np.isfinite(limit), limit, fit)
 
 
-__all__ = ("BoxItem", "ChartView", "LegendSample", "chart_font_family", "render_page")
+__all__ = (
+    "BoxItem",
+    "ChartView",
+    "LegendSample",
+    "chart_font",
+    "chart_font_family",
+    "render_page",
+)
