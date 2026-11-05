@@ -431,10 +431,10 @@ Make a plan first. When done, report what you built with before and after screen
 ### Step 2.7 — Several tables per project, renaming in place
 
 **Done when**
-- [ ] A project shows its tables as tabs along the bottom; New table (File menu, +, Ctrl+Shift+N) adds one, and tabs can be renamed and reordered.
-- [ ] Closing a table deletes it with its calculated columns, analyses and graphs after the warning, as one undo step; the last table cannot be closed.
-- [ ] The Results and Graph panels, Import data and the table toolbar follow the selected table; a project with several tables saves and opens unchanged.
-- [ ] Column, replicate group and category names are renamed in place in the header; Tab and Shift+Tab move to the next and previous header.
+- [x] A project shows its tables as tabs along the bottom; New table (File menu, +, Ctrl+Shift+N) adds one, and tabs can be renamed and reordered.
+- [x] Closing a table deletes it with its calculated columns, analyses and graphs after the warning, as one undo step; the last table cannot be closed.
+- [x] The Results and Graph panels, Import data and the table toolbar follow the selected table; a project with several tables saves and opens unchanged.
+- [x] Column, replicate group and category names are renamed in place in the header; Tab and Shift+Tab move to the next and previous header.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.7 in docs/PHASES.md.
