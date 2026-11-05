@@ -63,6 +63,12 @@ class _ExitWhenShown(QObject):
         return False
 
 
+def _freeze_startup_objects() -> None:
+    from curvis.compute import gc_main_thread  # the compute package is slow to import
+
+    gc_main_thread.freeze_startup_objects()
+
+
 def project_paths(args: list[str]) -> list[Path]:
     """The project files named on the command line (e.g. by a file association)."""
     return [Path(a) for a in args if not a.startswith("-") and a.lower().endswith(PROJECT_SUFFIX)]
@@ -93,6 +99,9 @@ def main(argv: list[str] | None = None) -> int:
         probe = _ExitWhenShown(window)
         window.launcher.installEventFilter(probe)
     window.show()
+    # Start-up ends with the formula warm-up: freeze what is alive by then, so later
+    # full garbage collections (on the main thread) stay short.
+    window.warm_up_done.connect(_freeze_startup_objects)
     QTimer.singleShot(FORMULA_WARM_UP_DELAY_MS, window.warm_up_formulas)
     router.set_window(window)
     for path in project_paths(argv[1:]):

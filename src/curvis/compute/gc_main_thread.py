@@ -51,6 +51,7 @@ class _Collector(QObject):
 
 
 _holders = 0
+_frozen = False
 _reenable = False  # automatic collection was on when it was switched off here
 _collector: _Collector | None = None
 
@@ -119,3 +120,19 @@ def collect_if_due() -> int:
         if count[gen] > threshold[gen]:
             generation = gen
     return gc.collect(generation)
+
+
+def freeze_startup_objects() -> None:
+    """Collect once, then exclude every surviving object from later collections
+    (:func:`gc.freeze`). Call it once, when start-up is over; later calls do nothing.
+
+    Frozen objects are still freed when their reference count drops to zero; only a
+    reference cycle made entirely of start-up objects would no longer be collected.
+    """
+    global _frozen
+    _check_main_thread()
+    if _frozen:
+        return
+    _frozen = True
+    gc.collect()
+    gc.freeze()

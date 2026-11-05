@@ -117,3 +117,34 @@ def test_hold_and_release_only_on_the_main_thread(qapp: QApplication) -> None:
     thread.start()
     thread.join()
     assert len(errors) == 1
+
+
+def test_freeze_startup_objects_runs_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gc_main_thread, "_frozen", False)
+    try:
+        gc_main_thread.freeze_startup_objects()
+        frozen = gc.get_freeze_count()
+        assert frozen > 0
+        gc_main_thread.freeze_startup_objects()  # later calls do nothing
+        assert gc.get_freeze_count() == frozen
+    finally:
+        gc.unfreeze()  # keep the rest of the test session collectable
+
+
+def test_frozen_objects_are_still_freed_by_reference_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    finalized: list[threading.Thread] = []
+
+    class Plain:
+        def __del__(self) -> None:
+            finalized.append(threading.current_thread())
+
+    holder = [Plain()]
+    monkeypatch.setattr(gc_main_thread, "_frozen", False)
+    try:
+        gc_main_thread.freeze_startup_objects()
+        holder.clear()
+        assert finalized == [threading.main_thread()]
+    finally:
+        gc.unfreeze()
