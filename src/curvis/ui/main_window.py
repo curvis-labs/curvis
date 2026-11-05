@@ -37,7 +37,7 @@ from curvis.data import ColumnRole, Table
 from curvis.settings import Settings
 from curvis.ui.actions import ActionRegistry
 from curvis.ui.document_tab import DocumentTab
-from curvis.ui.launcher import LauncherWidget
+from curvis.ui.launcher import SAMPLE_NAMES, LauncherWidget
 from curvis.ui.table import TableView
 from curvis.ui.toolbars import (
     build_main_toolbar,
@@ -170,6 +170,7 @@ class MainWindow(QMainWindow):
         self.table_toolbar: QToolBar | None = None
 
         self.launcher.new_requested.connect(self.new_document)
+        self.launcher.tile_chosen.connect(self.new_from_sample)
         self.launcher.open_requested.connect(self.open_document)
         self.launcher.recent_chosen.connect(self.open_path)
         self.launcher.remove_requested.connect(self.settings.remove_recent_project)
@@ -198,6 +199,13 @@ class MainWindow(QMainWindow):
         r = self.registry
         k = QKeySequence.StandardKey
         r.register("file.new", "&New project", self.new_document, category="File", shortcut=k.New)
+        for key, name in SAMPLE_NAMES.items():
+            r.register(
+                f"file.sample.{key}",
+                f"&{name}",
+                functools.partial(self.new_from_sample, key),
+                category="New from sample",
+            )
         r.register("file.open", "&Open…", self.open_document, category="File", shortcut=k.Open)
         r.register(
             "file.import",
@@ -251,7 +259,10 @@ class MainWindow(QMainWindow):
         a = self.registry.action
         file_menu = self.menuBar().addMenu("&File")
         file_menu.setToolTipsVisible(True)  # why Close table… is disabled
-        file_menu.addActions([a("file.new"), a("file.open"), a("file.import")])
+        file_menu.addAction(a("file.new"))
+        sample_menu = file_menu.addMenu("New from sa&mple")
+        sample_menu.addActions([a(f"file.sample.{key}") for key in SAMPLE_NAMES])
+        file_menu.addActions([a("file.open"), a("file.import")])
         file_menu.addSeparator()
         file_menu.addActions([a("file.save"), a("file.save_as")])
         file_menu.addSeparator()
@@ -588,6 +599,13 @@ class MainWindow(QMainWindow):
         self._untitled_count += 1
         name = "Untitled" if self._untitled_count == 1 else f"Untitled {self._untitled_count}"
         return self._add_tab(Document(name=name, tables=[Table.blank()]), None)
+
+    def new_from_sample(self, key: str) -> DocumentTab:
+        """Open the sample project ``key`` as a new, untitled copy: it has no file, so
+        Save asks where to save it, and it is not added to the recent projects."""
+        from curvis.samples import sample
+
+        return self._add_tab(sample(key).build(), None)
 
     def open_document(self) -> None:
         """Ask for a project file and open it."""

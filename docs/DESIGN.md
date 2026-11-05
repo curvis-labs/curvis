@@ -193,7 +193,7 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   | Ctrl+Shift+A | Analyze |
   | Ctrl+Shift+F | Format graph |
   | Ctrl+Shift+X | Export graph |
-  | — | Rename column, Constants, Edit analysis, Delete analysis, Close table, Change graph type, Delete graph (menu and palette only) |
+  | — | Rename column, Constants, Edit analysis, Delete analysis, Close table, Change graph type, Delete graph, the samples under File › New from sample (menu and palette only) |
 
   A new shortcut must not clash with these or with platform standard keys.
 - **Accessible names**: every control has a buddy label, visible text or `setAccessibleName`.
@@ -312,7 +312,9 @@ Mockup: `docs/mockups/launcher.html`.
 - **Tiles.** 178 px wide: a framed picture 104 px high on `Base`, the name under it, and a
   secondary line (*Sample* for a sample; empty for Blank project). *Blank project* comes
   first and has the focus, so Enter starts a project. Sample tiles show a small picture of
-  their graph drawn with `Link` and `PlaceholderText`. Hover and focus outline the picture in
+  their graph drawn with `Link` and `PlaceholderText`. A sample opens as a new, untitled
+  copy named after the sample (no file until it is saved; not added to the recent list); the
+  samples are also under *File › New from sample*. Hover and focus outline the picture in
   `Highlight`. Tiles that do not fit wrap to a second row.
 - **Recent list.** Rows of about 48 px on `Base`: a file icon, the name (semibold) with the
   folder under it in `PlaceholderText` (elided in the middle), and the relative time at the

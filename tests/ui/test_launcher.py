@@ -63,9 +63,15 @@ def inside(child: QWidget, ancestor: QWidget) -> QRect:
 # --- tiles -----------------------------------------------------------------------------
 
 
-def test_only_blank_project_tile_for_now(qtbot: QtBot) -> None:
+def test_blank_project_then_the_samples(qtbot: QtBot) -> None:
     launcher = make_launcher(qtbot)
-    assert [t.tile.name for t in launcher.tiles] == ["Blank project"]
+    assert [t.tile.name for t in launcher.tiles] == [
+        "Blank project",
+        "Group comparison",
+        "Dose-response",
+        "XY with replicates",
+    ]
+    assert [t.tile.detail for t in launcher.tiles[1:]] == ["Sample"] * 3
     assert launcher.blank_tile.tile.detail == ""  # no key combination on the launcher
     assert launcher.blank_tile.sizeHint().width() == TILE_WIDTH
 
