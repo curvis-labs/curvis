@@ -45,6 +45,10 @@ from curvis.charts.axes import (
     CAP_SHARE,
     ERROR_BAR_WIDTH_PT,
     FONT_FAMILY,
+    LEGEND_GAP_EM,
+    LEGEND_ROW_EM,
+    LEGEND_SAMPLE_EM,
+    PAGE_PAD_PT,
     SCREEN_DPI,
     TICK_LENGTH_PT,
     TITLE_SCALE,
@@ -105,6 +109,49 @@ class CrispErrorBars(pg.ErrorBarItem):  # type: ignore[misc]
     def paint(self, painter: QPainter, *args: Any) -> None:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         super().paint(painter, *args)
+
+
+class LegendSample(pg.ItemSample):  # type: ignore[misc]
+    """A legend sample sized in ems of the chart text, like the exported legend's: the
+    series' line across it and its symbol in the middle, or a patch for a bar or box.
+    A hidden series shows its sample dimmed."""
+
+    def __init__(self, item: Any, width: float, height: float, patch: bool = False) -> None:
+        super().__init__(item)
+        self._width, self._height, self._patch = width, height, patch
+        self.setFixedWidth(width)
+        self.setFixedHeight(height)
+
+    def boundingRect(self) -> QRectF:  # noqa: N802 (Qt API)
+        return QRectF(0, 0, self._width, self._height)
+
+    def paint(self, painter: QPainter, *_args: Any) -> None:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self.item.isVisible():
+            painter.setOpacity(0.3)
+        middle = self._height / 2
+        opts = self.item.opts
+        if self._patch:
+            side = 0.7 * self._height / LEGEND_ROW_EM  # 0.7 em, as on export
+            painter.setPen(pg.mkPen(opts["pen"]))
+            painter.setBrush(pg.mkBrush(opts["brush"]))
+            painter.drawRect(QRectF(0, middle - side / 2, self._width, side))
+            return
+        pen = opts.get("pen")
+        if pen is not None:
+            painter.setPen(pg.mkPen(pen))
+            painter.drawLine(QPointF(0, middle), QPointF(self._width, middle))
+        symbol = opts.get("symbol")
+        if symbol is not None:
+            scatter = self.item.scatter.opts
+            painter.translate(self._width / 2, middle)
+            painter.scale(scatter["size"], scatter["size"])
+            painter.setPen(pg.mkPen(scatter["pen"]))
+            painter.setBrush(pg.mkBrush(scatter["brush"]))
+            from pyqtgraph.graphicsItems.ScatterPlotItem import Symbols
+
+            path = Symbols[symbol]
+            painter.drawPath(path)
 
 
 @dataclass
@@ -287,6 +334,9 @@ class ChartView(QWidget):
         widget, plot = self.plot_widget, self.plot_item
         ink = QColor(colors.ink)
         widget.setBackground(QColor(colors.page))
+        pad = self._px(PAGE_PAD_PT)
+        widget.ci.setContentsMargins(pad, pad, pad, pad)
+        widget.ci.setSpacing(0)
         font = QFont(self.family)
         font.setPointSizeF(self._font_pt(spec.text_size))
         size = f"{self._font_pt(spec.text_size):.3f}pt"
@@ -309,7 +359,10 @@ class ChartView(QWidget):
                 showValues=axis_spec.show_labels,
                 tickLength=tick,
                 tickTextOffset=max(1, round(self._px(TICK_LENGTH_PT) * 0.8)),
-                hideOverlappingLabels=False,  # draw a label at the axis end, as on export
+                # Draw every label, as on export: the ticks are already thinned to what
+                # fits (curvis.charts.axes), and a label may reach past the axis end.
+                hideOverlappingLabels=10_000,
+                textFillLimits=[(0, 1.0)],
             )
         plot.showGrid(False, False)
         self.legend.opts["labelTextSize"] = size
@@ -318,11 +371,19 @@ class ChartView(QWidget):
     def _legend_wanted(self, spec: ChartSpec) -> bool:
         return spec.show_legend and any(s.in_legend for s in spec.series)
 
-    def _add_legend_entry(self, item: Any, name: str) -> None:
-        self.legend.addItem(item, name)
+    def _add_legend_entry(self, item: Any, name: str, patch: bool = False) -> None:
+        assert self.spec is not None
+        em = self._px(self.spec.text_size)
+        sample = LegendSample(item, LEGEND_SAMPLE_EM * em, LEGEND_ROW_EM * em, patch)
+        self.legend.addItem(sample, name)
         _sample, label = self.legend.items[-1]
         label.item.setFont(QFont(self.family))
+        label.item.document().setDocumentMargin(0)
         label.setText(name, size=self.legend.opts["labelTextSize"])
+        self.legend.layout.setHorizontalSpacing(LEGEND_GAP_EM * em)
+        self.legend.layout.setVerticalSpacing(0)
+        self.legend.layout.setContentsMargins(LEGEND_GAP_EM * em, 0, 0, 0)
+        self.legend.updateSize()
 
     def _draw_xy(self, spec: ChartSpec, data: ChartData, colors: ColorScheme) -> None:
         plot = self.plot_item
@@ -429,9 +490,13 @@ class ChartView(QWidget):
             for c in shown:
                 if styles[c.source].in_legend:
                     sample = pg.BarGraphItem(
-                        x=[0], height=[1], width=1, brush=QColor(styles[c.source].color), pen=ink
+                        x=[0],
+                        height=[1],
+                        width=1,
+                        brush=QColor(styles[c.source].color),
+                        pen=pg.mkPen(ink, width=self._px(AXIS_WIDTH_PT)),
                     )
-                    self._add_legend_entry(sample, c.name)
+                    self._add_legend_entry(sample, c.name, patch=True)
                     self.legend.items[-1][0].setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         if not shown:
             return
@@ -574,10 +639,10 @@ def render_page(
 ) -> tuple[QImage, QRectF]:
     """Draw ``spec`` offscreen on its page at 96 dpi × ``scale``; returns the image and
     the plot area in it. For the image-diff tests and screenshots."""
-    width, height = page_px(spec)
+    width, height = page_px(spec, SCREEN_DPI * scale)
     view = ChartView()
     view.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
-    view.resize(round(width * scale), round(height * scale))
+    view.resize(width, height)
     view.show()
     view.render_chart(spec, data)
     app = QApplication.instance()
@@ -626,4 +691,4 @@ def _nan_to_edge(limit: Any, fit: Any) -> Any:
     return np.where(np.isfinite(limit), limit, fit)
 
 
-__all__ = ("BoxItem", "ChartView", "chart_font_family", "render_page")
+__all__ = ("BoxItem", "ChartView", "LegendSample", "chart_font_family", "render_page")

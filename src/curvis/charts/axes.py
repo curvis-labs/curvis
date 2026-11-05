@@ -12,9 +12,11 @@ compare the two renderers.
   Box: the whiskers, padded by 5 %. A range the user typed (From / To) replaces the
   automatic end it gives; on a log axis it is converted to log10, like the plot data.
 - **Ticks.** Linear axes: steps of 1, 2 or 5 × 10^k, about five of them. Log axes: one
-  major tick per decade (every second decade beyond eight), minor ticks at 2–9; a range
-  shorter than a decade gets linear steps of the values instead. Labels read like the
-  table (0.01, 1, 100); very large or small values use exponents (1e+08).
+  major tick per decade, minor ticks at 2–9; a range shorter than a decade gets linear
+  steps of the values instead. On a small page there are fewer ticks (every second or
+  third decade), so the labels do not run into each other: both renderers then show
+  every label, where pyqtgraph would hide some and Matplotlib would overlap them. Labels
+  read like the table (0.01, 1, 100); very large or small values use exponents (1e+08).
 - **Categories.** The shown bars or boxes are numbered 0, 1, 2 … from the left, so a
   hidden series leaves no gap.
 
@@ -25,6 +27,7 @@ from __future__ import annotations
 
 import importlib.util
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,6 +47,12 @@ CAP_SHARE = 0.012
 """Width of an XY error bar's cap, as a share of the X range."""
 TARGET_TICKS = 5
 MAX_DECADES = 8
+CHAR_WIDTH_EM = 0.62
+"""Average width of a DejaVu Sans digit, in ems: to tell how many tick labels fit."""
+AXIS_SHARE = 0.72
+"""Share of the page that an axis spans, roughly (the rest holds labels and titles)."""
+LEGEND_SHARE = 0.25
+"""Share of the page width a legend takes, roughly."""
 
 FONT_FAMILY = "DejaVu Sans"
 """The chart font in both renderers (Matplotlib ships it, Qt loads the same file)."""
@@ -56,6 +65,14 @@ ERROR_BAR_WIDTH_PT = 0.75
 BOX_LINE_PT = 1.125
 TITLE_SCALE = 1.2
 """The title is this many times the chart text size."""
+LEGEND_SAMPLE_EM = 1.6
+"""Width of a legend entry's sample (symbol, line or patch), in ems of the text size."""
+LEGEND_ROW_EM = 1.5
+"""Height of a legend row, in ems."""
+LEGEND_GAP_EM = 0.4
+"""Space between a legend sample and its name, and around the legend, in ems."""
+PAGE_PAD_PT = 2.0
+"""Space between the page edge and what is drawn on it."""
 BAND_ALPHA = 0.18
 BOX_FILL_ALPHA = 0.25
 
@@ -76,6 +93,15 @@ class AxisLayout:
 
 
 @dataclass(frozen=True)
+class Room:
+    """How much room an axis has for tick labels, roughly, in points."""
+
+    length: float
+    text_size: float
+    horizontal: bool
+
+
+@dataclass(frozen=True)
 class AxesLayout:
     x: AxisLayout
     y: AxisLayout
@@ -91,11 +117,11 @@ def points_to_px(points: float, dpi: float = SCREEN_DPI) -> float:
 
 
 def page_px(spec: ChartSpec, dpi: float = SCREEN_DPI) -> tuple[int, int]:
-    """The graph's page in pixels at ``dpi``."""
+    """The graph's page in whole pixels at ``dpi``, cut off as Matplotlib does."""
     width, height = spec.page_size_cm
     return (
-        max(1, round(width / CM_PER_INCH * dpi)),
-        max(1, round(height / CM_PER_INCH * dpi)),
+        max(1, int(width / CM_PER_INCH * dpi)),
+        max(1, int(height / CM_PER_INCH * dpi)),
     )
 
 
@@ -127,9 +153,31 @@ def axes_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
     if spec.family is ChartFamily.BAR:
         return _category_layout(spec, data)
     x_low, x_high, y_low, y_high = _xy_bounds(spec, data)
-    x = _axis(spec.x_axis, _pad(x_low, x_high))
-    y = _axis(spec.y_axis, _pad(y_low, y_high))
+    x = _axis(spec.x_axis, _pad(x_low, x_high), room=_room(spec, horizontal=True))
+    y = _axis(spec.y_axis, _pad(y_low, y_high), room=_room(spec, horizontal=False))
     return AxesLayout(x, y, {})
+
+
+def _room(spec: ChartSpec, *, horizontal: bool) -> Room:
+    """Room for the tick labels of the X (``horizontal``) or Y axis of ``spec``."""
+    width, height = (size / CM_PER_INCH * 72.0 for size in spec.page_size_cm)
+    if horizontal:
+        length = width * (AXIS_SHARE - (LEGEND_SHARE if spec.show_legend else 0.0))
+    else:
+        length = height * AXIS_SHARE
+    return Room(length, spec.text_size, horizontal)
+
+
+def _fits(ticks: Sequence[Tick], room: Room | None) -> bool:
+    """True when ``ticks``' labels fit along the axis without running into each other."""
+    if room is None or len(ticks) < 2:
+        return True
+    text = room.text_size
+    if room.horizontal:
+        need = max(len(t.label) for t in ticks) * CHAR_WIDTH_EM * text + text
+    else:
+        need = 1.6 * text
+    return (len(ticks) - 1) * need <= room.length
 
 
 def _category_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
@@ -144,7 +192,12 @@ def _category_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
     if spec.variant is ChartVariant.BOX:
         values = [v for c in shown if c.plot_box.n for v in (c.plot_box.min, c.plot_box.max)]
         low, high = _bounds(values)
-        y = _axis(spec.y_axis, _pad(low, high), log=spec.y_axis.scale is Scale.LOG)
+        y = _axis(
+            spec.y_axis,
+            _pad(low, high),
+            log=spec.y_axis.scale is Scale.LOG,
+            room=_room(spec, horizontal=False),
+        )
         return AxesLayout(x, y, positions)
     values = []
     for c in shown:
@@ -154,7 +207,7 @@ def _category_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
     bottom = min([0.0, *values])
     auto = (bottom, top + PADDING * ((top - bottom) or 1.0))
     # Bars start at 0, which a log axis cannot show: the Format dialog keeps bars linear.
-    y = _axis(spec.y_axis, auto, log=False)
+    y = _axis(spec.y_axis, auto, log=False, room=_room(spec, horizontal=False))
     return AxesLayout(x, y, positions)
 
 
@@ -203,8 +256,15 @@ def _pad(low: float, high: float) -> tuple[float, float]:
     return low - PADDING * span, high + PADDING * span
 
 
-def _axis(axis: AxisSpec, auto: tuple[float, float], *, log: bool | None = None) -> AxisLayout:
-    """The layout of ``axis`` with the automatic range ``auto`` (plot coordinates)."""
+def _axis(
+    axis: AxisSpec,
+    auto: tuple[float, float],
+    *,
+    log: bool | None = None,
+    room: Room | None = None,
+) -> AxisLayout:
+    """The layout of ``axis`` with the automatic range ``auto`` (plot coordinates);
+    ``room`` thins the ticks to what fits."""
     is_log = axis.scale is Scale.LOG if log is None else log
     low, high = auto
     if axis.minimum is not None:
@@ -218,10 +278,16 @@ def _axis(axis: AxisSpec, auto: tuple[float, float], *, log: bool | None = None)
         else:
             low = high - max(abs(high) * 0.1, 1.0)
     if is_log:
-        major, minor = log_ticks(low, high)
-    else:
-        major, minor = linear_ticks(low, high), ()
-    return AxisLayout(low, high, major, minor)
+        for every in range(1, 13):
+            major, minor = log_ticks(low, high, every)
+            if len(major) <= 2 or _fits(major, room):
+                break
+        return AxisLayout(low, high, major, minor)
+    for target in range(TARGET_TICKS, 1, -1):
+        ticks = linear_ticks(low, high, target)
+        if len(ticks) <= 2 or _fits(ticks, room):
+            break
+    return AxisLayout(low, high, ticks)
 
 
 # --- ticks -------------------------------------------------------------------------------
@@ -238,8 +304,8 @@ def nice_step(span: float, target: int = TARGET_TICKS) -> float:
     return factor * power
 
 
-def linear_ticks(low: float, high: float) -> tuple[Tick, ...]:
-    step = nice_step(high - low)
+def linear_ticks(low: float, high: float, target: int = TARGET_TICKS) -> tuple[Tick, ...]:
+    step = nice_step(high - low, target)
     first = math.ceil(low / step - 1e-9)
     last = math.floor(high / step + 1e-9)
     decimals = max(0, -math.floor(math.log10(step) + 1e-9))
@@ -259,24 +325,25 @@ def log_label(value: float) -> str:
     return f"{value:.6g}" if 1e-6 <= abs(value) < 1e7 else f"{value:.0e}"
 
 
-def log_ticks(low: float, high: float) -> tuple[tuple[Tick, ...], tuple[float, ...]]:
-    """Major and minor ticks of a log axis whose range is ``low``–``high`` in log10."""
+def log_ticks(
+    low: float, high: float, every: int = 1
+) -> tuple[tuple[Tick, ...], tuple[float, ...]]:
+    """Major and minor ticks of a log axis whose range is ``low``–``high`` in log10, with
+    a major tick every ``every`` decades (at least every ``MAX_DECADES``-th)."""
     first, last = math.ceil(low - 1e-9), math.floor(high + 1e-9)
     if last - first < 1:
         # Less than a decade: linear steps of the values, placed at their log10.
-        values = linear_ticks(10.0**low, 10.0**high)
+        values = linear_ticks(10.0**low, 10.0**high, max(2, TARGET_TICKS + 1 - every))
         major = tuple(Tick(math.log10(t.value), log_label(t.value)) for t in values if t.value > 0)
         return major, ()
-    every = 1 if last - first <= MAX_DECADES else math.ceil((last - first) / MAX_DECADES)
-    decades = range(first, last + 1, every)
-    major = tuple(Tick(float(d), log_label(10.0**d)) for d in decades)
+    every = max(every, math.ceil((last - first) / MAX_DECADES))
+    major = tuple(Tick(float(d), log_label(10.0**d)) for d in range(first, last + 1, every))
     minor: list[float] = []
-    if every == 1:
-        for d in range(first - 1, last + 1):
-            for k in range(2, 10):
-                v = d + math.log10(k)
-                if low <= v <= high:
-                    minor.append(v)
+    for d in range(first - 1, last + 1):
+        for k in range(2, 10) if every == 1 else range(1, 2):
+            v = d + math.log10(k)
+            if low <= v <= high and (every == 1 or (d - first) % every):
+                minor.append(v)
     return major, tuple(minor)
 
 

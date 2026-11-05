@@ -82,7 +82,7 @@ module = [
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["pyarrow", "scipy", "scipy.*", "lmfit", "pyqtgraph"]
+module = ["pyarrow", "scipy", "scipy.*", "lmfit", "pyqtgraph", "pyqtgraph.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

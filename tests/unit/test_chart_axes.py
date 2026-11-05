@@ -31,9 +31,9 @@ def xy(scale: Scale = Scale.LINEAR, **axis: float):  # type: ignore[no-untyped-d
 
 def test_page_px_follows_the_page_size() -> None:
     spec = default_spec(replicate_table(), ChartFamily.XY)  # Wide, 9 x 6 cm
-    assert page_px(spec) == (340, 227)
-    assert page_px(spec, 300) == (1063, 709)
-    assert page_px(replace(spec, aspect_ratio="tall"), 300) == (472, 709)
+    assert page_px(spec) == (340, 226)
+    assert page_px(spec, 300) == (1062, 708)
+    assert page_px(replace(spec, aspect_ratio="tall"), 300) == (472, 708)
 
 
 def test_xy_ranges_are_the_data_padded_by_five_percent() -> None:
@@ -51,9 +51,20 @@ def test_typed_limits_replace_the_automatic_ends() -> None:
     layout = axes_layout(spec, data)
     assert layout.x.low == -5.0
     spec, data = xy(Scale.LOG, minimum=0.01, maximum=1000.0)
-    layout = axes_layout(spec, data)
+    big = replace(spec, aspect_ratio="custom", custom_size=(20.0, 12.0))
+    layout = axes_layout(big, data)
     assert (layout.x.low, layout.x.high) == pytest.approx((-2.0, 3.0))
     assert [t.label for t in layout.x.major] == ["0.01", "0.1", "1", "10", "100", "1000"]
+
+
+def test_a_small_page_gets_fewer_ticks() -> None:
+    spec, data = xy(Scale.LOG, minimum=0.01, maximum=1000.0)
+    layout = axes_layout(spec, data)  # Wide, 9 cm, with a legend
+    assert [t.label for t in layout.x.major] == ["0.01", "1", "100"]
+    assert layout.x.minor == (-1.0, 1.0, 3.0)  # the decades between are minor ticks
+    narrow = replace(spec, aspect_ratio="tall", show_legend=False)
+    tall = axes_layout(narrow, data)
+    assert len(tall.x.major) <= 3 and len(tall.y.major) >= 4
 
 
 def test_hidden_series_do_not_count() -> None:
