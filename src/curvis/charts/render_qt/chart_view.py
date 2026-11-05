@@ -113,13 +113,16 @@ def chart_font_family() -> str:
 
 
 def chart_font(family: str) -> QFont:
-    """The chart font, antialiased in grey as Matplotlib draws it. Subpixel (LCD)
-    antialiasing, which some systems use for screen text, gives text coloured fringes
-    that no export has."""
+    """The chart font, drawn as Matplotlib draws it: antialiased in grey and unhinted.
+    Subpixel (LCD) antialiasing, which some systems use for screen text, gives text
+    coloured fringes that no export has."""
     font = QFont(family)
     font.setStyleStrategy(
         QFont.StyleStrategy.PreferAntialias | QFont.StyleStrategy.NoSubpixelAntialias
     )
+    # Unhinted outlines and advances, as Matplotlib lays text out: Windows hints them by
+    # default, which moves the letters of a label by several pixels.
+    font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
     return font
 
 
