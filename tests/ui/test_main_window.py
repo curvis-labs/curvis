@@ -254,7 +254,8 @@ def test_warm_up_builds_the_formula_parser_on_a_worker_thread(
 
     monkeypatch.setattr(parser, "_lark", None)
     monkeypatch.setattr(parser, "_parser", recording_parser)
-    window.warm_up_formulas()
+    with qtbot.waitSignal(window.warm_up_done):
+        window.warm_up_formulas()
     qtbot.waitUntil(lambda: not window.scheduler.busy)
     assert parser._lark is not None
     assert built_on and built_on[0] is not threading.main_thread()

@@ -6,8 +6,11 @@ pending job (waiting out the debounce delay) and one live run; a newer submit fo
 node replaces the pending job and cancels the older run.
 
 Results and errors are delivered on the main thread through the ``finished`` and
-``failed`` signals. A job that raises, cannot be pickled, or kills its worker process
-reports a :class:`~curvis.compute.jobs.JobError`; it never takes the app down.
+``failed`` signals. While a scheduler is alive, Python's garbage collector runs on the
+main thread only (:mod:`curvis.compute.gc_main_thread`), so a collection triggered on a
+worker cannot delete Qt objects there. A job that raises, cannot be pickled, or kills
+its worker process reports a :class:`~curvis.compute.jobs.JobError`; it never takes the
+app down.
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ from typing import Any
 
 from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, Qt, QTimer, Signal
 
-from curvis.compute import shared
+from curvis.compute import gc_main_thread, shared
 from curvis.compute.jobs import (
     WEIGHTS,
     CancelFlag,
@@ -110,6 +113,8 @@ class Scheduler(QObject):
         self._live: set[_Run] = set()  # every run whose future is not done yet
         self._closed = False
         self._done.connect(self._on_done, Qt.ConnectionType.QueuedConnection)
+        # Workers run Python: an automatic collection there could delete Qt objects.
+        gc_main_thread.hold()
 
     # --- public API ----------------------------------------------------------------
 
@@ -178,7 +183,11 @@ class Scheduler(QObject):
         return True
 
     def shutdown(self, wait: bool = True) -> None:
-        """Cancel everything and stop the worker pools. The scheduler cannot be reused."""
+        """Cancel everything and stop the worker pools. The scheduler cannot be reused.
+
+        With ``wait=False`` a job may still be running on a worker afterwards, so the
+        garbage collector stays on the main thread (the app is closing anyway).
+        """
         if self._closed:
             return
         self._closed = True
@@ -196,6 +205,8 @@ class Scheduler(QObject):
         for run in self._live:
             shared.release(run.blocks)
         self._live.clear()
+        if wait:
+            gc_main_thread.release()
 
     # --- internals -----------------------------------------------------------------
 

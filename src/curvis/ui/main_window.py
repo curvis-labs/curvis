@@ -9,7 +9,7 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import (
     QAction,
     QCloseEvent,
@@ -121,6 +121,9 @@ def _file_key(path: Path) -> str:
 
 class MainWindow(QMainWindow):
     """Top-level window with one tab per open document."""
+
+    warm_up_done = Signal()
+    """The formula warm-up job has finished (or failed): start-up is over."""
 
     def __init__(self, settings: Settings | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -586,6 +589,9 @@ class MainWindow(QMainWindow):
         self.scheduler.submit(FORMULA_WARM_UP, Job(warm_up), delay_ms=0)
 
     def _on_job_finished(self, node: str, result: object) -> None:
+        if node == FORMULA_WARM_UP:
+            self.warm_up_done.emit()
+            return
         if node in self._pending_imports:
             self._finish_import(*self._pending_imports.pop(node), result)
             return
@@ -597,6 +603,9 @@ class MainWindow(QMainWindow):
         self.settings.add_recent_project(path)
 
     def _on_job_failed(self, node: str, error: JobError) -> None:
+        if node == FORMULA_WARM_UP:
+            self.warm_up_done.emit()
+            return
         if node in self._pending_imports:
             source, _tab, _table = self._pending_imports.pop(node)
             self._show_error(
