@@ -231,12 +231,23 @@ def test_rename_column_from_the_right_click_menu_opens_no_dialog(
 
     QTimer.singleShot(100, pick)
     view._show_header_menu(pos)
+    window = view.window()
+
+    def ready() -> bool:
+        field = header.editor
+        if field is None or field.is_closed:
+            return False
+        # On macOS CI (offscreen) no window is active again after a popup closes, so
+        # nothing can have the focus there; elsewhere the field must have it.
+        return field.hasFocus() or not window.isActiveWindow()
+
     try:
-        qtbot.waitUntil(lambda: header.editor is not None and header.editor.hasFocus())
-        qtbot.wait(50)
+        qtbot.waitUntil(ready)
+        qtbot.wait(50)  # closing the menu must not close the field afterwards
     except qtbot.TimeoutError as exc:
         raise AssertionError(state()) from exc
-    assert header.editor is not None and not header.editor.is_closed, state()
+    assert ready(), state()
+    assert "triggered" in seen, state()
     field = editor(view)
     assert asked == [] and field.text() == "Control 2"
     type_name(qtbot, field, "Vehicle", Qt.Key.Key_Return)
