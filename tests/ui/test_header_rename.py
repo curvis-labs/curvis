@@ -191,6 +191,7 @@ def test_rename_column_action_edits_the_current_column(
     assert action.shortcut().isEmpty()  # Ctrl+Shift+R is Bulk rename
     view.setCurrentIndex(view.model().index(0, 2))
     action.trigger()
+    qtbot.waitUntil(lambda: view.grouped_header.editor is not None)
     field = editor(view)
     assert field.text() == "Control 2"
     type_name(qtbot, field, "Vehicle", Qt.Key.Key_Return)
@@ -209,17 +210,33 @@ def test_rename_column_from_the_right_click_menu_opens_no_dialog(
     header = view.grouped_header
     pos = QPoint(header.sectionViewportPosition(2) + 10, header.height() // 2)
 
+    seen: list[str] = []
+
     def pick() -> None:
         menu = QApplication.activePopupWidget()
+        seen.append(f"popup: {type(menu).__name__}")
         assert isinstance(menu, QMenu)
         action = next(a for a in menu.actions() if a.text() == "Re&name column")
+        action.triggered.connect(lambda: seen.append("triggered"))
         menu.setActiveAction(action)
         qtbot.keyClick(menu, Qt.Key.Key_Return)
 
+    def state() -> str:
+        field = header.editor
+        focus = QApplication.focusWidget()
+        return (
+            f"{seen}; field: {'none' if field is None else 'closed' if field.is_closed else 'open'}"
+            f"; focus: {type(focus).__name__ if focus else None}"
+        )
+
     QTimer.singleShot(100, pick)
     view._show_header_menu(pos)
-    qtbot.waitUntil(lambda: header.editor is not None and header.editor.hasFocus())
-    qtbot.wait(50)
+    try:
+        qtbot.waitUntil(lambda: header.editor is not None and header.editor.hasFocus())
+        qtbot.wait(50)
+    except qtbot.TimeoutError as exc:
+        raise AssertionError(state()) from exc
+    assert header.editor is not None and not header.editor.is_closed, state()
     field = editor(view)
     assert asked == [] and field.text() == "Control 2"
     type_name(qtbot, field, "Vehicle", Qt.Key.Key_Return)

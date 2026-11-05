@@ -30,6 +30,7 @@ from PySide6.QtCore import (
     QPoint,
     QRect,
     Qt,
+    QTimer,
     Signal,
 )
 from PySide6.QtGui import (
@@ -492,7 +493,12 @@ class TableView(QTableView):
         return self.model().remove_columns(self.selected_columns())
 
     def rename_current_column(self) -> bool:
-        """Edit the name of the current column in place, in the header."""
+        """Edit the name of the current column in place, in the header.
+
+        The field opens once the event loop is idle: this runs from menus and the
+        command palette, whose closing gives the focus back to where it was, which
+        would close a field opened right away. Returns False if there is no column.
+        """
         model = self.model()
         section = self.currentIndex().column()
         if model.column_at(section) is None:
@@ -500,7 +506,8 @@ class TableView(QTableView):
             if not cols:
                 return False
             section = cols[0]
-        return self.grouped_header.edit_column(section) is not None
+        self._rename_section(section)
+        return True
 
     def set_role_of_selected(self, role: ColumnRole) -> bool:
         return self.model().set_role(self.selected_columns(), role)
@@ -677,7 +684,8 @@ class TableView(QTableView):
         return menu
 
     def _rename_section(self, section: int) -> None:
-        self.grouped_header.edit_column(section)
+        """Open the name field of ``section`` after the menu that asked for it is gone."""
+        QTimer.singleShot(0, self, lambda: self.grouped_header.edit_column(section))
 
     def current_calculated_column(self) -> str | None:
         """Id of the calculated column of the current cell, or None."""

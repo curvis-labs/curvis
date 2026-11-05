@@ -419,6 +419,7 @@ def test_header_menu_on_a_spare_column_adds_a_column(view: TableView, doc: Docum
 
 def test_header_menu_renames_a_column(qtbot: QtBot, view: TableView, doc: Document) -> None:
     menu_action(view, 1, "Rename column")
+    qtbot.waitUntil(lambda: view.grouped_header.editor is not None)
     editor = view.grouped_header.editor
     assert editor is not None and editor.isVisible() and editor.text() == "Resp"
     qtbot.keyClicks(editor, "Response")
@@ -432,6 +433,7 @@ def test_rename_to_a_taken_name_is_refused(qtbot: QtBot, view: TableView, doc: D
     messages: list[str] = []
     view.error.connect(messages.append)
     menu_action(view, 1, "Rename column")
+    qtbot.waitUntil(lambda: view.grouped_header.editor is not None)
     editor = view.grouped_header.editor
     assert editor is not None
     qtbot.keyClicks(editor, "dose")
