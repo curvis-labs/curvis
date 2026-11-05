@@ -254,8 +254,9 @@ Mockup: `docs/mockups/table-tabs.html`.
 - **The side panel follows the selected table.** Results and Graph show that table's analyses
   and graphs. Import data and every table-toolbar action act on the selected table, and their
   status messages name it (“Imported 96 rows and 4 columns from plate.csv into Viability.”).
-- **New table**: a *+* button after the last tab, *New table* in the File menu under *New
-  project*, Ctrl+Shift+N and the command palette. There is no toolbar button; the *+* is
+- **New table**: a *+* after the last tab, drawn as one more (unselected) tab of the same
+  height; *New table* in the File menu under *New project*, Ctrl+Shift+N and the command
+  palette. There is no toolbar button; the *+* is
   always visible. The new table is named “Table 2”, “Table 3” … (the first free number), is
   added after the selected tab, and is selected. One undo step.
 - **Closing.** Each tab has a close button (the thin × of section 3) while the project has

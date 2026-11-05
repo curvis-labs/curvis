@@ -15,9 +15,17 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QHBoxLayout, QMenu, QTabBar, QToolButton, QWidget
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal
+from PySide6.QtGui import QEnterEvent, QMouseEvent, QPainter, QPaintEvent
+from PySide6.QtWidgets import (
+    QAbstractButton,
+    QHBoxLayout,
+    QMenu,
+    QStyle,
+    QStyleOptionTab,
+    QTabBar,
+    QWidget,
+)
 
 from curvis.ui.inline_edit import InlineEditor
 
@@ -66,6 +74,68 @@ class TableTabBar(QTabBar):
             self.drag_finished.emit(table_id, ids.index(table_id))
 
 
+class NewTableTab(QAbstractButton):
+    """The *+* after the last tab, drawn as an unselected tab of ``bar`` with the same
+    height, so it reads as "one more table"."""
+
+    def __init__(self, bar: QTabBar, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._bar = bar
+        self._hovered = False
+        self.setObjectName("newTableButton")
+        self.setText("+")
+        self.setToolTip(NEW_TABLE_TIP)
+        self.setAccessibleName("New table")
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover)
+
+    def sizeHint(self) -> QSize:  # noqa: N802 (Qt API)
+        height = self._tab_height()
+        return QSize(max(height + height // 3, 2 * self.fontMetrics().height()), height)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (Qt API)
+        return self.sizeHint()
+
+    def _tab_height(self) -> int:
+        if self._bar.count():
+            return self._bar.tabRect(0).height() or self._bar.sizeHint().height()
+        return self.fontMetrics().height() + 12
+
+    def enterEvent(self, event: QEnterEvent) -> None:  # noqa: N802 (Qt API)
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event: QEvent) -> None:  # noqa: N802 (Qt API)
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, _event: QPaintEvent) -> None:  # noqa: N802 (Qt API)
+        option = QStyleOptionTab()
+        option.initFrom(self)
+        option.rect = self.rect()
+        option.shape = self._bar.shape()
+        option.documentMode = self._bar.documentMode()
+        option.position = QStyleOptionTab.TabPosition.End
+        option.selectedPosition = QStyleOptionTab.SelectedPosition.NotAdjacent
+        option.text = ""
+        option.state &= ~QStyle.StateFlag.State_Selected
+        if self._hovered:
+            option.state |= QStyle.StateFlag.State_MouseOver
+        if self.isDown():
+            option.state |= QStyle.StateFlag.State_Sunken
+        painter = QPainter(self)
+        style = self._bar.style()
+        style.drawControl(QStyle.ControlElement.CE_TabBarTabShape, option, painter, self._bar)
+        font = painter.font()
+        font.setPointSizeF(font.pointSizeF() * 1.3)
+        painter.setFont(font)
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "+")
+        painter.end()
+
+
 class TableTabs(QWidget):
     """The tab bar with the *+* button after the last tab."""
 
@@ -80,18 +150,12 @@ class TableTabs(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.bar = TableTabBar(self)
-        self.plus = QToolButton(self)
-        self.plus.setObjectName("newTableButton")
-        self.plus.setText("+")
-        self.plus.setAutoRaise(True)
-        self.plus.setToolTip(NEW_TABLE_TIP)
-        self.plus.setAccessibleName("New table")
-        self.plus.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.plus = NewTableTab(self.bar, self)
         self.plus.clicked.connect(self.new_requested)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
-        layout.addWidget(self.bar, 0)
+        layout.setSpacing(0)  # the + sits right after the last tab, like another tab
+        layout.addWidget(self.bar, 0, Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self.plus, 0, Qt.AlignmentFlag.AlignTop)
         layout.addStretch(1)
         self.editor: InlineEditor | None = None
@@ -124,6 +188,7 @@ class TableTabs(QWidget):
                     bar.setTabData(index, table_id)
                     bar.setTabToolTip(index, name)
                 bar.setTabsClosable(closable)
+                self.plus.updateGeometry()
                 # Give the bar its new width now, so selecting a tab below does not
                 # scroll a bar that is still as narrow as before.
                 bar.updateGeometry()

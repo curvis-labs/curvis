@@ -380,4 +380,8 @@ def test_every_tab_is_on_screen(qtbot: QtBot, project: DocumentTab) -> None:
     for i in range(bar.count()):
         assert bar.rect().contains(bar.tabRect(i)), bar.tabText(i)
     plus = project.table_tabs.plus.geometry()
-    assert plus.left() >= bar.geometry().right()  # the + comes after the last tab
+    # the + is drawn as one more tab: right after the last tab, just as high
+    last = bar.tabRect(bar.count() - 1).translated(bar.pos())
+    assert plus.left() == last.right() + 1
+    assert plus.top() == last.top() and plus.height() == last.height()
+    assert plus.width() >= plus.height()
