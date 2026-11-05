@@ -376,9 +376,7 @@ def spec_from_json(data: Any) -> ChartSpec:
                 )
                 for o in _list(obj.get("overlays", []), "overlays")
             ),
-            show_legend=_bool(
-                obj.get("show_legend", family is ChartFamily.XY), "show_legend"
-            ),
+            show_legend=_bool(obj.get("show_legend", family is ChartFamily.XY), "show_legend"),
         )
     except TypeError as exc:  # pragma: no cover - guarded by the checks above
         raise ValueError(str(exc)) from None
