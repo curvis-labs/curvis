@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QSettings, Qt
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QApplication, QDialog
 from pytestqt.qtbot import QtBot
 
@@ -28,6 +29,7 @@ from curvis.ui.main_window import MainWindow
 from curvis.ui.toolbars import GRAPH_BUTTONS
 from tests.ui.dialog_samples import Context, graph_document
 from tests.ui.test_graph_panel import settle
+from tests.ui.test_toolbars import native
 from tests.unit.charts_tables import column_table, replicate_table
 
 
@@ -298,8 +300,13 @@ def test_graph_toolbar_buttons_are_registered_actions(window: MainWindow, tab: D
     for action in actions:
         assert window.registry.action(action.objectName()) is action
         assert action.isEnabled()
-    assert window.registry.action("graph.format").toolTip() == "Format graph (Ctrl+Shift+F)"
-    assert window.registry.action("graph.export").toolTip() == "Export graph (Ctrl+Shift+X)"
+    for action_id, name, keys in (
+        ("graph.format", "Format graph", "Ctrl+Shift+F"),
+        ("graph.export", "Export graph", "Ctrl+Shift+X"),
+    ):
+        action = window.registry.action(action_id)
+        assert action.shortcut() == QKeySequence(keys)
+        assert action.toolTip() == f"{name} ({native(action)})"  # ⇧⌘F on macOS
 
 
 def test_disabled_graph_buttons_say_why(window: MainWindow) -> None:
