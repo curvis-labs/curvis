@@ -1,12 +1,12 @@
 # Curvis — build phases and Claude Code prompts
 
-Curvis is built in 5 phases and 27 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
+Curvis is built in 5 phases and 28 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
 
 | Phase | Steps | Ends with (gate) |
 | --- | --- | --- |
 | 0 Foundations | 0.1–0.5 | App starts on Windows, macOS and Linux from CI-built installers |
 | 1 Data tables | 1.1–1.6 | You can type, paste, import and calculate data comfortably; dialogs follow one design |
-| 2 Core analyses + MVP | 2.1–2.8 | MVP beta: core tests match R, speed targets met |
+| 2 Core analyses + MVP | 2.1–2.9 | MVP beta: core tests match R, speed targets met |
 | 3 Full outline | 3.1–3.6 | Every feature in SPEC.md works |
 | 4 Release 1.0 | 4.1–4.2 | Validation report published, 1.0 installers released |
 
@@ -273,7 +273,7 @@ Write short UI design guidelines and bring the existing dialogs in line with the
   - Feedback: where errors, assumption warnings and plain-language readings appear; a disabled OK always shows why; empty states.
   - Keyboard: tab order, shortcuts, command palette entries.
 - A small shared module in src/curvis/ui for what DESIGN.md defines (dialog skeleton, spacing, stacked-page sizing), used by the existing dialogs.
-- Mockups (an HTML canvas, not code) of the Analyze dialog, the Results panel and the Format dialog from SPEC.md, following DESIGN.md, for steps 2.2 and 2.7 to build from.
+- Mockups (an HTML canvas, not code) of the Analyze dialog, the Results panel and the Format dialog from SPEC.md, following DESIGN.md, for steps 2.2 and 2.8 to build from.
 - Apply DESIGN.md to the Import, Bulk rename, Calculate, Constants and Settings dialogs. Take offscreen screenshots of each in light and dark theme, before and after.
 - Add a line to the UI conventions in CLAUDE.md that points to docs/DESIGN.md.
 - pytest-qt tests that every dialog fits its default size without overlapping widgets, and that every control has a label or an accessible name.
@@ -406,7 +406,29 @@ Build src/curvis/charts:
 Make a plan first. When done, report what you built and the redraw benchmark.
 ```
 
-### Step 2.6 — Several tables per project, renaming in place
+### Step 2.6 — Launcher redesign
+
+**Done when**
+- [ ] The launcher matches the approved mockup (docs/mockups/launcher.html) in the light and the dark theme.
+- [ ] Recent projects can be opened with one click or Enter and removed from the list with the right-click menu; a missing file shows "File not found".
+- [ ] Cold start to launcher stays under 1.5 s.
+
+```text
+Read CLAUDE.md, docs/SPEC.md and step 2.6 in docs/PHASES.md.
+
+Rebuild src/curvis/ui/launcher.py following docs/DESIGN.md section 10 and docs/mockups/launcher.html (approved: the start gallery, without logo, version or tagline):
+- A row of tiles with Blank project (Ctrl+N) first; it has the focus, so Enter starts a project. Leave room for the sample tiles of step 2.9 (the tile row takes a list of tiles), but show only Blank project for now.
+- A "Recent projects" heading with an Open project… button (Ctrl+O) at its right.
+- The recent list as rows: name, folder (elided in the middle), relative time at the right; hovered row shaded; one click or Enter opens. A missing file is dimmed, says "File not found" and does not open. Right-click (and the menu key / Shift+F10): Open, Remove from list (Settings.remove_recent_project; the file is not touched).
+- The empty state ("Projects you open or save will appear here.") with EmptyState.
+- A centred column 760 px wide; narrower windows use the full width with the 12 px margin and the tiles wrap.
+- Palette roles only, both themes; keyboard order tiles → Open project… → list.
+- pytest-qt tests: new project from the tile and with Enter, open from the button, open a recent row by click and by Enter, a missing file does not open, Remove from list (file kept), empty state, the layout at the narrow size. Keep the cold-start benchmark passing; add the launcher to scripts/dialog_screenshots.py.
+
+Make a plan first. When done, report what you built with before and after screenshots, the tests and the cold-start benchmark.
+```
+
+### Step 2.7 — Several tables per project, renaming in place
 
 **Done when**
 - [ ] A project shows its tables as tabs along the bottom; New table (File menu, +, Ctrl+Shift+N) adds one, and tabs can be renamed and reordered.
@@ -415,7 +437,7 @@ Make a plan first. When done, report what you built and the redraw benchmark.
 - [ ] Column, replicate group and category names are renamed in place in the header; Tab and Shift+Tab move to the next and previous header.
 
 ```text
-Read CLAUDE.md, docs/SPEC.md and step 2.6 in docs/PHASES.md.
+Read CLAUDE.md, docs/SPEC.md and step 2.7 in docs/PHASES.md.
 
 Build several tables per project, following docs/DESIGN.md section 8 and docs/mockups/table-tabs.html (approved: tabs along the bottom):
 - Core: RemoveTable also removes the table's analyses and graphs (and their dependency-graph nodes), and undo restores all of it, as one command with a clear change-log summary. It refuses to remove the last table. Add MoveTable (reorder); RenameTable exists. A project file without tables opens with one blank table added.
@@ -430,14 +452,14 @@ Build several tables per project, following docs/DESIGN.md section 8 and docs/mo
 Make a plan first. When done, report what you built, the tests and benchmarks, and anything open.
 ```
 
-### Step 2.7 — Format dialog and export
+### Step 2.8 — Format dialog and export
 
 **Done when**
 - [ ] The Format dialog changes everything listed in SPEC.md that applies to XY, bar and box.
 - [ ] PNG, SVG and PDF exports match the on-screen graph (image-diff tests pass); 300 dpi export under 1 s.
 
 ```text
-Read CLAUDE.md, docs/SPEC.md and step 2.7 in docs/PHASES.md.
+Read CLAUDE.md, docs/SPEC.md and step 2.8 in docs/PHASES.md.
 
 Build:
 - Format dialog editing the ChartSpec only (one undoable command per OK): graph title, aspect ratio presets (4:3, 16:9, 1:1, 3:4, 3:2) and custom size, each axis (title, range, label, linear/log), each series (symbol, size, line style, width, color, error-bar type), color scheme and chart text size. Changes preview live. Follow docs/DESIGN.md and the Format dialog mockup approved in step 1.6.
@@ -447,7 +469,7 @@ Build:
 Make a plan first. When done, report what you built, image-diff results and the export benchmark.
 ```
 
-### Step 2.8 — MVP hardening and beta build
+### Step 2.9 — MVP hardening and beta build
 
 **Gate for phase 2 (MVP):** all validation tests pass, all benchmarks meet targets, and 10–20 beta users can install it.
 
@@ -457,13 +479,13 @@ Make a plan first. When done, report what you built, image-diff results and the 
 - [ ] Beta installers are built and a short getting-started guide exists.
 
 ```text
-Read CLAUDE.md, docs/SPEC.md and step 2.8 in docs/PHASES.md.
+Read CLAUDE.md, docs/SPEC.md and step 2.9 in docs/PHASES.md.
 
 Prepare the MVP beta:
 - Run all tests and benchmarks; profile and fix anything that misses a target. Report before/after numbers.
 - Review every dialog for defaults: the common case must work with one click on OK. List any you changed.
 - Check keyboard access and the command palette for every action added so far.
-- Add a "Sample data" entry to the launcher with three example projects (group comparison, dose-response, XY with replicates).
+- Add the three sample projects (group comparison, dose-response, XY with replicates) as tiles in the launcher, after Blank project, each with a small picture of its graph, as in docs/mockups/launcher.html. A sample opens as a new, untitled copy.
 - Write docs/getting-started.md: install, import, analyze, graph, export.
 - Opt-in crash reporting that sends no user data (just a local crash log with a "copy to clipboard" option is fine for now).
 - Build beta installers in CI and tag v0.1.0-beta.
