@@ -54,6 +54,7 @@ from curvis.charts.axes import (
     CAP_SHARE,
     ERROR_BAR_WIDTH_PT,
     FONT_FAMILY,
+    LEGEND_BORDER_EM,
     LEGEND_GAP_EM,
     LEGEND_ROW_EM,
     LEGEND_SAMPLE_EM,
@@ -420,7 +421,10 @@ class ChartView(QWidget):
         label.setText(name, size=self.legend.opts["labelTextSize"])
         self.legend.layout.setHorizontalSpacing(LEGEND_GAP_EM * em)
         self.legend.layout.setVerticalSpacing(0)
-        self.legend.layout.setContentsMargins(LEGEND_GAP_EM * em, 0, 0, 0)
+        # As Matplotlib's layout: padding on both sides of the gap after the plot, and
+        # the legend's own border left and right.
+        border = LEGEND_BORDER_EM * em
+        self.legend.layout.setContentsMargins(2 * self._px(PAGE_PAD_PT) + border, 0, border, 0)
         self.legend.updateSize()
 
     def _draw_xy(self, spec: ChartSpec, data: ChartData, colors: ColorScheme) -> None:

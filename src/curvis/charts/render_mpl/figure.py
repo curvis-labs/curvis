@@ -31,6 +31,7 @@ from curvis.charts.axes import (
     CM_PER_INCH,
     ERROR_BAR_WIDTH_PT,
     FONT_FAMILY,
+    LEGEND_BORDER_EM,
     LEGEND_GAP_EM,
     LEGEND_ROW_EM,
     LEGEND_SAMPLE_EM,
@@ -376,7 +377,7 @@ def _legend(
             labelcolor=colors.ink,
             # The sizes of the Graph panel's legend (curvis.charts.axes), in ems.
             borderaxespad=0.0,
-            borderpad=(LEGEND_ROW_EM - 1.0) / 2,  # the half row above the first name
+            borderpad=LEGEND_BORDER_EM,  # the half row above the first name
             handlelength=LEGEND_SAMPLE_EM,
             handleheight=0.7,
             handletextpad=LEGEND_GAP_EM,

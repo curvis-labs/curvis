@@ -31,7 +31,7 @@ Two measures:
 | Measure | What is compared | Radius | Threshold | Measured (all 16 cases) |
 | --- | --- | --- | --- | --- |
 | **plot** | The plot area inside the axes, cut out of each image (3 px inset, because Matplotlib's axes box holds the axis lines and pyqtgraph's view box does not). The export's colour masks are scaled to the size of the screen's plot area. | 3 px (0.4 mm) | 0.01 | 0.0000 |
-| **page** | The whole page. | 8 px (1 mm) | 0.12 | 0.004 – 0.092 |
+| **page** | The whole page. | 8 px (1 mm) | 0.12 | 0.004 – 0.039 |
 
 The thresholds were set after the measurements, with a margin. The control test
 (`test_the_measure_sees_a_wrong_colour_and_a_wrong_range`) shows that the plot measure
@@ -43,13 +43,23 @@ from the theme (DESIGN.md §3).
 ## What still differs (page measure)
 
 - **Tick labels at the ends of the X axis.** Matplotlib makes the plot narrower so a label
-  at the end of the axis (e.g. "100") fits; pyqtgraph lets it reach past the end. The plot
-  is then up to about 2 mm narrower in the export, which moves the points near the right
-  end. This is the 0.092 of the scatter graph with a legend.
+  at the end of the axis (e.g. "100") fits; pyqtgraph lets it reach past the end. This can
+  move the points near the right end by a millimetre or two.
 - **Text rasterising.** Qt and Matplotlib draw DejaVu Sans with slightly different hinting
   and kerning; titles and labels can sit a pixel or two apart.
 - **Hidden series** (legend click) are left out of an exported legend; the screen lists
   them dimmed so they can be clicked back on. The tests compare graphs with every series
   shown.
 
-When a comparison fails, both images are saved side by side in `build/image-diff/`.
+## Pitfalls found on the CI runners
+
+- **Subpixel text.** Where the system asks for subpixel (LCD) antialiasing, Qt drew chart
+  text with coloured fringes that the measure counted as series colour (page 0.21). Chart
+  fonts now always use grey antialiasing, as Matplotlib does (`chart_font`).
+- **Legend spacing.** Matplotlib's layout pads both sides of the gap between the plot and
+  the legend, and the legend has a border inside; the screen legend now has the same
+  margins (`PAGE_PAD_PT`, `LEGEND_BORDER_EM`), so the two plots are equally wide.
+
+When a comparison fails, both images are saved side by side in `build/image-diff/` (CI
+uploads them as an artifact), and the failure message says where each key colour's pixels
+are on screen and in the export, so it can be read from the log alone.

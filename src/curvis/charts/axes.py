@@ -70,9 +70,12 @@ LEGEND_SAMPLE_EM = 1.6
 LEGEND_ROW_EM = 1.5
 """Height of a legend row, in ems."""
 LEGEND_GAP_EM = 0.4
-"""Space between a legend sample and its name, and around the legend, in ems."""
+"""Space between a legend sample and its name, in ems."""
+LEGEND_BORDER_EM = (LEGEND_ROW_EM - 1.0) / 2
+"""Space inside the legend's edge, all round, in ems: half a row's extra height."""
 PAGE_PAD_PT = 2.0
-"""Space between the page edge and what is drawn on it."""
+"""Space around everything drawn on the page: between the page edge and the plot or
+legend, and on each side of the gap between the plot and the legend."""
 BAND_ALPHA = 0.18
 BOX_FILL_ALPHA = 0.25
 
