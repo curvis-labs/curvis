@@ -667,6 +667,15 @@ class DocumentTab(QWidget):
 
         return self.table_tabs.edit_name(table_id, commit, self.table_view) is not None
 
+    def move_selected_table(self, step: int = 1) -> bool:
+        """Move the selected table one place right (``step`` 1) or left (-1)."""
+        if self._table_id is None:
+            return False
+        index = self.document.table_index(self._table_id) + step
+        if not 0 <= index < len(self.document.tables):
+            return False
+        return self.move_table(self._table_id, index)
+
     def move_table(self, table_id: str, index: int) -> bool:
         """Move ``table_id`` to position ``index`` (a dragged tab)."""
         ok = self._execute(MoveTable(table_id, index))

@@ -261,6 +261,7 @@ class MainWindow(QMainWindow):
         file_menu.setToolTipsVisible(True)  # why Close table… is disabled
         file_menu.addAction(a("file.new"))
         sample_menu = file_menu.addMenu("New from sa&mple")
+        self._sample_menu = sample_menu
         sample_menu.addActions([a(f"file.sample.{key}") for key in SAMPLE_NAMES])
         file_menu.addActions([a("file.open"), a("file.import")])
         file_menu.addSeparator()
@@ -504,6 +505,24 @@ class MainWindow(QMainWindow):
             shortcut="Ctrl+Shift+N",
         )
         r.register(
+            "table.rename",
+            "&Rename table",
+            self._tab_call(DocumentTab.rename_table),
+            category="File",
+        )
+        r.register(
+            "table.move_table_left",
+            "Move table le&ft",
+            self._tab_call(functools.partial(DocumentTab.move_selected_table, step=-1)),
+            category="View",
+        )
+        r.register(
+            "table.move_table_right",
+            "Move table righ&t",
+            self._tab_call(functools.partial(DocumentTab.move_selected_table, step=1)),
+            category="View",
+        )
+        r.register(
             "table.close",
             "Close ta&ble…",
             self._tab_call(DocumentTab.close_table),
@@ -575,10 +594,17 @@ class MainWindow(QMainWindow):
         )
         self._view_menu.insertSeparator(a("view.command_palette"))
         self._view_menu.insertActions(
-            a("view.command_palette"), [a("table.next"), a("table.previous")]
+            a("view.command_palette"),
+            [
+                a("table.next"),
+                a("table.previous"),
+                a("table.move_table_left"),
+                a("table.move_table_right"),
+            ],
         )
         self._view_menu.insertSeparator(a("view.command_palette"))
-        self._file_menu.insertAction(a("file.open"), a("table.new"))
+        before = self._sample_menu.menuAction()
+        self._file_menu.insertActions(before, [a("table.new"), a("table.rename")])
         self._file_menu.insertAction(a("file.close"), a("table.close"))
         self._ensure_main_toolbar()  # first in the row
         self.table_toolbar = build_table_toolbar(self, self.registry)
@@ -1019,11 +1045,12 @@ class MainWindow(QMainWindow):
         set_tooltips(self.registry, reasons)
 
     def _update_table_tab_actions(self, tab: DocumentTab | None, reasons: dict[str, str]) -> None:
-        """Enable New table, Close table and Next / Previous table, and say why when
-        they are not."""
+        """Enable New table, Rename table, Close table, Next / Previous table and Move
+        table left / right, and say why when they are not."""
         a = self.registry.action
-        a("table.new").setEnabled(tab is not None)
-        reasons["table.new"] = NO_PROJECT
+        for action_id in ("table.new", "table.rename"):
+            a(action_id).setEnabled(tab is not None)
+            reasons[action_id] = NO_PROJECT
         tables = tab.document.tables if tab is not None else []
         selected = tab.current_table_id if tab is not None else None
         # -1 while the selected table is being removed (before the tab selects another)
@@ -1032,6 +1059,8 @@ class MainWindow(QMainWindow):
             "table.close": (len(tables) > 1, LAST_TABLE),
             "table.next": (0 <= index < len(tables) - 1, LAST_TABLE_SELECTED),
             "table.previous": (index > 0, FIRST_TABLE_SELECTED),
+            "table.move_table_left": (index > 0, FIRST_TABLE_SELECTED),
+            "table.move_table_right": (0 <= index < len(tables) - 1, LAST_TABLE_SELECTED),
         }
         for action_id, (enabled, reason) in states.items():
             action = a(action_id)

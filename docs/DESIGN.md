@@ -193,7 +193,7 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   | Ctrl+Shift+A | Analyze |
   | Ctrl+Shift+F | Format graph |
   | Ctrl+Shift+X | Export graph |
-  | — | Rename column, Constants, Edit analysis, Delete analysis, Close table, Change graph type, Delete graph, the samples under File › New from sample (menu and palette only) |
+  | — | Rename column, Constants, Edit analysis, Delete analysis, Rename table, Move table left / right, Close table, Change graph type, Delete graph, the samples under File › New from sample (menu and palette only) |
 
   A new shortcut must not clash with these or with platform standard keys.
 - **Accessible names**: every control has a buddy label, visible text or `setAccessibleName`.
