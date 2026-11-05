@@ -15,6 +15,7 @@ from curvis.charts.spec import (
     ChartFamily,
     ChartVariant,
     ErrorBars,
+    LabelAngle,
     LineStyle,
     Scale,
     Symbol,
@@ -401,3 +402,45 @@ def test_a_failed_export_says_why(tab: DocumentTab, qtbot: QtBot, tmp_path: Path
     tab.start_export(graph_id, target, ExportFormat.PNG, 300)
     qtbot.waitUntil(lambda: any(m.startswith("Could not export") for m in messages), timeout=30_000)
     assert not target.exists()
+
+
+def test_label_angle_of_the_x_axis(qtbot: QtBot, context: Context) -> None:
+    dialog, _doc = open_dialog(qtbot, context, "bar")
+    dialog.set_section(AXES)
+    assert dialog.label_angle.isEnabled()
+    assert dialog.label_angle.currentText() == "Auto"
+    dialog.label_angle.setCurrentIndex(dialog.label_angle.findData(LabelAngle.ANGLED.value))
+    dialog.label_angle.activated.emit(dialog.label_angle.currentIndex())
+    assert dialog.spec.x_axis.label_angle is LabelAngle.ANGLED
+    assert dialog.preview.layout_ is not None and dialog.preview.layout_.x.label_angle == 45.0
+    dialog.axes_list.setCurrentRow(1)
+    assert not dialog.label_angle.isEnabled()
+    assert "always horizontal" in dialog.axis_note.text()
+
+
+def test_a_fitted_curve_can_be_removed(qtbot: QtBot, context: Context) -> None:
+    from curvis.analysis.base import Analysis
+    from curvis.analysis.fit.analyses import Hill4Params
+    from curvis.charts.builder import with_fit
+    from curvis.core import add_analysis, edit_graph
+
+    doc, graph_id = graph_document("xy")
+    table = doc.table("t")
+    fit = Analysis("hill_4pl", "t", tuple(g.id for g in table.replicate_groups), Hill4Params())
+    doc.execute(add_analysis(doc, fit))
+    doc.execute(edit_graph(doc, with_fit(doc.graph(graph_id), fit)))
+    dialog = FormatDialog(doc, graph_id, scheduler=context.scheduler)
+    qtbot.addWidget(dialog)
+    dialog.set_section(SERIES)
+    series = len(dialog.spec.series)
+    item = dialog.series_list.item(series)
+    assert item.text().startswith("Fitted curve: ")
+    dialog.series_list.clearSelection()
+    item.setSelected(True)
+    assert dialog.selected_fits() == [fit.id]
+    assert dialog.selection_note.text() == "1 fitted curve selected."
+    assert dialog.remove_button.isEnabled()
+    dialog.remove_button.click()
+    assert dialog.spec.overlays == ()
+    assert len(dialog.spec.series) == series
+    assert dialog.series_list.count() == series

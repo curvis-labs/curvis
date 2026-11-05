@@ -66,6 +66,8 @@ from curvis.charts.spec import (
     ChartSpec,
     ChartVariant,
     ErrorBars,
+    FitOverlay,
+    LabelAngle,
     LineStyle,
     Scale,
     SeriesSpec,
@@ -95,7 +97,8 @@ SECTIONS = ("Graph", "Axes", "Series", "Colors and text")
 DESCRIPTIONS = (
     "The title, size and legend of the graph.",
     "Titles, ranges, labels and scales of the axes.",
-    "Symbols, lines, colors and error bars. Select several series to change them together.",
+    "Symbols, lines, colors, error bars and fitted curves. Select several series to change "
+    "them together.",
     "The color scheme and the size of the graph's text.",
 )
 MIXED = "Mixed"
@@ -118,6 +121,10 @@ CATEGORY_NOTE = "Bar and box graphs use only the color, error bars and legend of
 BOX_NOTE = "Box plots use only the color and legend of a series."
 CATEGORY_AXIS_NOTE = "The X axis of a bar or box graph shows the series by name."
 BAR_LOG_NOTE = "Bars start at 0, which a log axis cannot show."
+Y_ANGLE_NOTE = "Y axis labels are always horizontal."
+FIT_PREFIX = "fit:"
+"""Item data of a fitted curve in the series list: the prefix and the analysis id."""
+FIT_NOTE = "A fitted curve is drawn in the color of its series. Remove takes it off the graph."
 EVERY_SERIES_SHOWN = "Every series of the table is in the graph."
 LAST_SERIES = "A graph needs at least one series."
 PREVIEW_NODE = "format-preview"
@@ -379,6 +386,12 @@ class FormatDialog(QDialog):
         form.addRow(buddy_label("&From", self.axis_from), range_row)
         self.axis_labels = QCheckBox("Show la&bels")
         form.addRow("", self.axis_labels)
+        self.label_angle = QComboBox()
+        self.label_angle.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        for angle in LabelAngle:
+            self.label_angle.addItem(angle.label, angle.value)
+        self.label_angle.setToolTip("Auto turns the labels when they do not fit side by side")
+        form.addRow(buddy_label("Label a&ngle", self.label_angle), self.label_angle)
         scale_row = QHBoxLayout()
         self.linear = QRadioButton("L&inear")
         self.log = QRadioButton("Lo&g")
@@ -396,6 +409,7 @@ class FormatDialog(QDialog):
         self.axis_from.textEdited.connect(lambda _t: self._edit_axis())
         self.axis_to.textEdited.connect(lambda _t: self._edit_axis())
         self.axis_labels.toggled.connect(lambda _on: self._edit_axis())
+        self.label_angle.activated.connect(lambda _i: self._edit_axis())
         self.linear.toggled.connect(lambda _on: self._edit_axis())
         return page
 
@@ -547,6 +561,7 @@ class FormatDialog(QDialog):
                 self.axis_from,
                 self.axis_to,
                 self.axis_labels,
+                self.label_angle,
                 self.linear,
                 self.log,
             ]
@@ -606,6 +621,10 @@ class FormatDialog(QDialog):
                 edit.setText(_format_limit(value))
         with QSignalBlocker(self.axis_labels):
             self.axis_labels.setChecked(axis.show_labels)
+        with QSignalBlocker(self.label_angle):
+            self.label_angle.setCurrentIndex(
+                max(0, self.label_angle.findData(axis.label_angle.value))
+            )
         for button, checked in (
             (self.linear, axis.scale is Scale.LINEAR),
             (self.log, axis.scale is Scale.LOG),
@@ -622,7 +641,11 @@ class FormatDialog(QDialog):
         for widget in (self.axis_from, self.axis_to, self.linear, self.log):
             widget.setEnabled(not categorical_x)
         self.log.setEnabled(not (categorical_x or bars_y))
-        note = CATEGORY_AXIS_NOTE if categorical_x else BAR_LOG_NOTE if bars_y else ""
+        self.label_angle.setEnabled(key == "x_axis")
+        notes = [CATEGORY_AXIS_NOTE if categorical_x else BAR_LOG_NOTE if bars_y else ""]
+        if key == "y_axis":
+            notes.append(Y_ANGLE_NOTE)
+        note = " ".join(n for n in notes if n)
         self.axis_note.setText(note)
         self.axis_note.setVisible(bool(note))
 
@@ -635,10 +658,27 @@ class FormatDialog(QDialog):
                 item.setData(Qt.ItemDataRole.UserRole, s.source)
                 self.series_list.addItem(item)
                 item.setSelected(s.source in keep)
+            for overlay in self.spec.overlays:
+                key = FIT_PREFIX + overlay.analysis_id
+                item = QListWidgetItem(f"Fitted curve: {self._fit_name(overlay)}")
+                item.setData(Qt.ItemDataRole.UserRole, key)
+                self.series_list.addItem(item)
+                item.setSelected(key in keep)
             if not self.series_list.selectedItems() and self.series_list.count():
                 self.series_list.item(0).setSelected(True)
                 self.series_list.setCurrentRow(0)
         self._load_series_options()
+
+    def _fit_name(self, overlay: FitOverlay) -> str:
+        try:
+            return self.document.analysis(overlay.analysis_id).analysis_type.name
+        except KeyError:
+            return "analysis no longer in the project"
+
+    def selected_fits(self) -> list[str]:
+        """Analysis ids of the selected fitted curves, in the graph's order."""
+        chosen = {item.data(Qt.ItemDataRole.UserRole) for item in self.series_list.selectedItems()}
+        return [o.analysis_id for o in self.spec.overlays if FIT_PREFIX + o.analysis_id in chosen]
 
     def selected_sources(self) -> list[str]:
         """Sources of the selected series, in the graph's order."""
@@ -659,7 +699,13 @@ class FormatDialog(QDialog):
     def _load_series_options(self) -> None:
         styles = self._selected_styles()
         n = len(styles)
-        self.selection_note.setText("No series selected." if n == 0 else f"{n} series selected.")
+        fits = len(self.selected_fits())
+        parts = [
+            f"{n} series" if n else "",
+            f"{fits} fitted curve{'s' if fits > 1 else ''}" if fits else "",
+        ]
+        picked = " and ".join(p for p in parts if p)
+        self.selection_note.setText(f"{picked} selected." if picked else "No series selected.")
         widgets: list[QWidget] = [
             self.in_legend,
             self.symbol,
@@ -673,6 +719,8 @@ class FormatDialog(QDialog):
             widget.setEnabled(n > 0)
         self._update_series_buttons()
         if not styles:
+            self.series_note.setText(FIT_NOTE if fits else "")
+            self.series_note.setVisible(bool(fits))
             return
 
         def common(get: Callable[[SeriesSpec], Any]) -> tuple[Any, bool]:
@@ -753,7 +801,8 @@ class FormatDialog(QDialog):
         missing = self._missing_sources()
         self.add_button.setEnabled(bool(missing))
         self.add_button.setToolTip("" if missing else EVERY_SERIES_SHOWN)
-        removable = bool(selected) and len(selected) < len(order)
+        fits = self.selected_fits()
+        removable = bool(fits) or (bool(selected) and len(selected) < len(order))
         self.remove_button.setEnabled(removable)
         self.remove_button.setToolTip("" if removable or not selected else LAST_SERIES)
         indexes = [order.index(s) for s in selected]
@@ -819,6 +868,7 @@ class FormatDialog(QDialog):
             maximum=maximum,
             show_labels=self.axis_labels.isChecked(),
             scale=scale,
+            label_angle=LabelAngle(str(self.label_angle.currentData())),
         )
         if key == "x_axis":
             self._apply(replace(self.spec, x_axis=new))
@@ -914,11 +964,18 @@ class FormatDialog(QDialog):
         self._fill_series_list([source])
 
     def remove_selected(self) -> None:
+        """Remove the selected series (a graph keeps at least one) and fitted curves."""
         chosen = set(self.selected_sources())
+        fits = set(self.selected_fits())
         kept = tuple(s for s in self.spec.series if s.source not in chosen)
-        if not chosen or not kept:
+        if not kept:
+            if not fits:
+                return
+            kept, chosen = self.spec.series, set()
+        if not chosen and not fits:
             return
-        self._apply(replace(self.spec, series=kept))
+        overlays = tuple(o for o in self.spec.overlays if o.analysis_id not in fits)
+        self._apply(replace(self.spec, series=kept, overlays=overlays))
         self._fill_series_list([kept[0].source])
 
     def move_selected(self, by: int) -> None:
