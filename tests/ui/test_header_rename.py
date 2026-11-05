@@ -188,7 +188,7 @@ def test_rename_column_action_edits_the_current_column(
 ) -> None:
     action = window.registry.action("table.rename_column")
     assert action.text() == "Re&name column"  # opens no dialog: no ellipsis
-    assert action.shortcut() == QKeySequence("Ctrl+Shift+R")
+    assert action.shortcut().isEmpty()  # Ctrl+Shift+R is Bulk rename
     view.setCurrentIndex(view.model().index(0, 2))
     action.trigger()
     field = editor(view)
@@ -274,3 +274,17 @@ def test_band_esc_and_invalid_name(
     )
     type_name(qtbot, field, "x", Qt.Key.Key_Escape)
     assert band_names(tab) == ["Control", "Drug"] and tab.document.undo_stack.count == 0
+
+
+def test_ctrl_shift_r_opens_bulk_rename(
+    view: TableView, window: MainWindow, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    action = window.registry.action("table.bulk_rename")
+    assert action.shortcut() == QKeySequence("Ctrl+Shift+R")
+    opened: list[str] = []
+    monkeypatch.setattr(
+        TableView, "_exec_dialog", lambda self, dialog: opened.append(dialog.windowTitle())
+    )
+    action.trigger()
+    assert opened == ["Bulk rename"]
+    assert view.grouped_header.editor is None  # no field opened in the header

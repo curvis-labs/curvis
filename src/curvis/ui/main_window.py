@@ -299,7 +299,6 @@ class MainWindow(QMainWindow):
             "Re&name column",
             self._table_call(TableView.rename_current_column),
             category="Table",
-            shortcut="Ctrl+Shift+R",
         )
         r.register(
             "table.delete_columns",
@@ -366,6 +365,7 @@ class MainWindow(QMainWindow):
             "&Bulk rename…",
             self._table_call(TableView.bulk_rename),
             category="Table",
+            shortcut="Ctrl+Shift+R",
         )
         r.register(
             "table.calculate",

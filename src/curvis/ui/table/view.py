@@ -9,7 +9,7 @@
 - Right-clicking a column header adds, deletes and renames columns, sets their role,
   groups them as replicates or into categories, and opens bulk rename.
 - Column, group and category names are renamed in place in the header (double-click or
-  Ctrl+Shift+R); Tab and Shift+Tab move to the next and previous name.
+  Rename column); Tab and Shift+Tab move to the next and previous name.
 - Groups are shown above their columns; columns and groups move by drag and drop
   (see :mod:`curvis.ui.table.header`).
 
