@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curvis graph panel</title>
+<!--
+  Mockup of the Graph panel toolbar (step 2.8, DESIGN.md section 7). Drawn at 1:1 with the
+  theme palette; the icons are the SVG files in src/curvis/ui/icons/toolbar/.
+-->
+<style>
+  :root, :root[data-theme="light"] {
+    --window: #f4f6f8; --text: #1d3557; --base: #ffffff; --altbase: #e0f2f1;
+    --secondary: #667085; --link: #007a7a; --highlight: #007a7a; --hl-text: #ffffff;
+    --button: #e9edf2; --border: #c3cad4; --grid: #cdd3da; --disabled: #9aa3b0;
+    --tip-bg: #1d3557; --tip-text: #f4f6f8; --canvas: #d5dbe3; --note: #1d3557; --mark: #e8590c;
+    --hover: rgba(29, 53, 87, .14); --press: rgba(29, 53, 87, .25);
+  }
+  :root[data-theme="dark"] {
+    --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+    --secondary: #9aa8bc; --link: #00a6a6; --highlight: #00a6a6; --hl-text: #0f1f33;
+    --button: #1d3557; --border: #2e4a70; --grid: #3e4c5d; --disabled: #5e7491;
+    --tip-bg: #1d3557; --tip-text: #f4f6f8; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+    --hover: rgba(244, 246, 248, .14); --press: rgba(244, 246, 248, .25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+      --secondary: #9aa8bc; --link: #00a6a6; --highlight: #00a6a6; --hl-text: #0f1f33;
+      --button: #1d3557; --border: #2e4a70; --grid: #3e4c5d; --disabled: #5e7491;
+      --tip-bg: #1d3557; --tip-text: #f4f6f8; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+      --hover: rgba(244, 246, 248, .14); --press: rgba(244, 246, 248, .25);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--note);
+         font: 13px/1.4 system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  header.page { padding: 20px 24px 8px 40px; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header.page h1 { font-size: 20px; margin: 0; }
+  header.page p { margin: 0; flex: 1 1 320px; }
+  .switch button { font: inherit; padding: 4px 12px; border: 1px solid var(--border);
+                   background: var(--button); color: var(--text); border-radius: 3px; cursor: pointer; }
+  .switch button[aria-pressed="true"] { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  section.board { padding: 16px 24px 32px 40px; overflow-x: auto; }
+  section.board > h2 { font-size: 16px; margin: 8px 0 12px; }
+  .row { display: flex; gap: 24px; align-items: flex-start; }
+  .notes { width: 320px; flex: none; }
+  .notes ol { margin: 0; padding-left: 22px; } .notes li { margin-bottom: 6px; }
+  .notes li::marker { color: var(--mark); font-weight: 700; }
+
+  .win { flex: none; background: var(--window); color: var(--text); border: 1px solid var(--border);
+         box-shadow: 0 8px 28px rgba(0,0,0,.28); position: relative; }
+  .titlebar { height: 30px; display: flex; align-items: center; justify-content: center;
+              border-bottom: 1px solid var(--border); font-weight: 600; }
+  .menubar { display: flex; gap: 16px; padding: 4px 10px; }
+  u { text-underline-offset: 2px; }
+  .toolbars { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--border);
+              white-space: nowrap; overflow: hidden; }
+  .tb { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 5px; border-radius: 3px;
+        color: var(--text); flex: none; }
+  .tb.icon { width: 28px; justify-content: center; padding: 0; }
+  .tb.hover { background: var(--hover); }
+  .tb.press { background: var(--press); }
+  .tb.dis { color: var(--disabled); }
+  .tb svg { width: 20px; height: 20px; flex: none; }
+  svg .a { stroke: var(--link); }
+  .dis svg .a { stroke: var(--disabled); }
+  .menu .hl svg .a { stroke: currentColor; }
+  .tb .arrow { margin-left: -2px; font-size: 10px; color: var(--secondary); }
+  .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex: none; }
+  .gap { width: 12px; flex: none; }
+  .tabs { display: flex; padding: 4px 8px 0; gap: 2px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 4px 10px; border: 1px solid var(--border); border-bottom: none; border-radius: 3px 3px 0 0;
+         background: var(--button); display: flex; gap: 8px; align-items: center; }
+  .tab.on { background: var(--window); position: relative; top: 1px; }
+  .tab .x { color: var(--secondary); font-size: 12px; }
+  .grid { background: var(--base); overflow: hidden; }
+  .grid table { border-collapse: collapse; }
+  .grid th { background: var(--button); border: 1px solid var(--border); font-weight: 400; padding: 2px 8px; min-width: 90px; }
+  .grid th.rh { min-width: 24px; text-align: left; }
+  .grid th small { display: block; }
+  .grid td { border: 1px solid var(--grid); padding: 2px 8px; text-align: right; min-width: 90px; height: 23px; }
+  .grid td.calc { background: var(--altbase); }
+  .grid tr.sel td.c { background: var(--highlight); color: var(--hl-text); }
+  .tip { position: absolute; background: var(--tip-bg); color: var(--tip-text); padding: 3px 8px; border-radius: 3px;
+         font-size: 12px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.3); z-index: 3; }
+  .menu { position: absolute; background: var(--base); border: 1px solid var(--border); border-radius: 3px;
+          box-shadow: 0 6px 18px rgba(0,0,0,.3); padding: 4px 0; z-index: 3; min-width: 200px; }
+  .menu div { padding: 4px 12px 4px 10px; display: flex; gap: 8px; align-items: center; }
+  .menu div.hl { background: var(--highlight); color: var(--hl-text); }
+  .menu div.dis { color: var(--disabled); }
+  .menu svg { width: 20px; height: 20px; }
+  .menu small { margin-left: auto; color: var(--secondary); padding-left: 16px; }
+  .m { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--mark); color: #fff;
+       font: 700 11px/18px system-ui, sans-serif; text-align: center; z-index: 4; box-shadow: 0 0 0 2px var(--window); }
+  .sheet { display: grid; grid-template-columns: repeat(6, 150px); gap: 4px; }
+  .sheet .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px; }
+  .sheet .big svg { width: 40px; height: 40px; }
+  .sheet .label { font-size: 12px; text-align: center; }
+</style>
+
+<style>
+  .panel { width: 460px; background: var(--window); display: flex; flex-direction: column; }
+  .ph { display: flex; align-items: center; gap: 8px; padding: 8px; }
+  .ph b { font-weight: 600; }
+  .combo { flex: 1; min-width: 0; background: var(--button); border: 1px solid var(--border); border-radius: 3px; padding: 3px 8px;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .combo::after { content: " ▾"; float: right; color: var(--secondary); }
+  .combo.dis { color: var(--disabled); }
+  .icons { display: flex; gap: 4px; }
+  .page { margin: 0 8px; background: var(--window); flex: 1; display: flex; align-items: center; justify-content: center; }
+  .page svg { background: #fff; }
+  .empty { color: var(--secondary); text-align: center; flex: 1; display: flex; align-items: center; justify-content: center; }
+  .menu .check { width: 12px; }
+  .menu small { white-space: nowrap; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Graph panel toolbar</h1>
+  <p>The four graph actions in the Graph panel's header, following <code>docs/DESIGN.md</code> section 7. Orange numbers point to the notes.</p>
+  <div class="switch" role="group" aria-label="Theme">
+    <button type="button" data-set="light">Light</button>
+    <button type="button" data-set="dark">Dark</button>
+  </div>
+</header>
+
+<section class="board">
+  <h2>1 · Graph panel, 460 px wide (Format graph hovered)</h2>
+  <div class="row">
+    <div class="win panel" style="height:400px">
+      <span class="m" style="left:-26px;top:14px">1</span>
+      <div class="ph"><b>Graph</b><span class="combo">XY graph · Dose response</span>
+        <span class="icons"><span class="tb icon "><i data-icon="graph_type"></i></span><span class="tb icon hover"><i data-icon="format_graph"></i></span><span class="tb icon "><i data-icon="delete_graph"></i></span><span class="tb icon "><i data-icon="export_graph"></i></span></span></div>
+      <div class="tip" style="left:330px;top:44px">Format graph (Ctrl+Shift+F)</div>
+      <div class="page"><svg width="444" height="296" viewBox="0 0 444 296" role="img" aria-label="Graph">
+ <g font-family="DejaVu Sans, sans-serif" font-size="13" fill="#1a1a1a">
+  <text x="190" y="22" text-anchor="middle" font-size="15">Dose response</text>
+  <text x="190" y="288" text-anchor="middle">Dose (µM)</text>
+  <text x="16" y="150" transform="rotate(-90 16 150)" text-anchor="middle">Response (%)</text>
+  <text x="58" y="262" text-anchor="middle">0.01</text><text x="128" y="262" text-anchor="middle">0.1</text>
+  <text x="198" y="262" text-anchor="middle">1</text><text x="268" y="262" text-anchor="middle">10</text>
+  <text x="50" y="246" text-anchor="end">0</text><text x="50" y="146" text-anchor="end">50</text><text x="50" y="46" text-anchor="end">100</text>
+  <text x="352" y="48">Control</text><text x="352" y="68">Drug</text>
+ </g>
+ <g stroke="#1a1a1a" fill="none"><path d="M56 36v206h264"/><path d="M52 242h4M52 142h4M52 42h4M58 242v4M128 242v4M198 242v4M268 242v4"/></g>
+ <g fill="#1d3557"><circle cx="70" cy="232" r="4"/><circle cx="110" cy="230" r="4"/><circle cx="150" cy="226" r="4"/><circle cx="190" cy="220" r="4"/><circle cx="230" cy="216" r="4"/><circle cx="270" cy="214" r="4"/><circle cx="340" cy="44" r="4"/></g>
+ <g fill="#00a6a6"><rect x="66" y="210" width="8" height="8"/><rect x="106" y="196" width="8" height="8"/><rect x="146" y="160" width="8" height="8"/><rect x="186" y="104" width="8" height="8"/><rect x="226" y="66" width="8" height="8"/><rect x="266" y="56" width="8" height="8"/><rect x="336" y="60" width="8" height="8"/></g>
+ <path fill="none" stroke="#00a6a6" stroke-width="2" d="M60 216C120 210 150 180 190 120S250 62 300 58"/>
+</svg></div>
+      <div style="height:40px"></div>
+    </div>
+    <div class="notes"><ol>
+      <li><b>Where:</b> at the right of the panel header, after the graph list. Icons only, like the main toolbar: 28 px buttons, 4 px apart, no text. The graph list takes the rest of the width.</li>
+      <li><b>Order:</b> Change graph type, Format graph, Delete graph, Export graph. Each is the registered action (Graph menu and command palette too); the tooltip gives name and shortcut.</li>
+      <li><b>Shortcuts:</b> Format graph Ctrl+Shift+F, Export graph Ctrl+Shift+X (reserved in §6). Change graph type and Delete graph: menu and palette only.</li>
+      <li><b>The graph</b> is the export page zoomed to fit (here Wide, 9 × 6 cm): text, symbols and lines scale with the panel. Double-click opens Format graph.</li>
+    </ol></div>
+  </div>
+</section>
+
+<section class="board">
+  <h2>2 · Change graph type opens a menu</h2>
+  <div class="row">
+    <div class="win panel" style="height:260px">
+      <div class="ph"><b>Graph</b><span class="combo">Bar graph · Viability</span>
+        <span class="icons"><span class="tb icon press"><i data-icon="graph_type"></i></span><span class="tb icon "><i data-icon="format_graph"></i></span><span class="tb icon "><i data-icon="delete_graph"></i></span><span class="tb icon "><i data-icon="export_graph"></i></span></span></div>
+      <div class="menu" style="left:96px;top:40px;min-width:350px">
+        <div class="dis"><span class="check"></span><i data-icon="xy"></i>Scatter<small>Needs an X column with values</small></div>
+        <div class="dis"><span class="check"></span><i data-icon="plot"></i>Line<small>Needs an X column with values</small></div>
+        <div><span class="check">✓</span><i data-icon="bar"></i>Bar</div>
+        <div class="hl"><span class="check"></span><i data-icon="box"></i>Box</div>
+      </div>
+    </div>
+    <div class="notes"><ol start="5">
+      <li><b>The menu</b> lists Scatter, Line, Bar and Box with a check at the current type. A type the table cannot draw is disabled with its reason, as in the Plot menu.</li>
+      <li><b>Switching</b> keeps the series, their colours and styles, the title and size; it is one undo step (“Change graph type to Box”).</li>
+    </ol></div>
+  </div>
+</section>
+
+<section class="board">
+  <h2>3 · No graph yet: the buttons are disabled and say why</h2>
+  <div class="row">
+    <div class="win panel" style="height:200px">
+      <div class="ph"><b>Graph</b><span class="combo dis"></span>
+        <span class="icons"><span class="tb icon dis"><i data-icon="graph_type"></i></span><span class="tb icon dis"><i data-icon="format_graph"></i></span><span class="tb icon dis"><i data-icon="delete_graph"></i></span><span class="tb icon dis"><i data-icon="export_graph"></i></span></span></div>
+      <div class="tip" style="left:180px;top:44px">Export graph: There is no graph to export</div>
+      <div class="empty">No graphs yet.<br>Click Plot to draw this table.</div>
+    </div>
+    <div class="notes"><ol start="7"><li>Disabled icons use the disabled text colour for both tones; the tooltip names the reason (“There is no graph to format”).</li></ol></div>
+  </div>
+</section>
+
+<section class="board">
+  <h2>4 · The icons (normal, disabled, 2×)</h2>
+  <div class="win" style="padding:12px"><div class="sheet" id="sheet" style="grid-template-columns:repeat(4,150px)"></div></div>
+</section>
+
+<script>
+  var ICONS = {
+    "graph_type": "<path d=\"M3.25 3.25v13.5h13.5\"/> <path class=\"a\" d=\"M7 13.25v-3M10 13.25v-5.5\"/> <path class=\"a\" d=\"M12.25 9.5a3 3 0 1 0 1-4.25M13.25 3.5v1.75h-1.75\"/>",
+    "format_graph": "<path d=\"M3.25 5.5h6M13.75 5.5h3M3.25 10h1.5M9.25 10h7.5M3.25 14.5h7M15 14.5h1.75\"/> <circle class=\"a\" cx=\"11.5\" cy=\"5.5\" r=\"1.5\"/> <circle class=\"a\" cx=\"7\" cy=\"10\" r=\"1.5\"/> <circle class=\"a\" cx=\"12.75\" cy=\"14.5\" r=\"1.5\"/>",
+    "delete_graph": "<path d=\"M5 7.25l.75 9.5h8.5l.75-9.5M8.5 9.75v4.5M11.5 9.75v4.5\"/> <path class=\"a\" d=\"M3.75 4.75h12.5M8 4.75v-1.5h4v1.5\"/>",
+    "export_graph": "<path d=\"M12.5 7.5V6.25L9.25 3H4.25v14h8.25v-2.5M9.25 3v3.25h3.25\"/> <path class=\"a\" d=\"M8.5 11h8.25M14.25 8.5l2.5 2.5-2.5 2.5\"/>",
+    "xy": "<path d=\"M3.25 3.25v13.5h13.5\"/><circle class=\"a\" cx=\"7\" cy=\"12.5\" r=\"1.25\"/><circle class=\"a\" cx=\"10.5\" cy=\"9\" r=\"1.25\"/><circle class=\"a\" cx=\"14\" cy=\"6\" r=\"1.25\"/>",
+    "plot": "<path d=\"M3.25 3.25v13.5h13.5\"/><path class=\"a\" d=\"M6 13.25 9 9.5l2.5 2 4.25-6\"/>",
+    "bar": "<path d=\"M3.25 16.75h13.5\"/><rect class=\"a\" x=\"4.75\" y=\"9.75\" width=\"3\" height=\"5\" rx=\".5\"/><rect class=\"a\" x=\"11.25\" y=\"5.75\" width=\"3\" height=\"9\" rx=\".5\"/>",
+    "box": "<path d=\"M3.25 16.75h13.5\"/><path class=\"a\" d=\"M6.25 3.5v2.75M6.25 12.5v2.25M13.75 5.5v2M13.75 12v2.75\"/><rect class=\"a\" x=\"4.5\" y=\"6.25\" width=\"3.5\" height=\"6.25\" rx=\".5\"/><rect class=\"a\" x=\"12\" y=\"7.5\" width=\"3.5\" height=\"4.5\" rx=\".5\"/>"
+  };
+  function svg(name) {
+    return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + '</svg>';
+  }
+  document.querySelectorAll("i[data-icon]").forEach(function (el) { el.outerHTML = svg(el.dataset.icon); });
+  var names = [["graph_type","Change graph type"],["format_graph","Format graph"],["delete_graph","Delete graph"],["export_graph","Export graph"]];
+  var sheet = document.getElementById("sheet");
+  names.forEach(function (n) {
+    sheet.insertAdjacentHTML("beforeend",
+      '<div class="cell"><div style="display:flex;gap:10px"><span class="tb icon">' + svg(n[0]) + '</span><span class="tb icon dis">' + svg(n[0]) +
+      '</span></div><span class="big tb">' + svg(n[0]) + '</span><span class="label">' + n[1] + '</span></div>');
+  });
+  (function () {
+    var root = document.documentElement, buttons = document.querySelectorAll(".switch button");
+    function show(theme) {
+      root.setAttribute("data-theme", theme);
+      buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.set === theme)); });
+      try { localStorage.setItem("curvis-mockup-theme", theme); } catch (e) {}
+    }
+    var start = null;
+    try { start = localStorage.getItem("curvis-mockup-theme"); } catch (e) {}
+    if (!start) start = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    buttons.forEach(function (b) { b.addEventListener("click", function () { show(b.dataset.set); }); });
+    show(start);
+  })();
+</script>
+</body>
+</html>
