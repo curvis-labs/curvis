@@ -409,9 +409,9 @@ Make a plan first. When done, report what you built and the redraw benchmark.
 ### Step 2.6 — Launcher redesign
 
 **Done when**
-- [ ] The launcher matches the approved mockup (docs/mockups/launcher.html) in the light and the dark theme.
-- [ ] Recent projects can be opened with one click or Enter and removed from the list with the right-click menu; a missing file shows "File not found".
-- [ ] Cold start to launcher stays under 1.5 s.
+- [x] The launcher matches the approved mockup (docs/mockups/launcher.html) in the light and the dark theme.
+- [x] Recent projects can be opened with one click or Enter and removed from the list with the right-click menu; a missing file shows "File not found".
+- [x] Cold start to launcher stays under 1.5 s.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 2.6 in docs/PHASES.md.
