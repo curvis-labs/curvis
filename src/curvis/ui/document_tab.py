@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
+from weakref import WeakKeyDictionary
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QDialog, QLabel, QSplitter, QTabWidget, QVBoxLayout, QWidget
@@ -53,7 +54,8 @@ class DocumentTab(QWidget):
     The table tabs along the bottom select the table. The table view, the Results and
     the Graph panel and every table action follow the selected table. Commands keep the
     selection; when the selected table is removed its neighbour is selected, and a table
-    that is added (or brought back by undo) is selected.
+    that is added (or brought back by undo) is selected. Undoing an added table goes back
+    to the table that was selected before it.
 
     ``message`` sends short notes for the status bar, such as why an edit was refused.
     With a ``scheduler``, the tab keeps the document's calculated columns and analyses up
@@ -132,6 +134,8 @@ class DocumentTab(QWidget):
         self._table_id: str | None = None
         self._table_index = 0
         self._side_width = RESULTS_PANEL_WIDTH
+        # command that added a table -> the table selected before it (for its undo)
+        self._selected_before: WeakKeyDictionary[Command, str | None] = WeakKeyDictionary()
         self._show_table(document.tables[0].id if document.tables else None)
         self._unsubscribe = document.undo_stack.subscribe(self._on_undo_event)
         self.destroyed.connect(lambda *_: self._unsubscribe())
@@ -492,7 +496,13 @@ class DocumentTab(QWidget):
 
     def _on_undo_event(self, event: UndoEvent) -> None:
         ids = [t.id for t in self.document.tables]
+        command = event.command
         wanted = _table_to_select(event)
+        if command is not None and event.kind in ("do", "redo") and wanted is not None:
+            # a table was added: undo goes back to the table selected before it
+            self._selected_before[command] = self._table_id
+        elif command is not None and event.kind == "undo":
+            wanted = wanted or self._selected_before.get(command)
         if wanted is None or wanted not in ids:
             wanted = self._table_id
         if wanted not in ids:

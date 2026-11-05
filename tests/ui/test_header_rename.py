@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from PySide6.QtCore import QPoint, Qt
+from PySide6.QtCore import QPoint, Qt, QTimer
 from PySide6.QtGui import QFocusEvent, QKeySequence
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QInputDialog, QMenu
 from pytestqt.qtbot import QtBot
 
 from curvis.core import Document, GroupColumns
@@ -193,6 +193,35 @@ def test_rename_column_action_edits_the_current_column(
     action.trigger()
     field = editor(view)
     assert field.text() == "Control 2"
+    type_name(qtbot, field, "Vehicle", Qt.Key.Key_Return)
+    assert names(tab)[2] == "Vehicle"
+
+
+def test_rename_column_from_the_right_click_menu_opens_no_dialog(
+    qtbot: QtBot, view: TableView, tab: DocumentTab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Through the real popup menu: closing the menu must not close the field."""
+    asked: list[object] = []
+    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: asked.append(a) or ("", False))
+    view.window().activateWindow()
+    view.setFocus()
+    qtbot.waitUntil(view.hasFocus)
+    header = view.grouped_header
+    pos = QPoint(header.sectionViewportPosition(2) + 10, header.height() // 2)
+
+    def pick() -> None:
+        menu = QApplication.activePopupWidget()
+        assert isinstance(menu, QMenu)
+        action = next(a for a in menu.actions() if a.text() == "Re&name column")
+        menu.setActiveAction(action)
+        qtbot.keyClick(menu, Qt.Key.Key_Return)
+
+    QTimer.singleShot(100, pick)
+    view._show_header_menu(pos)
+    qtbot.waitUntil(lambda: header.editor is not None and header.editor.hasFocus())
+    qtbot.wait(50)
+    field = editor(view)
+    assert asked == [] and field.text() == "Control 2"
     type_name(qtbot, field, "Vehicle", Qt.Key.Key_Return)
     assert names(tab)[2] == "Vehicle"
 

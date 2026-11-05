@@ -104,10 +104,14 @@ def test_new_table_from_the_menu_the_plus_and_the_shortcut(
     assert shown(tab) == "Table 3"
     assert tab.document.undo_stack.undo_text == "Add table 'Table 3'"
     window.undo()
-    # the selected table went away: its neighbour (now in its place) is selected
-    assert names(tab) == ["Data 1", "Table 2"] and shown(tab) == "Table 2"
+    # back to the table that was selected when "Table 3" was added
+    assert names(tab) == ["Data 1", "Table 2"] and shown(tab) == "Data 1"
     window.redo()
     assert shown(tab) == "Table 3"
+    window.undo()
+    assert shown(tab) == "Data 1"
+    window.undo()  # "Table 2" was added while "Data 1" was selected
+    assert names(tab) == ["Data 1"] and shown(tab) == "Data 1"
 
 
 def test_file_menu_has_new_table_and_close_table(window: MainWindow) -> None:
