@@ -297,10 +297,11 @@ Mockup: `docs/mockups/launcher.html`.
 
 - **Layout.** One centred column, 760 px wide (narrower windows: the full width with the
   12 px margin). From the top: a row of tiles, then the *Recent projects* heading with the
-  *Open project…* button (Ctrl+O) at its right, then the recent list. No logo, version or
-  tagline; the window title already says Curvis.
+  *Open project…* button at its right, then the recent list. No logo, version or
+  tagline; the window title already says Curvis. The launcher shows **no key
+  combinations**: Ctrl+N and Ctrl+O work as everywhere, and the menus name them.
 - **Tiles.** 178 px wide: a framed picture 104 px high on `Base`, the name under it, and a
-  secondary line (*Ctrl+N* for Blank project, *Sample* for a sample). *Blank project* comes
+  secondary line (*Sample* for a sample; empty for Blank project). *Blank project* comes
   first and has the focus, so Enter starts a project. Sample tiles show a small picture of
   their graph drawn with `Link` and `PlaceholderText`. Hover and focus outline the picture in
   `Highlight`. Tiles that do not fit wrap to a second row.

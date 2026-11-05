@@ -152,6 +152,7 @@ class MainWindow(QMainWindow):
         self.launcher.new_requested.connect(self.new_document)
         self.launcher.open_requested.connect(self.open_document)
         self.launcher.recent_chosen.connect(self.open_path)
+        self.launcher.remove_requested.connect(self.settings.remove_recent_project)
         self.tabs.currentChanged.connect(self._on_current_tab_changed)
         self.tabs.tabCloseRequested.connect(self._on_tab_close_requested)
         self.settings.changed.connect(self._on_setting_changed)

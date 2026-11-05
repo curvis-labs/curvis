@@ -6,6 +6,8 @@ in the light and the dark theme.
 Each dialog is shown at its default size, with the sample data of
 tests/ui/dialog_samples.py. Files are named <dialog>-<theme>.png; the main window is
 main_window-<theme>.png, and the Results panel next to a table results_panel-<theme>.png.
+The launcher is launcher-<theme>.png (with recent projects, one of them missing),
+launcher_empty-<theme>.png (first start) and launcher_narrow-<theme>.png (a narrow window).
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -54,6 +57,49 @@ def main_window(settings: Settings, app: QApplication, path: Path) -> None:
         window._scheduler.shutdown()
     window.deleteLater()
     app.processEvents()
+
+
+RECENT = [
+    ("Lab/2026/Cell assays/Experiment 12.cvp", timedelta(hours=2)),
+    ("Lab/2026/Cell assays/Dose response HeLa.cvp", timedelta(days=1, hours=1)),
+    ("Lab/2026/Viability/Viability 24 h.cvp", timedelta(days=3)),
+    ("Shared/Group/Projects/2025/Survival/Mouse survival cohort B.cvp", timedelta(days=15)),
+]
+MISSING = "Desktop/Old study.cvp"
+
+
+def launcher(app: QApplication, out: Path, theme: str) -> None:
+    """The launcher with recent projects (one file missing), empty, and in a narrow window."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        store = QSettings(str(root / "launcher.ini"), QSettings.Format.IniFormat)
+        settings = Settings(store)
+        now = datetime.now(UTC)
+        settings.add_recent_project(root / MISSING, now - timedelta(days=40))
+        for relative, ago in reversed(RECENT):
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+            settings.add_recent_project(path, now - ago)
+        shots = [
+            ("launcher", 1000, 640),
+            ("launcher_narrow", 480, 640),
+            ("launcher_empty", 1000, 640),
+        ]
+        for name, width, height in shots:
+            if name == "launcher_empty":
+                settings.clear_recent_projects()
+            window = MainWindow(settings)
+            window.resize(width, height)
+            window.show()
+            for _ in range(5):
+                app.processEvents()
+            path = out / f"{name}-{theme}.png"
+            window.grab().save(str(path))
+            print(path, f"{window.width()}x{window.height()}")
+            window.close()
+            window.deleteLater()
+            app.processEvents()
 
 
 def results_panel(settings: Settings, app: QApplication, path: Path) -> None:
@@ -104,6 +150,7 @@ def main(out: Path) -> None:
                     dialog.done(0)
                     dialog.deleteLater()
                     app.processEvents()
+                launcher(app, out, theme.value)
                 main_window(ctx.settings, app, out / f"main_window-{theme.value}.png")
                 results_panel(ctx.settings, app, out / f"results_panel-{theme.value}.png")
         finally:

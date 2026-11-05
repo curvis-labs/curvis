@@ -34,7 +34,7 @@ def test_starts_on_launcher(window: MainWindow) -> None:
 
 
 def test_new_opens_a_tab_and_last_close_returns_to_launcher(window: MainWindow) -> None:
-    window.launcher.new_button.click()
+    window.launcher.blank_tile.click()
     assert window.tabs.count() == 1
     assert window.stack.currentWidget() is window.tabs
     assert window.tabs.tabText(0) == "Untitled"
@@ -157,8 +157,7 @@ def test_open_from_recent_list(
 ) -> None:
     path = saved_project(tmp_path)
     settings.add_recent_project(path)
-    item = window.launcher.recent_list.item(0)
-    window.launcher.recent_list.itemActivated.emit(item)
+    window.launcher.open_row(0)
     qtbot.waitUntil(lambda: window.tabs.count() == 1)
     assert window.current_tab is not None and window.current_tab.path == path
 
