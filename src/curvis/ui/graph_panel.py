@@ -12,20 +12,25 @@ pyqtgraph) is made when the first graph is shown, so opening a project stays qui
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
     QStackedWidget,
+    QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from curvis.core import Document
 from curvis.ui.dialogs import SPACING, secondary_label
+from curvis.ui.toolbar_icons import ICON_SIZE
 
 if TYPE_CHECKING:
     from curvis.charts.render_qt.chart_view import ChartView
@@ -40,6 +45,8 @@ class GraphPanel(QWidget):
 
     toggle_requested = Signal(str, str, bool)
     """(graph id, series source, visible): a legend entry was clicked."""
+    format_requested = Signal()
+    """The graph was double-clicked."""
     current_changed = Signal()
 
     def __init__(
@@ -72,9 +79,19 @@ class GraphPanel(QWidget):
         self.badge = secondary_label(RECALCULATING, self)
         self.badge.setWordWrap(False)
         self.badge.hide()
+        self.toolbar = QToolBar("Graph toolbar", self)
+        self.toolbar.setObjectName("graphToolbar")
+        self.toolbar.setMovable(False)
+        self.toolbar.setFloatable(False)
+        self.toolbar.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+        self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.toolbar.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
+        self.toolbar.setContentsMargins(0, 0, 0, 0)
+        self.toolbar.hide()  # until the window gives it its actions
         header.addWidget(title)
         header.addWidget(self.combo, 1)
         header.addWidget(self.badge)
+        header.addWidget(self.toolbar)
         layout.addLayout(header)
 
         self.stack = QStackedWidget(self)
@@ -93,6 +110,18 @@ class GraphPanel(QWidget):
         self.refresh_list()
 
     # --- public ------------------------------------------------------------------------
+
+    def set_toolbar_actions(self, actions: Sequence[QAction]) -> None:
+        """Show ``actions`` (registered actions with icons) as the panel's toolbar
+        (docs/DESIGN.md §7, docs/mockups/graph-panel.html)."""
+        self.toolbar.clear()
+        for action in actions:
+            self.toolbar.addAction(action)
+            if action.menu() is not None:
+                button = self.toolbar.widgetForAction(action)
+                if isinstance(button, QToolButton):
+                    button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.toolbar.setVisible(bool(actions))
 
     @property
     def current_id(self) -> str | None:
@@ -146,6 +175,7 @@ class GraphPanel(QWidget):
 
             self.chart = ChartView(self.stack)
             self.chart.series_toggled.connect(self._on_series_toggled)
+            self.chart.double_clicked.connect(self.format_requested)
             self.stack.addWidget(self.chart)
         return self.chart
 

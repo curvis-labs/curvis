@@ -84,12 +84,14 @@ Graphs are drawn directly from a data table. You pick a chart family from the to
 
 The Format dialog controls:
 
-- Graph title and aspect ratio (4:3, 16:9, 1:1, 3:4, 3:2 or custom size)
+- Graph title, size (Tall 4 × 6 cm, Wide 9 × 6 cm, Square 6 × 6 cm, or a custom width and height) and whether the graph shows a legend
 - Each axis: title, range, label, and linear or log scale
-- Each series: symbol, symbol size, line style, line width, color and error-bar type
+- Each series: symbol, symbol size, line style, line width, color, error-bar type and whether it is listed in the legend; series can be added, removed and reordered
 - Color scheme and chart text size
 
-Clicking a legend entry on XY and survival charts toggles that series on or off. Graphs export as PNG, SVG or PDF.
+The Graph panel has a small toolbar to change the graph type (scatter, line, bar or box), format, delete and export the graph shown.
+
+Clicking a legend entry on XY and survival charts toggles that series on or off. Graphs export as PNG (at a chosen resolution), SVG or PDF, at the graph's size.
 
 ## Projects, history and settings
 
@@ -98,4 +100,4 @@ Clicking a legend entry on XY and survival charts toggles that series on or off.
 - **Toolbars.** A main toolbar with New project, Open project, Save project, Undo and Redo, and a table toolbar with Import data, Add column, Group as replicates, Set category, Calculate, Plot and Analyze. Plot opens the chart families to pick from. Every toolbar button is also in the menus and the command palette.
 - **Launcher.** On start-up, and whenever no project is open, a launcher screen shows a row of tiles to start from (a blank project and the sample projects, each sample with a small picture of its graph), an Open button, and a list of recent projects with their folder and a relative timestamp (e.g. "2 days ago"). A recent project opens with one click; right-clicking it offers to remove it from the list (the file is kept). A missing file is shown as "File not found".
 - **Undo and redo.** Each document keeps up to 50 undo steps.
-- **Settings.** Theme (light, dark or follow the system), default color palette for new columns and series (with a palette editor), default chart aspect ratio, chart text size, and the number of decimal places shown in calculated columns.
+- **Settings.** Theme (light, dark or follow the system), default color palette for new columns and series (with a palette editor), default graph size, chart text size, and the number of decimal places shown in calculated columns.

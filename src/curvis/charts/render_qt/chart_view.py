@@ -3,11 +3,17 @@
 
 It draws XY graphs (scatter or line, SD / SEM / Error-column error bars, fitted curves
 and their confidence bands), bar graphs (mean with error bars) and box plots. It
-computes nothing: every number comes from :mod:`curvis.charts.data`.
+computes nothing: every number comes from :mod:`curvis.charts.data`, and the ranges and
+ticks come from :mod:`curvis.charts.axes`, as in the export renderer.
 
-- The graph keeps the spec's aspect ratio inside the widget (letterboxed).
+- **The page.** The widget shows the graph's page (its size in cm) zoomed to fit,
+  letterboxed: text, symbols, lines and ticks are drawn at their size in points times
+  the zoom, so the graph keeps the proportions of its export.
+- **Font.** DejaVu Sans, the font Matplotlib exports with, loaded from Matplotlib's
+  files (:func:`curvis.charts.axes.chart_font_path`).
 - Colours come from the spec's colour scheme, not the app theme (docs/DESIGN.md §3).
-- Clicking a legend entry of an XY graph sends :attr:`ChartView.series_toggled`; the
+- **Legend** to the right of the plot when the spec shows one, listing the series that
+  are in the legend. Clicking an XY entry sends :attr:`ChartView.series_toggled`; the
   owner turns it into an undoable command, and the next render shows the result.
 - Hovering a point, bar or box shows its values as typed in the table
   (:mod:`curvis.charts.tooltips`).
@@ -17,6 +23,7 @@ pyqtgraph is slow to import, so this module is only imported when a graph is sho
 
 from __future__ import annotations
 
+import functools
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
@@ -25,18 +32,49 @@ from typing import Any
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import QPointF, QRect, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QResizeEvent
-from PySide6.QtWidgets import QSizePolicy, QToolTip, QWidget
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QFontDatabase,
+    QImage,
+    QPainter,
+    QPen,
+    QResizeEvent,
+    QTransform,
+)
+from PySide6.QtWidgets import QApplication, QSizePolicy, QToolTip, QWidget
 
+from curvis.charts.axes import (
+    AXIS_WIDTH_PT,
+    BAND_ALPHA,
+    BAR_WIDTH,
+    BOX_FILL_ALPHA,
+    BOX_LINE_PT,
+    BOX_WIDTH,
+    CAP_SHARE,
+    ERROR_BAR_WIDTH_PT,
+    FONT_FAMILY,
+    LEGEND_BORDER_EM,
+    LEGEND_GAP_EM,
+    LEGEND_ROW_EM,
+    LEGEND_SAMPLE_EM,
+    PAGE_PAD_PT,
+    SCREEN_DPI,
+    TICK_LENGTH_PT,
+    TITLE_SCALE,
+    AxesLayout,
+    AxisLayout,
+    axes_layout,
+    chart_font_path,
+    page_px,
+    points_to_px,
+)
 from curvis.charts.colors import ColorScheme, scheme
 from curvis.charts.data import CategoryData, ChartData, XYSeriesData
 from curvis.charts.spec import (
-    AxisSpec,
-    ChartFamily,
     ChartSpec,
     ChartVariant,
     LineStyle,
-    Scale,
     SeriesSpec,
     Symbol,
 )
@@ -46,9 +84,6 @@ pg.setConfigOptions(antialias=True)
 
 HOVER_RADIUS_PX = 8.0
 """A point shows its tooltip when the pointer is this close (in pixels)."""
-BAR_WIDTH = 0.6
-BOX_WIDTH = 0.5
-BAND_ALPHA = 0.18
 UNSUPPORTED = "This chart type cannot be drawn yet."
 
 _SYMBOLS = {
@@ -65,28 +100,98 @@ _PEN_STYLES = {
 }
 
 
-def _points_to_px(points: float) -> float:
-    return points * 96.0 / 72.0
+@functools.cache
+def chart_font_family() -> str:
+    """The chart font, loaded once from Matplotlib's copy of DejaVu Sans."""
+    path = chart_font_path()
+    if path is not None:
+        font_id = QFontDatabase.addApplicationFont(str(path))
+        families = QFontDatabase.applicationFontFamilies(font_id) if font_id >= 0 else []
+        if families:
+            return str(families[0])
+    return FONT_FAMILY
 
 
-class ChartAxis(pg.AxisItem):  # type: ignore[misc]
-    """An axis whose log ticks read as plain numbers (0.01, 1, 100), like the table."""
-
-    def logTickStrings(self, values: list[float], scale: float, spacing: float) -> list[str]:  # noqa: N802
-        out: list[str] = []
-        for v in values:
-            value = 10.0 ** (v * scale)
-            out.append(f"{value:.6g}" if 1e-6 <= abs(value) < 1e7 else f"{value:.0e}")
-        return out
+def chart_font(family: str) -> QFont:
+    """The chart font, drawn as Matplotlib draws it: antialiased in grey and unhinted.
+    Subpixel (LCD) antialiasing, which some systems use for screen text, gives text
+    coloured fringes that no export has."""
+    font = QFont(family)
+    font.setStyleStrategy(
+        QFont.StyleStrategy.PreferAntialias | QFont.StyleStrategy.NoSubpixelAntialias
+    )
+    # Unhinted outlines and advances, as Matplotlib lays text out: Windows hints them by
+    # default, which moves the letters of a label by several pixels.
+    font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+    return font
 
 
 class CrispErrorBars(pg.ErrorBarItem):  # type: ignore[misc]
-    """Error bars drawn without antialiasing: they are only horizontal and vertical
-    lines, and antialiasing thousands of them costs most of a redraw."""
+    """Error bars drawn without antialiasing, with a 1 px cosmetic pen: they are only
+    horizontal and vertical lines, and Qt draws thin lines on its fast path. A bar
+    ``width`` pixels wide is drawn in passes moved by a device pixel sideways and up and
+    down; a wide pen would take Qt's slow path (about 25 times slower for thousands of
+    bars)."""
+
+    width = 1
 
     def paint(self, painter: QPainter, *args: Any) -> None:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-        super().paint(painter, *args)
+        if self.width <= 1:
+            super().paint(painter, *args)
+            return
+        base = painter.worldTransform()
+        offsets = [i - (self.width - 1) / 2 for i in range(self.width)]
+        # Moving sideways thickens the vertical lines, moving up and down the caps.
+        moves = {(dx, 0.0) for dx in offsets} | {(0.0, dy) for dy in offsets}
+        for dx, dy in sorted(moves):
+            painter.setWorldTransform(base * QTransform.fromTranslate(dx, dy))
+            super().paint(painter, *args)
+        painter.setWorldTransform(base)
+
+
+class LegendSample(pg.ItemSample):  # type: ignore[misc]
+    """A legend sample sized in ems of the chart text, like the exported legend's: the
+    series' line across it and its symbol in the middle, or a patch for a bar or box.
+    A hidden series shows its sample dimmed."""
+
+    def __init__(self, item: Any, width: float, height: float, patch: bool = False) -> None:
+        super().__init__(item)
+        self._width, self._height, self._patch = width, height, patch
+        self.setFixedWidth(width)
+        self.setFixedHeight(height)
+
+    def boundingRect(self) -> QRectF:  # noqa: N802 (Qt API)
+        return QRectF(0, 0, self._width, self._height)
+
+    def paint(self, painter: QPainter, *_args: Any) -> None:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self.item.isVisible():
+            painter.setOpacity(0.3)
+        middle = self._height / 2
+        opts = self.item.opts
+        if self._patch:
+            side = 0.7 * self._height / LEGEND_ROW_EM  # 0.7 em, as on export
+            painter.setPen(pg.mkPen(opts["pen"]))
+            painter.setBrush(pg.mkBrush(opts["brush"]))
+            painter.drawRect(QRectF(0, middle - side / 2, self._width, side))
+            return
+        pen = opts.get("pen")
+        if pen is not None:
+            painter.setPen(pg.mkPen(pen))
+            painter.drawLine(QPointF(0, middle), QPointF(self._width, middle))
+        symbol = opts.get("symbol")
+        if symbol is not None:
+            # The item's own options: a series without values has no scatter style yet.
+            size = opts["symbolSize"]
+            painter.translate(self._width / 2, middle)
+            painter.scale(size, size)
+            painter.setPen(pg.mkPen(opts["symbolPen"]))
+            painter.setBrush(pg.mkBrush(opts["symbolBrush"]))
+            from pyqtgraph.graphicsItems.ScatterPlotItem import Symbols
+
+            path = Symbols[symbol]
+            painter.drawPath(path)
 
 
 @dataclass
@@ -105,10 +210,10 @@ class _XYParts:
 class BoxItem(pg.GraphicsObject):  # type: ignore[misc]
     """Box plots: a box from Q1 to Q3 with the median, whiskers from min to max."""
 
-    def __init__(self, boxes: Sequence[tuple[float, Any, QColor]], ink: QColor) -> None:
+    def __init__(self, boxes: Sequence[tuple[float, Any, QColor]], width_px: float) -> None:
         super().__init__()
         self._boxes = boxes  # (position, plot BoxStats, colour)
-        self._ink = ink
+        self._width_px = width_px
         finite = [b for _, b, _ in boxes if b.n > 0]
         low = min((b.min for b in finite), default=0.0)
         high = max((b.max for b in finite), default=1.0)
@@ -126,11 +231,12 @@ class BoxItem(pg.GraphicsObject):  # type: ignore[misc]
         for position, b, color in self._boxes:
             if b.n == 0:
                 continue
-            pen = QPen(color, 1.5)
+            pen = QPen(color, self._width_px)
             pen.setCosmetic(True)
+            pen.setCapStyle(Qt.PenCapStyle.FlatCap)
             painter.setPen(pen)
             fill = QColor(color)
-            fill.setAlphaF(0.25)
+            fill.setAlphaF(BOX_FILL_ALPHA)
             painter.setBrush(fill)
             painter.drawRect(QRectF(position - half, b.q1, BOX_WIDTH, b.q3 - b.q1))
             painter.drawLine(QPointF(position - half, b.median), QPointF(position + half, b.median))
@@ -148,6 +254,8 @@ class _Drawn:
     xy: list[tuple[XYSeriesData, Any]] = field(default_factory=list)
     """(series data, its main PlotDataItem)."""
     categories: list[CategoryData] = field(default_factory=list)
+    positions: dict[str, int] = field(default_factory=dict)
+    """Position of each bar or box drawn, by source."""
     legend_sources: dict[int, str] = field(default_factory=dict)
     """id(item) -> series source, for legend clicks."""
 
@@ -157,19 +265,21 @@ class ChartView(QWidget):
 
     series_toggled = Signal(str, bool)
     """(series source, visible): a legend entry was clicked."""
+    double_clicked = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setAccessibleName("Graph")
+        self.family = chart_font_family()
         # The plot and, to its right, the legend (outside the data, like Prism).
         self.plot_widget = pg.GraphicsLayoutWidget(self)
         self.plot_widget.setAccessibleName("Graph")
-        self.plot_item: pg.PlotItem = pg.PlotItem(
-            axisItems={"bottom": ChartAxis("bottom"), "left": ChartAxis("left")}
-        )
+        self.plot_item: pg.PlotItem = pg.PlotItem()
         self.plot_item.setMenuEnabled(False)
         self.plot_item.hideButtons()
         self.plot_item.vb.setMouseEnabled(False, False)
+        self.plot_item.vb.disableAutoRange()
+        self.plot_item.titleLabel.item.setFont(chart_font(self.family))
         self.plot_widget.ci.addItem(self.plot_item, 0, 0)
         self.legend = pg.LegendItem()
         self.legend.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
@@ -178,19 +288,28 @@ class ChartView(QWidget):
         self._xy_parts: _XYParts | None = None
         self.spec: ChartSpec | None = None
         self.data: ChartData | None = None
+        self.layout_: AxesLayout | None = None
+        self.scale = 1.0
+        """Zoom of the page: widget pixels per page pixel at 96 dpi."""
         self.message = ""
         """Why nothing is drawn (an unsupported variant), or ""."""
         self._drawn = _Drawn()
         self.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
+        self.plot_widget.scene().sigMouseClicked.connect(self._on_scene_clicked)
 
     # --- layout ----------------------------------------------------------------------
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802 (Qt API)
         super().resizeEvent(event)
+        old = self.scale
         self._fit()
+        if self.spec is not None and not math.isclose(old, self.scale, rel_tol=1e-3):
+            self._redraw()
 
     def _fit(self) -> None:
-        aspect = self.spec.aspect if self.spec is not None else 4 / 3
+        """Letterbox the page in the widget and work out the zoom."""
+        spec = self.spec
+        aspect = spec.aspect if spec is not None else 3 / 2
         width, height = self.width(), self.height()
         if width <= 0 or height <= 0:
             return
@@ -199,20 +318,39 @@ class ChartView(QWidget):
         else:
             w, h = width, round(width / aspect)
         self.plot_widget.setGeometry(QRect((width - w) // 2, (height - h) // 2, w, h))
+        if spec is not None:
+            self.scale = w / page_px(spec)[0]
+
+    def _px(self, points: float) -> float:
+        """``points`` in widget pixels at the current zoom."""
+        return points_to_px(points) * self.scale
+
+    def _font_pt(self, points: float) -> float:
+        """A Qt point size that draws ``points`` of the page at the current zoom: Qt
+        turns points into pixels with the screen's logical dpi, the page with 96."""
+        dpi = self.logicalDpiY() or SCREEN_DPI
+        return points * self.scale * SCREEN_DPI / dpi
 
     # --- rendering -------------------------------------------------------------------
 
     def render_chart(self, spec: ChartSpec, data: ChartData | None) -> None:
         """Draw ``spec`` with ``data`` (None: the frame and titles only)."""
-        aspect_changed = self.spec is None or self.spec.aspect != spec.aspect
+        page_changed = self.spec is None or self.spec.page_size_cm != spec.page_size_cm
         self.spec, self.data = spec, data
-        colors = scheme(spec.color_scheme)
+        if page_changed:
+            self._fit()
         xy = spec.variant in (ChartVariant.SCATTER, ChartVariant.LINE)
         parts = self._xy_parts
         if xy and data is not None and parts is not None and parts.key == _xy_key(spec, data):
+            self.layout_ = axes_layout(spec, data)
             self._update_xy(spec, data)
-            self._apply_ranges(spec)
+            self._apply_layout(spec, self.layout_)
             return
+        self._redraw()
+
+    def _redraw(self) -> None:
+        spec, data = self.spec, self.data
+        assert spec is not None
         self._xy_parts = None
         plot = self.plot_item
         plot.clear()
@@ -220,6 +358,8 @@ class ChartView(QWidget):
         self._show_legend(False)
         self._drawn = _Drawn()
         self.message = ""
+        colors = scheme(spec.color_scheme)
+        self.layout_ = axes_layout(spec, data)
         self._style(spec, colors)
         if data is not None:
             if spec.variant in (ChartVariant.SCATTER, ChartVariant.LINE):
@@ -228,36 +368,72 @@ class ChartView(QWidget):
                 self._draw_categories(spec, data, colors)
             else:
                 self.message = UNSUPPORTED
-        self._apply_ranges(spec)
-        if aspect_changed:
-            self._fit()
+        self._apply_layout(spec, self.layout_)
 
     def _style(self, spec: ChartSpec, colors: ColorScheme) -> None:
         widget, plot = self.plot_widget, self.plot_item
         ink = QColor(colors.ink)
         widget.setBackground(QColor(colors.page))
-        font = QFont(self.font())
-        font.setPointSizeF(spec.text_size)
-        size = f"{spec.text_size:g}pt"
-        plot.setTitle(spec.title or None, color=colors.ink, size=f"{spec.text_size * 1.2:g}pt")
-        categorical = spec.family is ChartFamily.BAR
+        pad = self._px(PAGE_PAD_PT)
+        widget.ci.setContentsMargins(pad, pad, pad, pad)
+        widget.ci.setSpacing(0)
+        font = chart_font(self.family)
+        font.setPointSizeF(self._font_pt(spec.text_size))
+        size = f"{self._font_pt(spec.text_size):.3f}pt"
+        title_size = f"{self._font_pt(spec.text_size * TITLE_SCALE):.3f}pt"
+        plot.setTitle(spec.title or None, color=colors.ink, size=title_size)
+        tick = max(1, round(self._px(TICK_LENGTH_PT)))
         for name, axis_spec in (("bottom", spec.x_axis), ("left", spec.y_axis)):
             axis = plot.getAxis(name)
-            pen = pg.mkPen(ink, width=1)
+            pen = pg.mkPen(ink, width=self._px(AXIS_WIDTH_PT))
             axis.setPen(pen)
-            axis.setTextPen(pen)
+            axis.setTextPen(pg.mkPen(ink))
             axis.setTickFont(font)
-            axis.setLabel(axis_spec.title or None, color=colors.ink, **{"font-size": size})
-            log = axis_spec.scale is Scale.LOG and not (categorical and name == "bottom")
-            axis.setLogMode(log)
-            axis.setStyle(showValues=axis_spec.show_labels)
-            axis.setTicks(None)
+            axis.label.setFont(chart_font(self.family))
+            axis.setLabel(
+                axis_spec.title or None,
+                color=colors.ink,
+                **{"font-size": size, "font-family": self.family},
+            )
+            axis.setLogMode(False)  # plot coordinates are log10 already; ticks come from us
+            axis._curvis_ticks = None
+            axis.setStyle(
+                showValues=axis_spec.show_labels,
+                tickLength=tick,
+                tickTextOffset=max(1, round(self._px(TICK_LENGTH_PT) * 0.8)),
+                # Draw every label, as on export: the ticks are already thinned to what
+                # fits (curvis.charts.axes), and a label may reach past the axis end.
+                hideOverlappingLabels=10_000,
+                textFillLimits=[(0, 1.0)],
+            )
         plot.showGrid(False, False)
+        self.legend.opts["labelTextSize"] = size
+        self.legend.setLabelTextColor(colors.ink)
+
+    def _legend_wanted(self, spec: ChartSpec) -> bool:
+        return spec.show_legend and any(s.in_legend for s in spec.series)
+
+    def _add_legend_entry(self, item: Any, name: str, patch: bool = False) -> None:
+        assert self.spec is not None
+        em = self._px(self.spec.text_size)
+        sample = LegendSample(item, LEGEND_SAMPLE_EM * em, LEGEND_ROW_EM * em, patch)
+        self.legend.addItem(sample, name)
+        _sample, label = self.legend.items[-1]
+        label.item.setFont(chart_font(self.family))
+        label.item.document().setDocumentMargin(0)
+        label.setText(name, size=self.legend.opts["labelTextSize"])
+        self.legend.layout.setHorizontalSpacing(LEGEND_GAP_EM * em)
+        self.legend.layout.setVerticalSpacing(0)
+        # As Matplotlib's layout: padding on both sides of the gap after the plot, and
+        # the legend's own border left and right.
+        border = LEGEND_BORDER_EM * em
+        self.legend.layout.setContentsMargins(2 * self._px(PAGE_PAD_PT) + border, 0, border, 0)
+        self.legend.updateSize()
 
     def _draw_xy(self, spec: ChartSpec, data: ChartData, colors: ColorScheme) -> None:
         plot = self.plot_item
-        self.legend.setLabelTextColor(colors.ink)
-        self._show_legend(True)
+        legend = self._legend_wanted(spec)
+        self._show_legend(legend)
         styles = {s.source: s for s in spec.series}
         parts = _XYParts(_xy_key(spec, data), [], [])
         for curve in data.curves:
@@ -273,27 +449,45 @@ class ChartView(QWidget):
                 band = pg.FillBetweenItem(upper, lower, brush=fill)
                 band.setZValue(-1)
                 plot.addItem(band)
-            pen = pg.mkPen(color, width=_points_to_px(style.line_width))
+            pen = pg.mkPen(color, width=self._px(style.line_width))
             line = pg.PlotCurveItem(pen=pen)
             plot.addItem(line)
             parts.curves.append((line, upper, lower, band))
         for series in data.xy:
             style = styles[series.source]
-            item = pg.PlotDataItem(name=series.name, **_point_style(spec, style))
-            # An exact 1 px cosmetic pen: Qt draws it on its fast path.
+            item = pg.PlotDataItem(name=series.name, **self._point_style(spec, style))
             bars = CrispErrorBars(pen=pg.mkPen(QColor(style.color), width=1))
+            # Whole device pixels, rounded down (1 px until the page is zoomed to 2x).
+            bars.width = max(1, math.floor(self._px(ERROR_BAR_WIDTH_PT) + 1e-6))
             plot.addItem(item)
             plot.addItem(bars)
             self._drawn.legend_sources[id(item)] = series.source
-            self.legend.addItem(item, series.name)
+            if legend and style.in_legend:
+                self._add_legend_entry(item, series.name)
             parts.series.append((item, bars))
         self._xy_parts = parts
         self._update_xy(spec, data)
 
+    def _point_style(self, spec: ChartSpec, style: SeriesSpec) -> dict[str, Any]:
+        color = QColor(style.color)
+        line_style = style.line_style
+        if spec.variant is ChartVariant.LINE and line_style is LineStyle.NONE:
+            line_style = LineStyle.SOLID
+        pen: Any = None
+        if line_style is not LineStyle.NONE:
+            pen = pg.mkPen(color, width=self._px(style.line_width), style=_PEN_STYLES[line_style])
+        return {
+            "pen": pen,
+            "symbol": _SYMBOLS[style.symbol],
+            "symbolSize": self._px(style.size),
+            "symbolBrush": color,
+            "symbolPen": pg.mkPen(color),
+        }
+
     def _update_xy(self, spec: ChartSpec, data: ChartData) -> None:
         """Put ``data`` into the items made by :meth:`_draw_xy`, and show or hide them."""
         parts = self._xy_parts
-        assert parts is not None
+        assert parts is not None and self.layout_ is not None
         styles = {s.source: s for s in spec.series}
         visible_curves = [c for c in data.curves if c.series_source in styles]
         for curve, (line, upper, lower, band) in zip(visible_curves, parts.curves, strict=True):
@@ -304,13 +498,14 @@ class ChartView(QWidget):
                 upper.setData(curve.px, _nan_to_edge(curve.high, curve.py))
                 lower.setData(curve.px, _nan_to_edge(curve.low, curve.py))
                 band.setVisible(shown)
-        width = _x_span(data)
+        x = self.layout_.x
+        cap = CAP_SHARE * (x.high - x.low)
         self._drawn.xy = []
         for series, (item, bars) in zip(data.xy, parts.series, strict=True):
             shown = styles[series.source].visible
             item.setData(series.px, series.py)
             item.setVisible(shown)
-            has_bars = _set_error_bars(bars, series, width)
+            has_bars = _set_error_bars(bars, series, cap)
             bars.setVisible(shown and has_bars)
             self._drawn.xy.append((series, item))
 
@@ -327,23 +522,45 @@ class ChartView(QWidget):
 
     def _draw_categories(self, spec: ChartSpec, data: ChartData, colors: ColorScheme) -> None:
         plot = self.plot_item
+        assert self.layout_ is not None
         styles = {s.source: s for s in spec.series}
-        shown = [c for c in data.categories if styles[c.source].visible]
-        ticks = [(c.position, c.name) for c in shown]
-        plot.getAxis("bottom").setTicks([ticks])
+        positions = self.layout_.positions
+        shown = [c for c in data.categories if c.source in positions]
         self._drawn.categories = shown
+        self._drawn.positions = dict(positions)
+        ink = QColor(colors.ink)
+        legend = self._legend_wanted(spec)
+        self._show_legend(legend)
+        if legend:
+            for c in shown:
+                if styles[c.source].in_legend:
+                    sample = pg.BarGraphItem(
+                        x=[0],
+                        height=[1],
+                        width=1,
+                        brush=QColor(styles[c.source].color),
+                        pen=pg.mkPen(ink, width=self._px(AXIS_WIDTH_PT)),
+                    )
+                    self._add_legend_entry(sample, c.name, patch=True)
+                    self.legend.items[-1][0].setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         if not shown:
             return
-        ink = QColor(colors.ink)
         if spec.variant is ChartVariant.BOX:
-            boxes = [(c.position, c.plot_box, QColor(styles[c.source].color)) for c in shown]
-            plot.addItem(BoxItem(boxes, ink))
+            boxes = [
+                (float(positions[c.source]), c.plot_box, QColor(styles[c.source].color))
+                for c in shown
+            ]
+            plot.addItem(BoxItem(boxes, self._px(BOX_LINE_PT)))
             return
-        x = np.array([c.position for c in shown], dtype=np.float64)
+        x = np.array([positions[c.source] for c in shown], dtype=np.float64)
         heights = np.array([c.mean for c in shown], dtype=np.float64)
         brushes = [QColor(styles[c.source].color) for c in shown]
         bar = pg.BarGraphItem(
-            x=x, height=np.nan_to_num(heights), width=BAR_WIDTH, brushes=brushes, pen=pg.mkPen(ink)
+            x=x,
+            height=np.nan_to_num(heights),
+            width=BAR_WIDTH,
+            brushes=brushes,
+            pen=pg.mkPen(ink, width=self._px(AXIS_WIDTH_PT)),
         )
         plot.addItem(bar)
         top = np.array([c.err_high for c in shown], dtype=np.float64)
@@ -357,35 +574,25 @@ class ChartView(QWidget):
                     top=top[keep],
                     bottom=bottom[keep],
                     beam=BAR_WIDTH / 3,
-                    pen=pg.mkPen(ink, width=1.5),
+                    pen=pg.mkPen(ink, width=self._px(BOX_LINE_PT)),
                 )
             )
 
-    def _apply_ranges(self, spec: ChartSpec) -> None:
-        vb = self.plot_item.vb
-        vb.enableAutoRange(x=True, y=True)
-        if spec.family is ChartFamily.BAR:
-            n = max(len(self._drawn.categories), 1)
-            vb.setXRange(-0.6, n - 0.4, padding=0)
-        for axis_spec, horizontal in ((spec.x_axis, True), (spec.y_axis, False)):
-            if horizontal and spec.family is ChartFamily.BAR:
-                continue
-            if axis_spec.minimum is None and axis_spec.maximum is None:
-                continue
-            low, high = _limits(axis_spec, vb.childrenBounds()[0 if horizontal else 1])
-            if horizontal:
-                vb.setXRange(low, high, padding=0)
-            else:
-                vb.setYRange(low, high, padding=0)
-        bars = spec.family is ChartFamily.BAR and spec.variant is ChartVariant.BAR
-        if bars and spec.y_axis.minimum is None and self._drawn.categories:
-            bounds = vb.childrenBounds()[1]
-            if bounds is not None:
-                top = max(bounds[1], 0.0)
-                bottom = min(bounds[0], 0.0)
-                vb.setYRange(bottom, top + 0.05 * (top - bottom or 1.0), padding=0)
+    def _apply_layout(self, spec: ChartSpec, layout: AxesLayout) -> None:
+        """Set the ticks and ranges, only where they changed: new ticks make pyqtgraph
+        lay out the axis text again, which costs more than the rest of a data redraw."""
+        plot = self.plot_item
+        for name, axis_layout in (("bottom", layout.x), ("left", layout.y)):
+            axis = plot.getAxis(name)
+            ticks = _ticks(axis_layout)
+            if getattr(axis, "_curvis_ticks", None) != ticks:
+                axis.setTicks(ticks)
+                axis._curvis_ticks = ticks
+        ranges = ((layout.x.low, layout.x.high), (layout.y.low, layout.y.high))
+        if plot.vb.viewRange() != [list(r) for r in ranges]:
+            plot.vb.setRange(xRange=ranges[0], yRange=ranges[1], padding=0)
 
-    # --- legend and tooltips ----------------------------------------------------------
+    # --- legend, clicks and tooltips ---------------------------------------------------
 
     def _on_legend_clicked(self, item: Any) -> None:
         source = self._drawn.legend_sources.get(id(item))
@@ -393,14 +600,33 @@ class ChartView(QWidget):
             # pyqtgraph has toggled the item already; the command makes it stick.
             self.series_toggled.emit(source, bool(item.isVisible()))
 
+    def _on_scene_clicked(self, event: Any) -> None:
+        if event.double():
+            self.double_clicked.emit()
+
     def legend_entries(self) -> list[tuple[str, Any]]:
-        """(source, sample item) of each legend entry, for tests."""
+        """(source, sample item) of each XY legend entry, for tests."""
         if not self._legend_shown:
             return []
         return [
             (self._drawn.legend_sources[id(sample.item)], sample)
             for sample, _label in self.legend.items
+            if id(sample.item) in self._drawn.legend_sources
         ]
+
+    def legend_names(self) -> list[str]:
+        """The names listed in the legend (empty without one)."""
+        if not self._legend_shown:
+            return []
+        return [label.text for _sample, label in self.legend.items]
+
+    def plot_rect(self) -> QRectF:
+        """The plot area (inside the axes) in this widget's coordinates."""
+        rect = self.plot_item.vb.sceneBoundingRect()
+        top_left = self.plot_widget.mapFromScene(rect.topLeft())
+        bottom_right = self.plot_widget.mapFromScene(rect.bottomRight())
+        offset = self.plot_widget.pos()
+        return QRectF(top_left + offset, bottom_right + offset)
 
     def tooltip_at(self, scene_pos: QPointF) -> str | None:
         """The tooltip for the point, bar or box under ``scene_pos`` (scene coordinates)."""
@@ -438,7 +664,7 @@ class ChartView(QWidget):
         box = self.spec.variant is ChartVariant.BOX
         half = (BOX_WIDTH if box else BAR_WIDTH) / 2
         for c in self._drawn.categories:
-            if abs(x - c.position) > half:
+            if abs(x - self._drawn.positions[c.source]) > half:
                 continue
             if box:
                 b = c.plot_box
@@ -459,22 +685,40 @@ class ChartView(QWidget):
             QToolTip.hideText()
 
 
-def _point_style(spec: ChartSpec, style: SeriesSpec) -> dict[str, Any]:
-    color = QColor(style.color)
-    symbol = _SYMBOLS[style.symbol]
-    line_style = style.line_style
-    if spec.variant is ChartVariant.LINE and line_style is LineStyle.NONE:
-        line_style = LineStyle.SOLID
-    pen: Any = None
-    if line_style is not LineStyle.NONE:
-        pen = pg.mkPen(color, width=_points_to_px(style.line_width), style=_PEN_STYLES[line_style])
-    return {
-        "pen": pen,
-        "symbol": symbol,
-        "symbolSize": _points_to_px(style.size),
-        "symbolBrush": color,
-        "symbolPen": pg.mkPen(color),
-    }
+def render_page(
+    spec: ChartSpec, data: ChartData | None, scale: float = 1.0
+) -> tuple[QImage, QRectF]:
+    """Draw ``spec`` offscreen on its page at 96 dpi × ``scale``; returns the image and
+    the plot area in it. For the image-diff tests and screenshots.
+
+    The page is painted into a non-premultiplied ARGB32 image: Qt's raster engine draws
+    text there with grey antialiasing on every system, where on Windows with ClearType
+    it would use subpixel text (coloured fringes) for an opaque target whatever the font
+    asks for. The export never has those fringes, and on screen they are only a display
+    effect."""
+    width, height = page_px(spec, SCREEN_DPI * scale)
+    view = ChartView()
+    view.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
+    view.resize(width, height)
+    view.show()
+    view.render_chart(spec, data)
+    app = QApplication.instance()
+    for _ in range(3):
+        if app is not None:
+            app.processEvents()
+    image = QImage(view.plot_widget.size(), QImage.Format.Format_ARGB32)
+    image.fill(QColor(scheme(spec.color_scheme).page))
+    painter = QPainter(image)
+    view.plot_widget.render(painter)
+    painter.end()
+    rect = view.plot_rect().translated(-view.plot_widget.pos().toPointF())
+    view.close()
+    view.deleteLater()
+    return image, rect
+
+
+def _ticks(axis: AxisLayout) -> list[list[tuple[float, str]]]:
+    return [[(t.value, t.label) for t in axis.major], [(v, "") for v in axis.minor]]
 
 
 def _xy_key(spec: ChartSpec, data: ChartData) -> object:
@@ -488,7 +732,7 @@ def _xy_key(spec: ChartSpec, data: ChartData) -> object:
     )
 
 
-def _set_error_bars(bars: Any, series: XYSeriesData, x_span: float) -> bool:
+def _set_error_bars(bars: Any, series: XYSeriesData, cap: float) -> bool:
     """Give ``bars`` the error bars of ``series``; False if it has none."""
     keep = np.isfinite(series.err_high) | np.isfinite(series.err_low)
     if not np.any(keep):
@@ -498,18 +742,9 @@ def _set_error_bars(bars: Any, series: XYSeriesData, x_span: float) -> bool:
         y=series.py[keep],
         top=np.nan_to_num(series.err_high[keep]),
         bottom=np.nan_to_num(series.err_low[keep]),
-        beam=0.012 * x_span,
+        beam=cap,
     )
     return True
-
-
-def _x_span(data: ChartData) -> float:
-    xs = [s.px for s in data.xy if len(s.px)]
-    if not xs:
-        return 1.0
-    all_x = np.concatenate(xs)
-    span = float(np.max(all_x) - np.min(all_x))
-    return span if span > 0 else 1.0
 
 
 def _nan_to_edge(limit: Any, fit: Any) -> Any:
@@ -517,13 +752,11 @@ def _nan_to_edge(limit: Any, fit: Any) -> Any:
     return np.where(np.isfinite(limit), limit, fit)
 
 
-def _limits(axis: AxisSpec, bounds: Any) -> tuple[float, float]:
-    log = axis.scale is Scale.LOG
-    auto_low, auto_high = (bounds[0], bounds[1]) if bounds is not None else (0.0, 1.0)
-
-    def convert(value: float | None, fallback: float) -> float:
-        if value is None:
-            return float(fallback)
-        return math.log10(value) if log else value
-
-    return convert(axis.minimum, auto_low), convert(axis.maximum, auto_high)
+__all__ = (
+    "BoxItem",
+    "ChartView",
+    "LegendSample",
+    "chart_font",
+    "chart_font_family",
+    "render_page",
+)

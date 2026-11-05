@@ -1,6 +1,6 @@
 # Toolbar icons
 
-20 × 20 line icons for the main and table toolbars (docs/DESIGN.md, section 7).
+20 × 20 line icons for the main, table and Graph panel toolbars (docs/DESIGN.md, section 7).
 Each file uses two colours, which the app replaces with palette colours for the theme:
 
 | Colour in the file | Part | Palette role |

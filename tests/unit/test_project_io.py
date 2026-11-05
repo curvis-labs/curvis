@@ -220,7 +220,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 5
+    assert data["schema_version"] == SCHEMA_VERSION == 6
     assert set(data["document"]) == {
         "id",
         "name",
@@ -390,7 +390,7 @@ def test_newer_version(tmp_path: Path) -> None:
 
 
 def test_migrations_cover_every_older_version() -> None:
-    assert SCHEMA_VERSION == 5
+    assert SCHEMA_VERSION == 6
     assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
@@ -448,9 +448,9 @@ def test_version_1_files_get_the_default_category_factor(tmp_path: Path) -> None
 def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "old.cvp"
     save(Document(), path)
-    monkeypatch.setattr(project, "SCHEMA_VERSION", 6)
-    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 5)})
-    with pytest.raises(ProjectFileError, match="from format 5"):
+    monkeypatch.setattr(project, "SCHEMA_VERSION", 7)
+    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 6)})
+    with pytest.raises(ProjectFileError, match="from format 6"):
         load(path)
 
 
@@ -688,3 +688,25 @@ def test_damaged_analyses_are_reported(tmp_path: Path, change: Any, message: str
     _rewrite(path, lambda data: change(data["document"]["analyses"][0]))
     with pytest.raises(CorruptProjectError, match=message):
         load(path)
+
+
+def test_version_5_graphs_get_page_presets_and_legends(tmp_path: Path) -> None:
+    """Format 6 replaced the aspect ratios by Tall, Wide and Square pages and stores
+    whether a graph shows its legend."""
+    path = tmp_path / "v5.cvp"
+    save(_graph_document(), path)
+    ratios = ["4:3", "3:4"]
+
+    def to_v5(data: dict[str, Any]) -> None:
+        data["schema_version"] = 5
+        for graph, ratio in zip(data["document"]["graphs"], ratios, strict=True):
+            graph["aspect_ratio"] = ratio
+            del graph["show_legend"]
+            for series in graph["series"]:
+                del series["in_legend"]
+
+    _rewrite(path, to_v5)
+    xy, bar = load(path).graphs
+    assert (xy.aspect_ratio, bar.aspect_ratio) == ("wide", "tall")
+    assert (xy.show_legend, bar.show_legend) == (True, False)
+    assert all(s.in_legend for s in xy.series)

@@ -75,6 +75,10 @@ WORKBENCH = {
     "analyze",
     "analyze_advanced",
     "analyze_nothing_ticked",
+    "format_graph",
+    "format_axes",
+    "format_series",
+    "format_colors",
 }
 
 

@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from curvis.charts.spec import ChartFamily
+from curvis.charts.spec import ChartFamily, ChartVariant
 from curvis.core import LAST_TABLE, Document, UndoEvent
 from curvis.data import ColumnRole, Table
 from curvis.settings import Settings
@@ -39,7 +39,12 @@ from curvis.ui.actions import ActionRegistry
 from curvis.ui.document_tab import DocumentTab
 from curvis.ui.launcher import LauncherWidget
 from curvis.ui.table import TableView
-from curvis.ui.toolbars import build_main_toolbar, build_table_toolbar, set_tooltips
+from curvis.ui.toolbars import (
+    build_main_toolbar,
+    build_table_toolbar,
+    graph_panel_actions,
+    set_tooltips,
+)
 
 if TYPE_CHECKING:
     from curvis.compute import JobError, Scheduler
@@ -82,6 +87,13 @@ TABLE_ACTIONS = (
 
 FAMILY_ACTIONS = {f"graph.new.{family.value}": family for family in ChartFamily}
 """The chart families of the Plot menu."""
+TYPE_ACTIONS = {
+    "graph.type.scatter": (ChartVariant.SCATTER, "&Scatter", "chart_xy"),
+    "graph.type.line": (ChartVariant.LINE, "&Line", "plot"),
+    "graph.type.bar": (ChartVariant.BAR, "&Bar", "chart_bar"),
+    "graph.type.box": (ChartVariant.BOX, "B&ox", "chart_box"),
+}
+"""The graph types of the Change graph type menu."""
 
 NO_PROJECT = "Open or create a project first"
 NO_TABLE = "Show a table first"
@@ -90,6 +102,9 @@ NOTHING_TO_REDO = "Nothing to redo"
 SELECT_TO_GROUP = "Select columns to group"
 SELECT_FOR_CATEGORY = "Select columns to set their category"
 NO_GRAPH = "There is no graph to delete"
+NO_GRAPH_TO_FORMAT = "There is no graph to format"
+NO_GRAPH_TO_EXPORT = "There is no graph to export"
+NO_GRAPH_TO_CHANGE = "There is no graph to change"
 NO_ANALYSIS = "There is no analysis to change"
 LAST_TABLE_SELECTED = "This is the last table"
 FIRST_TABLE_SELECTED = "This is the first table"
@@ -414,6 +429,32 @@ class MainWindow(QMainWindow):
             category="Graph",
         )
         r.register(
+            "graph.format",
+            "&Format graph…",
+            self._tab_call(DocumentTab.format_graph),
+            category="Graph",
+            shortcut="Ctrl+Shift+F",
+        )
+        r.register(
+            "graph.export",
+            "&Export graph…",
+            self._tab_call(DocumentTab.export_graph),
+            category="Graph",
+            shortcut="Ctrl+Shift+X",
+        )
+        from curvis.ui.toolbar_icons import toolbar_icon
+
+        for action_id, (variant, text, icon) in TYPE_ACTIONS.items():
+            action = r.register(action_id, text, self._type_call(variant), category="Graph type")
+            action.setCheckable(True)
+            action.setIcon(toolbar_icon(icon))
+        graph_type = r.register(
+            "graph.type", "Change graph &type", self.show_type_menu, category="Graph"
+        )
+        self.type_menu = QMenu("Change graph &type", self)
+        self.type_menu.addActions([r.action(a) for a in TYPE_ACTIONS])
+        graph_type.setMenu(self.type_menu)
+        r.register(
             "view.results",
             "&Results panel",
             self._tab_call(DocumentTab.show_results),
@@ -514,6 +555,8 @@ class MainWindow(QMainWindow):
         graph_menu = QMenu("&Graph", self)
         self.menuBar().insertMenu(self._view_menu.menuAction(), graph_menu)
         graph_menu.addAction(a("graph.plot"))
+        graph_menu.addSeparator()
+        graph_menu.addActions([a("graph.type"), a("graph.format"), a("graph.export")])
         graph_menu.addSeparator()
         graph_menu.addAction(a("graph.delete"))
         self._view_menu.insertActions(
@@ -634,6 +677,7 @@ class MainWindow(QMainWindow):
         tab.manage_constants_requested.connect(self.show_constants)
         tab.analysis_used.connect(self.settings.add_recent_analysis)
         tab.state_changed.connect(functools.partial(self._on_tab_state_changed, tab))
+        tab.graph_panel.set_toolbar_actions(graph_panel_actions(self.registry))
         index = self.tabs.addTab(tab, tab.title)
         self.tabs.setTabToolTip(index, str(path) if path else tab.title)
         document.undo_stack.subscribe(functools.partial(self._on_undo_event, tab))
@@ -829,6 +873,25 @@ class MainWindow(QMainWindow):
         else:
             self.plot_menu.popup(QCursor.pos())
 
+    def _type_call(self, variant: ChartVariant) -> Callable[[], None]:
+        def call() -> None:
+            tab = self.current_tab
+            if tab is not None:
+                tab.change_graph_type(variant)
+            self._update_state()  # the checked type follows the graph
+
+        return call
+
+    def show_type_menu(self) -> None:
+        """Open the graph-type menu under the panel's button (or at the pointer)."""
+        tab = self.current_tab
+        action = self.registry.action("graph.type")
+        button = tab.graph_panel.toolbar.widgetForAction(action) if tab is not None else None
+        if button is not None and button.isVisible():
+            self.type_menu.popup(button.mapToGlobal(button.rect().bottomLeft()))
+        else:
+            self.type_menu.popup(QCursor.pos())
+
     def _tab_call(self, method: Callable[..., object]) -> Callable[[], None]:
         """A callback that runs ``method`` on the current document tab, if any."""
 
@@ -972,8 +1035,15 @@ class MainWindow(QMainWindow):
             a(action_id).setEnabled(bool(has_analysis))
             reasons[action_id] = NO_ANALYSIS
         has_graph = view is not None and tab is not None and tab.current_graph_id is not None
-        a("graph.delete").setEnabled(has_graph)
-        reasons["graph.delete"] = NO_GRAPH
+        for action_id, reason in (
+            ("graph.delete", NO_GRAPH),
+            ("graph.format", NO_GRAPH_TO_FORMAT),
+            ("graph.export", NO_GRAPH_TO_EXPORT),
+            ("graph.type", NO_GRAPH_TO_CHANGE),
+        ):
+            a(action_id).setEnabled(has_graph)
+            reasons[action_id] = reason
+        self._update_type_actions(tab if has_graph else None, reasons)
         if view is not None:
             selected = bool(view.selected_columns())
             a("table.group").setEnabled(selected)
@@ -990,6 +1060,25 @@ class MainWindow(QMainWindow):
             label = f"&{family.label}"
             action.setText(label if problem is None else f"{label}\t{problem}")
             reasons[action_id] = problem or ""
+
+    def _update_type_actions(self, tab: DocumentTab | None, reasons: dict[str, str]) -> None:
+        """Check the shown graph's type; a type its table cannot draw is disabled with
+        the reason, as in the Plot menu."""
+        from curvis.charts.builder import variant_problem
+
+        spec = None
+        if tab is not None and tab.current_graph_id is not None:
+            # The panel can still name a graph that a command just removed.
+            spec = next((g for g in tab.document.graphs if g.id == tab.current_graph_id), None)
+        for action_id, (variant, text, _icon) in TYPE_ACTIONS.items():
+            action = self.registry.action(action_id)
+            problem = NO_GRAPH_TO_CHANGE
+            if spec is not None and tab is not None:
+                problem = variant_problem(tab.document.table(spec.table_id), variant) or ""
+            action.setChecked(spec is not None and spec.variant is variant)
+            action.setEnabled(not problem)
+            action.setText(text if not problem else f"{text}\t{problem}")
+            reasons[action_id] = problem
 
     # --- dialogs (tests replace these) ---------------------------------------------------
 

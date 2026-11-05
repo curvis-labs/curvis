@@ -18,13 +18,20 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QToolBar, QToolButton
 
 from curvis.ui.actions import ActionRegistry, RegisteredAction
 from curvis.ui.theme import TOOL_BUTTON_HEIGHT as BUTTON_HEIGHT
 from curvis.ui.toolbar_icons import ICON_SIZE, toolbar_icon
 
-__all__ = ["BUTTON_HEIGHT", "build_main_toolbar", "build_table_toolbar", "set_tooltips"]
+__all__ = [
+    "BUTTON_HEIGHT",
+    "build_main_toolbar",
+    "build_table_toolbar",
+    "graph_panel_actions",
+    "set_tooltips",
+]
 
 
 @dataclass(frozen=True)
@@ -56,6 +63,13 @@ TABLE_BUTTONS: tuple[Button | None, ...] = (
     Button("graph.plot", "plot"),
     Button("analyze.analyze", "analyze"),
 )
+GRAPH_BUTTONS: tuple[Button, ...] = (
+    Button("graph.type", "graph_type", "Change graph type"),
+    Button("graph.format", "format_graph", "Format graph"),
+    Button("graph.delete", "delete_graph", "Delete graph"),
+    Button("graph.export", "export_graph", "Export graph"),
+)
+"""The Graph panel's toolbar (docs/mockups/graph-panel.html)."""
 FAMILY_ICONS = {
     "graph.new.xy": "chart_xy",
     "graph.new.bar": "chart_bar",
@@ -125,9 +139,21 @@ def build_table_toolbar(window: QMainWindow, registry: ActionRegistry) -> QToolB
     return table
 
 
+def graph_panel_actions(registry: ActionRegistry) -> list[QAction]:
+    """The Graph panel toolbar's actions, with their icons."""
+    actions = []
+    for button in GRAPH_BUTTONS:
+        action = registry.action(button.action_id)
+        action.setIcon(toolbar_icon(button.icon))
+        action.setIconText(button.name)
+        actions.append(action)
+    return actions
+
+
 def toolbar_buttons() -> dict[str, Button]:
     """Every toolbar button by action id."""
-    return {b.action_id: b for b in (*MAIN_BUTTONS, *TABLE_BUTTONS) if b is not None}
+    buttons = (*MAIN_BUTTONS, *TABLE_BUTTONS, *GRAPH_BUTTONS)
+    return {b.action_id: b for b in buttons if b is not None}
 
 
 def set_tooltips(registry: ActionRegistry, reasons: Mapping[str, str]) -> None:
@@ -137,7 +163,7 @@ def set_tooltips(registry: ActionRegistry, reasons: Mapping[str, str]) -> None:
     buttons = toolbar_buttons()
     for entry in registry.entries():
         button = buttons.get(entry.id)
-        if button is None and not entry.id.startswith("graph.new."):
+        if button is None and not entry.id.startswith(("graph.new.", "graph.type.")):
             continue
         action = entry.action
         if not action.isEnabled():

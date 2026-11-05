@@ -53,6 +53,15 @@ jobs:
       - name: Tests
         run: uv run pytest
 
+      # The image-diff tests save the screen and export side by side when they differ.
+      - name: Keep the image-diff pictures
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-diff-${{ matrix.os }}
+          path: build/image-diff/
+          if-no-files-found: ignore
+
   # Statistics against the committed R reference fixtures (tests/validation/fixtures),
   # as its own check so a disagreement with R stands out. R is not needed here.
   validation:

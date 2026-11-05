@@ -67,7 +67,7 @@ Inner layouts (pages, rows) have zero margins; only the dialog has a margin.
 
 | Dialog | Default size | Minimum size |
 | --- | --- | --- |
-| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 (to be confirmed for Format in step 2.8) |
+| Workbench (Calculate, Analyze, Format, Import) | 900 × 640 | 820 × 540 |
 | Bulk rename | 720 × 520 | 600 × 420 |
 | Constants | 560 × 420 | 460 × 340 |
 | Simple dialog (Settings, constant editor) | its size hint | its size hint, at least 360 wide |
@@ -191,10 +191,11 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   | Ctrl+Shift+K | Calculate |
   | Ctrl+Shift+E | Edit calculation |
   | Ctrl+Shift+A | Analyze |
-  | — | Rename column, Constants, Edit analysis, Delete analysis, Close table (menu and palette only) |
+  | Ctrl+Shift+F | Format graph |
+  | Ctrl+Shift+X | Export graph |
+  | — | Rename column, Constants, Edit analysis, Delete analysis, Close table, Change graph type, Delete graph (menu and palette only) |
 
-  Reserved for later steps: Ctrl+Shift+F *Format graph*, Ctrl+Shift+X
-  *Export graph*. A new shortcut must not clash with these or with platform standard keys.
+  A new shortcut must not clash with these or with platform standard keys.
 - **Accessible names**: every control has a buddy label, visible text or `setAccessibleName`.
   The tests check this for every dialog.
 
@@ -242,7 +243,14 @@ Mockup: `docs/mockups/toolbars.html`.
   data | columns | results groups).
 - **Keyboard.** The toolbars are not in the Tab order, because every button has a shortcut or
   menu entry. The tooltips name the shortcut.
-- **Open:** a toolbar for graph formatting is not decided yet. It is not in SPEC.md.
+- **Graph panel toolbar.** Mockup: `docs/mockups/graph-panel.html`. Four icon-only
+  buttons at the right of the Graph panel's header, after the graph list: *Change graph
+  type*, *Format graph…*, *Delete graph*, *Export graph…*. Same buttons, states and icon
+  rules as the main toolbar (28 px, 4 px apart, two tones, tooltip with name and shortcut,
+  disabled with the reason: “There is no graph to format”). *Change graph type* opens a
+  menu of Scatter, Line, Bar and Box with a check at the current type; a type the table
+  cannot draw is disabled with its reason, as in the Plot menu. Double-clicking the graph
+  opens *Format graph…*.
 
 ## 8. Table tabs
 
