@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal
-from PySide6.QtGui import QEnterEvent, QMouseEvent, QPainter, QPaintEvent
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtGui import QEnterEvent, QMouseEvent, QPainter, QPaintEvent, QPalette
 from PySide6.QtWidgets import (
     QAbstractButton,
     QHBoxLayout,
@@ -50,6 +50,15 @@ class TableTabBar(QTabBar):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._pressed: tuple[str, int] | None = None
 
+    def label_rect(self, index: int) -> QRect:
+        """Where the style draws the text of an unselected tab ``index``, relative to
+        the tab's own rectangle."""
+        option = QStyleOptionTab()
+        self.initStyleOption(option, index)
+        option.state &= ~QStyle.StateFlag.State_Selected
+        rect = self.style().subElementRect(QStyle.SubElement.SE_TabBarTabText, option, self)
+        return rect.translated(-option.rect.topLeft())
+
     def table_id(self, index: int) -> str:
         data = self.tabData(index)
         return data if isinstance(data, str) else ""
@@ -78,7 +87,7 @@ class NewTableTab(QAbstractButton):
     """The *+* after the last tab, drawn as an unselected tab of ``bar`` with the same
     height, so it reads as "one more table"."""
 
-    def __init__(self, bar: QTabBar, parent: QWidget | None = None) -> None:
+    def __init__(self, bar: TableTabBar, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._bar = bar
         self._hovered = False
@@ -128,12 +137,25 @@ class NewTableTab(QAbstractButton):
         painter = QPainter(self)
         style = self._bar.style()
         style.drawControl(QStyle.ControlElement.CE_TabBarTabShape, option, painter, self._bar)
-        font = painter.font()
-        font.setPointSizeF(font.pointSizeF() * 1.3)
-        painter.setFont(font)
-        painter.setPen(self.palette().color(self.foregroundRole()))
-        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "+")
+        # The + in the tabs' font, on the line of their names.
+        painter.setFont(self._bar.font())
+        style.drawItemText(
+            painter,
+            self.label_rect(),
+            int(Qt.AlignmentFlag.AlignCenter),
+            self._bar.palette(),
+            self.isEnabled(),
+            "+",
+            QPalette.ColorRole.WindowText,
+        )
         painter.end()
+
+    def label_rect(self) -> QRect:
+        """Where the + is drawn: the height and vertical place of the tabs' names."""
+        if not self._bar.count():
+            return self.rect()
+        label = self._bar.label_rect(0)
+        return QRect(0, label.top(), self.width(), label.height())
 
 
 class TableTabs(QWidget):

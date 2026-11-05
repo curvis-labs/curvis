@@ -385,3 +385,8 @@ def test_every_tab_is_on_screen(qtbot: QtBot, project: DocumentTab) -> None:
     assert plus.left() == last.right() + 1
     assert plus.top() == last.top() and plus.height() == last.height()
     assert plus.width() >= plus.height()
+    # the + is set like the tab names: same font, same line
+    label = bar.label_rect(0)
+    plus_label = project.table_tabs.plus.label_rect()
+    assert (plus_label.top(), plus_label.height()) == (label.top(), label.height())
+    assert project.table_tabs.plus.font() == bar.font()
