@@ -66,7 +66,7 @@ def inside(child: QWidget, ancestor: QWidget) -> QRect:
 def test_only_blank_project_tile_for_now(qtbot: QtBot) -> None:
     launcher = make_launcher(qtbot)
     assert [t.tile.name for t in launcher.tiles] == ["Blank project"]
-    assert launcher.blank_tile.tile.detail == "Ctrl+N"
+    assert launcher.blank_tile.tile.detail == ""  # no key combination on the launcher
     assert launcher.blank_tile.sizeHint().width() == TILE_WIDTH
 
 
@@ -115,13 +115,22 @@ def test_arrow_keys_move_along_the_tiles(qtbot: QtBot) -> None:
     assert launcher.focusWidget() is first
 
 
+def test_no_key_combinations_are_shown(qtbot: QtBot) -> None:
+    sample = Tile("dose", "Dose-response", "Sample", draw_plus)
+    launcher = make_launcher(qtbot, [blank_tile(), sample])
+    shown = [t.tile.detail for t in launcher.tiles]
+    shown += [launcher.open_button.text(), launcher.open_button.toolTip()]
+    assert not any("Ctrl" in text or "⌘" in text for text in shown)
+    # blank and sample tiles keep the same height, so their names line up
+    assert launcher.tiles[0].sizeHint() == launcher.tiles[1].sizeHint()
+
+
 # --- Open project… -----------------------------------------------------------------------
 
 
 def test_open_project_button(qtbot: QtBot) -> None:
     launcher = make_launcher(qtbot)
     assert launcher.open_button.text() == "&Open project…"
-    assert launcher.open_button.shortcut_text == "Ctrl+O"
     with qtbot.waitSignal(launcher.open_requested, timeout=1000):
         qtbot.mouseClick(launcher.open_button, Qt.MouseButton.LeftButton)
 

@@ -149,7 +149,7 @@
     <div class="win" id="vc" style="width:1000px;height:640px"></div>
     <div class="notes">
       <ol>
-        <li>A row of tiles: <b>Blank project</b> first (with its shortcut), then the sample projects, each with a small picture of its graph (the samples come with step 2.9). Click a tile to start; a sample opens as a new, untitled copy.</li>
+        <li>A row of tiles: <b>Blank project</b> first, then the sample projects, each with a small picture of its graph (the samples come with step 2.9). Click a tile to start; a sample opens as a new, untitled copy.</li>
         <li><b>Open project…</b> sits at the right of the Recent projects heading, next to the list it belongs with.</li>
         <li>Recent projects, newest first: name, folder (shortened in the middle when long) and when it was last opened. One click opens. The hovered row is shaded.</li>
         <li>Right-click a row: <b>Open</b>, <b>Remove from list</b>. Removing never touches the file. A missing file is dimmed and says “File not found”; clicking it does nothing.</li>
@@ -166,7 +166,7 @@
     <div class="holder"><div class="win" id="ec" style="width:1000px;height:620px"></div><div class="cap">First start: no recent projects</div></div>
     <div class="holder"><div class="win" id="ed" style="width:1000px;height:620px"></div><div class="cap">Until step 2.9: Blank project only</div></div>
   </div>
-  <p style="margin-top:40px;max-width:900px">With no recent projects the list is replaced by one centred sentence (DESIGN.md section 5): “Projects you open or save will appear here.” Keyboard: Blank project has the focus, so Enter starts one; Ctrl+N and Ctrl+O work as everywhere. Tab moves from the tiles to Open project… and the list; arrow keys move along the tiles and in the list, Enter opens, and the menu key or Shift+F10 opens the row's menu.</p>
+  <p style="margin-top:40px;max-width:900px">With no recent projects the list is replaced by one centred sentence (DESIGN.md section 5): “Projects you open or save will appear here.” The launcher shows no key combinations. Keyboard: Blank project has the focus, so Enter starts one; Ctrl+N and Ctrl+O work as everywhere. Tab moves from the tiles to Open project… and the list; arrow keys move along the tiles and in the list, Enter opens, and the menu key or Shift+F10 opens the row's menu.</p>
 </section>
 
 <script>
@@ -217,12 +217,12 @@
   };
   function versionC(opts) {
     opts = opts || {};
-    var tiles = [["blank", "Blank project", "Ctrl+N"], ["bars", "Group comparison", "Sample"], ["dose", "Dose-response", "Sample"], ["xy", "XY with replicates", "Sample"]];
+    var tiles = [["blank", "Blank project", ""], ["bars", "Group comparison", "Sample"], ["dose", "Dose-response", "Sample"], ["xy", "XY with replicates", "Sample"]];
     return chrome() + '<div class="body"><div class="c-col">' +
       '<div class="c-tiles">' + (opts.noSamples ? tiles.slice(0, 1) : tiles).map(function (t, i) {
-        return '<div class="ctile' + (i === 2 && !opts.empty ? ' hover' : '') + '"><div class="thumb">' + THUMBS[t[0]] + '</div><b>' + t[1] + '</b><span class="kbd">' + t[2] + '</span></div>';
+        return '<div class="ctile' + (i === 2 && !opts.empty ? ' hover' : '') + '"><div class="thumb">' + THUMBS[t[0]] + '</div><b>' + t[1] + '</b><span class="kbd">' + (t[2] || '&nbsp;') + '</span></div>';
       }).join('') + '</div>' +
-      '<div class="listhead"><h3>Recent projects</h3><span class="right btn">' + svg("open") + 'Open project…<span class="kbd" style="padding-left:8px">Ctrl+O</span></span></div>' + recentList(opts) +
+      '<div class="listhead"><h3>Recent projects</h3><span class="right btn">' + svg("open") + 'Open project…</span></div>' + recentList(opts) +
     '</div></div>';
   }
 

@@ -33,9 +33,7 @@ from PySide6.QtGui import (
     QFocusEvent,
     QFont,
     QFontMetrics,
-    QIcon,
     QKeyEvent,
-    QKeySequence,
     QMouseEvent,
     QPainter,
     QPaintEvent,
@@ -59,7 +57,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QStyle,
     QStyledItemDelegate,
-    QStyleOptionButton,
     QStyleOptionViewItem,
     QVBoxLayout,
     QWidget,
@@ -108,11 +105,6 @@ def _semibold(font: QFont) -> QFont:
     return bold
 
 
-def _native(key: QKeySequence.StandardKey) -> str:
-    """A standard shortcut as the platform writes it (Ctrl+N, ⌘N)."""
-    return QKeySequence(key).toString(QKeySequence.SequenceFormat.NativeText)
-
-
 # --- tiles ---------------------------------------------------------------------------
 
 PictureFn = Callable[[QPainter, QRectF, QPalette], None]
@@ -126,7 +118,8 @@ class Tile:
     key: str
     name: str
     detail: str
-    """The secondary line under the name: the shortcut, or "Sample"."""
+    """The secondary line under the name ("Sample"); empty for *Blank project*. The
+    launcher shows no key combinations."""
     picture: PictureFn
 
 
@@ -144,7 +137,7 @@ def draw_plus(painter: QPainter, rect: QRectF, palette: QPalette) -> None:
 
 
 def blank_tile() -> Tile:
-    return Tile(BLANK_KEY, "Blank project", _native(QKeySequence.StandardKey.New), draw_plus)
+    return Tile(BLANK_KEY, "Blank project", "", draw_plus)
 
 
 class TileButton(QAbstractButton):
@@ -159,7 +152,8 @@ class TileButton(QAbstractButton):
         self.tile = tile
         self.setText(tile.name)
         self.setAccessibleName(tile.name)
-        self.setAccessibleDescription(tile.detail)
+        if tile.detail:
+            self.setAccessibleDescription(tile.detail)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -301,75 +295,6 @@ class TileRow(QWidget):
         index = self.buttons.index(button) + step
         if 0 <= index < len(self.buttons):
             self.buttons[index].setFocus(Qt.FocusReason.TabFocusReason)
-
-
-# --- Open project… -------------------------------------------------------------------
-
-
-class ShortcutButton(QPushButton):
-    """A push button with its icon and text at the left and its shortcut, in
-    ``PlaceholderText``, at the right (*Open project…  Ctrl+O*)."""
-
-    PADDING = 10
-
-    def __init__(
-        self, text: str, icon: QIcon, shortcut_text: str, parent: QWidget | None = None
-    ) -> None:
-        super().__init__(icon, text, parent)
-        self.shortcut_text = shortcut_text
-
-    def _label_width(self) -> int:
-        return self.fontMetrics().horizontalAdvance(self.text().replace("&", ""))
-
-    def sizeHint(self) -> QSize:  # noqa: N802 (Qt API)
-        base = super().sizeHint()
-        width = (
-            self.PADDING * 2
-            + self.iconSize().width()
-            + SPACING
-            + self._label_width()
-            + SECTION_SPACING
-            + self.fontMetrics().horizontalAdvance(self.shortcut_text)
-        )
-        return QSize(max(base.width(), width), base.height())
-
-    def minimumSizeHint(self) -> QSize:  # noqa: N802 (Qt API)
-        return self.sizeHint()
-
-    def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802 (Qt API)
-        painter = QPainter(self)
-        option = QStyleOptionButton()
-        self.initStyleOption(option)
-        option.text = ""
-        option.icon = QIcon()
-        style = self.style()
-        style.drawControl(QStyle.ControlElement.CE_PushButton, option, painter, self)
-
-        inner = self.rect().adjusted(self.PADDING, 0, -self.PADDING, 0)
-        size = self.iconSize()
-        mode = QIcon.Mode.Normal if self.isEnabled() else QIcon.Mode.Disabled
-        top = inner.top() + (inner.height() - size.height()) // 2
-        self.icon().paint(painter, QRect(QPoint(inner.left(), top), size), mode=mode)
-
-        text_rect = inner.adjusted(size.width() + SPACING, 0, 0, 0)
-        mnemonic = (
-            Qt.TextFlag.TextShowMnemonic
-            if style.styleHint(QStyle.StyleHint.SH_UnderlineShortcut, option, self)
-            else Qt.TextFlag.TextHideMnemonic
-        )
-        left = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        style.drawItemText(
-            painter,
-            text_rect,
-            int(left) | int(mnemonic),
-            self.palette(),
-            self.isEnabled(),
-            self.text(),
-            _R.ButtonText,
-        )
-        painter.setPen(self.palette().color(_R.PlaceholderText))
-        right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-        painter.drawText(text_rect, right, self.shortcut_text)
 
 
 # --- recent list ---------------------------------------------------------------------
@@ -603,12 +528,7 @@ class _Content:
         self.recent_label = QLabel("&Recent projects", self.column)
         self.recent_label.setFont(_semibold(self.recent_label.font()))
         self.recent_label.setBuddy(self.recent_list)
-        self.open_button = ShortcutButton(
-            "&Open project…",
-            toolbar_icon("open_project"),
-            _native(QKeySequence.StandardKey.Open),
-            self.column,
-        )
+        self.open_button = QPushButton(toolbar_icon("open_project"), "&Open project…", self.column)
         self.open_button.setToolTip("Open a project file")
         heading = QHBoxLayout()
         heading.setContentsMargins(0, 0, 0, 0)
@@ -691,7 +611,7 @@ class LauncherWidget(QWidget):
         return self._ensure_built().recent_label
 
     @property
-    def open_button(self) -> ShortcutButton:
+    def open_button(self) -> QPushButton:
         return self._ensure_built().open_button
 
     @property
