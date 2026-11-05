@@ -45,12 +45,15 @@ def test_cycles_dropped_on_a_worker_are_collected_on_the_main_thread(
     finalized: list[threading.Thread] = []
     holder = [CyclicProbe(finalized)]
 
-    def job() -> int:
+    def job() -> list[tuple[int, str]]:
         holder.clear()  # the probe is now unreachable garbage
         # Allocate like a CSV preview does (tuples per record): enough container
         # objects for automatic collection of every generation to trigger here.
-        kept = [(i, str(i)) for i in range(300_000)]
-        return len(kept)
+        # Return them, so they are still alive when the main thread's timer next
+        # looks: it sees only the net count (allocations minus frees) at that moment.
+        # Freed in the job, the net count could be anywhere near zero, depending on
+        # how full the tuple free list was (it is full after many earlier tests).
+        return [(i, str(i)) for i in range(300_000)]
 
     done: list[object] = []
     scheduler.finished.connect(lambda node, result: done.append(result))
