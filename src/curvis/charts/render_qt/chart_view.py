@@ -686,7 +686,13 @@ def render_page(
     spec: ChartSpec, data: ChartData | None, scale: float = 1.0
 ) -> tuple[QImage, QRectF]:
     """Draw ``spec`` offscreen on its page at 96 dpi × ``scale``; returns the image and
-    the plot area in it. For the image-diff tests and screenshots."""
+    the plot area in it. For the image-diff tests and screenshots.
+
+    The page is painted into a non-premultiplied ARGB32 image: Qt's raster engine draws
+    text there with grey antialiasing on every system, where on Windows with ClearType
+    it would use subpixel text (coloured fringes) for an opaque target whatever the font
+    asks for. The export never has those fringes, and on screen they are only a display
+    effect."""
     width, height = page_px(spec, SCREEN_DPI * scale)
     view = ChartView()
     view.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
@@ -697,7 +703,11 @@ def render_page(
     for _ in range(3):
         if app is not None:
             app.processEvents()
-    image = view.plot_widget.grab().toImage()
+    image = QImage(view.plot_widget.size(), QImage.Format.Format_ARGB32)
+    image.fill(QColor(scheme(spec.color_scheme).page))
+    painter = QPainter(image)
+    view.plot_widget.render(painter)
+    painter.end()
     rect = view.plot_rect().translated(-view.plot_widget.pos().toPointF())
     view.close()
     view.deleteLater()

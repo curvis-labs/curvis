@@ -55,7 +55,10 @@ from the theme (DESIGN.md §3).
 
 - **Subpixel text.** Where the system asks for subpixel (LCD) antialiasing, Qt drew chart
   text with coloured fringes that the measure counted as series colour (page 0.21). Chart
-  fonts now always use grey antialiasing, as Matplotlib does (`chart_font`).
+  fonts now always use grey antialiasing, as Matplotlib does (`chart_font`). On Windows
+  with ClearType, Qt's raster engine ignores that for an opaque target, so `render_page`
+  paints into a non-premultiplied ARGB32 image, where it always draws grey text. A
+  Windows screen may still show chart text with ClearType: a display effect only.
 - **Legend spacing.** Matplotlib's layout pads both sides of the gap between the plot and
   the legend, and the legend has a border inside; the screen legend now has the same
   margins (`PAGE_PAD_PT`, `LEGEND_BORDER_EM`), so the two plots are equally wide.
