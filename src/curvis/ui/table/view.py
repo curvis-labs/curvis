@@ -518,13 +518,15 @@ class TableView(QTableView):
         return text if ok else None
 
     def _ask_category(self, current: str, existing: list[str]) -> str | None:
-        """Ask for a category name, offering the existing ones (tests replace this)."""
+        """Ask for a category name, offering the existing ones and ``current`` (selected;
+        tests replace this)."""
+        items = existing if current in existing else [*existing, current]
         text, ok = QInputDialog.getItem(
             self,
             "Set category",
             f"{self.model().table.category_factor}:",
-            existing,
-            existing.index(current) if current in existing else 0,
+            items,
+            items.index(current),
             True,
         )
         return text if ok else None
@@ -553,7 +555,8 @@ class TableView(QTableView):
             return False
         table = model.table
         existing = [c.name for c in table.category_groups]
-        current = model.category_at(cols) or ""
+        # One click on OK keeps the series' category, or starts a new one.
+        current = model.category_at(cols) or model.next_category_name()
         name = self._ask_category(current, existing)
         if name is None or not name.strip():
             return False

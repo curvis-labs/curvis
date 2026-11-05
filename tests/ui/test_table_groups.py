@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterator
 
 import pytest
 from PySide6.QtCore import QPoint, Qt
-from PySide6.QtWidgets import QDialogButtonBox
+from PySide6.QtWidgets import QDialogButtonBox, QInputDialog
 from pytestqt.qtbot import QtBot
 
 from curvis.core import AddTable, Document, GroupColumns, SetCategory
@@ -486,3 +486,40 @@ def test_move_actions_have_shortcuts(window: MainWindow) -> None:
     action = window.registry.action("table.move_right")
     assert action.shortcut().toString() == "Alt+Shift+Right"
     assert action.isEnabled()
+
+
+def test_set_category_works_with_one_click_on_ok(
+    view: TableView, doc: Document, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The prompt suggests a free name, so OK alone puts the series in a new category;
+    the next series are offered a new name too, with the existing ones in the list."""
+    offered: list[tuple[str, list[str]]] = []
+
+    def ok(self: TableView, current: str, existing: list[str]) -> str:
+        offered.append((current, existing))
+        return current
+
+    monkeypatch.setattr(TableView, "_ask_category", ok)
+    view.select_columns(5, 5)
+    assert view.set_category_of_selected()
+    view.select_columns(6, 6)
+    assert view.set_category_of_selected()
+    assert offered == [("Category 1", []), ("Category 2", ["Category 1"])]
+    assert [c.name for c in doc.tables[0].category_groups] == ["Category 1", "Category 2"]
+
+
+def test_set_category_prompt_selects_the_suggestion(
+    view: TableView, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, object] = {}
+
+    def get_item(*args: object) -> tuple[str, bool]:
+        _parent, _title, _label, items, index, editable = args
+        seen.update(items=items, index=index, editable=editable)
+        return items[index], True  # type: ignore[index]
+
+    monkeypatch.setattr(QInputDialog, "getItem", staticmethod(get_item))
+    assert view._ask_category("Category 2", ["Category 1"]) == "Category 2"
+    assert seen == {"items": ["Category 1", "Category 2"], "index": 1, "editable": True}
+    assert view._ask_category("Category 1", ["Category 1"]) == "Category 1"
+    assert seen["items"] == ["Category 1"]
