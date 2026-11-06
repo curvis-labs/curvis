@@ -173,8 +173,17 @@ class CrashLog:
         """Write ``report`` to a new file and keep only the newest :data:`MAX_REPORTS`."""
         self.directory.mkdir(parents=True, exist_ok=True)
         stamp = (when or datetime.now(UTC)).strftime("%Y%m%d-%H%M%S-%f")
-        path = self.directory / f"{REPORT_PREFIX}{stamp}.log"
-        path.write_text(report, encoding="utf-8")
+        # Two reports can get the same time (the clock is coarse on Windows): number
+        # them, and never overwrite one. The names sort oldest first.
+        number = 1
+        while True:
+            path = self.directory / f"{REPORT_PREFIX}{stamp}-{number:03d}.log"
+            try:
+                with path.open("x", encoding="utf-8") as file:
+                    file.write(report)
+                break
+            except FileExistsError:
+                number += 1
         for old in self.reports()[:-MAX_REPORTS]:
             old.unlink(missing_ok=True)
         return path

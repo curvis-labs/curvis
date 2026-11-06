@@ -78,6 +78,16 @@ def test_only_the_newest_reports_are_kept(tmp_path: Path) -> None:
     assert log.reports() == paths[3:]
 
 
+def test_reports_at_the_same_time_are_all_kept(tmp_path: Path) -> None:
+    """The clock can give two reports the same time (Windows): neither is lost, and
+    they stay in order."""
+    log = CrashLog(tmp_path)
+    when = datetime(2026, 11, 6, tzinfo=UTC)
+    paths = [log.save(f"report {i}", when) for i in range(3)]
+    assert log.reports() == paths
+    assert [p.read_text(encoding="utf-8") for p in paths] == ["report 0", "report 1", "report 2"]
+
+
 def test_one_dialog_at_a_time(tmp_path: Path) -> None:
     """An error raised while the dialog is open (e.g. in a paint event) is saved but
     does not open a second dialog."""
