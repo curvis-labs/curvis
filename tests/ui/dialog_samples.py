@@ -279,6 +279,26 @@ def _export(_ctx: Context) -> QDialog:
     return ExportDialog(doc.graph(graph_id))
 
 
+CRASH_REPORT = """Curvis 0.1.0b1
+Python 3.12.3 (CPython)
+Qt 6.9.0 (PySide6 6.9.0)
+Linux 6.8.0 (x86_64)
+Time 2026-11-05 14:02:11 UTC
+
+Traceback (most recent call last):
+  File "~/curvis/src/curvis/ui/graph_panel.py", line 214, in _on_series_toggled
+    self.toggle_requested.emit(self.current_id, source, visible)
+ValueError: series 'Drug' is not in this graph
+"""
+
+
+def _crash(_ctx: Context) -> QDialog:
+    from curvis.ui.crash_dialog import CrashDialog
+
+    path = Path("~/.local/share/Curvis/Curvis/crash/curvis-crash-20261105-140211.log")
+    return CrashDialog(CRASH_REPORT, path)
+
+
 SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "import": _import,
     "bulk_rename": _bulk_rename,
@@ -307,6 +327,7 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "format_bar_series": _format_bar_series,
     "format_bad_range": _format_bad_range,
     "export_graph": _export,
+    "crash": _crash,
 }
 
 

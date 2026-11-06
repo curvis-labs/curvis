@@ -75,6 +75,7 @@ class Settings(QObject):
     RECENT = "projects/recent"
     GLOBAL_CONSTANTS = "formulas/global_constants"
     RECENT_ANALYSES = "analyses/recent"
+    CRASH_LOG = "privacy/crash_log"
 
     def __init__(self, store: QSettings | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -119,6 +120,18 @@ class Settings(QObject):
                 f"Decimal places must be between {DECIMAL_PLACES_MIN} and {DECIMAL_PLACES_MAX}."
             )
         self._set(self.DECIMAL_PLACES, int(places))
+
+    # --- crash log -----------------------------------------------------------------
+
+    @property
+    def crash_log(self) -> bool:
+        """Keep a local crash log (opt-in, off by default; nothing is sent)."""
+        value = self._store.value(self.CRASH_LOG, False)
+        return str(value).lower() in ("true", "1")
+
+    @crash_log.setter
+    def crash_log(self, enabled: bool) -> None:
+        self._set(self.CRASH_LOG, bool(enabled))
 
     # --- recent projects ---------------------------------------------------------
 

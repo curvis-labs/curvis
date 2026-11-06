@@ -109,12 +109,6 @@ class DeleteDialog(QDialog):
         self.cancel_button.setDefault(True)
         self.cancel_button.setFocus()
         size_simple(self)
-        # A long lead wraps: keep room for all its lines.
-        layout = self.layout()
-        if layout is not None and layout.hasHeightForWidth():
-            height = layout.totalHeightForWidth(self.width())
-            self.setMinimumHeight(height)
-            self.resize(self.width(), max(self.height(), height))
 
     @property
     def delete_button(self) -> QWidget:

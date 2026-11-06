@@ -8,9 +8,10 @@ from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, QTimer
 from PySide6.QtGui import QFileOpenEvent
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QWidget
 
 from curvis import __version__
+from curvis.crash import CrashLog
 from curvis.settings import Settings
 from curvis.settings.store import APPLICATION, ORGANIZATION, ORGANIZATION_DOMAIN
 from curvis.ui.main_window import FORMULA_WARM_UP_DELAY_MS, PROJECT_SUFFIX, MainWindow
@@ -88,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     app.setWindowIcon(app_icon())
 
     settings = Settings()
+    crash_log = CrashLog(enabled=settings.crash_log)
+    crash_log.install()
     themes = ThemeManager(app)
     themes.apply(settings.theme)
     settings.changed.connect(
@@ -95,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     window = MainWindow(settings)
+    crash_log.show = lambda report, path: show_crash_report(window, report, path)
+    settings.changed.connect(
+        lambda key: crash_log.set_enabled(settings.crash_log) if key == Settings.CRASH_LOG else None
+    )
     if os.environ.get(EXIT_AFTER_LAUNCHER):
         probe = _ExitWhenShown(window)
         window.launcher.installEventFilter(probe)
@@ -106,4 +113,19 @@ def main(argv: list[str] | None = None) -> int:
     router.set_window(window)
     for path in project_paths(argv[1:]):
         window.open_path(path)
-    return app.exec()
+    leftover = crash_log.take_leftover_fault()
+    if leftover is not None:  # the last session crashed hard
+        QTimer.singleShot(0, lambda: show_crash_report(window, *leftover))
+    try:
+        return app.exec()
+    finally:
+        crash_log.close()
+
+
+def show_crash_report(parent: QWidget, report: str, path: Path) -> None:
+    """Show a crash report (the crash log is on)."""
+    from curvis.ui.crash_dialog import CrashDialog
+
+    dialog = CrashDialog(report, path, parent)
+    dialog.exec()
+    dialog.deleteLater()

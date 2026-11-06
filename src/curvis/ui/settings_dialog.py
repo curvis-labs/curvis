@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QComboBox, QDialog, QSpinBox, QWidget
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QSpinBox, QWidget
 
 from curvis.settings import Settings, Theme
 from curvis.settings.store import DECIMAL_PLACES_MAX, DECIMAL_PLACES_MIN
-from curvis.ui.dialogs import DialogSkeleton, form_layout, size_simple
+from curvis.ui.dialogs import DialogSkeleton, form_layout, secondary_label, size_simple
+
+CRASH_LOG_TEXT = "Keep a &crash log on this computer"
+CRASH_LOG_NOTE = (
+    "Nothing is sent. When Curvis runs into a problem, it saves a report you can copy "
+    "and send yourself."
+)
 
 
 class SettingsDialog(QDialog):
-    """Theme and decimal places. More settings arrive in step 3.5."""
+    """Theme, decimal places and the crash log. More settings arrive in step 3.5."""
 
     def __init__(self, settings: Settings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -27,12 +33,18 @@ class SettingsDialog(QDialog):
         self.decimal_places.setValue(settings.decimal_places)
         self.decimal_places.setToolTip("Number of decimal places shown in calculated columns.")
 
+        self.crash_log = QCheckBox(CRASH_LOG_TEXT, self)
+        self.crash_log.setChecked(settings.crash_log)
+        self.crash_log_note = secondary_label(CRASH_LOG_NOTE, self)
+
         self.skeleton = DialogSkeleton(self, "Save")
         self.buttons = self.skeleton.buttons
         form = form_layout()
         form.addRow("&Theme", self.theme)
         form.addRow("&Decimal places in calculated columns", self.decimal_places)
         self.skeleton.body.addLayout(form)
+        self.skeleton.body.addWidget(self.crash_log)
+        self.skeleton.body.addWidget(self.crash_log_note)
         self.skeleton.body.addStretch(1)
         size_simple(self)
 
@@ -42,4 +54,6 @@ class SettingsDialog(QDialog):
             self._settings.theme = theme
         if self.decimal_places.value() != self._settings.decimal_places:
             self._settings.decimal_places = self.decimal_places.value()
+        if self.crash_log.isChecked() != self._settings.crash_log:
+            self._settings.crash_log = self.crash_log.isChecked()
         super().accept()
