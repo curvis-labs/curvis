@@ -210,6 +210,12 @@ def size_simple(dialog: QDialog) -> None:
     hint = dialog.sizeHint()
     dialog.setMinimumWidth(max(SIMPLE_MINIMUM_WIDTH, dialog.minimumSizeHint().width()))
     dialog.resize(max(SIMPLE_MINIMUM_WIDTH, hint.width()), hint.height())
+    # Text that wraps needs more height at a narrow width: keep room for all its lines.
+    layout = dialog.layout()
+    if layout is not None and layout.hasHeightForWidth():
+        height = layout.totalHeightForWidth(dialog.minimumWidth())
+        dialog.setMinimumHeight(height)
+        dialog.resize(dialog.width(), max(dialog.height(), height))
 
 
 def columns(body: QBoxLayout, left: int = 1, right: int = 1) -> tuple[QVBoxLayout, QVBoxLayout]:

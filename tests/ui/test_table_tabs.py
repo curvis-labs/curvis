@@ -259,6 +259,29 @@ def test_move_table_keeps_the_tabs_in_step(project: DocumentTab) -> None:
     assert shown(project) == "Viability"
 
 
+def test_rename_and_move_a_table_by_keyboard(
+    qtbot: QtBot, project: DocumentTab, window: MainWindow
+) -> None:
+    """Rename table and Move table left / right are actions (menu and palette), so a
+    table can be renamed and reordered without the mouse."""
+    a = window.registry.action
+    assert not a("table.move_table_left").isEnabled()  # Viability is the first table
+    assert a("table.move_table_left").toolTip() == "This is the first table"
+    a("table.move_table_right").trigger()
+    assert names(project) == ["Survival", "Viability"]
+    assert shown(project) == "Viability"
+    assert not a("table.move_table_right").isEnabled()
+    a("table.move_table_left").trigger()
+    assert names(project) == ["Viability", "Survival"]
+    a("table.rename").trigger()
+    editor = project.table_tabs.editor
+    assert editor is not None and editor.text() == "Viability"
+    qtbot.keyClicks(editor, "Viability 48 h")
+    qtbot.keyClick(editor, Qt.Key.Key_Return)
+    assert names(project) == ["Viability 48 h", "Survival"]
+    assert project.document.undo_stack.count == 3
+
+
 # --- closing -------------------------------------------------------------------------------
 
 

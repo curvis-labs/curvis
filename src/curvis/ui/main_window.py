@@ -37,7 +37,7 @@ from curvis.data import ColumnRole, Table
 from curvis.settings import Settings
 from curvis.ui.actions import ActionRegistry
 from curvis.ui.document_tab import DocumentTab
-from curvis.ui.launcher import LauncherWidget
+from curvis.ui.launcher import SAMPLE_NAMES, LauncherWidget
 from curvis.ui.table import TableView
 from curvis.ui.toolbars import (
     build_main_toolbar,
@@ -151,6 +151,7 @@ class MainWindow(QMainWindow):
         # scheduler node -> (file, tab and table to import into; None for a new project)
         self._pending_imports: dict[str, tuple[Path, DocumentTab | None, str | None]] = {}
         self._untitled_count = 0
+        self._sample_menu: QMenu | None = None
         self._table_actions_created = False
 
         self.launcher = LauncherWidget(self)
@@ -170,6 +171,7 @@ class MainWindow(QMainWindow):
         self.table_toolbar: QToolBar | None = None
 
         self.launcher.new_requested.connect(self.new_document)
+        self.launcher.tile_chosen.connect(self.new_from_sample)
         self.launcher.open_requested.connect(self.open_document)
         self.launcher.recent_chosen.connect(self.open_path)
         self.launcher.remove_requested.connect(self.settings.remove_recent_project)
@@ -251,7 +253,10 @@ class MainWindow(QMainWindow):
         a = self.registry.action
         file_menu = self.menuBar().addMenu("&File")
         file_menu.setToolTipsVisible(True)  # why Close table… is disabled
-        file_menu.addActions([a("file.new"), a("file.open"), a("file.import")])
+        file_menu.addAction(a("file.new"))
+        file_menu.addActions([a("file.open"), a("file.import")])
+        # The samples' menu and actions are made when first needed (start-up time).
+        file_menu.aboutToShow.connect(self.ensure_sample_actions)
         file_menu.addSeparator()
         file_menu.addActions([a("file.save"), a("file.save_as")])
         file_menu.addSeparator()
@@ -493,6 +498,24 @@ class MainWindow(QMainWindow):
             shortcut="Ctrl+Shift+N",
         )
         r.register(
+            "table.rename",
+            "&Rename table",
+            self._tab_call(DocumentTab.rename_table),
+            category="File",
+        )
+        r.register(
+            "table.move_table_left",
+            "Move table le&ft",
+            self._tab_call(functools.partial(DocumentTab.move_selected_table, step=-1)),
+            category="View",
+        )
+        r.register(
+            "table.move_table_right",
+            "Move table righ&t",
+            self._tab_call(functools.partial(DocumentTab.move_selected_table, step=1)),
+            category="View",
+        )
+        r.register(
             "table.close",
             "Close ta&ble…",
             self._tab_call(DocumentTab.close_table),
@@ -564,10 +587,17 @@ class MainWindow(QMainWindow):
         )
         self._view_menu.insertSeparator(a("view.command_palette"))
         self._view_menu.insertActions(
-            a("view.command_palette"), [a("table.next"), a("table.previous")]
+            a("view.command_palette"),
+            [
+                a("table.next"),
+                a("table.previous"),
+                a("table.move_table_left"),
+                a("table.move_table_right"),
+            ],
         )
         self._view_menu.insertSeparator(a("view.command_palette"))
-        self._file_menu.insertAction(a("file.open"), a("table.new"))
+        before = self._sample_menu.menuAction() if self._sample_menu else a("file.open")
+        self._file_menu.insertActions(before, [a("table.new"), a("table.rename")])
         self._file_menu.insertAction(a("file.close"), a("table.close"))
         self._ensure_main_toolbar()  # first in the row
         self.table_toolbar = build_table_toolbar(self, self.registry)
@@ -588,6 +618,32 @@ class MainWindow(QMainWindow):
         self._untitled_count += 1
         name = "Untitled" if self._untitled_count == 1 else f"Untitled {self._untitled_count}"
         return self._add_tab(Document(name=name, tables=[Table.blank()]), None)
+
+    def ensure_sample_actions(self) -> QMenu:
+        """*New from sample* in the File menu and its actions (one per sample, in the command
+        palette too), made the first time the File menu or the palette opens."""
+        if self._sample_menu is None:
+            r = self.registry
+            for key, name in SAMPLE_NAMES.items():
+                r.register(
+                    f"file.sample.{key}",
+                    f"&{name}",
+                    functools.partial(self.new_from_sample, key),
+                    category="New from sample",
+                )
+            menu = QMenu("New from sa&mple", self._file_menu)
+            menu.addActions([r.action(f"file.sample.{key}") for key in SAMPLE_NAMES])
+            # after New project (and New table, Rename table), before Open
+            self._file_menu.insertMenu(r.action("file.open"), menu)
+            self._sample_menu = menu
+        return self._sample_menu
+
+    def new_from_sample(self, key: str) -> DocumentTab:
+        """Open the sample project ``key`` as a new, untitled copy: it has no file, so
+        Save asks where to save it, and it is not added to the recent projects."""
+        from curvis.samples import sample
+
+        return self._add_tab(sample(key).build(), None)
 
     def open_document(self) -> None:
         """Ask for a project file and open it."""
@@ -927,6 +983,7 @@ class MainWindow(QMainWindow):
     def show_command_palette(self) -> None:
         from curvis.ui.command_palette import CommandPalette
 
+        self.ensure_sample_actions()
         CommandPalette(self.registry, self).exec()
 
     # --- state ------------------------------------------------------------------------
@@ -1001,11 +1058,12 @@ class MainWindow(QMainWindow):
         set_tooltips(self.registry, reasons)
 
     def _update_table_tab_actions(self, tab: DocumentTab | None, reasons: dict[str, str]) -> None:
-        """Enable New table, Close table and Next / Previous table, and say why when
-        they are not."""
+        """Enable New table, Rename table, Close table, Next / Previous table and Move
+        table left / right, and say why when they are not."""
         a = self.registry.action
-        a("table.new").setEnabled(tab is not None)
-        reasons["table.new"] = NO_PROJECT
+        for action_id in ("table.new", "table.rename"):
+            a(action_id).setEnabled(tab is not None)
+            reasons[action_id] = NO_PROJECT
         tables = tab.document.tables if tab is not None else []
         selected = tab.current_table_id if tab is not None else None
         # -1 while the selected table is being removed (before the tab selects another)
@@ -1014,6 +1072,8 @@ class MainWindow(QMainWindow):
             "table.close": (len(tables) > 1, LAST_TABLE),
             "table.next": (0 <= index < len(tables) - 1, LAST_TABLE_SELECTED),
             "table.previous": (index > 0, FIRST_TABLE_SELECTED),
+            "table.move_table_left": (index > 0, FIRST_TABLE_SELECTED),
+            "table.move_table_right": (0 <= index < len(tables) - 1, LAST_TABLE_SELECTED),
         }
         for action_id, (enabled, reason) in states.items():
             action = a(action_id)

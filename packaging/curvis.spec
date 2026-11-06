@@ -11,6 +11,8 @@ ROOT = Path(SPECPATH).parent  # noqa: F821 (defined by PyInstaller)
 VERSION = re.search(
     r'__version__ = "([^"]+)"', (ROOT / "src" / "curvis" / "__init__.py").read_text()
 ).group(1)
+# macOS wants digits only (0.1.0b1 -> 0.1.0); the full version stays in the file names.
+NUMERIC_VERSION = re.match(r"\d+(\.\d+)*", VERSION).group(0)
 BUNDLE_ID = "org.curvis.Curvis"
 DOCUMENT_TYPE = "org.curvis.project"  # macOS type identifier of .cvp files
 
@@ -72,10 +74,24 @@ def keep(entry):
     return not any(part in path for part in DROP)
 
 
+# Curvis imports some of its own modules by name (the built-in analyses, scheduler
+# jobs), which PyInstaller cannot see: bundle all of them, and with them the libraries
+# they import inside functions (lmfit). packaging/check_bundle.py checks it.
+sys.path.insert(0, str(ROOT / "src"))
+from PyInstaller.utils.hooks import collect_submodules  # noqa: E402
+
+HIDDEN_IMPORTS = [
+    *collect_submodules("curvis"),
+    # savefig(format="pdf" / "svg") loads these backends by name (PDF and SVG export).
+    "matplotlib.backends.backend_pdf",
+    "matplotlib.backends.backend_svg",
+]
+
 a = Analysis(  # noqa: F821
     [str(ROOT / "packaging" / "entry.py")],
     pathex=[str(ROOT / "src")],
     datas=[(str(ROOT / "src" / "curvis" / "ui" / "icons"), "curvis/ui/icons")],
+    hiddenimports=HIDDEN_IMPORTS,
     excludes=EXCLUDES,
     noarchive=False,
 )
@@ -110,12 +126,12 @@ if sys.platform == "darwin":
         name="Curvis.app",
         bundle_identifier=BUNDLE_ID,
         icon=str(ICONS["icns"]),
-        version=VERSION,
+        version=NUMERIC_VERSION,
         info_plist={
             "CFBundleName": "Curvis",
             "CFBundleDisplayName": "Curvis",
-            "CFBundleShortVersionString": VERSION,
-            "CFBundleVersion": VERSION,
+            "CFBundleShortVersionString": NUMERIC_VERSION,
+            "CFBundleVersion": NUMERIC_VERSION,
             "NSHighResolutionCapable": True,
             "NSRequiresAquaSystemAppearance": False,  # allow dark mode
             "LSMinimumSystemVersion": "12.0",

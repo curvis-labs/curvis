@@ -24,6 +24,7 @@ from PySide6.QtCore import (
     QRect,
     QRectF,
     QSize,
+    QSizeF,
     Qt,
     Signal,
 )
@@ -36,6 +37,7 @@ from PySide6.QtGui import (
     QKeyEvent,
     QMouseEvent,
     QPainter,
+    QPainterPath,
     QPaintEvent,
     QPalette,
     QPen,
@@ -113,7 +115,7 @@ PictureFn = Callable[[QPainter, QRectF, QPalette], None]
 
 @dataclass(frozen=True)
 class Tile:
-    """Something to start from: a blank project, or a sample project (step 2.9)."""
+    """Something to start from: a blank project, or a sample project."""
 
     key: str
     name: str
@@ -138,6 +140,116 @@ def draw_plus(painter: QPainter, rect: QRectF, palette: QPalette) -> None:
 
 def blank_tile() -> Tile:
     return Tile(BLANK_KEY, "Blank project", "", draw_plus)
+
+
+# The sample pictures follow docs/mockups/launcher.html: a 120 × 76 drawing, centred in
+# the frame, with the axes in PlaceholderText and the data in Link.
+THUMB_SIZE = QSizeF(120, 76)
+SAMPLE_DETAIL = "Sample"
+
+
+def _thumb_origin(painter: QPainter, rect: QRectF) -> None:
+    """Move the painter so (0, 0) is the top left of a 120 × 76 drawing centred in ``rect``."""
+    painter.translate(
+        rect.center().x() - THUMB_SIZE.width() / 2, rect.center().y() - THUMB_SIZE.height() / 2
+    )
+
+
+def _pen(color: QColor, width: float) -> QPen:
+    pen = QPen(color, width)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    return pen
+
+
+def _axes(painter: QPainter, palette: QPalette) -> None:
+    painter.setPen(_pen(palette.color(_R.PlaceholderText), 1.5))
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawPolyline([QPointF(10, 6), QPointF(10, 68), QPointF(114, 68)])
+
+
+def _dots(painter: QPainter, color: QColor, points: Sequence[tuple[float, float]]) -> None:
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(color)
+    for x, y in points:
+        painter.drawEllipse(QPointF(x, y), 2.5, 2.5)
+
+
+def draw_bars(painter: QPainter, rect: QRectF, palette: QPalette) -> None:
+    """The picture of *Group comparison*: three bars with error bars."""
+    painter.save()
+    _thumb_origin(painter, rect)
+    _axes(painter, palette)
+    link = palette.color(_R.Link)
+    light = QColor(link)
+    light.setAlphaF(0.45)
+    painter.setPen(Qt.PenStyle.NoPen)
+    for x, top, color in ((22, 40, link), (48, 22, light), (74, 30, link)):
+        painter.setBrush(color)
+        painter.drawRoundedRect(QRectF(x, top, 18, 68 - top), 1, 1)
+    painter.setPen(_pen(link, 1.5))
+    for x, top in ((31, 34), (57, 16), (83, 24)):
+        painter.drawLine(QPointF(x, top), QPointF(x, top - 8))
+    painter.restore()
+
+
+def draw_dose_response(painter: QPainter, rect: QRectF, palette: QPalette) -> None:
+    """The picture of *Dose-response*: points on a rising sigmoid curve."""
+    painter.save()
+    _thumb_origin(painter, rect)
+    _axes(painter, palette)
+    link = palette.color(_R.Link)
+    path = QPainterPath(QPointF(14, 62))
+    path.cubicTo(QPointF(44, 62), QPointF(44, 60), QPointF(60, 36))
+    path.cubicTo(QPointF(76, 12), QPointF(76, 12), QPointF(110, 10))
+    painter.setPen(_pen(link, 2.0))
+    painter.drawPath(path)
+    _dots(painter, link, [(20, 60), (38, 58), (56, 42), (70, 22), (88, 14), (104, 12)])
+    painter.restore()
+
+
+def draw_xy(painter: QPainter, rect: QRectF, palette: QPalette) -> None:
+    """The picture of *XY with replicates*: a line through points with error bars."""
+    painter.save()
+    _thumb_origin(painter, rect)
+    _axes(painter, palette)
+    link = palette.color(_R.Link)
+    points = [(18, 58), (40, 46), (62, 38), (84, 24), (106, 16)]
+    painter.setPen(_pen(link, 1.5))
+    painter.drawPolyline([QPointF(x, y) for x, y in points])
+    painter.setPen(_pen(link, 1.0))
+    for x, y in points:
+        painter.drawLine(QPointF(x, y - 6), QPointF(x, y + 6))
+    _dots(painter, link, points)
+    painter.restore()
+
+
+SAMPLE_PICTURES: dict[str, PictureFn] = {
+    "group_comparison": draw_bars,
+    "dose_response": draw_dose_response,
+    "xy_replicates": draw_xy,
+}
+"""The picture of each sample tile, by sample key (see curvis.samples)."""
+
+SAMPLE_NAMES = {
+    "group_comparison": "Group comparison",
+    "dose_response": "Dose-response",
+    "xy_replicates": "XY with replicates",
+}
+"""The sample names, here so the launcher does not import curvis.samples at start-up
+(a test checks that they match)."""
+
+
+def sample_tiles() -> list[Tile]:
+    """A tile for each sample project, after *Blank project*."""
+    return [
+        Tile(key, name, SAMPLE_DETAIL, SAMPLE_PICTURES[key]) for key, name in SAMPLE_NAMES.items()
+    ]
+
+
+def default_tiles() -> list[Tile]:
+    """*Blank project*, then the sample projects."""
+    return [blank_tile(), *sample_tiles()]
 
 
 class TileButton(QAbstractButton):
@@ -567,7 +679,7 @@ class LauncherWidget(QWidget):
     remove_requested = Signal(Path)
     """Take this project off the recent list; the file is not touched."""
     tile_chosen = Signal(str)
-    """A tile other than *Blank project* was chosen (the sample projects, step 2.9)."""
+    """A tile other than *Blank project* was chosen: the key of a sample project."""
 
     def __init__(
         self,
@@ -578,7 +690,7 @@ class LauncherWidget(QWidget):
         super().__init__(parent)
         self.setObjectName("launcher")
         self._clock = clock
-        self._tiles = list(tiles) if tiles is not None else [blank_tile()]
+        self._tiles = list(tiles) if tiles is not None else default_tiles()
         self._projects: list[RecentProject] = []
         self._content: _Content | None = None
 

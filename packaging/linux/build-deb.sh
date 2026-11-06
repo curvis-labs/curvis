@@ -4,6 +4,8 @@
 # .cvp MIME type (dpkg triggers refresh the MIME and desktop databases).
 set -euo pipefail
 version="$1"
+# A pre-release sorts before its release in Debian with a tilde: 0.1.0b1 -> 0.1.0~b1.
+deb_version="$(printf '%s' "$version" | sed -E 's/([0-9])(a|b|rc)([0-9]+)$/\1~\2\3/')"
 here="$(cd "$(dirname "$0")" && pwd)"
 arch="$(dpkg --print-architecture)"
 root="build/deb/curvis"
@@ -21,7 +23,7 @@ cp -r "$icons/hicolor" "$root/usr/share/icons/"
 size="$(du -sk "$root" | cut -f1)"
 cat > "$root/DEBIAN/control" <<CONTROL
 Package: curvis
-Version: ${version}
+Version: ${deb_version}
 Section: science
 Priority: optional
 Architecture: ${arch}

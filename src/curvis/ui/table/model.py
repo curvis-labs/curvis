@@ -439,6 +439,14 @@ class TableModel(QAbstractTableModel):
             n += 1
         return f"Group {n}"
 
+    def next_category_name(self) -> str:
+        """A free category name: "Category 1", "Category 2", …"""
+        taken = {name_key(c.name) for c in self.table.category_groups}
+        n = 1
+        while name_key(f"Category {n}") in taken:
+            n += 1
+        return f"Category {n}"
+
     def group_columns(self, positions: Sequence[int], name: str) -> bool:
         """Combine the columns at ``positions`` into a new replicate group."""
         columns = self.columns_at(positions)

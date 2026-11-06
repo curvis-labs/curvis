@@ -2,6 +2,8 @@
 
 Curvis is an open-source desktop application for analyzing and plotting scientific data, comparable to GraphPad Prism. You enter or import measurements into data tables, run statistical tests, curve fits and survival analyses, and draw publication-ready graphs, all from one project window and without writing code. It is aimed at lab scientists, runs on Windows, macOS and Linux, and puts correct statistics first: every analysis is validated against reference results from R.
 
+**New to Curvis?** Read [Getting started](docs/getting-started.md).
+
 ## Development
 
 Curvis uses Python 3.12 and [uv](https://docs.astral.sh/uv/).
@@ -43,8 +45,18 @@ To build the app bundle locally:
 ```bash
 uv sync --group build
 uv run pyinstaller packaging/curvis.spec --noconfirm   # dist/Curvis or dist/Curvis.app
-packaging/linux/build-deb.sh 0.1.0                     # Linux: dist/curvis_0.1.0_<arch>.deb
+packaging/linux/build-deb.sh 0.1.0b1                   # Linux: dist/curvis_0.1.0b1_<arch>.deb
 ```
+
+### Releases
+
+Pushing a version tag builds the installers and publishes them as a GitHub release (`.github/workflows/release.yml`); a tag with a hyphen, such as `v0.1.0-beta`, is a pre-release. Tag a commit on `main`:
+
+```bash
+git tag -a v0.1.0-beta -m "Curvis 0.1.0 beta" && git push origin v0.1.0-beta
+```
+
+The version in `src/curvis/__init__.py` and `pyproject.toml` (e.g. `0.1.0b1`) names the installer files. macOS and the Windows file properties show only its numbers (`0.1.0`), and the `.deb` is versioned `0.1.0~b1` so that `0.1.0` counts as newer.
 
 ## License
 
