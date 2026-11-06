@@ -26,6 +26,7 @@ def menu_actions(menu: QMenu) -> list[QAction]:
 
 
 def all_ui_actions(window: MainWindow) -> list[QAction]:
+    window.ensure_sample_actions()  # made when the File menu first opens
     actions: list[QAction] = []
     for top in window.menuBar().actions():
         menu = top.menu()
@@ -49,6 +50,7 @@ def test_every_menu_and_toolbar_action_is_registered(window: MainWindow) -> None
 
 def test_the_palette_lists_every_menu_and_toolbar_action(window: MainWindow) -> None:
     window.new_document()
+    window.ensure_sample_actions()  # as show_command_palette does
     palette = CommandPalette(window.registry, window)
     listed = {id(e.action) for e in palette.visible_entries()}
     missing = [a.text() for a in all_ui_actions(window) if id(a) not in listed]

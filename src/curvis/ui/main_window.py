@@ -151,6 +151,7 @@ class MainWindow(QMainWindow):
         # scheduler node -> (file, tab and table to import into; None for a new project)
         self._pending_imports: dict[str, tuple[Path, DocumentTab | None, str | None]] = {}
         self._untitled_count = 0
+        self._sample_menu: QMenu | None = None
         self._table_actions_created = False
 
         self.launcher = LauncherWidget(self)
@@ -199,13 +200,6 @@ class MainWindow(QMainWindow):
         r = self.registry
         k = QKeySequence.StandardKey
         r.register("file.new", "&New project", self.new_document, category="File", shortcut=k.New)
-        for key, name in SAMPLE_NAMES.items():
-            r.register(
-                f"file.sample.{key}",
-                f"&{name}",
-                functools.partial(self.new_from_sample, key),
-                category="New from sample",
-            )
         r.register("file.open", "&Open…", self.open_document, category="File", shortcut=k.Open)
         r.register(
             "file.import",
@@ -260,10 +254,9 @@ class MainWindow(QMainWindow):
         file_menu = self.menuBar().addMenu("&File")
         file_menu.setToolTipsVisible(True)  # why Close table… is disabled
         file_menu.addAction(a("file.new"))
-        sample_menu = file_menu.addMenu("New from sa&mple")
-        self._sample_menu = sample_menu
-        sample_menu.addActions([a(f"file.sample.{key}") for key in SAMPLE_NAMES])
         file_menu.addActions([a("file.open"), a("file.import")])
+        # The samples' menu and actions are made when first needed (start-up time).
+        file_menu.aboutToShow.connect(self.ensure_sample_actions)
         file_menu.addSeparator()
         file_menu.addActions([a("file.save"), a("file.save_as")])
         file_menu.addSeparator()
@@ -603,7 +596,7 @@ class MainWindow(QMainWindow):
             ],
         )
         self._view_menu.insertSeparator(a("view.command_palette"))
-        before = self._sample_menu.menuAction()
+        before = self._sample_menu.menuAction() if self._sample_menu else a("file.open")
         self._file_menu.insertActions(before, [a("table.new"), a("table.rename")])
         self._file_menu.insertAction(a("file.close"), a("table.close"))
         self._ensure_main_toolbar()  # first in the row
@@ -625,6 +618,25 @@ class MainWindow(QMainWindow):
         self._untitled_count += 1
         name = "Untitled" if self._untitled_count == 1 else f"Untitled {self._untitled_count}"
         return self._add_tab(Document(name=name, tables=[Table.blank()]), None)
+
+    def ensure_sample_actions(self) -> QMenu:
+        """*New from sample* in the File menu and its actions (one per sample, in the command
+        palette too), made the first time the File menu or the palette opens."""
+        if self._sample_menu is None:
+            r = self.registry
+            for key, name in SAMPLE_NAMES.items():
+                r.register(
+                    f"file.sample.{key}",
+                    f"&{name}",
+                    functools.partial(self.new_from_sample, key),
+                    category="New from sample",
+                )
+            menu = QMenu("New from sa&mple", self._file_menu)
+            menu.addActions([r.action(f"file.sample.{key}") for key in SAMPLE_NAMES])
+            # after New project (and New table, Rename table), before Open
+            self._file_menu.insertMenu(r.action("file.open"), menu)
+            self._sample_menu = menu
+        return self._sample_menu
 
     def new_from_sample(self, key: str) -> DocumentTab:
         """Open the sample project ``key`` as a new, untitled copy: it has no file, so
@@ -971,6 +983,7 @@ class MainWindow(QMainWindow):
     def show_command_palette(self) -> None:
         from curvis.ui.command_palette import CommandPalette
 
+        self.ensure_sample_actions()
         CommandPalette(self.registry, self).exec()
 
     # --- state ------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPalette
+from PySide6.QtWidgets import QMenu
 from pytestqt.qtbot import QtBot
 
 from curvis.ui.document_tab import DocumentTab
@@ -66,6 +67,7 @@ def test_save_asks_where_to_save_the_copy(window: MainWindow, prompts: Prompts) 
 
 
 def test_samples_are_in_the_file_menu_and_the_palette(window: MainWindow) -> None:
+    window.ensure_sample_actions()
     for key, name in SAMPLE_NAMES.items():
         action = window.registry.action(f"file.sample.{key}")
         entry = next(e for e in window.registry.entries() if e.action is action)
@@ -77,8 +79,51 @@ def test_samples_are_in_the_file_menu_and_the_palette(window: MainWindow) -> Non
     assert [a.text().replace("&", "") for a in submenu.actions()] == list(SAMPLE_NAMES.values())
 
 
+def test_sample_actions_are_made_when_first_needed(
+    window: MainWindow, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Not at start-up (the window shell stays quick), but when the File menu or the
+    command palette opens."""
+    assert not any(e.id.startswith("file.sample.") for e in window.registry.entries())
+    file_menu = window.menuBar().actions()[0].menu()
+    assert isinstance(file_menu, QMenu)
+    file_menu.aboutToShow.emit()
+    texts = [a.text() for a in file_menu.actions() if not a.isSeparator()]
+    assert texts[:3] == ["&New project", "New from sa&mple", "&Open…"]
+    assert len([e for e in window.registry.entries() if e.category == "New from sample"]) == 3
+    file_menu.aboutToShow.emit()  # made once
+    assert len([e for e in window.registry.entries() if e.category == "New from sample"]) == 3
+
+
+def test_palette_lists_the_samples(window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    from curvis.ui.command_palette import CommandPalette
+
+    listed: list[str] = []
+    monkeypatch.setattr(
+        CommandPalette, "exec", lambda self: listed.extend(e.id for e in self.visible_entries())
+    )
+    window.show_command_palette()
+    assert {f"file.sample.{key}" for key in SAMPLE_NAMES} <= set(listed)
+
+
+def test_file_menu_order_with_a_project_open(window: MainWindow) -> None:
+    window.new_document()
+    window.ensure_sample_actions()
+    file_menu = window.menuBar().actions()[0].menu()
+    assert isinstance(file_menu, QMenu)
+    texts = [a.text() for a in file_menu.actions() if not a.isSeparator()]
+    assert texts[:5] == [
+        "&New project",
+        "New &table",
+        "&Rename table",
+        "New from sa&mple",
+        "&Open…",
+    ]
+
+
 def test_sample_menu_works_while_a_project_is_open(window: MainWindow) -> None:
     window.new_document()
+    window.ensure_sample_actions()
     window.registry.action("file.sample.group_comparison").trigger()
     assert [t.title for t in window.document_tabs()] == ["Untitled", "Group comparison"]
 
