@@ -169,6 +169,11 @@ def test_a_real_hard_crash_is_caught(tmp_path: Path) -> None:
         log.close()
 
 
+@pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="turns the log on through XDG_CONFIG_HOME, which only Linux uses for app "
+    "settings; on macOS and Windows that would mean writing the user's real preferences",
+)
 def test_the_app_starts_and_quits_cleanly_with_the_log_on(tmp_path: Path) -> None:
     import os
     import subprocess
