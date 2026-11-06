@@ -74,10 +74,24 @@ def keep(entry):
     return not any(part in path for part in DROP)
 
 
+# Curvis imports some of its own modules by name (the built-in analyses, scheduler
+# jobs), which PyInstaller cannot see: bundle all of them, and with them the libraries
+# they import inside functions (lmfit). packaging/check_bundle.py checks it.
+sys.path.insert(0, str(ROOT / "src"))
+from PyInstaller.utils.hooks import collect_submodules  # noqa: E402
+
+HIDDEN_IMPORTS = [
+    *collect_submodules("curvis"),
+    # savefig(format="pdf" / "svg") loads these backends by name (PDF and SVG export).
+    "matplotlib.backends.backend_pdf",
+    "matplotlib.backends.backend_svg",
+]
+
 a = Analysis(  # noqa: F821
     [str(ROOT / "packaging" / "entry.py")],
     pathex=[str(ROOT / "src")],
     datas=[(str(ROOT / "src" / "curvis" / "ui" / "icons"), "curvis/ui/icons")],
+    hiddenimports=HIDDEN_IMPORTS,
     excludes=EXCLUDES,
     noarchive=False,
 )

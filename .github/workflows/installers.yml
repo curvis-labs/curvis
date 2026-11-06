@@ -48,6 +48,11 @@ jobs:
       - name: Build app bundle
         run: uv run --no-sync pyinstaller packaging/curvis.spec --noconfirm
 
+      # The analyses and some libraries are imported by name or inside functions; a
+      # missing one only fails when used, which the smoke test below would not see.
+      - name: Check the bundle has every analysis and library
+        run: uv run --no-sync python packaging/check_bundle.py
+
       - name: Build .deb
         run: packaging/linux/build-deb.sh "$VERSION"
 
@@ -96,6 +101,11 @@ jobs:
 
       - name: Build app bundle
         run: uv run --no-sync pyinstaller packaging/curvis.spec --noconfirm
+
+      # The analyses and some libraries are imported by name or inside functions; a
+      # missing one only fails when used, which the smoke test below would not see.
+      - name: Check the bundle has every analysis and library
+        run: uv run --no-sync python packaging/check_bundle.py
 
       - name: Check the bundle id, icon and .cvp file type
         run: |
@@ -147,6 +157,11 @@ jobs:
 
       - name: Build app bundle
         run: uv run --no-sync pyinstaller packaging/curvis.spec --noconfirm
+
+      # The analyses and some libraries are imported by name or inside functions; a
+      # missing one only fails when used, which the smoke test below would not see.
+      - name: Check the bundle has every analysis and library
+        run: uv run --no-sync python packaging/check_bundle.py
 
       - name: Build installer
         run: |
