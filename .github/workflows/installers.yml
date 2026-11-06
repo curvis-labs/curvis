@@ -154,7 +154,8 @@ jobs:
           if (-not (Test-Path $iscc)) {
             choco install innosetup --no-progress -y
           }
-          & $iscc "/DAppVersion=$env:VERSION" packaging\windows\curvis.iss
+          $numeric = [regex]::Match($env:VERSION, '^\d+(\.\d+)*').Value
+          & $iscc "/DAppVersion=$env:VERSION" "/DNumericVersion=$numeric" packaging\windows\curvis.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Smoke test the installer

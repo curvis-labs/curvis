@@ -1,6 +1,6 @@
 [project]
 name = "curvis"
-version = "0.1.0"
+version = "0.1.0b1"
 description = "Desktop app for scientific data analysis and plotting."
 readme = "README.md"
 license = "GPL-3.0-only"

@@ -1,15 +1,20 @@
 ; Inno Setup script for the Curvis Windows installer.
-; Build: iscc /DAppVersion=0.1.0 packaging\windows\curvis.iss  (after PyInstaller)
+; Build: iscc /DAppVersion=0.1.0b1 /DNumericVersion=0.1.0 packaging\windows\curvis.iss  (after PyInstaller)
 ; Output: dist\Curvis-<version>-setup.exe
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
+#endif
+; The file version info takes digits only (0.1.0b1 -> 0.1.0): pass /DNumericVersion=0.1.0.
+#ifndef NumericVersion
+  #define NumericVersion "0.0.0"
 #endif
 
 [Setup]
 AppId={{6B3C2A0E-8E7D-4B6A-9C1F-3D5E7A9B2C41}
 AppName=Curvis
 AppVersion={#AppVersion}
+VersionInfoVersion={#NumericVersion}
 AppPublisher=Curvis developers
 AppPublisherURL=https://github.com/curvis-labs/curvis
 DefaultDirName={autopf}\Curvis

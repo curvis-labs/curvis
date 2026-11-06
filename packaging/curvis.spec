@@ -11,6 +11,8 @@ ROOT = Path(SPECPATH).parent  # noqa: F821 (defined by PyInstaller)
 VERSION = re.search(
     r'__version__ = "([^"]+)"', (ROOT / "src" / "curvis" / "__init__.py").read_text()
 ).group(1)
+# macOS wants digits only (0.1.0b1 -> 0.1.0); the full version stays in the file names.
+NUMERIC_VERSION = re.match(r"\d+(\.\d+)*", VERSION).group(0)
 BUNDLE_ID = "org.curvis.Curvis"
 DOCUMENT_TYPE = "org.curvis.project"  # macOS type identifier of .cvp files
 
@@ -110,12 +112,12 @@ if sys.platform == "darwin":
         name="Curvis.app",
         bundle_identifier=BUNDLE_ID,
         icon=str(ICONS["icns"]),
-        version=VERSION,
+        version=NUMERIC_VERSION,
         info_plist={
             "CFBundleName": "Curvis",
             "CFBundleDisplayName": "Curvis",
-            "CFBundleShortVersionString": VERSION,
-            "CFBundleVersion": VERSION,
+            "CFBundleShortVersionString": NUMERIC_VERSION,
+            "CFBundleVersion": NUMERIC_VERSION,
             "NSHighResolutionCapable": True,
             "NSRequiresAquaSystemAppearance": False,  # allow dark mode
             "LSMinimumSystemVersion": "12.0",

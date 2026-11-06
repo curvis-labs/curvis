@@ -1,0 +1,71 @@
+name: Release
+
+# Pushing a tag such as v0.1.0-beta builds the installers for Windows, macOS and Linux
+# (installers.yml: each one is installed and started on its runner) and publishes them
+# as a GitHub release. A tag with a hyphen (v0.1.0-beta, v1.0.0-rc1) is a pre-release.
+#
+#     git tag -a v0.1.0-beta -m "Curvis 0.1.0 beta" && git push origin v0.1.0-beta
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  installers:
+    name: installers
+    uses: ./.github/workflows/installers.yml
+
+  release:
+    name: GitHub release
+    needs: installers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create the release and upload the installers
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: curvis-*
+          path: dist
+          merge-multiple: true
+
+      - name: List the installers
+        run: ls -l dist
+
+      - name: Write the release notes
+        run: |
+          version="$(python3 -c 'import re,pathlib; print(re.search(r"__version__ = \"([^\"]+)\"", pathlib.Path("src/curvis/__init__.py").read_text()).group(1))')"
+          cat > notes.md <<NOTES
+          Curvis ${version} (${GITHUB_REF_NAME}).
+
+          Download the installer for your computer:
+
+          - **Windows**: \`Curvis-${version}-setup.exe\`
+          - **macOS** (Apple silicon): \`Curvis-${version}-macos-arm64.dmg\`
+          - **Linux**: \`curvis_${version}_amd64.deb\` (Debian, Ubuntu) or \`Curvis-${version}-x86_64.AppImage\`
+
+          The installers are not signed yet, so Windows and macOS warn before the first start.
+          [Getting started](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/docs/getting-started.md)
+          explains how to install, and how to go from a CSV file to an exported graph.
+          NOTES
+          cat notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "Curvis ${GITHUB_REF_NAME#v}" \
+            --notes-file notes.md \
+            --verify-tag \
+            "${flags[@]}"
