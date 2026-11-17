@@ -47,6 +47,18 @@ def describe_point(data: XYSeriesData, index: int, x_name: str = "X") -> str:
     return "\n".join(lines)
 
 
+def describe_cell(data: XYSeriesData, index: int, level: str, factor: str = "") -> str:
+    """The tooltip of point ``index`` of an interaction line: one cell of a two-way
+    ANOVA (the line is a level of the second factor, ``level`` one of the first)."""
+    lines = [f"{data.name} · {factor + ': ' if factor else ''}{level}"]
+    lines.append(f"Mean: {computed(float(data.y[index]))}")
+    error = float(data.error[index])
+    if data.error_bars in (ErrorBars.SD, ErrorBars.SEM) and not math.isnan(error):
+        lines.append(f"{data.error_bars.label}: {computed(error)}")
+    lines.append(f"n: {int(data.n[index])}")
+    return "\n".join(lines)
+
+
 def describe_category(category: CategoryData, variant: ChartVariant) -> str:
     """The tooltip of a bar or a box."""
     lines = [category.name]

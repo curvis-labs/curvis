@@ -310,6 +310,26 @@ def _format_bar_series(ctx: Context) -> QDialog:
     return dialog
 
 
+def _format_interaction_series(ctx: Context) -> QDialog:
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily
+    from curvis.core import add_analysis, add_graph
+    from curvis.ui.format_dialog import SERIES, FormatDialog
+    from tests.unit.charts_tables import two_way_analysis, two_way_table
+
+    table = two_way_table()
+    doc = Document()
+    doc.execute(AddTable(table))
+    analysis = two_way_analysis(table)
+    doc.execute(add_analysis(doc, analysis))
+    graph = default_spec(table, ChartFamily.INTERACTION, [analysis])
+    doc.execute(add_graph(doc, graph))
+    dialog = FormatDialog(doc, graph.id, scheduler=ctx.scheduler)
+    dialog.set_section(SERIES)
+    dialog.select_series([s.source for s in dialog.spec.series])
+    return dialog
+
+
 def _format_bad_range(ctx: Context) -> QDialog:
     from curvis.ui.format_dialog import AXES, FormatDialog
 
@@ -363,6 +383,7 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "analyze_anova_dunnett": _analyze_anova_dunnett,
     "analyze_repeated": _analyze_repeated,
     "analyze_two_way": _analyze_two_way,
+    "format_interaction_series": _format_interaction_series,
     "analyze_fit": _analyze_fit,
     "analyze_fit_advanced": _analyze_fit_advanced,
     "constants": _constants,

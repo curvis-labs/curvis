@@ -52,7 +52,7 @@ from PySide6.QtWidgets import (
 )
 
 from curvis.analysis.result import Result
-from curvis.charts.builder import default_series, error_column_of, series_source
+from curvis.charts.builder import default_series_of, error_column_of, graph_series_names
 from curvis.charts.colors import SCHEMES, scheme
 from curvis.charts.data import ChartData, compute, gather
 from curvis.charts.spec import (
@@ -74,7 +74,7 @@ from curvis.charts.spec import (
     Symbol,
 )
 from curvis.core import Document
-from curvis.data import Table, series
+from curvis.data import Table
 from curvis.ui.dialogs import (
     FIELD_WIDTH,
     DialogSkeleton,
@@ -120,6 +120,7 @@ LINE_LABELS = {
 CATEGORY_NOTE = "Bar and box graphs use only the color, error bars and legend of a series."
 BOX_NOTE = "Box plots use only the color and legend of a series."
 CATEGORY_AXIS_NOTE = "The X axis of a bar or box graph shows the series by name."
+LEVEL_AXIS_NOTE = "The X axis of an interaction graph shows the levels of the first factor."
 BAR_LOG_NOTE = "Bars start at 0, which a log axis cannot show."
 Y_ANGLE_NOTE = "Y axis labels are always horizontal."
 FIT_PREFIX = "fit:"
@@ -264,7 +265,7 @@ class FormatDialog(QDialog):
         self._node = f"{PREVIEW_NODE}:{graph_id}"
         self._pending_key: object = None
         self._problems: dict[str, str] = {}
-        self._names = {series_source(s): s.name for s in series(self.table)}
+        self._names = graph_series_names(self.table, self.original)
         self.setWindowTitle("Format graph")
         self._build()
         size_workbench(self)
@@ -636,13 +637,15 @@ class FormatDialog(QDialog):
         self._show_problem()
 
     def _update_axis_enabled(self, key: str) -> None:
-        categorical_x = self.spec.family is ChartFamily.BAR and key == "x_axis"
+        levels_x = self.spec.family is ChartFamily.INTERACTION and key == "x_axis"
+        categorical_x = (self.spec.family is ChartFamily.BAR and key == "x_axis") or levels_x
         bars_y = self.spec.variant is ChartVariant.BAR and key == "y_axis"
         for widget in (self.axis_from, self.axis_to, self.linear, self.log):
             widget.setEnabled(not categorical_x)
         self.log.setEnabled(not (categorical_x or bars_y))
         self.label_angle.setEnabled(key == "x_axis")
-        notes = [CATEGORY_AXIS_NOTE if categorical_x else BAR_LOG_NOTE if bars_y else ""]
+        axis_note = LEVEL_AXIS_NOTE if levels_x else CATEGORY_AXIS_NOTE
+        notes = [axis_note if categorical_x else BAR_LOG_NOTE if bars_y else ""]
         if key == "y_axis":
             notes.append(Y_ANGLE_NOTE)
         note = " ".join(n for n in notes if n)
@@ -950,7 +953,7 @@ class FormatDialog(QDialog):
 
     def add_series(self, source: str) -> None:
         """Add the table's series ``source`` at the end, in the next colour and symbol."""
-        defaults = {s.source: s for s in default_series(self.table)}
+        defaults = {s.source: s for s in default_series_of(self.table, self.spec)}
         style = defaults[source]
         index = len(self.spec.series)
         style = replace(

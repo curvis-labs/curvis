@@ -29,7 +29,8 @@ type _Signature = tuple[ChartSpec, tuple[str, ...]]
 
 
 def graph_reads(table: Table, spec: ChartSpec) -> list[str]:
-    """What a graph reads: its table, the columns it draws and the fits it overlays."""
+    """What a graph reads: its table, the columns it draws, the fits it overlays and the
+    analysis it draws (interaction graphs)."""
     reads = [table.id]
     by_source = {s.group_id or s.column_ids[0]: s for s in series(table)}
     for style in spec.series:
@@ -41,6 +42,8 @@ def graph_reads(table: Table, spec: ChartSpec) -> list[str]:
     if spec.family is ChartFamily.XY:
         reads.extend(c.id for c in table.columns if c.role is ColumnRole.X)
         reads.extend(o.analysis_id for o in spec.overlays)
+    if spec.analysis_id is not None:
+        reads.append(spec.analysis_id)
     return list(dict.fromkeys(reads))
 
 

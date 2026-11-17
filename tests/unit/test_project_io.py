@@ -221,7 +221,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 7
+    assert data["schema_version"] == SCHEMA_VERSION == 8
     assert set(data["document"]) == {
         "id",
         "name",
@@ -391,7 +391,7 @@ def test_newer_version(tmp_path: Path) -> None:
 
 
 def test_migrations_cover_every_older_version() -> None:
-    assert SCHEMA_VERSION == 7
+    assert SCHEMA_VERSION == 8
     assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
@@ -449,9 +449,9 @@ def test_version_1_files_get_the_default_category_factor(tmp_path: Path) -> None
 def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "old.cvp"
     save(Document(), path)
-    monkeypatch.setattr(project, "SCHEMA_VERSION", 8)
-    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 7)})
-    with pytest.raises(ProjectFileError, match="from format 7"):
+    monkeypatch.setattr(project, "SCHEMA_VERSION", 9)
+    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 8)})
+    with pytest.raises(ProjectFileError, match="from format 8"):
         load(path)
 
 
@@ -728,3 +728,32 @@ def test_version_6_axes_get_auto_label_angles(tmp_path: Path) -> None:
     for graph in load(path).graphs:
         assert graph.x_axis.label_angle is LabelAngle.AUTO
         assert graph.y_axis.label_angle is LabelAngle.AUTO
+
+
+def test_version_7_graphs_draw_no_analysis(tmp_path: Path) -> None:
+    """Format 8 lets an interaction graph name the two-way ANOVA it draws."""
+    path = tmp_path / "v7.cvp"
+    save(_graph_document(), path)
+
+    def to_v7(data: dict[str, Any]) -> None:
+        data["schema_version"] = 7
+        for graph in data["document"]["graphs"]:
+            del graph["analysis_id"]
+
+    _rewrite(path, to_v7)
+    assert [g.analysis_id for g in load(path).graphs] == [None, None]
+
+
+def test_interaction_graphs_round_trip(tmp_path: Path) -> None:
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily
+    from tests.unit.charts_tables import two_way_analysis, two_way_table
+
+    table = two_way_table()
+    analysis = two_way_analysis(table)
+    graph = default_spec(table, ChartFamily.INTERACTION, [analysis])
+    path = tmp_path / "interaction.cvp"
+    save(Document(tables=[table], analyses=[analysis], graphs=[graph]), path)
+    loaded = load(path)
+    assert loaded.graphs == [graph]
+    assert loaded.graphs[0].analysis_id == analysis.id
