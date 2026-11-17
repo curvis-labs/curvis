@@ -346,6 +346,58 @@ def mann_whitney(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
     }
 
 
+def _kruskal(inputs: Mapping[str, Any]) -> Any:
+    from curvis.analysis.compare.kruskal import kruskal_wallis
+
+    return kruskal_wallis(inputs["groups"])
+
+
+@adapter("kruskal_wallis")
+def kruskal_wallis(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/kruskal_wallis.R: the Kruskal-Wallis test."""
+    r = _kruskal(inputs)
+    return {
+        "n": [s.n for s in r.samples],
+        "median": [s.median for s in r.samples],
+        "mean_rank": r.mean_ranks,
+        "h": r.h,
+        "df": r.df,
+        "p_value": r.p_value,
+    }
+
+
+@adapter("dunn_all_pairs")
+def dunn_all_pairs(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/kruskal_wallis.R: Dunn's test of all pairs, Holm-adjusted."""
+    from curvis.analysis.compare.kruskal import dunn
+
+    rows = dunn(_kruskal(inputs))
+    return {
+        "group_i": [c.i for c in rows],
+        "group_j": [c.j for c in rows],
+        "mean_rank_diff": [c.mean_rank_diff for c in rows],
+        "z": [c.z for c in rows],
+        "p_unadjusted": [c.p_unadjusted for c in rows],
+        "p_value": [c.p_value for c in rows],
+    }
+
+
+@adapter("dunn_control")
+def dunn_control(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/kruskal_wallis.R: Dunn's test against the control, Holm over
+    the k - 1 comparisons."""
+    from curvis.analysis.compare.kruskal import dunn
+
+    rows = dunn(_kruskal(inputs), int(inputs["control"]))
+    return {
+        "group": [c.j for c in rows],
+        "mean_rank_diff": [c.mean_rank_diff for c in rows],
+        "z": [c.z for c in rows],
+        "p_unadjusted": [c.p_unadjusted for c in rows],
+        "p_value": [c.p_value for c in rows],
+    }
+
+
 # --- curve fits ----------------------------------------------------------------------
 
 
