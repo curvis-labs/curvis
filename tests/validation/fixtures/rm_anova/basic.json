@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_anova",
+  "case": "basic",
+  "description": "Eight subjects, four treatments.",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [7.139887638332282, 9.9425001800663324, 1.5950484778528611, 12.418899638641564, 11.543805165308333, 12.136830264440107, 7.8633422528322576, 8.2042784529397803],
+      [8.6554984697914339, 11.479713584328382, 4.1551900449955994, 13.48623466880221, 11.309643158711062, 11.153268766651689, 7.8456911985335225, 8.0264730744327757],
+      [11.803765881567644, 13.689278224595929, 3.6070574220377756, 14.747867387198839, 12.310993556274923, 12.716588520694822, 11.913427247990434, 9.3796693298553766],
+      [8.1364444192314664, 12.741619932528417, 2.5694131393997672, 12.363162470984967, 10.088497909322825, 12.580693002286127, 7.5314036432712781, 9.2239676955508738]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n_subjects": 8,
+    "n_incomplete": 0,
+    "mean": [8.855574008801689, 9.5139641207808339, 11.271080946276967, 9.4044002765719661],
+    "df_treatment": 3,
+    "df_subjects": 7,
+    "df_error": 21,
+    "ss_treatment": 26.306644147575021,
+    "ss_subjects": 295.39896165341509,
+    "ss_error": 19.975816682378262,
+    "ms_treatment": 8.7688813825250076,
+    "ms_subjects": 42.199851664773583,
+    "ms_error": 0.95122936582753626,
+    "f": 9.2184721136067829,
+    "p_value": 0.0004340611162003213,
+    "gg_epsilon": 0.89736411296269369,
+    "gg_df_treatment": 2.6920923388880809,
+    "gg_df_error": 18.844646372216566,
+    "gg_p_value": 0.00076655810256097748
+  },
+  "kinds": {
+    "n_subjects": "exact",
+    "n_incomplete": "exact",
+    "mean": "statistic",
+    "df_treatment": "exact",
+    "df_subjects": "exact",
+    "df_error": "exact",
+    "ss_treatment": "statistic",
+    "ss_subjects": "statistic",
+    "ss_error": "statistic",
+    "ms_treatment": "statistic",
+    "ms_subjects": "statistic",
+    "ms_error": "statistic",
+    "f": "statistic",
+    "p_value": "p_value",
+    "gg_epsilon": "statistic",
+    "gg_df_treatment": "statistic",
+    "gg_df_error": "statistic",
+    "gg_p_value": "p_value"
+  }
+}

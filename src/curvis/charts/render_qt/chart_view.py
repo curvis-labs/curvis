@@ -81,13 +81,16 @@ from curvis.charts.axes import (
 from curvis.charts.colors import ColorScheme, scheme
 from curvis.charts.data import CategoryData, ChartData, XYSeriesData
 from curvis.charts.spec import (
+    LINE_VARIANTS,
+    XY_VARIANTS,
+    ChartFamily,
     ChartSpec,
     ChartVariant,
     LineStyle,
     SeriesSpec,
     Symbol,
 )
-from curvis.charts.tooltips import describe_category, describe_point
+from curvis.charts.tooltips import describe_category, describe_cell, describe_point
 
 pg.setConfigOptions(antialias=True)
 
@@ -624,7 +627,7 @@ class ChartView(QWidget):
         self.spec, self.data = spec, data
         if page_changed:
             self._fit()
-        xy = spec.variant in (ChartVariant.SCATTER, ChartVariant.LINE)
+        xy = spec.variant in XY_VARIANTS
         parts = self._xy_parts
         if xy and data is not None and parts is not None and parts.key == _xy_key(spec, data):
             self.layout_ = axes_layout(spec, data)
@@ -647,7 +650,7 @@ class ChartView(QWidget):
         self.layout_ = axes_layout(spec, data)
         self._style(spec, colors)
         if data is not None:
-            if spec.variant in (ChartVariant.SCATTER, ChartVariant.LINE):
+            if spec.variant in XY_VARIANTS:
                 self._draw_xy(spec, data, colors)
             elif spec.variant in (ChartVariant.BAR, ChartVariant.BOX):
                 self._draw_categories(spec, data, colors)
@@ -827,7 +830,7 @@ class ChartView(QWidget):
     def _point_style(self, spec: ChartSpec, style: SeriesSpec) -> dict[str, Any]:
         color = QColor(style.color)
         line_style = style.line_style
-        if spec.variant is ChartVariant.LINE and line_style is LineStyle.NONE:
+        if spec.variant in LINE_VARIANTS and line_style is LineStyle.NONE:
             line_style = LineStyle.SOLID
         pen: Any = None
         if line_style is not LineStyle.NONE:
@@ -1016,8 +1019,13 @@ class ChartView(QWidget):
                     best = (distance, series, i)
         if best is None:
             return None
+        series, index = best[1], best[2]
+        if self.spec.family is ChartFamily.INTERACTION and self.data is not None:
+            level = int(series.rows[index])
+            name = self.data.levels[level] if level < len(self.data.levels) else ""
+            return describe_cell(series, index, name, self.spec.x_axis.title)
         x_name = self.spec.x_axis.title or "X"
-        return describe_point(best[1], best[2], x_name)
+        return describe_point(series, index, x_name)
 
     def _category_tooltip(self, x: float, y: float) -> str | None:
         assert self.spec is not None

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_anova",
+  "case": "ties",
+  "description": "Repeated values within and across treatments.",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [3, 3, 4, 4, 5, 5],
+      [4, 4, 4, 5, 5, 6],
+      [5, 5, 6, 6, 6, 7]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n_subjects": 6,
+    "n_incomplete": 0,
+    "mean": [4, 4.666666666666667, 5.833333333333333],
+    "df_treatment": 2,
+    "df_subjects": 5,
+    "df_error": 10,
+    "ss_treatment": 10.33333333333333,
+    "ss_subjects": 9.1666666666666661,
+    "ss_error": 1,
+    "ms_treatment": 5.1666666666666652,
+    "ms_subjects": 1.8333333333333333,
+    "ms_error": 0.10000000000000001,
+    "f": 51.66666666666665,
+    "p_value": 5.3482498589646698e-06,
+    "gg_epsilon": 0.90000000000000013,
+    "gg_df_treatment": 1.8000000000000003,
+    "gg_df_error": 9.0000000000000018,
+    "gg_p_value": 1.446404165365731e-05
+  },
+  "kinds": {
+    "n_subjects": "exact",
+    "n_incomplete": "exact",
+    "mean": "statistic",
+    "df_treatment": "exact",
+    "df_subjects": "exact",
+    "df_error": "exact",
+    "ss_treatment": "statistic",
+    "ss_subjects": "statistic",
+    "ss_error": "statistic",
+    "ms_treatment": "statistic",
+    "ms_subjects": "statistic",
+    "ms_error": "statistic",
+    "f": "statistic",
+    "p_value": "p_value",
+    "gg_epsilon": "statistic",
+    "gg_df_treatment": "statistic",
+    "gg_df_error": "statistic",
+    "gg_p_value": "p_value"
+  }
+}

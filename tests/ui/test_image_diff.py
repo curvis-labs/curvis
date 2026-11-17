@@ -28,7 +28,15 @@ from curvis.charts.spec import (
 from curvis.data import Column, ColumnRole, Table
 from curvis.ui.theme import dark_palette, light_palette
 from tests.ui.image_diff import as_array, compare, save_pair
-from tests.unit.charts_tables import DOSES, column_table, replicate_table, sigmoid_table
+from tests.unit.charts_tables import (
+    DOSES,
+    column_table,
+    replicate_table,
+    sigmoid_table,
+    two_way_analysis,
+    two_way_result,
+    two_way_table,
+)
 
 PLOT_THRESHOLD = 0.01
 """Largest miss allowed in the plot area (measured: 0.0000 for every graph)."""
@@ -79,6 +87,21 @@ def _bars(variant: ChartVariant) -> tuple[ChartSpec, ChartData]:
     return spec, compute(gather(table, spec, {}))
 
 
+def _interaction() -> tuple[ChartSpec, ChartData]:
+    table = two_way_table()
+    analysis = two_way_analysis(table)
+    result = two_way_result(table, analysis)
+    spec = replace(default_spec(table, ChartFamily.INTERACTION, [analysis]), aspect_ratio="square")
+    return spec, compute(gather(table, spec, {analysis.id: result}))
+
+
+def _wide_interaction() -> tuple[ChartSpec, ChartData]:
+    """The interaction graph (turned labels) on a wide page with a legend; GRAPHS has
+    it on a square page."""
+    spec, data = _interaction()
+    return replace(spec, aspect_ratio="wide", show_legend=True), data
+
+
 def _long_title(title: str) -> tuple[ChartSpec, ChartData]:
     """A title wider than the plot of a square page with a legend: broken into lines
     as wide as the plot at most, in both renderers."""
@@ -119,6 +142,7 @@ LAYOUTS = {
     "turned-labels-square-no-legend": lambda: _turned_bars("square", False),
     "turned-labels-wide-legend": lambda: _turned_bars("wide", True),
     "turned-labels-wide-no-legend": lambda: _turned_bars("wide", False),
+    "interaction-wide-legend": lambda: _wide_interaction(),
 }
 """Layouts that once differed between the renderers: a title wider than the plot, and
 turned category labels (both renderers now lay out a title and turned labels as
@@ -129,6 +153,7 @@ GRAPHS = {
     "line": _line_with_fit,
     "bar": lambda: _bars(ChartVariant.BAR),
     "box": lambda: _bars(ChartVariant.BOX),
+    "interaction": _interaction,
 }
 
 

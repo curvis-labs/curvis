@@ -29,7 +29,7 @@ are**:
 
 Two measures:
 
-| Measure | What is compared | Radius | Threshold | Measured (all 22 cases) |
+| Measure | What is compared | Radius | Threshold | Measured (all 27 cases) |
 | --- | --- | --- | --- | --- |
 | **plot** | The plot area inside the axes, cut out of each image (3 px inset, because Matplotlib's axes box holds the axis lines and pyqtgraph's view box does not). The export's colour masks are scaled to the size of the screen's plot area. | 3 px (0.4 mm) | 0.01 | 0.0000 |
 | **page** | The whole page. | 8 px (1 mm) | 0.12 | 0 – 0.037 |
@@ -76,7 +76,8 @@ from the theme (DESIGN.md §3).
   plot's final width. Axis titles and X tick labels, level or turned, take Matplotlib's
   1 em line (`FONT_ASCENT_EM + FONT_DESCENT_EM`) instead of Qt's 1.16 em one.
   `test_title_and_turned_labels_match` covers long titles on a square page with a legend
-  and turned category labels on square and wide pages.
+  and turned category labels on square and wide pages (bars, and the interaction graph,
+  which no longer needs a tall page).
 - **Legend spacing.** Matplotlib's constrained layout puts the legend's frame against the
   page edge and, before it, the room for a tick label reaching past the end of the X
   axis and three paddings (the plot's, and the legend's on both its sides); the legend has

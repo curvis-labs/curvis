@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_tukey",
+  "case": "n_two",
+  "description": "Two subjects, three treatments (df_error = 2).",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "emmeans": "2.0.4",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [1.2, 2.8999999999999999],
+      [2, 3.1000000000000001],
+      [3.3999999999999999, 5.5999999999999996]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [0.5, 2.4500000000000002, 1.9500000000000002],
+    "se": [0.38944404818493061, 0.38944404818493061, 0.38944404818493061],
+    "q": [1.8156825980064082, 8.8968447302314004, 7.0811621322249927],
+    "p_value": [0.524778563563564, 0.044113342448147193, 0.067892444358512286],
+    "ci_lower": [-1.7941186567476404, 0.15588134325235981, -0.34411865674764019],
+    "ci_upper": [2.7941186567476404, 4.7441186567476406, 4.2441186567476406]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "q": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

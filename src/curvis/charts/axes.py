@@ -18,7 +18,8 @@ compare the two renderers.
   every label, where pyqtgraph would hide some and Matplotlib would overlap them. Labels
   read like the table (0.01, 1, 100); very large or small values use exponents (1e+08).
 - **Categories.** The shown bars or boxes are numbered 0, 1, 2 … from the left, so a
-  hidden series leaves no gap.
+  hidden series leaves no gap. Interaction graphs put the levels of the first factor at
+  0, 1, 2 … (from −0.5 to n − 0.5); their Y range is that of XY graphs.
 
 Pure functions, no Qt and no Matplotlib: the renderers and the tests import it freely.
 """
@@ -175,6 +176,9 @@ def axes_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
     """The ranges and ticks of ``spec`` drawing ``data`` (None: the frame only)."""
     if spec.family is ChartFamily.BAR:
         x = _category_axis(spec, data)
+    elif spec.family is ChartFamily.INTERACTION:
+        bounds = _xy_bounds(spec, data)
+        x = _level_axis(data)
     else:
         bounds = _xy_bounds(spec, data)
         x = _axis(spec.x_axis, _pad(bounds[0], bounds[1]), room=_room(spec, horizontal=True))
@@ -355,6 +359,14 @@ def _category_axis(spec: ChartSpec, data: ChartData | None) -> AxisLayout:
     return AxisLayout(
         -0.6, n - 0.4, tuple(Tick(float(i), names.get(s, "")) for i, s in enumerate(sources))
     )
+
+
+def _level_axis(data: ChartData | None) -> AxisLayout:
+    """Interaction graphs: the levels of the first factor at 0, 1, 2 …, with half a step
+    of room at each end."""
+    levels = data.levels if data is not None else ()
+    n = max(len(levels), 1)
+    return AxisLayout(-0.5, n - 0.5, tuple(Tick(float(i), name) for i, name in enumerate(levels)))
 
 
 def _category_y(

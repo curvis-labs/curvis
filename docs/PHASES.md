@@ -501,8 +501,8 @@ Make a plan first. When done, report benchmark results, changes made and anythin
 ### Step 3.1 — Repeated-measures ANOVA, two-way ANOVA, interaction plot
 
 **Done when**
-- [ ] Both match R fixtures; two-way ANOVA uses category groups and runs Tukey for each significant factor.
-- [ ] The interaction plot draws from two-way ANOVA results.
+- [x] Both match R fixtures; two-way ANOVA uses category groups and runs Tukey for each significant factor.
+- [x] The interaction plot draws from two-way ANOVA results.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.1 in docs/PHASES.md.

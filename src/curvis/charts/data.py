@@ -12,6 +12,9 @@ Statistics shown on graphs:
 - Bar: the mean of all of a series' values with their SD or SEM (also ``row_stats``).
 - Box: :func:`box_stats` — the quartiles by R's ``quantile(type = 6)`` (as GraphPad
   Prism) and whiskers from the minimum to the maximum (validated in ``box_stats``).
+- Interaction: the cell means of the graph's two-way ANOVA with their SD or SEM, as the
+  analysis reports them (validated in ``two_way_anova``). The levels of the first factor
+  are at X = 0, 1, 2 …; each line is one level of the second factor (a category group).
 
 On a log axis the coordinates are log10 values; points at or below 0 cannot be drawn
 there and are left out, with a note. The values for tooltips stay as typed.
@@ -27,9 +30,9 @@ import numpy as np
 import numpy.typing as npt
 
 from curvis.analysis.base import x_column_id
-from curvis.analysis.result import FittedCurve, Result
+from curvis.analysis.result import CellMeans, FittedCurve, Result
 from curvis.charts.spec import ChartFamily, ChartSpec, ChartVariant, ErrorBars, Scale
-from curvis.data import Table, row_stats, series
+from curvis.data import Table, name_key, row_stats, series
 
 type FloatArray = npt.NDArray[np.float64]
 type IntArray = npt.NDArray[np.int64]
@@ -69,11 +72,18 @@ class ChartInputs:
     missing: int = 0
     """Series in the spec that are no longer in the table."""
     notes: tuple[str, ...] = ()
+    cells: CellMeans | None = None
+    """Interaction graphs: the cells of the two-way ANOVA (None: it has no result)."""
+    line_names: tuple[tuple[str, str], ...] = ()
+    """Interaction graphs: (source, name) of each category group the spec draws."""
 
 
 def gather(table: Table, spec: ChartSpec, results: Mapping[str, Result]) -> ChartInputs:
     """Copy what ``spec`` draws out of ``table``; ``results`` are the analysis results
-    by id (for fit overlays). Series whose source is gone are counted, not drawn."""
+    by id (for fit overlays and interaction graphs). Series whose source is gone are
+    counted, not drawn."""
+    if spec.family is ChartFamily.INTERACTION:
+        return _gather_interaction(table, spec, results)
     by_source = {s.group_id or s.column_ids[0]: s for s in series(table)}
     inputs: list[SeriesInput] = []
     missing = 0
@@ -106,6 +116,23 @@ def gather(table: Table, spec: ChartSpec, results: Mapping[str, Result]) -> Char
                 continue
             curves.extend(CurveInput(c, overlay.show_band) for c in result.curves)
     return ChartInputs(spec, x, tuple(inputs), tuple(curves), missing, tuple(notes))
+
+
+def _gather_interaction(
+    table: Table, spec: ChartSpec, results: Mapping[str, Result]
+) -> ChartInputs:
+    categories = {c.id: c.name for c in table.category_groups}
+    names = tuple((s.source, categories[s.source]) for s in spec.series if s.source in categories)
+    result = results.get(spec.analysis_id or "")
+    cells = result.cells if result is not None else None
+    notes = () if cells is not None else (NO_TWO_WAY_RESULT,)
+    missing = len(spec.series) - len(names)
+    return ChartInputs(spec, None, (), missing=missing, notes=notes, cells=cells, line_names=names)
+
+
+NO_TWO_WAY_RESULT = (
+    "The two-way ANOVA this graph draws has no results. Check it in the Results panel."
+)
 
 
 # --- outputs ---------------------------------------------------------------------------
@@ -190,6 +217,8 @@ class ChartData:
     curves: tuple[CurveData, ...] = ()
     notes: tuple[str, ...] = ()
     """Secondary sentences for the Graph panel (left-out points, missing series)."""
+    levels: tuple[str, ...] = ()
+    """Interaction graphs: the levels of the first factor, at X = 0, 1, 2 …"""
 
 
 # --- statistics ------------------------------------------------------------------------
@@ -260,6 +289,12 @@ def compute(inputs: ChartInputs) -> ChartData:
     if inputs.missing:
         many = inputs.missing != 1
         notes.append(f"{inputs.missing} series {'are' if many else 'is'} no longer in the table.")
+    if spec.family is ChartFamily.INTERACTION:
+        xy, dropped, levels = _interaction(inputs)
+        if dropped:
+            s = "s" if dropped != 1 else ""
+            notes.append(f"{dropped} mean{s} at or below 0 cannot be shown on a log axis.")
+        return ChartData(spec.family, spec.variant, xy=xy, notes=tuple(notes), levels=levels)
     if spec.family is ChartFamily.XY:
         xy, dropped = _xy(inputs)
         curves = _curves(inputs)
@@ -307,14 +342,7 @@ def _xy(inputs: ChartInputs) -> tuple[tuple[XYSeriesData, ...], int]:
         rows = np.flatnonzero(drawable).astype(np.int64)
         xs, ys, es = x_all[rows], y[rows], error[rows]
         py = _to_plot(ys, y_scale)
-        with np.errstate(invalid="ignore", divide="ignore"):
-            if y_scale is Scale.LOG:
-                size = np.abs(es)
-                high = np.log10(ys + size) - py
-                below = ys - size
-                low = np.where(below > 0, py - np.log10(np.where(below > 0, below, 1.0)), np.nan)
-            else:
-                high, low = np.abs(es), np.abs(es)
+        low, high = _error_extent(ys, es, py, y_scale)
         out.append(
             XYSeriesData(
                 source=s.source,
@@ -333,6 +361,70 @@ def _xy(inputs: ChartInputs) -> tuple[tuple[XYSeriesData, ...], int]:
             )
         )
     return tuple(out), dropped
+
+
+def _error_extent(
+    ys: FloatArray, es: FloatArray, py: FloatArray, y_scale: Scale
+) -> tuple[FloatArray, FloatArray]:
+    """How far error bars of size ``es`` reach below and above ``py`` (plot coordinates)."""
+    with np.errstate(invalid="ignore", divide="ignore"):
+        if y_scale is Scale.LOG:
+            size = np.abs(es)
+            high = np.log10(ys + size) - py
+            below = ys - size
+            low = np.where(below > 0, py - np.log10(np.where(below > 0, below, 1.0)), np.nan)
+            return low, high
+        return np.abs(es), np.abs(es)
+
+
+def _interaction(inputs: ChartInputs) -> tuple[tuple[XYSeriesData, ...], int, tuple[str, ...]]:
+    spec, cells = inputs.spec, inputs.cells
+    if cells is None:
+        return (), 0, ()
+    y_scale = spec.y_axis.scale
+    columns = {name_key(name): j for j, name in enumerate(cells.levels_b)}
+    a = len(cells.levels_a)
+    out: list[XYSeriesData] = []
+    dropped = 0
+    for source, name in inputs.line_names:
+        j = columns.get(name_key(name))
+        style = spec.series_for(source)
+        if j is None or style is None:
+            continue
+        y = np.array([cells.mean[i][j] for i in range(a)], dtype=np.float64)
+        n = np.array([cells.n[i][j] for i in range(a)], dtype=np.int64)
+        if style.error_bars is ErrorBars.SD:
+            error = np.array([cells.sd[i][j] for i in range(a)], dtype=np.float64)
+        elif style.error_bars is ErrorBars.SEM:
+            error = np.array([cells.sem[i][j] for i in range(a)], dtype=np.float64)
+        else:
+            error = np.full(a, np.nan)
+        shown = np.isfinite(y)
+        drawable = shown & _log_mask(y, y_scale)
+        dropped += int(np.count_nonzero(shown & ~drawable))
+        rows = np.flatnonzero(drawable).astype(np.int64)
+        ys, es = y[rows], error[rows]
+        py = _to_plot(ys, y_scale)
+        low, high = _error_extent(ys, es, py, y_scale)
+        positions = rows.astype(np.float64)
+        out.append(
+            XYSeriesData(
+                source=source,
+                name=name,
+                px=positions,
+                py=py,
+                err_low=low,
+                err_high=high,
+                rows=rows,
+                x=positions,
+                y=ys,
+                error=es,
+                n=n[rows],
+                replicates=np.empty((len(rows), 0)),
+                error_bars=style.error_bars,
+            )
+        )
+    return tuple(out), dropped, cells.levels_a
 
 
 def _curves(inputs: ChartInputs) -> tuple[CurveData, ...]:

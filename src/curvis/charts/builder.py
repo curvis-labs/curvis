@@ -6,6 +6,9 @@
   table are laid over it, and the X axis is logarithmic when a dose-response fit uses
   concentrations.
 - **Bar**: one bar per series, the mean of all its values with SD error bars.
+- **Interaction**: the cell means of the table's latest two-way ANOVA, with the levels
+  of the first factor on the X axis and one line per level of the second factor (the
+  category groups), with SD error bars. An interaction graph keeps its type.
 
 New XY graphs show a legend; bar graphs name their bars on the X axis and show one only
 when the table has category groups. :func:`with_variant` changes the type of a graph
@@ -50,8 +53,28 @@ NEEDS_TWO_WAY = "Needs a two-way ANOVA"
 DOSE_RESPONSE_TYPES = ("hill_4pl", "hill_3pl")
 
 
-def family_problem(table: Table, family: ChartFamily) -> str | None:
-    """Why ``table`` cannot be drawn as a ``family`` graph (no full stop), or None."""
+TWO_WAY = "two_way_anova"
+INTERACTION_ONLY = "An interaction graph keeps its type"
+
+
+def two_way_analyses(table: Table, analyses: Sequence[Analysis]) -> list[Analysis]:
+    """The two-way ANOVAs of ``table`` among ``analyses``, oldest first."""
+    return [a for a in analyses if a.table_id == table.id and a.type == TWO_WAY]
+
+
+def first_factor_name(analysis: Analysis) -> str:
+    """The name of the first factor of a two-way ANOVA, as its results show it."""
+    from curvis.analysis.compare.two_way_analysis import DEFAULT_FACTOR
+
+    return str(getattr(analysis.params, "factor_name", "")).strip() or DEFAULT_FACTOR
+
+
+def family_problem(
+    table: Table, family: ChartFamily, analyses: Sequence[Analysis] = ()
+) -> str | None:
+    """Why ``table`` cannot be drawn as a ``family`` graph (no full stop), or None.
+    ``analyses`` are the document's analyses (an interaction graph draws a two-way
+    ANOVA)."""
     if family is ChartFamily.XY:
         if not rows_match_x(table):
             return NEEDS_X
@@ -63,7 +86,7 @@ def family_problem(table: Table, family: ChartFamily) -> str | None:
         if not {ColumnRole.TIME, ColumnRole.EVENT} <= roles:
             return NEEDS_SURVIVAL
         return SURVIVAL_LATER
-    return NEEDS_TWO_WAY
+    return None if two_way_analyses(table, analyses) else NEEDS_TWO_WAY
 
 
 def error_column_of(table: Table, column_id: str) -> Column | None:
@@ -115,6 +138,42 @@ def default_series(
     return tuple(specs)
 
 
+def interaction_series(
+    table: Table,
+    *,
+    color_scheme: str = DEFAULT_SCHEME,
+    error_bars: ErrorBars = DEFAULT_ERROR_BARS,
+) -> tuple[SeriesSpec, ...]:
+    """A styled line for each category group of ``table`` (a level of the second
+    factor of a two-way ANOVA), left to right."""
+    colors = scheme(color_scheme)
+    return tuple(
+        SeriesSpec(
+            source=c.id,
+            color=colors.series_color(i),
+            symbol=SYMBOL_CYCLE[i % len(SYMBOL_CYCLE)],
+            line_style=LineStyle.SOLID,
+            error_bars=error_bars,
+        )
+        for i, c in enumerate(table.category_groups)
+    )
+
+
+def graph_series_names(table: Table, spec: ChartSpec) -> dict[str, str]:
+    """What ``spec`` can draw from ``table``, by source: its category groups for an
+    interaction graph, its series otherwise."""
+    if spec.family is ChartFamily.INTERACTION:
+        return {c.id: c.name for c in table.category_groups}
+    return {series_source(s): s.name for s in series(table)}
+
+
+def default_series_of(table: Table, spec: ChartSpec) -> tuple[SeriesSpec, ...]:
+    """The default style of everything ``spec`` can draw from ``table``."""
+    if spec.family is ChartFamily.INTERACTION:
+        return interaction_series(table)
+    return default_series(table)
+
+
 def is_fit(analysis: Analysis) -> bool:
     try:
         return analysis.analysis_type.family is Family.FIT
@@ -143,10 +202,26 @@ def default_spec(
     Raises ``ValueError`` with :func:`family_problem`'s reason if the table cannot be
     drawn in that family.
     """
-    problem = family_problem(table, family)
+    problem = family_problem(table, family, analyses)
     if problem is not None:
         raise ValueError(f"{problem}.")
     found = series(table)
+    if family is ChartFamily.INTERACTION:
+        analysis = two_way_analyses(table, analyses)[-1]
+        factor = first_factor_name(analysis)
+        return ChartSpec(
+            table_id=table.id,
+            family=family,
+            variant=ChartVariant.INTERACTION,
+            series=interaction_series(table, error_bars=error_bars),
+            x_axis=AxisSpec(title=factor),
+            y_axis=AxisSpec(title=_shared_unit(table, found)),
+            title=table.name,
+            aspect_ratio=aspect_ratio,
+            text_size=text_size,
+            show_legend=True,
+            analysis_id=analysis.id,
+        )
     if family is ChartFamily.XY:
         x_id = x_column_id(table)
         assert x_id is not None
@@ -189,8 +264,13 @@ GRAPH_TYPES = (ChartVariant.SCATTER, ChartVariant.LINE, ChartVariant.BAR, ChartV
 """The types a graph can be changed to (Change graph type)."""
 
 
-def variant_problem(table: Table, variant: ChartVariant) -> str | None:
-    """Why a graph of ``table`` cannot be changed to ``variant`` (no full stop), or None."""
+def variant_problem(
+    table: Table, variant: ChartVariant, current: ChartSpec | None = None
+) -> str | None:
+    """Why a graph of ``table`` (``current``, if given) cannot be changed to
+    ``variant`` (no full stop), or None."""
+    if current is not None and current.family is ChartFamily.INTERACTION:
+        return INTERACTION_ONLY
     if variant not in GRAPH_TYPES:
         return "This chart type cannot be drawn yet"
     return family_problem(table, variant.family)
@@ -205,7 +285,7 @@ def with_variant(spec: ChartSpec, variant: ChartVariant, table: Table) -> ChartS
 
     Raises ``ValueError`` with :func:`variant_problem`'s reason.
     """
-    problem = variant_problem(table, variant)
+    problem = variant_problem(table, variant, spec)
     if problem is not None:
         raise ValueError(f"{problem}.")
     family = variant.family

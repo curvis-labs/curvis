@@ -444,3 +444,78 @@ def test_a_fitted_curve_can_be_removed(qtbot: QtBot, context: Context) -> None:
     assert dialog.spec.overlays == ()
     assert len(dialog.spec.series) == series
     assert dialog.series_list.count() == series
+
+
+def test_a_removed_fit_can_be_added_back(qtbot: QtBot, context: Context) -> None:
+    from curvis.analysis.base import Analysis
+    from curvis.analysis.fit.analyses import Hill4Params
+    from curvis.core import add_analysis
+
+    doc, graph_id = graph_document("xy")
+    table = doc.table("t")
+    inputs = tuple(g.id for g in table.replicate_groups)
+    first = Analysis("hill_4pl", "t", inputs, Hill4Params())
+    second = Analysis("hill_4pl", "t", inputs, Hill4Params(), id="second")
+    for fit in (first, second):
+        doc.execute(add_analysis(doc, fit))
+    dialog = FormatDialog(doc, graph_id, scheduler=context.scheduler)
+    qtbot.addWidget(dialog)
+    dialog.set_section(SERIES)
+    assert dialog.spec.overlays == ()
+    assert dialog.add_button.isEnabled()
+    dialog._fill_add_menu()
+    texts = [a.text() for a in dialog.add_menu.actions() if not a.isSeparator()]
+    assert texts[-2:] == [
+        "Fitted curve: Hill 4PL (variable slope) 1",
+        "Fitted curve: Hill 4PL (variable slope) 2",
+    ]
+    dialog.add_menu.actions()[-1].trigger()
+    assert [o.analysis_id for o in dialog.spec.overlays] == ["second"]
+    assert dialog.selected_fits() == ["second"]
+    item = dialog.series_list.selectedItems()[0]
+    assert item.text() == "Fitted curve: Hill 4PL (variable slope) 2"
+
+
+def test_an_interaction_graph_can_draw_another_two_way_anova(
+    qtbot: QtBot, context: Context
+) -> None:
+    from curvis.analysis.compare.two_way_analysis import TwoWayParams
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily
+    from curvis.core import Document, add_analysis, add_graph
+    from tests.unit.charts_tables import two_way_analysis, two_way_table
+
+    table = two_way_table()
+    doc = Document(tables=[table])
+    first = two_way_analysis(table)
+    second = replace(first, id="second", params=TwoWayParams("Treatment"))
+    for analysis in (first, second):
+        doc.execute(add_analysis(doc, analysis))
+    graph = default_spec(table, ChartFamily.INTERACTION, [first])
+    doc.execute(add_graph(doc, graph))
+    dialog = FormatDialog(doc, graph.id, scheduler=context.scheduler)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    combo = dialog.anova_combo
+    assert combo.isVisible()
+    assert [combo.itemText(i) for i in range(combo.count())] == [
+        "Two-way ANOVA 1",
+        "Two-way ANOVA 2",
+    ]
+    assert combo.currentData() == first.id
+    combo.setCurrentIndex(1)
+    assert dialog.spec.analysis_id == "second"
+    assert dialog.spec.x_axis.title == "Treatment"  # follows the factor's name
+    # A typed title stays.
+    dialog.spec = replace(dialog.spec, x_axis=replace(dialog.spec.x_axis, title="Dose (mM)"))
+    combo.setCurrentIndex(0)
+    assert dialog.spec.analysis_id == first.id
+    assert dialog.spec.x_axis.title == "Dose (mM)"
+
+
+def test_other_graphs_have_no_anova_choice(qtbot: QtBot, context: Context) -> None:
+    doc, graph_id = graph_document("xy")
+    dialog = FormatDialog(doc, graph_id, scheduler=context.scheduler)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    assert not dialog.anova_combo.isVisible() and not dialog.anova_label.isVisible()

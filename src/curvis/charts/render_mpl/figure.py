@@ -51,7 +51,15 @@ from curvis.charts.axes import (
 )
 from curvis.charts.colors import ColorScheme, scheme
 from curvis.charts.data import ChartData, XYSeriesData
-from curvis.charts.spec import ChartSpec, ChartVariant, LineStyle, SeriesSpec, Symbol
+from curvis.charts.spec import (
+    LINE_VARIANTS,
+    XY_VARIANTS,
+    ChartSpec,
+    ChartVariant,
+    LineStyle,
+    SeriesSpec,
+    Symbol,
+)
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -104,7 +112,7 @@ def make_figure(spec: ChartSpec, data: ChartData | None) -> Figure:
     layout = axes_layout(spec, data)
     _style(ax, spec, colors, layout)
     if data is not None:
-        if spec.variant in (ChartVariant.SCATTER, ChartVariant.LINE):
+        if spec.variant in XY_VARIANTS:
             _draw_xy(ax, spec, data, layout)
         elif spec.variant in (ChartVariant.BAR, ChartVariant.BOX):
             _draw_categories(ax, spec, data, colors, layout)
@@ -272,7 +280,7 @@ def _draw_xy(ax: Axes, spec: ChartSpec, data: ChartData, layout: AxesLayout) -> 
         if not style.visible:
             continue
         line = style.line_style
-        if spec.variant is ChartVariant.LINE and line is LineStyle.NONE:
+        if spec.variant in LINE_VARIANTS and line is LineStyle.NONE:
             line = LineStyle.SOLID
         ax.plot(
             series.px,
@@ -428,13 +436,13 @@ def _legend(
     styles = {s.source: s for s in spec.series}
     handles: list[Any] = []
     names: list[str] = []
-    if spec.variant in (ChartVariant.SCATTER, ChartVariant.LINE):
+    if spec.variant in XY_VARIANTS:
         for series in data.xy:
             style = styles[series.source]
             if not (style.visible and style.in_legend):
                 continue
             line = style.line_style
-            if spec.variant is ChartVariant.LINE and line is LineStyle.NONE:
+            if spec.variant in LINE_VARIANTS and line is LineStyle.NONE:
                 line = LineStyle.SOLID
             handle = Line2D(
                 [],

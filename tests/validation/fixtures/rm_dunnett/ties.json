@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_dunnett",
+  "case": "ties",
+  "description": "Repeated values within and across treatments.",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "multcomp": "1.4.32",
+      "mvtnorm": "1.4.2",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [3, 3, 4, 4, 5, 5],
+      [4, 4, 4, 5, 5, 6],
+      [5, 5, 6, 6, 6, 7]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group": [1, 2],
+    "difference": [0.66666666666666696, 1.833333333333333],
+    "se": [0.18257418583505536, 0.18257418583505536],
+    "t": [3.6514837167011094, 10.041580220928045],
+    "p_value": [0.0082096326821430605, 2.9183081285749472e-06],
+    "ci_lower": [0.1977542874266715, 1.3644209540933376],
+    "ci_upper": [1.1355790459066624, 2.3022457125733284]
+  },
+  "kinds": {
+    "group": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

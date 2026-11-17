@@ -293,3 +293,22 @@ def test_check_says_why_run_is_disabled() -> None:
     kind = base.get("descriptive_statistics")
     assert kind.check(grouped_table(), (), DescriptiveParams()) == "Tick at least one series."
     assert kind.check(grouped_table(), ("b",), DescriptiveParams()) is None
+
+
+def test_analysis_labels_number_analyses_of_the_same_type() -> None:
+    from curvis.analysis.base import Analysis, analysis_labels
+    from curvis.analysis.compare.anova_analysis import AnovaParams
+    from curvis.analysis.compare.ttest_analysis import TTestParams
+
+    analyses = [
+        Analysis("one_way_anova", "t", (), AnovaParams(), id="a"),
+        Analysis("t_test", "t", (), TTestParams(), id="b"),
+        Analysis("one_way_anova", "t", (), AnovaParams(), id="c"),
+        Analysis("gone", "t", (), AnovaParams(), id="d"),
+    ]
+    assert analysis_labels(analyses) == {
+        "a": "One-way ANOVA 1",
+        "b": "t test",
+        "c": "One-way ANOVA 2",
+        "d": "gone",
+    }

@@ -405,6 +405,35 @@
       ],
       "Hash": "5c0359193ea75eae6087c0f1ca72a1dc"
     },
+    "emmeans": {
+      "Package": "emmeans",
+      "Version": "2.0.4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "estimability",
+        "graphics",
+        "methods",
+        "mvtnorm",
+        "numDeriv",
+        "rlang",
+        "stats",
+        "utils"
+      ],
+      "Hash": "4b1a9deaadc921992795563ef658ca19"
+    },
+    "estimability": {
+      "Package": "estimability",
+      "Version": "2.0.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "stats"
+      ],
+      "Hash": "0a032de8b3ae5b5695c8319112607bda"
+    },
     "farver": {
       "Package": "farver",
       "Version": "2.1.2",

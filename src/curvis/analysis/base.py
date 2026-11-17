@@ -43,6 +43,7 @@ BUILTIN_MODULES = (
     "curvis.analysis.descriptive",
     "curvis.analysis.compare.ttest_analysis",
     "curvis.analysis.compare.anova_analysis",
+    "curvis.analysis.compare.two_way_analysis",
     "curvis.analysis.compare.mann_whitney_analysis",
     "curvis.analysis.fit.analyses",
 )
@@ -251,6 +252,8 @@ class SeriesData:
     name: str
     columns: tuple[FloatArray, ...]
     """One array per replicate column, all of the table's length."""
+    category: str = ""
+    """The name of the series' category group (two-way ANOVA), or ""."""
 
 
 @dataclass(frozen=True)
@@ -262,6 +265,8 @@ class AnalysisInputs:
     series: tuple[SeriesData, ...]
     x: FloatArray | None = None
     x_name: str = ""
+    category_factor: str = ""
+    """The name of the factor whose levels are the category groups (two-way ANOVA)."""
 
 
 def series_choices(table: Table) -> list[InputChoice]:
@@ -284,6 +289,30 @@ def rows_match_x(table: Table) -> bool:
 def x_column_id(table: Table) -> str | None:
     """The first X column of ``table``, or None."""
     return next((c.id for c in table.columns if c.role is ColumnRole.X), None)
+
+
+def analysis_labels(analyses: Sequence[Analysis]) -> dict[str, str]:
+    """A name for each analysis, by id, that tells analyses of the same type apart: the
+    type's name, numbered 1, 2 … in the given order when there are several of it
+    ("Two-way ANOVA 1", "Two-way ANOVA 2")."""
+    names: dict[str, str] = {}
+    for analysis in analyses:
+        try:
+            names[analysis.id] = analysis.analysis_type.name
+        except KeyError:
+            names[analysis.id] = analysis.type
+    counts: dict[str, int] = {}
+    for name in names.values():
+        counts[name] = counts.get(name, 0) + 1
+    seen: dict[str, int] = {}
+    labels: dict[str, str] = {}
+    for analysis_id, name in names.items():
+        if counts[name] > 1:
+            seen[name] = seen.get(name, 0) + 1
+            labels[analysis_id] = f"{name} {seen[name]}"
+        else:
+            labels[analysis_id] = name
+    return labels
 
 
 # --- analysis types --------------------------------------------------------------------

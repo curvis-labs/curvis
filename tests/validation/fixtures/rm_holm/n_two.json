@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_holm",
+  "case": "n_two",
+  "description": "Two subjects, three treatments (df_error = 2).",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "emmeans": "2.0.4",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [1.2, 2.8999999999999999],
+      [2, 3.1000000000000001],
+      [3.3999999999999999, 5.5999999999999996]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "difference": [0.5, 2.4500000000000002, 1.9500000000000002],
+    "se": [0.38944404818493061, 0.38944404818493061, 0.38944404818493061],
+    "t": [1.2838814775327392, 6.2910192399104226, 5.0071377623776838],
+    "df": 2,
+    "p_unadjusted": [0.32783392757766872, 0.024348221838643273, 0.037647999933671704],
+    "p_value": [0.32783392757766872, 0.073044665515929821, 0.075295999867343408]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "df": "exact",
+    "p_unadjusted": "p_value",
+    "p_value": "p_value"
+  }
+}

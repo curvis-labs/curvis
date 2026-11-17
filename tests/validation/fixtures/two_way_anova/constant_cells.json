@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "analysis": "two_way_anova",
+  "case": "constant_cells",
+  "description": "Every cell is constant (different values): no residual variation.",
+  "generated_by": {
+    "script": "validation/r/scripts/two_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "cells": [
+      [
+        [1, 1, 1],
+        [2, 2, 2]
+      ],
+      [
+        [3, 3, 3],
+        [5, 5, 5]
+      ]
+    ]
+  },
+  "expected": {
+    "n": [3, 3, 3, 3],
+    "cell_mean": [1, 2, 3, 5],
+    "marginal_mean_a": [1.5, 4],
+    "marginal_mean_b": [2, 3.5],
+    "df_a": 1,
+    "df_b": 1,
+    "df_interaction": 1,
+    "df_residual": 8,
+    "ss_a": 18.75,
+    "ss_b": 6.75,
+    "ss_interaction": 0.75,
+    "ss_residual": 0,
+    "ms_a": 18.75,
+    "ms_b": 6.75,
+    "ms_interaction": 0.75,
+    "ms_residual": 0,
+    "f_a": "NaN",
+    "f_b": "NaN",
+    "f_interaction": "NaN",
+    "p_a": "NaN",
+    "p_b": "NaN",
+    "p_interaction": "NaN"
+  },
+  "kinds": {
+    "n": "exact",
+    "cell_mean": "statistic",
+    "marginal_mean_a": "statistic",
+    "marginal_mean_b": "statistic",
+    "df_a": "exact",
+    "df_b": "exact",
+    "df_interaction": "exact",
+    "df_residual": "exact",
+    "ss_a": "statistic",
+    "ss_b": "statistic",
+    "ss_interaction": "statistic",
+    "ss_residual": "statistic",
+    "ms_a": "statistic",
+    "ms_b": "statistic",
+    "ms_interaction": "statistic",
+    "ms_residual": "statistic",
+    "f_a": "statistic",
+    "f_b": "statistic",
+    "f_interaction": "statistic",
+    "p_a": "p_value",
+    "p_b": "p_value",
+    "p_interaction": "p_value"
+  }
+}

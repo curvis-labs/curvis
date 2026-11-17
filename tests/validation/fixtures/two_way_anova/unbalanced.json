@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "analysis": "two_way_anova",
+  "case": "unbalanced",
+  "description": "3 x 2 design with cell sizes 2 to 9.",
+  "generated_by": {
+    "script": "validation/r/scripts/two_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "cells": [
+      [
+        [17.756340814258596, 20.098063240819897, 18.792594636678484],
+        [22.756981967093143, 18.476706831116225, 21.020198678934051, 20.148283425869685, 26.267102627356927, 23.102835050446433, 25.451275498793315, 25.652666469892488, 22.031331265911483]
+      ],
+      [
+        [16.244196589516989, 24.497416741549824, 23.310185200670517, 19.966495166288482, 26.549994140934277],
+        [26.354273013156352, 25.320164384347397]
+      ],
+      [
+        [19.683641872966938, 17.311975998032565, 19.013959050059114, 19.807539915389871, 19.538386725894298, 19.370177452801428, 17.809468458089299],
+        [20.606481507595177, 24.652935687569823, 25.282471368280387, 25.51316902740383]
+      ]
+    ]
+  },
+  "expected": {
+    "n": [3, 9, 5, 2, 7, 4],
+    "cell_mean": [18.882332897252326, 22.767486868379304, 22.113657567792018, 25.837218698751876, 18.933592781890503, 24.013764397712304],
+    "marginal_mean_a": [20.824909882815817, 23.975438133271947, 21.473678589801402],
+    "marginal_mean_b": [19.976527748978281, 24.206156654947829],
+    "df_a": 2,
+    "df_b": 1,
+    "df_interaction": 2,
+    "df_residual": 24,
+    "ss_a": 36.680012433029219,
+    "ss_b": 104.73406615193436,
+    "ss_interaction": 2.4028172467208964,
+    "ss_residual": 147.55581429203878,
+    "ms_a": 18.34000621651461,
+    "ms_b": 104.73406615193436,
+    "ms_interaction": 1.2014086233604482,
+    "ms_residual": 6.148158928834949,
+    "f_a": 2.9830078286525308,
+    "f_b": 17.035029081751638,
+    "f_interaction": 0.19540949368205585,
+    "p_a": 0.069660546188213823,
+    "p_b": 0.00038173702478266262,
+    "p_interaction": 0.82379338933964719
+  },
+  "kinds": {
+    "n": "exact",
+    "cell_mean": "statistic",
+    "marginal_mean_a": "statistic",
+    "marginal_mean_b": "statistic",
+    "df_a": "exact",
+    "df_b": "exact",
+    "df_interaction": "exact",
+    "df_residual": "exact",
+    "ss_a": "statistic",
+    "ss_b": "statistic",
+    "ss_interaction": "statistic",
+    "ss_residual": "statistic",
+    "ms_a": "statistic",
+    "ms_b": "statistic",
+    "ms_interaction": "statistic",
+    "ms_residual": "statistic",
+    "f_a": "statistic",
+    "f_b": "statistic",
+    "f_interaction": "statistic",
+    "p_a": "p_value",
+    "p_b": "p_value",
+    "p_interaction": "p_value"
+  }
+}

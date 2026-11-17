@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "analysis": "two_way_anova",
+  "case": "missing",
+  "description": "Missing values in several cells.",
+  "generated_by": {
+    "script": "validation/r/scripts/two_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "cells": [
+      [
+        [5.0999999999999996, "NaN", 6.2000000000000002, 5.7999999999999998],
+        [7, 7.4000000000000004, "NaN", 6.9000000000000004]
+      ],
+      [
+        ["NaN", "NaN", 4.7999999999999998, 5.5],
+        [8.0999999999999996, 8.8000000000000007, 9, 8.1999999999999993]
+      ],
+      [
+        [6.5999999999999996, 6, 5.7000000000000002, "NaN"],
+        ["NaN", 7.9000000000000004, 8.4000000000000004, 7.7000000000000002]
+      ]
+    ]
+  },
+  "expected": {
+    "n": [3, 3, 2, 4, 3, 3],
+    "cell_mean": [5.7000000000000002, 7.1000000000000005, 5.1500000000000004, 8.5250000000000004, 6.0999999999999996, 8],
+    "marginal_mean_a": [6.4000000000000004, 6.8375000000000004, 7.0499999999999998],
+    "marginal_mean_b": [5.6500000000000004, 7.875],
+    "df_a": 2,
+    "df_b": 1,
+    "df_interaction": 2,
+    "df_residual": 12,
+    "ss_a": 1.3142307692307675,
+    "ss_b": 21.386700000000005,
+    "ss_interaction": 2.9342307692307683,
+    "ss_residual": 2.2725000000000017,
+    "ms_a": 0.65711538461538377,
+    "ms_b": 21.386700000000005,
+    "ms_interaction": 1.4671153846153842,
+    "ms_residual": 0.18937500000000015,
+    "f_a": 3.4699162223914626,
+    "f_b": 112.93306930693062,
+    "f_interaction": 7.7471439451637387,
+    "p_a": 0.064689036199645555,
+    "p_b": 1.8493481278034447e-07,
+    "p_interaction": 0.0069124598436942101
+  },
+  "kinds": {
+    "n": "exact",
+    "cell_mean": "statistic",
+    "marginal_mean_a": "statistic",
+    "marginal_mean_b": "statistic",
+    "df_a": "exact",
+    "df_b": "exact",
+    "df_interaction": "exact",
+    "df_residual": "exact",
+    "ss_a": "statistic",
+    "ss_b": "statistic",
+    "ss_interaction": "statistic",
+    "ss_residual": "statistic",
+    "ms_a": "statistic",
+    "ms_b": "statistic",
+    "ms_interaction": "statistic",
+    "ms_residual": "statistic",
+    "f_a": "statistic",
+    "f_b": "statistic",
+    "f_interaction": "statistic",
+    "p_a": "p_value",
+    "p_b": "p_value",
+    "p_interaction": "p_value"
+  }
+}
