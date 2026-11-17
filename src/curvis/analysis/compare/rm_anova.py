@@ -128,6 +128,14 @@ def complete_rows(treatments: Sequence[npt.ArrayLike]) -> tuple[FloatArray, int]
     return full[complete], incomplete
 
 
+def _means(y: FloatArray, axis: int) -> FloatArray:
+    """Means along ``axis``, refined with a second pass as :func:`mean` does."""
+    count = y.shape[axis]
+    first = np.sum(y, axis=axis) / count
+    centred = y - np.expand_dims(first, axis)
+    return np.asarray(first + np.sum(centred, axis=axis) / count, dtype=np.float64)
+
+
 def rm_anova(treatments: Sequence[npt.ArrayLike]) -> RMAnovaStats:
     """Repeated-measures ANOVA of ``treatments`` (equal-length columns; row i is
     subject i). Needs at least two treatments and two complete subjects."""
@@ -139,8 +147,8 @@ def rm_anova(treatments: Sequence[npt.ArrayLike]) -> RMAnovaStats:
     n, k = y.shape
     if n < 2:
         raise ValueError("repeated-measures ANOVA needs at least two complete subjects")
-    col_means = np.array([mean(y[:, j]) for j in range(k)])
-    row_means = np.array([mean(y[i, :]) for i in range(n)])
+    col_means = _means(y, axis=0)
+    row_means = _means(y, axis=1)
     grand = mean(y.ravel(order="F"))
     ss_t = 0.0 if np.all(col_means == col_means[0]) else n * float(np.sum((col_means - grand) ** 2))
     ss_s = 0.0 if np.all(row_means == row_means[0]) else k * float(np.sum((row_means - grand) ** 2))
