@@ -513,6 +513,57 @@
       ]
     },
     {
+      "name": "test_repeated_measures_anova_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_repeated_measures_anova_10k_points",
+      "stats": {
+        "min": 0.0008476389341728643
+      },
+      "runs": [
+        {
+          "min": 0.0009092020134816007,
+          "median": 0.0011405149223841443
+        },
+        {
+          "min": 0.0008476389341728643,
+          "median": 0.0010416536247912825
+        }
+      ]
+    },
+    {
+      "name": "test_two_way_anova_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_two_way_anova_10k_points",
+      "stats": {
+        "min": 0.0006454449352240949
+      },
+      "runs": [
+        {
+          "min": 0.000732160329567926,
+          "median": 0.0014461799494847577
+        },
+        {
+          "min": 0.0006454449352240949,
+          "median": 0.000794714159791506
+        }
+      ]
+    },
+    {
+      "name": "test_two_way_anova_analysis_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_two_way_anova_analysis_10k_points",
+      "stats": {
+        "min": 0.1878330956855807
+      },
+      "runs": [
+        {
+          "min": 0.19056126042581678,
+          "median": 0.19675909904439706
+        },
+        {
+          "min": 0.1878330956855807,
+          "median": 0.2133983783113942
+        }
+      ]
+    },
+    {
       "name": "test_4pl_12_points_by_20_series",
       "fullname": "tests/bench/test_fit.py::test_4pl_12_points_by_20_series",
       "stats": {

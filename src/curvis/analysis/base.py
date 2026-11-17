@@ -291,6 +291,30 @@ def x_column_id(table: Table) -> str | None:
     return next((c.id for c in table.columns if c.role is ColumnRole.X), None)
 
 
+def analysis_labels(analyses: Sequence[Analysis]) -> dict[str, str]:
+    """A name for each analysis, by id, that tells analyses of the same type apart: the
+    type's name, numbered 1, 2 … in the given order when there are several of it
+    ("Two-way ANOVA 1", "Two-way ANOVA 2")."""
+    names: dict[str, str] = {}
+    for analysis in analyses:
+        try:
+            names[analysis.id] = analysis.analysis_type.name
+        except KeyError:
+            names[analysis.id] = analysis.type
+    counts: dict[str, int] = {}
+    for name in names.values():
+        counts[name] = counts.get(name, 0) + 1
+    seen: dict[str, int] = {}
+    labels: dict[str, str] = {}
+    for analysis_id, name in names.items():
+        if counts[name] > 1:
+            seen[name] = seen.get(name, 0) + 1
+            labels[analysis_id] = f"{name} {seen[name]}"
+        else:
+            labels[analysis_id] = name
+    return labels
+
+
 # --- analysis types --------------------------------------------------------------------
 
 

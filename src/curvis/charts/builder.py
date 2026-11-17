@@ -62,6 +62,13 @@ def two_way_analyses(table: Table, analyses: Sequence[Analysis]) -> list[Analysi
     return [a for a in analyses if a.table_id == table.id and a.type == TWO_WAY]
 
 
+def first_factor_name(analysis: Analysis) -> str:
+    """The name of the first factor of a two-way ANOVA, as its results show it."""
+    from curvis.analysis.compare.two_way_analysis import DEFAULT_FACTOR
+
+    return str(getattr(analysis.params, "factor_name", "")).strip() or DEFAULT_FACTOR
+
+
 def family_problem(
     table: Table, family: ChartFamily, analyses: Sequence[Analysis] = ()
 ) -> str | None:
@@ -201,7 +208,7 @@ def default_spec(
     found = series(table)
     if family is ChartFamily.INTERACTION:
         analysis = two_way_analyses(table, analyses)[-1]
-        factor = getattr(analysis.params, "factor_name", "").strip()
+        factor = first_factor_name(analysis)
         return ChartSpec(
             table_id=table.id,
             family=family,

@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from curvis.analysis.base import analysis_labels
 from curvis.analysis.result import STARS_FOOTNOTE, Grid, Result, grids
 from curvis.core import Document
 from curvis.ui.dialogs import SECTION_SPACING, SPACING, secondary_label
@@ -300,12 +301,9 @@ class ResultsPanel(QWidget):
         table = self.document.table(self.table_id).name if analyses and self.table_id else ""
         self.combo.blockSignals(True)
         self.combo.clear()
+        labels = analysis_labels(analyses)
         for analysis in analyses:
-            try:
-                name = analysis.analysis_type.name
-            except KeyError:
-                name = analysis.type
-            self.combo.addItem(f"{name} · {table}", analysis.id)
+            self.combo.addItem(f"{labels[analysis.id]} · {table}", analysis.id)
         added = [a.id for a in analyses if a.id not in previous]
         target = added[-1] if added and previous else current
         index = self.combo.findData(target) if target else -1

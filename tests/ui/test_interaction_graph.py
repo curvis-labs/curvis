@@ -106,3 +106,17 @@ def test_deleting_the_anova_deletes_the_graph_after_asking(
     assert tab.document.graphs == []
     tab.document.undo_stack.undo()
     assert len(tab.document.graphs) == 1
+
+
+def test_results_panel_numbers_analyses_of_the_same_type(tab: DocumentTab) -> None:
+    from dataclasses import replace
+
+    table = tab.document.tables[0]
+    first = two_way_analysis(table)
+    for analysis in (first, replace(first, id="second")):
+        tab.document.execute(add_analysis(tab.document, analysis))
+    combo = tab.results_panel.combo
+    assert [combo.itemText(i) for i in range(combo.count())] == [
+        "Two-way ANOVA 1 · Assay",
+        "Two-way ANOVA 2 · Assay",
+    ]
