@@ -3,7 +3,8 @@
 `tests/ui/test_image_diff.py` checks that an exported graph (Matplotlib,
 `curvis.charts.render_mpl`) matches the Graph panel (pyqtgraph,
 `curvis.charts.render_qt`). It draws every graph type (scatter, line with a fitted curve and
-its band, bar, box), with and without a legend, in the light and the dark app theme.
+its band, bar, box), with and without a legend, in the light and the dark app theme,
+plus layouts that once differed: titles wider than the plot and turned category labels.
 The helpers are in `tests/ui/image_diff.py`.
 
 ## Method
@@ -59,6 +60,16 @@ from the theme (DESIGN.md §3).
   with ClearType, Qt's raster engine ignores that for an opaque target, so `render_page`
   paints into a non-premultiplied ARGB32 image, where it always draws grey text. A
   Windows screen may still show chart text with ClearType: a display effect only.
+- **Title and text lines.** pyqtgraph's own title row is 30 px high at any zoom and as
+  wide as its text, so a long title widened the plot and squeezed the legend, and the
+  screen plot sat about 9 px higher than the export's. The Graph panel now has its own
+  title item (`ChartTitle`) laid out as Matplotlib lays out `Axes.set_title`: baseline
+  `FONT_ASCENT_EM` under the page padding, plot `TITLE_PAD_PT` under the baseline. A title
+  wider than the plot is shortened with "…" to the plot's width in both renderers
+  (`shorten_to_fit`). Axis titles and X tick labels, level or turned, take Matplotlib's
+  1 em line (`FONT_ASCENT_EM + FONT_DESCENT_EM`) instead of Qt's 1.16 em one.
+  `test_title_and_turned_labels_match` covers long titles on a square page with a legend
+  and turned category labels on square and wide pages.
 - **Legend spacing.** Matplotlib's layout pads both sides of the gap between the plot and
   the legend, and the legend has a border inside; the screen legend now has the same
   margins (`PAGE_PAD_PT`, `LEGEND_BORDER_EM`), so the two plots are equally wide.

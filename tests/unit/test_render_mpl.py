@@ -120,3 +120,41 @@ def test_matplotlib_is_not_imported_at_start_up() -> None:
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "False"
+
+
+
+def titled(title: str):  # type: ignore[no-untyped-def]
+    """The XY graph on a square page with its legend and ``title``, drawn: (title text
+    as drawn, title box, plot box, legend box) in pixels."""
+    import matplotlib
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    from curvis.charts.render_mpl.figure import RC_PARAMS, make_figure
+
+    spec, data = xy()
+    spec = replace(spec, title=title, aspect_ratio="square", show_legend=True)
+    with matplotlib.rc_context(RC_PARAMS):  # type: ignore[arg-type]
+        fig = make_figure(spec, data)
+        canvas = FigureCanvasAgg(fig)
+        canvas.draw()
+        renderer = canvas.get_renderer()
+        ax = fig.axes[0]
+        return (
+            ax.title.get_text(),
+            ax.title.get_window_extent(renderer),
+            ax.bbox,
+            fig.legends[0].get_window_extent(renderer),
+        )
+
+
+@pytest.mark.parametrize("title", ["Dose by sex and time", "Response of cells to dose"])
+def test_a_title_wider_than_the_plot_is_shortened_to_it(title: str) -> None:
+    """Not past the page edge and over the legend, as it was."""
+    shown, title_box, plot, legend = titled(title)
+    assert shown.endswith("…") and title.startswith(shown[:-1])
+    assert plot.x0 - 1 <= title_box.x0 and title_box.x1 <= plot.x1 + 1
+    assert title_box.x1 <= legend.x0
+
+
+def test_a_title_that_fits_is_left_whole() -> None:
+    assert titled("Dose")[0] == "Dose"

@@ -28,7 +28,7 @@ from __future__ import annotations
 import importlib.util
 import itertools
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -66,6 +66,20 @@ ERROR_BAR_WIDTH_PT = 0.75
 BOX_LINE_PT = 1.125
 TITLE_SCALE = 1.2
 """The title is this many times the chart text size."""
+TITLE_PAD_PT = 6.0
+"""Space between the title's baseline and the top of the plot (Matplotlib's
+``axes.titlepad``)."""
+FONT_ASCENT_EM = 1556 / 2048
+"""DejaVu Sans's typographic ascender (OS/2 ``sTypoAscender`` over ``unitsPerEm``).
+Matplotlib makes a line of text at least this tall above its baseline: the title's
+baseline sits this far (or the height of its tallest letter, if more) below the top of
+the page's padding, and an axis title's or tick label's below the top of its line."""
+FONT_DESCENT_EM = 492 / 2048
+"""DejaVu Sans's typographic descender: a line of text reaches at least this far below
+its baseline. Matplotlib's line of text is ``FONT_ASCENT_EM + FONT_DESCENT_EM`` (1 em)
+high, where Qt's is the font's line height (1.16 em); the Graph panel lays out axis
+titles and turned tick labels with Matplotlib's."""
+ELLIPSIS = "…"
 LEGEND_SAMPLE_EM = 1.6
 """Width of a legend entry's sample (symbol, line or patch), in ems of the text size."""
 LEGEND_ROW_EM = 1.5
@@ -241,6 +255,24 @@ def _shorten(axis: AxisLayout, room: Room, height: float) -> AxisLayout:
         for t in axis.major
     )
     return replace(axis, major=ticks)
+
+
+def shorten_to_fit(text: str, width: float, measure: Callable[[str], float]) -> str:
+    """``text`` whole if it fits in ``width``, otherwise its longest beginning that fits
+    with an ellipsis after it (just the ellipsis if nothing does). ``measure`` gives the
+    width of a text in the units of ``width``; each renderer measures with its own font
+    engine, both on DejaVu Sans, so they shorten a title alike (DESIGN.md: the page
+    leaves room for everything it shows)."""
+    if not text or measure(text) <= width:
+        return text
+    low, high = 0, len(text) - 1  # the longest beginning that fits is text[:low]
+    while low < high:
+        middle = (low + high + 1) // 2
+        if measure(text[:middle].rstrip() + ELLIPSIS) <= width:
+            low = middle
+        else:
+            high = middle - 1
+    return text[:low].rstrip() + ELLIPSIS
 
 
 ANGLED_PITCH_EM = 1.6
@@ -465,4 +497,5 @@ __all__ = (
     "log_ticks",
     "page_px",
     "points_to_px",
+    "shorten_to_fit",
 )

@@ -20,11 +20,12 @@ from curvis.charts.spec import (
     ChartVariant,
     ErrorBars,
     FitOverlay,
+    LabelAngle,
     LineStyle,
     Scale,
     Symbol,
 )
-from curvis.data import Table
+from curvis.data import Column, ColumnRole, Table
 from curvis.ui.theme import dark_palette, light_palette
 from tests.ui.image_diff import as_array, compare, save_pair
 from tests.unit.charts_tables import DOSES, column_table, replicate_table, sigmoid_table
@@ -78,6 +79,49 @@ def _bars(variant: ChartVariant) -> tuple[ChartSpec, ChartData]:
     return spec, compute(gather(table, spec, {}))
 
 
+def _long_title(title: str) -> tuple[ChartSpec, ChartData]:
+    """A title wider than the plot of a square page with a legend: shortened with an
+    ellipsis to the plot's width in both renderers."""
+    spec, data = _scatter()
+    return replace(spec, title=title, aspect_ratio="square", show_legend=True), data
+
+
+def _turned_bars(aspect_ratio: str, legend: bool) -> tuple[ChartSpec, ChartData]:
+    """Category labels turned by 45°."""
+    table = Table(
+        "Dose groups",
+        [
+            Column.new(name, ColumnRole.Y, values)
+            for name, values in (
+                ("Control", [1.0, 2.0, 4.0]),
+                ("Low", [3.0, 5.0, 6.0]),
+                ("High", [7.0, 8.0, 9.5]),
+            )
+        ],
+    )
+    spec = default_spec(table, ChartFamily.BAR)
+    spec = replace(
+        spec,
+        aspect_ratio=aspect_ratio,
+        show_legend=legend,
+        x_axis=replace(spec.x_axis, label_angle=LabelAngle.ANGLED),
+        y_axis=replace(spec.y_axis, title="Signal"),
+    )
+    return spec, compute(gather(table, spec, {}))
+
+
+LAYOUTS = {
+    "title-dose-by-sex-and-time": lambda: _long_title("Dose by sex and time"),
+    "title-response-of-cells-to-dose": lambda: _long_title("Response of cells to dose"),
+    "turned-labels-square-legend": lambda: _turned_bars("square", True),
+    "turned-labels-square-no-legend": lambda: _turned_bars("square", False),
+    "turned-labels-wide-legend": lambda: _turned_bars("wide", True),
+    "turned-labels-wide-no-legend": lambda: _turned_bars("wide", False),
+}
+"""Layouts that once differed between the renderers: a title wider than the plot, and
+turned category labels (both renderers now lay out a title and turned labels as
+Matplotlib does)."""
+
 GRAPHS = {
     "scatter": _scatter,
     "line": _line_with_fit,
@@ -99,8 +143,17 @@ def theme(request: pytest.FixtureRequest, qapp: QApplication) -> Iterator[str]:
 def test_export_matches_the_screen(graph: str, legend: bool, theme: str) -> None:
     spec, data = GRAPHS[graph]()
     spec = replace(spec, show_legend=legend)
+    _check(spec, data, f"{graph}-{'legend' if legend else 'no-legend'}-{theme}")
+
+
+@pytest.mark.parametrize("layout", LAYOUTS)
+def test_title_and_turned_labels_match(layout: str, qapp: QApplication) -> None:
+    spec, data = LAYOUTS[layout]()
+    _check(spec, data, layout)
+
+
+def _check(spec: ChartSpec, data: ChartData, name: str) -> None:
     diff = compare(spec, data)
-    name = f"{graph}-{'legend' if legend else 'no-legend'}-{theme}"
     report = f"{name}: plot {diff.plot:.4f}, page {diff.page:.4f}"
     print(report)
     if diff.plot > PLOT_THRESHOLD or diff.page > PAGE_THRESHOLD:

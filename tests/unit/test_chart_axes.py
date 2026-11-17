@@ -8,6 +8,9 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from curvis.charts.axes import (
+    ELLIPSIS,
+    FONT_ASCENT_EM,
+    FONT_DESCENT_EM,
     PADDING,
     axes_layout,
     chart_font_path,
@@ -17,6 +20,7 @@ from curvis.charts.axes import (
     log_ticks,
     nice_step,
     page_px,
+    shorten_to_fit,
 )
 from curvis.charts.builder import default_spec
 from curvis.charts.data import compute, gather
@@ -209,3 +213,45 @@ def test_column_major_puts_matplotlib_entries_where_rows_put_them() -> None:
     assert column_major(5, 3) == [0, 3, 1, 4, 2]
     assert column_major(4, 2) == [0, 2, 1, 3]
     assert column_major(3, 3) == [0, 1, 2]
+
+
+def test_font_metrics_are_dejavu_sans_typographic_ones() -> None:
+    from matplotlib.ft2font import FT2Font
+
+    path = chart_font_path()
+    assert path is not None
+    font = FT2Font(str(path))
+    os2, em = font.get_sfnt_table("OS/2"), font.get_sfnt_table("head")["unitsPerEm"]
+    assert FONT_ASCENT_EM == os2["sTypoAscender"] / em
+    assert FONT_DESCENT_EM == -os2["sTypoDescender"] / em
+
+
+def width(text: str) -> float:
+    """One unit per character: enough to check the rule."""
+    return float(len(text))
+
+
+def test_a_text_that_fits_is_left_whole() -> None:
+    assert shorten_to_fit("Dose by sex", 11, width) == "Dose by sex"
+    assert shorten_to_fit("", 0, width) == ""
+
+
+def test_a_text_too_wide_is_shortened_with_an_ellipsis() -> None:
+    assert shorten_to_fit("Dose by sex and time", 10, width) == "Dose by s" + ELLIPSIS
+    # No space before the ellipsis.
+    assert shorten_to_fit("Dose by sex and time", 9, width) == "Dose by" + ELLIPSIS
+    assert shorten_to_fit("Dose by sex", 0.5, width) == ELLIPSIS
+
+
+@given(st.text(min_size=1, max_size=40), st.floats(0, 50))
+def test_a_shortened_text_fits_and_keeps_the_most_it_can(text: str, room: float) -> None:
+    shown = shorten_to_fit(text, room, width)
+    if shown == text:
+        assert width(text) <= room
+        return
+    assert shown.endswith(ELLIPSIS)
+    kept = shown[: -len(ELLIPSIS)]
+    assert text.startswith(kept)
+    assert width(shown) <= room or kept == ""
+    longer = text[: len(kept) + 1].rstrip() + ELLIPSIS
+    assert width(longer) > room or len(longer) <= len(shown)
