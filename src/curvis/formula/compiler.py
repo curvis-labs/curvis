@@ -9,6 +9,9 @@ Rules for values:
 - Division by zero, ``x % 0``, a result too large to store (±inf) and an undefined
   power such as ``(-8)^(1/3)`` all give NaN, not an error. A formula therefore only
   produces finite numbers or NaN.
+- ``x^2``, ``x^−1`` and ``x^0.5`` are computed as ``x·x``, ``1/x`` and ``√x``, which are
+  correctly rounded, whether the exponent is typed or comes from a column. Other powers
+  use NumPy's ``power``, which can be one unit in the last place off.
 - ``%`` is modulo; the result takes the sign of the divisor (as in Excel): ``-7 % 3 = 2``.
 - Column functions skip missing values. With no values left, FIRST, LAST, MIN, MAX and
   MEAN give NaN, SUM and COUNT give 0. FIRST and LAST give the first and last value
@@ -250,13 +253,36 @@ def _divide(a: Value, b: Value) -> Any:
     return result
 
 
+# Exponents NumPy computes exactly, but only when the exponent is a single number (its
+# fast path); with an array of exponents it uses its vectorised pow for every element.
+_EXACT_POWERS: dict[float, Callable[[Any], Any]] = {
+    2.0: np.square,
+    -1.0: np.reciprocal,
+    0.5: np.sqrt,
+}
+
+
+def _power(a: Value, b: Value) -> Any:
+    """``a ^ b``, with the same result in a row whether ``b`` is a number or a column."""
+    if not isinstance(b, np.ndarray):
+        exact = _EXACT_POWERS.get(float(b))
+        return exact(a) if exact is not None else np.power(a, b)
+    result = np.power(a, b)
+    for exponent, exact in _EXACT_POWERS.items():
+        where = b == exponent
+        if where.any():
+            base = a[where] if isinstance(a, np.ndarray) else a
+            result[where] = exact(base)
+    return result
+
+
 _BINARY: dict[BinaryOp, Callable[[Value, Value], Any]] = {
     BinaryOp.ADD: np.add,
     BinaryOp.SUB: np.subtract,
     BinaryOp.MUL: np.multiply,
     BinaryOp.DIV: _divide,
     BinaryOp.MOD: np.mod,
-    BinaryOp.POW: np.power,
+    BinaryOp.POW: _power,
 }
 
 

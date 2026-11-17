@@ -86,6 +86,23 @@ def test_power() -> None:
     same(run("0^0"), [1] * 5)
 
 
+@pytest.mark.parametrize("exponent", [2.0, -1.0, 0.5])
+def test_exact_powers_do_not_depend_on_where_the_exponent_comes_from(exponent: float) -> None:
+    rng = np.random.default_rng(0)
+    x = np.concatenate([rng.uniform(-100, 100, 1000), [1e300, 1e-300, 0.0, -0.0, NAN]])
+    columns = {"x": x, "e": np.full(x.size, exponent)}
+    with np.errstate(all="ignore"):
+        exact = {2.0: x * x, -1.0: 1 / x, 0.5: np.sqrt(x)}[exponent]
+    exact[np.isinf(exact) | (exact != exact)] = NAN
+    same(run(f"[x] ^ {exponent}", columns, x.size), list(exact))
+    same(run("[x] ^ [e]", columns, x.size), list(exact))
+
+
+def test_reciprocal_power_of_a_column_exponent_is_exact() -> None:
+    # Was 9.999999999999999e-301: NumPy's vectorised pow is one ulp off here.
+    same(run("1e300 ^ -[b]", {"b": np.array([1.0])}, 1), [1e-300])
+
+
 def test_undefined_and_overflowing_powers_give_nan() -> None:
     same(run("(-8)^(1/3)"), [NAN] * 5)
     same(run("0^-1"), [NAN] * 5)

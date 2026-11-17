@@ -175,10 +175,19 @@ def binary(op: BinaryOp, a: float, b: float) -> float:
         return math.nan if math.isnan(a) or math.isnan(b) or b == 0 else clean(a / b)
     if op is BinaryOp.MOD:
         return math.nan if math.isnan(a) or math.isnan(b) or b == 0 else a % b
-    # The power itself is NumPy's: its vectorised pow can differ from libm in the last bit
-    # (2^0.001), see test_numpy_power_is_within_one_ulp_of_libm.
+    # Squares, reciprocals and square roots are exact (correctly rounded) ...
+    if b == 2:
+        return clean(a * a)
+    if b == -1:
+        return math.nan if a == 0 else clean(1 / a)
+    if b == 0.5:
+        return math.nan if a < 0 else math.sqrt(a)
+    # ... any other power is NumPy's: its vectorised pow can differ from libm in the last
+    # bit (2^0.001), see test_numpy_power_is_within_one_ulp_of_libm. Use one-element
+    # arrays: with a 0-d exponent NumPy would take a different (scalar fast) path.
     with np.errstate(all="ignore"):
-        return clean(float(np.power(a, b)))  # (-8)^(1/3) is NaN; 0^-1 and 10^400 are inf
+        power = np.power(np.array([a]), np.array([b]))[0]
+    return clean(float(power))  # (-8)^(1/3) is NaN; 0^-1 and 10^400 are inf
 
 
 class Reference:
