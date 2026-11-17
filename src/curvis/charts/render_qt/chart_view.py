@@ -256,12 +256,17 @@ class ChartAxis(pg.AxisItem):  # type: ignore[misc]
             )
 
     def _line(self) -> float:
-        """Height of a line of Matplotlib's in the chart font, in pixels."""
+        """Height of a line of Matplotlib's in the chart font, in pixels (before the
+        chart has set :attr:`em`: the label's own height)."""
+        if not self.em:
+            return float(self.label.boundingRect().height())
         return (FONT_ASCENT_EM + FONT_DESCENT_EM) * self.em
 
     def _baseline_shift(self, font: QFont) -> float:
         """How much lower Qt puts the baseline under the top of a line of ``font`` than
-        Matplotlib does, in pixels."""
+        Matplotlib does, in pixels (0 before the chart has set :attr:`em`)."""
+        if not self.em:
+            return 0.0
         return QFontMetricsF(font).ascent() - FONT_ASCENT_EM * self.em
 
     def _title_room(self) -> float:
@@ -383,8 +388,8 @@ class ChartTitle(QGraphicsWidget):
     def __init__(self) -> None:
         super().__init__()
         self.text = ""
-        self.font = QFont()
-        self.color = QColor()
+        self.title_font = QFont()
+        self.title_color = QColor()
         self.ascent = 0.0
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setMinimumWidth(0)
@@ -394,7 +399,7 @@ class ChartTitle(QGraphicsWidget):
     def set_title(self, text: str, font: QFont, color: QColor, em: float, pad: float) -> None:
         """Show ``text`` in ``font`` (``em`` pixels high) with ``pad`` pixels between its
         baseline and the plot; an empty text hides the title and its row."""
-        self.text, self.font, self.color = text, font, color
+        self.text, self.title_font, self.title_color = text, font, color
         if text:
             ink = -QFontMetricsF(font).tightBoundingRect(text).top()
             self.ascent = max(FONT_ASCENT_EM * em, ink)
@@ -409,16 +414,16 @@ class ChartTitle(QGraphicsWidget):
 
     def shown_text(self) -> str:
         """The title as drawn: shortened to the width of the plot if it is wider."""
-        metrics = QFontMetricsF(self.font)
+        metrics = QFontMetricsF(self.title_font)
         return shorten_to_fit(self.text, self.size().width(), metrics.horizontalAdvance)
 
     def paint(self, painter: QPainter, *_args: Any) -> None:
         text = self.shown_text()
         if not text:
             return
-        width = QFontMetricsF(self.font).horizontalAdvance(text)
-        painter.setFont(self.font)
-        painter.setPen(self.color)
+        width = QFontMetricsF(self.title_font).horizontalAdvance(text)
+        painter.setFont(self.title_font)
+        painter.setPen(self.title_color)
         painter.drawText(QPointF((self.size().width() - width) / 2, self.ascent), text)
 
 

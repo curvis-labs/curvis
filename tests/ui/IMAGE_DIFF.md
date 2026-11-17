@@ -29,10 +29,10 @@ are**:
 
 Two measures:
 
-| Measure | What is compared | Radius | Threshold | Measured (all 16 cases) |
+| Measure | What is compared | Radius | Threshold | Measured (all 22 cases) |
 | --- | --- | --- | --- | --- |
 | **plot** | The plot area inside the axes, cut out of each image (3 px inset, because Matplotlib's axes box holds the axis lines and pyqtgraph's view box does not). The export's colour masks are scaled to the size of the screen's plot area. | 3 px (0.4 mm) | 0.01 | 0.0000 |
-| **page** | The whole page. | 8 px (1 mm) | 0.12 | 0.004 – 0.039 |
+| **page** | The whole page. | 8 px (1 mm) | 0.12 | 0 – 0.035; 0.088 for the long titles (the plot is narrower in the export, so the "100" label fits) |
 
 The thresholds were set after the measurements, with a margin. The control test
 (`test_the_measure_sees_a_wrong_colour_and_a_wrong_range`) shows that the plot measure

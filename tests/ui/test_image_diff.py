@@ -33,7 +33,7 @@ from tests.unit.charts_tables import DOSES, column_table, replicate_table, sigmo
 PLOT_THRESHOLD = 0.01
 """Largest miss allowed in the plot area (measured: 0.0000 for every graph)."""
 PAGE_THRESHOLD = 0.12
-"""Largest miss allowed on the page (measured: at most 0.092). See IMAGE_DIFF.md."""
+"""Largest miss allowed on the page (measured: at most 0.088). See IMAGE_DIFF.md."""
 FAILED = Path(__file__).parents[2] / "build" / "image-diff"
 
 

@@ -122,7 +122,6 @@ def test_matplotlib_is_not_imported_at_start_up() -> None:
     assert out.stdout.strip() == "False"
 
 
-
 def titled(title: str):  # type: ignore[no-untyped-def]
     """The XY graph on a square page with its legend and ``title``, drawn: (title text
     as drawn, title box, plot box, legend box) in pixels."""

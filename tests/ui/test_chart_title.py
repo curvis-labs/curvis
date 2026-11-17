@@ -38,9 +38,7 @@ def legend_box(view: ChartView) -> QRectF:
 
 
 @pytest.mark.parametrize("title", ["Dose by sex and time", "Response of cells to dose"])
-def test_a_long_title_is_shortened_and_leaves_the_layout_alone(
-    qtbot: QtBot, title: str
-) -> None:
+def test_a_long_title_is_shortened_and_leaves_the_layout_alone(qtbot: QtBot, title: str) -> None:
     short = drawn(qtbot, "Dose")
     long = drawn(qtbot, title)
     shown = long.title.shown_text()

@@ -222,8 +222,8 @@ def test_font_metrics_are_dejavu_sans_typographic_ones() -> None:
     assert path is not None
     font = FT2Font(str(path))
     os2, em = font.get_sfnt_table("OS/2"), font.get_sfnt_table("head")["unitsPerEm"]
-    assert FONT_ASCENT_EM == os2["sTypoAscender"] / em
-    assert FONT_DESCENT_EM == -os2["sTypoDescender"] / em
+    assert os2["sTypoAscender"] / em == FONT_ASCENT_EM
+    assert -os2["sTypoDescender"] / em == FONT_DESCENT_EM
 
 
 def width(text: str) -> float:

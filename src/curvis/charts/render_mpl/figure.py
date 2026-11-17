@@ -133,9 +133,7 @@ def _chart_axes() -> type[Axes]:
                 font = self.title.get_fontproperties()
 
                 def measure(text: str) -> float:
-                    width, _h, _d = renderer.get_text_width_height_descent(
-                        text, font, ismath=False
-                    )
+                    width, _h, _d = renderer.get_text_width_height_descent(text, font, ismath=False)
                     return float(width)
 
                 self.title.set_text(shorten_to_fit(self.full_title, self.bbox.width, measure))
@@ -157,9 +155,7 @@ def _style(ax: Axes, spec: ChartSpec, colors: ColorScheme, layout: AxesLayout) -
         ax.spines[side].set_linewidth(AXIS_WIDTH_PT)
         ax.spines[side].set_capstyle("projecting")
     if spec.title:
-        ax.set_title(
-            spec.title, fontsize=spec.text_size * TITLE_SCALE, color=ink, pad=TITLE_PAD_PT
-        )
+        ax.set_title(spec.title, fontsize=spec.text_size * TITLE_SCALE, color=ink, pad=TITLE_PAD_PT)
         ax.full_title = spec.title  # type: ignore[attr-defined]  # ChartAxes
     ax.set_xlabel(spec.x_axis.title, fontsize=spec.text_size, color=ink)
     ax.set_ylabel(spec.y_axis.title, fontsize=spec.text_size, color=ink)
