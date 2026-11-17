@@ -20,11 +20,12 @@ from curvis.charts.spec import (
     ChartVariant,
     ErrorBars,
     FitOverlay,
+    LabelAngle,
     LineStyle,
     Scale,
     Symbol,
 )
-from curvis.data import Table
+from curvis.data import Column, ColumnRole, Table
 from curvis.ui.theme import dark_palette, light_palette
 from tests.ui.image_diff import as_array, compare, save_pair
 from tests.unit.charts_tables import (
@@ -40,7 +41,7 @@ from tests.unit.charts_tables import (
 PLOT_THRESHOLD = 0.01
 """Largest miss allowed in the plot area (measured: 0.0000 for every graph)."""
 PAGE_THRESHOLD = 0.12
-"""Largest miss allowed on the page (measured: at most 0.092). See IMAGE_DIFF.md."""
+"""Largest miss allowed on the page (measured: at most 0.037). See IMAGE_DIFF.md."""
 FAILED = Path(__file__).parents[2] / "build" / "image-diff"
 
 
@@ -90,12 +91,62 @@ def _interaction() -> tuple[ChartSpec, ChartData]:
     table = two_way_table()
     analysis = two_way_analysis(table)
     result = two_way_result(table, analysis)
-    # Tall: on square and wide pages the title and the turned labels are placed a few
-    # pixels apart by the two renderers (a layout difference shared by every family,
-    # not the interaction lines; see the step 3.1 report).
-    spec = replace(default_spec(table, ChartFamily.INTERACTION, [analysis]), aspect_ratio="tall")
+    spec = replace(default_spec(table, ChartFamily.INTERACTION, [analysis]), aspect_ratio="square")
     return spec, compute(gather(table, spec, {analysis.id: result}))
 
+
+def _wide_interaction() -> tuple[ChartSpec, ChartData]:
+    """The interaction graph (turned labels) on a wide page with a legend; GRAPHS has
+    it on a square page."""
+    spec, data = _interaction()
+    return replace(spec, aspect_ratio="wide", show_legend=True), data
+
+
+def _long_title(title: str) -> tuple[ChartSpec, ChartData]:
+    """A title wider than the plot of a square page with a legend: broken into lines
+    as wide as the plot at most, in both renderers."""
+    spec, data = _scatter()
+    return replace(spec, title=title, aspect_ratio="square", show_legend=True), data
+
+
+def _turned_bars(aspect_ratio: str, legend: bool) -> tuple[ChartSpec, ChartData]:
+    """Category labels turned by 45°."""
+    table = Table(
+        "Dose groups",
+        [
+            Column.new(name, ColumnRole.Y, values)
+            for name, values in (
+                ("Control", [1.0, 2.0, 4.0]),
+                ("Low", [3.0, 5.0, 6.0]),
+                ("High", [7.0, 8.0, 9.5]),
+            )
+        ],
+    )
+    spec = default_spec(table, ChartFamily.BAR)
+    spec = replace(
+        spec,
+        aspect_ratio=aspect_ratio,
+        show_legend=legend,
+        x_axis=replace(spec.x_axis, label_angle=LabelAngle.ANGLED),
+        y_axis=replace(spec.y_axis, title="Signal"),
+    )
+    return spec, compute(gather(table, spec, {}))
+
+
+LAYOUTS = {
+    "title-dose-by-sex-and-time": lambda: _long_title("Dose by sex and time"),
+    "title-six-lines": lambda: _long_title(
+        "Response of HeLa cells to increasing doses of cisplatin"
+    ),
+    "turned-labels-square-legend": lambda: _turned_bars("square", True),
+    "turned-labels-square-no-legend": lambda: _turned_bars("square", False),
+    "turned-labels-wide-legend": lambda: _turned_bars("wide", True),
+    "turned-labels-wide-no-legend": lambda: _turned_bars("wide", False),
+    "interaction-wide-legend": lambda: _wide_interaction(),
+}
+"""Layouts that once differed between the renderers: a title wider than the plot, and
+turned category labels (both renderers now lay out a title and turned labels as
+Matplotlib does)."""
 
 GRAPHS = {
     "scatter": _scatter,
@@ -119,8 +170,17 @@ def theme(request: pytest.FixtureRequest, qapp: QApplication) -> Iterator[str]:
 def test_export_matches_the_screen(graph: str, legend: bool, theme: str) -> None:
     spec, data = GRAPHS[graph]()
     spec = replace(spec, show_legend=legend)
+    _check(spec, data, f"{graph}-{'legend' if legend else 'no-legend'}-{theme}")
+
+
+@pytest.mark.parametrize("layout", LAYOUTS)
+def test_title_and_turned_labels_match(layout: str, qapp: QApplication) -> None:
+    spec, data = LAYOUTS[layout]()
+    _check(spec, data, layout)
+
+
+def _check(spec: ChartSpec, data: ChartData, name: str) -> None:
     diff = compare(spec, data)
-    name = f"{graph}-{'legend' if legend else 'no-legend'}-{theme}"
     report = f"{name}: plot {diff.plot:.4f}, page {diff.page:.4f}"
     print(report)
     if diff.plot > PLOT_THRESHOLD or diff.page > PAGE_THRESHOLD:

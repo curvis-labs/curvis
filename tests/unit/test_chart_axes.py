@@ -1,5 +1,6 @@
 """The page and axes shared by the screen and export renderers."""
 
+import itertools
 import math
 from dataclasses import replace
 
@@ -8,6 +9,10 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from curvis.charts.axes import (
+    ELLIPSIS,
+    FONT_ASCENT_EM,
+    FONT_DESCENT_EM,
+    FONT_LINE_GAP_EM,
     PADDING,
     axes_layout,
     chart_font_path,
@@ -17,6 +22,8 @@ from curvis.charts.axes import (
     log_ticks,
     nice_step,
     page_px,
+    shorten_to_fit,
+    wrap_to_fit,
 )
 from curvis.charts.builder import default_spec
 from curvis.charts.data import compute, gather
@@ -209,3 +216,76 @@ def test_column_major_puts_matplotlib_entries_where_rows_put_them() -> None:
     assert column_major(5, 3) == [0, 3, 1, 4, 2]
     assert column_major(4, 2) == [0, 2, 1, 3]
     assert column_major(3, 3) == [0, 1, 2]
+
+
+def test_font_metrics_are_dejavu_sans_typographic_ones() -> None:
+    from matplotlib.ft2font import FT2Font
+
+    path = chart_font_path()
+    assert path is not None
+    font = FT2Font(str(path))
+    os2, em = font.get_sfnt_table("OS/2"), font.get_sfnt_table("head")["unitsPerEm"]
+    assert os2["sTypoAscender"] / em == FONT_ASCENT_EM
+    assert -os2["sTypoDescender"] / em == FONT_DESCENT_EM
+    assert os2["sTypoLineGap"] / em == FONT_LINE_GAP_EM
+
+
+def width(text: str) -> float:
+    """One unit per character: enough to check the rule."""
+    return float(len(text))
+
+
+def test_a_text_that_fits_is_left_whole() -> None:
+    assert shorten_to_fit("Dose by sex", 11, width) == "Dose by sex"
+    assert shorten_to_fit("", 0, width) == ""
+
+
+def test_a_text_too_wide_is_shortened_with_an_ellipsis() -> None:
+    assert shorten_to_fit("Dose by sex and time", 10, width) == "Dose by s" + ELLIPSIS
+    # No space before the ellipsis.
+    assert shorten_to_fit("Dose by sex and time", 9, width) == "Dose by" + ELLIPSIS
+    assert shorten_to_fit("Dose by sex", 0.5, width) == ELLIPSIS
+
+
+@given(st.text(min_size=1, max_size=40), st.floats(0, 50))
+def test_a_shortened_text_fits_and_keeps_the_most_it_can(text: str, room: float) -> None:
+    shown = shorten_to_fit(text, room, width)
+    if shown == text:
+        assert width(text) <= room
+        return
+    assert shown.endswith(ELLIPSIS)
+    kept = shown[: -len(ELLIPSIS)]
+    assert text.startswith(kept)
+    assert width(shown) <= room or kept == ""
+    longer = text[: len(kept) + 1].rstrip() + ELLIPSIS
+    assert width(longer) > room or len(longer) <= len(shown)
+
+
+def test_a_title_that_fits_stays_on_one_line() -> None:
+    assert wrap_to_fit("Dose by sex", 11, width) == ("Dose by sex",)
+    assert wrap_to_fit("  ", 11, width) == ()
+
+
+def test_a_title_too_wide_breaks_between_words() -> None:
+    assert wrap_to_fit("Dose by sex and time", 11, width) == ("Dose by sex", "and time")
+    assert wrap_to_fit("Response of cells to dose", 13, width) == (
+        "Response of",
+        "cells to dose",
+    )
+
+
+def test_a_word_wider_than_the_line_is_shortened() -> None:
+    assert wrap_to_fit("Concentration of IL-6", 8, width) == ("Concent" + ELLIPSIS, "of IL-6")
+
+
+@given(
+    st.lists(st.text("abcdefgh", min_size=1, max_size=9), min_size=1, max_size=8), st.floats(4, 40)
+)
+def test_wrapped_lines_fit_and_keep_the_words(words: list[str], room: float) -> None:
+    lines = wrap_to_fit(" ".join(words), room, width)
+    assert all(width(line) <= room for line in lines)
+    if all(width(word) <= room for word in words):
+        assert " ".join(lines).split() == words
+        # Greedy: the first word of each line did not fit on the line before.
+        for before, after in itertools.pairwise(lines):
+            assert width(f"{before} {after.split()[0]}") > room

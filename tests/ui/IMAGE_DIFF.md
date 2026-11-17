@@ -3,7 +3,8 @@
 `tests/ui/test_image_diff.py` checks that an exported graph (Matplotlib,
 `curvis.charts.render_mpl`) matches the Graph panel (pyqtgraph,
 `curvis.charts.render_qt`). It draws every graph type (scatter, line with a fitted curve and
-its band, bar, box), with and without a legend, in the light and the dark app theme.
+its band, bar, box), with and without a legend, in the light and the dark app theme,
+plus layouts that once differed: titles wider than the plot and turned category labels.
 The helpers are in `tests/ui/image_diff.py`.
 
 ## Method
@@ -28,10 +29,10 @@ are**:
 
 Two measures:
 
-| Measure | What is compared | Radius | Threshold | Measured (all 16 cases) |
+| Measure | What is compared | Radius | Threshold | Measured (all 27 cases) |
 | --- | --- | --- | --- | --- |
 | **plot** | The plot area inside the axes, cut out of each image (3 px inset, because Matplotlib's axes box holds the axis lines and pyqtgraph's view box does not). The export's colour masks are scaled to the size of the screen's plot area. | 3 px (0.4 mm) | 0.01 | 0.0000 |
-| **page** | The whole page. | 8 px (1 mm) | 0.12 | 0.004 – 0.039 |
+| **page** | The whole page. | 8 px (1 mm) | 0.12 | 0 – 0.037 |
 
 The thresholds were set after the measurements, with a margin. The control test
 (`test_the_measure_sees_a_wrong_colour_and_a_wrong_range`) shows that the plot measure
@@ -42,9 +43,14 @@ from the theme (DESIGN.md §3).
 
 ## What still differs (page measure)
 
-- **Tick labels at the ends of the X axis.** Matplotlib makes the plot narrower so a label
-  at the end of the axis (e.g. "100") fits; pyqtgraph lets it reach past the end. This can
-  move the points near the right end by a millimetre or two.
+- **Tick labels at the ends of the X axis.** Both renderers make the plot narrower so a
+  label at the end of the axis (e.g. "100") fits, also when a legend is to the right. The
+  plots can still differ in width by a few pixels (Qt's page is cut to whole pixels, and
+  text advances differ by a fraction of a pixel).
+- **Where a long title breaks.** It follows from the plot's width, so a title whose break
+  falls within a pixel or two of the plot's edge can break one word apart on screen and
+  in the export (with the default size, "Response of cells to dose" on a square page
+  with a legend: its second line fits the export's plot by 0.75 px).
 - **Text rasterising.** Qt and Matplotlib draw DejaVu Sans with slightly different hinting
   and kerning; titles and labels can sit a pixel or two apart.
 - **Hidden series** (legend click) are left out of an exported legend; the screen lists
@@ -59,9 +65,25 @@ from the theme (DESIGN.md §3).
   with ClearType, Qt's raster engine ignores that for an opaque target, so `render_page`
   paints into a non-premultiplied ARGB32 image, where it always draws grey text. A
   Windows screen may still show chart text with ClearType: a display effect only.
-- **Legend spacing.** Matplotlib's layout pads both sides of the gap between the plot and
-  the legend, and the legend has a border inside; the screen legend now has the same
-  margins (`PAGE_PAD_PT`, `LEGEND_BORDER_EM`), so the two plots are equally wide.
+- **Title and text lines.** pyqtgraph's own title row is 30 px high at any zoom and as
+  wide as its text, so a long title widened the plot and squeezed the legend, and the
+  screen plot sat about 9 px higher than the export's. The Graph panel now has its own
+  title item (`ChartTitle`) laid out as Matplotlib lays out `Axes.set_title`: baseline
+  `FONT_ASCENT_EM` under the page padding, plot `TITLE_PAD_PT` under the last baseline. A
+  title wider than the plot is broken into lines between words in both renderers
+  (`wrap_to_fit`), 1.2 em apart (`FONT_LINE_GAP_EM`). The export wraps it while the
+  constrained layout runs, and runs the layout again while the lines do not fit the
+  plot's final width. Axis titles and X tick labels, level or turned, take Matplotlib's
+  1 em line (`FONT_ASCENT_EM + FONT_DESCENT_EM`) instead of Qt's 1.16 em one.
+  `test_title_and_turned_labels_match` covers long titles on a square page with a legend
+  and turned category labels on square and wide pages (bars, and the interaction graph,
+  which no longer needs a tall page).
+- **Legend spacing.** Matplotlib's constrained layout puts the legend's frame against the
+  page edge and, before it, the room for a tick label reaching past the end of the X
+  axis and three paddings (the plot's, and the legend's on both its sides); the legend has
+  a border inside. The screen legend has the same margins (`PAGE_PAD_PT`,
+  `LEGEND_BORDER_EM`). Before, the screen put one padding to the right of the legend and
+  let the end label reach into the gap, so its legend sat about 7 px further left.
 
 When a comparison fails, both images are saved side by side in `build/image-diff/` (CI
 uploads them as an artifact), and the failure message says where each key colour's pixels

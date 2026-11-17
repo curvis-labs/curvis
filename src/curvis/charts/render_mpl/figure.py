@@ -15,6 +15,7 @@ No pyplot: figures are made directly, so this runs in worker processes and threa
 
 from __future__ import annotations
 
+import functools
 import math
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -39,12 +40,14 @@ from curvis.charts.axes import (
     MINOR_TICK_LENGTH_PT,
     PAGE_PAD_PT,
     TICK_LENGTH_PT,
+    TITLE_PAD_PT,
     TITLE_SCALE,
     AxesLayout,
     AxisLayout,
     axes_layout,
     column_major,
     legend_columns,
+    wrap_to_fit,
 )
 from curvis.charts.colors import ColorScheme, scheme
 from curvis.charts.data import ChartData, XYSeriesData
@@ -104,8 +107,8 @@ def make_figure(spec: ChartSpec, data: ChartData | None) -> Figure:
     colors = scheme(spec.color_scheme)
     fig = Figure(figsize=(width / CM_PER_INCH, height / CM_PER_INCH), facecolor=colors.page)
     pad = PAGE_PAD_PT / 72
-    fig.set_layout_engine("constrained", w_pad=pad, h_pad=pad, wspace=0, hspace=0)
-    ax = fig.add_subplot()
+    fig.set_layout_engine(_title_layout()(w_pad=pad, h_pad=pad, wspace=0, hspace=0))
+    ax = fig.add_subplot(axes_class=_chart_axes())
     layout = axes_layout(spec, data)
     _style(ax, spec, colors, layout)
     if data is not None:
@@ -117,6 +120,80 @@ def make_figure(spec: ChartSpec, data: ChartData | None) -> Figure:
             raise ValueError(UNSUPPORTED)
     _legend(ax, spec, data, colors, layout)
     return fig
+
+
+@functools.cache
+def _chart_axes() -> type[Axes]:
+    """Matplotlib's Axes, with the title broken into lines no wider than the plot.
+
+    The Graph panel wraps a title wider than the plot the same way (``ChartTitle``,
+    :func:`~curvis.charts.axes.wrap_to_fit`). The constrained layout leaves a title's
+    width out (only its height counts), so a long title would otherwise run past the
+    page and over the legend.
+
+    The wrapped title's height must be known to the layout, and the plot's width only
+    after it: the layout asks for the axes' extent (``get_tightbbox``) in each of its
+    passes, so the title is wrapped there to the plot's width of the pass before. The
+    plot's width does not depend on the title's height, so the last pass wraps it as
+    drawn; ``draw`` wraps it once more to the final width all the same."""
+    from matplotlib.axes import Axes
+
+    class ChartAxes(Axes):
+        full_title = ""
+        renderer: Any = None
+
+        def _wrap_title(self, renderer: Any) -> bool:
+            """Wrap the title to the plot's width now; True if its lines changed."""
+            if renderer is not None:
+                self.renderer = renderer
+            renderer = self.renderer
+            if not self.full_title or renderer is None:
+                return False
+            font = self.title.get_fontproperties()
+
+            def measure(text: str) -> float:
+                width, _h, _d = renderer.get_text_width_height_descent(text, font, ismath=False)
+                return float(width)
+
+            text = "\n".join(wrap_to_fit(self.full_title, self.bbox.width, measure))
+            if text == self.title.get_text():
+                return False
+            self.title.set_text(text)
+            return True
+
+        def get_tightbbox(self, renderer: Any = None, *args: Any, **kwargs: Any) -> Any:
+            self._wrap_title(renderer)
+            return super().get_tightbbox(renderer, *args, **kwargs)
+
+        def draw(self, renderer: Any) -> None:
+            self._wrap_title(renderer)
+            super().draw(renderer)
+
+    return ChartAxes
+
+
+@functools.cache
+def _title_layout() -> type[Any]:
+    """Matplotlib's constrained layout, run again (at most twice) while a wrapped title's
+    lines do not fit the plot's final width: the layout stops after two passes, and the
+    plot's width can still move by a few pixels in the second, enough to change where
+    a long title breaks and so its height."""
+    from matplotlib.layout_engine import ConstrainedLayoutEngine
+
+    chart_axes: Any = _chart_axes()  # ChartAxes, with _wrap_title
+
+    class TitleLayout(ConstrainedLayoutEngine):
+        def execute(self, fig: Any) -> Any:
+            result = super().execute(fig)
+            for _ in range(2):
+                axes: list[Any] = [ax for ax in fig.axes if isinstance(ax, chart_axes)]
+                changed = [ax._wrap_title(None) for ax in axes]
+                if not any(changed):
+                    break
+                result = super().execute(fig)
+            return result
+
+    return TitleLayout
 
 
 # --- frame -------------------------------------------------------------------------------
@@ -132,7 +209,14 @@ def _style(ax: Axes, spec: ChartSpec, colors: ColorScheme, layout: AxesLayout) -
         ax.spines[side].set_linewidth(AXIS_WIDTH_PT)
         ax.spines[side].set_capstyle("projecting")
     if spec.title:
-        ax.set_title(spec.title, fontsize=spec.text_size * TITLE_SCALE, color=ink)
+        ax.set_title(
+            spec.title,
+            fontsize=spec.text_size * TITLE_SCALE,
+            color=ink,
+            pad=TITLE_PAD_PT,
+            multialignment="center",
+        )
+        ax.full_title = spec.title  # type: ignore[attr-defined]  # ChartAxes
     ax.set_xlabel(spec.x_axis.title, fontsize=spec.text_size, color=ink)
     ax.set_ylabel(spec.y_axis.title, fontsize=spec.text_size, color=ink)
     _axis_ticks(ax, "x", layout.x, spec.x_axis.show_labels)

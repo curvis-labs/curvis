@@ -120,3 +120,50 @@ def test_matplotlib_is_not_imported_at_start_up() -> None:
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "False"
+
+
+def titled(title: str):  # type: ignore[no-untyped-def]
+    """The XY graph on a square page with its legend and ``title``, drawn: (title text
+    as drawn, title box, plot box, legend box, page box) in pixels."""
+    import matplotlib
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    from curvis.charts.render_mpl.figure import RC_PARAMS, make_figure
+
+    spec, data = xy()
+    spec = replace(spec, title=title, aspect_ratio="square", show_legend=True)
+    with matplotlib.rc_context(RC_PARAMS):  # type: ignore[arg-type]
+        fig = make_figure(spec, data)
+        canvas = FigureCanvasAgg(fig)
+        canvas.draw()
+        renderer = canvas.get_renderer()
+        ax = fig.axes[0]
+        return (
+            ax.title.get_text(),
+            ax.title.get_window_extent(renderer),
+            ax.bbox,
+            fig.legends[0].get_window_extent(renderer),
+            fig.bbox,
+        )
+
+
+@pytest.mark.parametrize(
+    ("title", "lines"),
+    [
+        ("Dose by sex and time", 2),
+        ("Response of HeLa cells to increasing doses of cisplatin", 6),
+    ],
+)
+def test_a_title_wider_than_the_plot_breaks_into_lines(title: str, lines: int) -> None:
+    """Not past the page edge and over the legend, as it was."""
+    shown, title_box, plot, legend, page = titled(title)
+    assert len(shown.split("\n")) == lines
+    assert shown.split() == title.split()
+    assert plot.x0 - 1 <= title_box.x0 and title_box.x1 <= plot.x1 + 1
+    assert title_box.x1 <= legend.x0
+    # The layout made room for every line: on the page, above the plot.
+    assert title_box.y1 <= page.y1 and title_box.y0 >= plot.y1
+
+
+def test_a_title_that_fits_is_left_whole() -> None:
+    assert titled("Dose")[0] == "Dose"
