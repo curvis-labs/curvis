@@ -124,7 +124,7 @@ def test_matplotlib_is_not_imported_at_start_up() -> None:
 
 def titled(title: str):  # type: ignore[no-untyped-def]
     """The XY graph on a square page with its legend and ``title``, drawn: (title text
-    as drawn, title box, plot box, legend box) in pixels."""
+    as drawn, title box, plot box, legend box, page box) in pixels."""
     import matplotlib
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
@@ -143,16 +143,26 @@ def titled(title: str):  # type: ignore[no-untyped-def]
             ax.title.get_window_extent(renderer),
             ax.bbox,
             fig.legends[0].get_window_extent(renderer),
+            fig.bbox,
         )
 
 
-@pytest.mark.parametrize("title", ["Dose by sex and time", "Response of cells to dose"])
-def test_a_title_wider_than_the_plot_is_shortened_to_it(title: str) -> None:
+@pytest.mark.parametrize(
+    ("title", "lines"),
+    [
+        ("Dose by sex and time", 2),
+        ("Response of HeLa cells to increasing doses of cisplatin", 6),
+    ],
+)
+def test_a_title_wider_than_the_plot_breaks_into_lines(title: str, lines: int) -> None:
     """Not past the page edge and over the legend, as it was."""
-    shown, title_box, plot, legend = titled(title)
-    assert shown.endswith("…") and title.startswith(shown[:-1])
+    shown, title_box, plot, legend, page = titled(title)
+    assert len(shown.split("\n")) == lines
+    assert shown.split() == title.split()
     assert plot.x0 - 1 <= title_box.x0 and title_box.x1 <= plot.x1 + 1
     assert title_box.x1 <= legend.x0
+    # The layout made room for every line: on the page, above the plot.
+    assert title_box.y1 <= page.y1 and title_box.y0 >= plot.y1
 
 
 def test_a_title_that_fits_is_left_whole() -> None:

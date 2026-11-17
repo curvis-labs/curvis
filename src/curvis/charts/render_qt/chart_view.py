@@ -58,6 +58,7 @@ from curvis.charts.axes import (
     FONT_ASCENT_EM,
     FONT_DESCENT_EM,
     FONT_FAMILY,
+    FONT_LINE_GAP_EM,
     LEGEND_BORDER_EM,
     LEGEND_COLUMN_GAP_EM,
     LEGEND_GAP_EM,
@@ -75,7 +76,7 @@ from curvis.charts.axes import (
     legend_columns,
     page_px,
     points_to_px,
-    shorten_to_fit,
+    wrap_to_fit,
 )
 from curvis.charts.colors import ColorScheme, scheme
 from curvis.charts.data import CategoryData, ChartData, XYSeriesData
@@ -380,17 +381,27 @@ class ChartTitle(QGraphicsWidget):
     pyqtgraph's own title row is 30 px high whatever the zoom and the font, and its label
     is as wide as its text, so a long title made the plot wider than the page allows and
     squeezed the legend. This one is centred over the plot and never wider than it: a
-    title that does not fit is shortened with an ellipsis (``shorten_to_fit``). Its
-    baseline sits ``FONT_ASCENT_EM`` (or the height of its tallest letter) below its
-    top, and the plot starts ``TITLE_PAD_PT`` below the baseline.
+    title that does not fit is broken into lines between words (``wrap_to_fit``), as the
+    export does. Lines are spaced as Matplotlib spaces them: each at least
+    ``FONT_ASCENT_EM`` above and ``FONT_DESCENT_EM`` below its baseline (or as far as its
+    letters reach), plus half ``FONT_LINE_GAP_EM`` on each side when there are several.
+    The plot starts ``TITLE_PAD_PT`` below the last line's baseline.
+
+    The lines depend on the plot's width, and the title's height on the lines: when a
+    resize changes them, ``on_height`` gives the layout the new height (the plot's width
+    does not depend on it, so this settles at once).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, on_height: Callable[[float], None]) -> None:
         super().__init__()
         self.text = ""
         self.title_font = QFont()
         self.title_color = QColor()
-        self.ascent = 0.0
+        self.em = 0.0
+        self.pad = 0.0
+        self.lines: tuple[str, ...] = ()
+        self.baselines: tuple[float, ...] = ()
+        self.on_height = on_height
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.setMinimumWidth(0)
         self.setPreferredWidth(0)
@@ -398,33 +409,59 @@ class ChartTitle(QGraphicsWidget):
 
     def set_title(self, text: str, font: QFont, color: QColor, em: float, pad: float) -> None:
         """Show ``text`` in ``font`` (``em`` pixels high) with ``pad`` pixels between its
-        baseline and the plot; an empty text hides the title and its row."""
+        last baseline and the plot; an empty text hides the title and its row."""
         self.text, self.title_font, self.title_color = text, font, color
-        if text:
-            ink = -QFontMetricsF(font).tightBoundingRect(text).top()
-            self.ascent = max(FONT_ASCENT_EM * em, ink)
-            height = self.ascent + pad
-        else:
-            height = 0.0
-        self.setMinimumHeight(height)
-        self.setMaximumHeight(height)
-        self.setPreferredHeight(height)
+        self.em, self.pad = em, pad
+        self.lines = ()
         self.setVisible(bool(text))
+        self._lay_out()
+
+    def shown_lines(self) -> tuple[str, ...]:
+        """The title's lines as drawn."""
+        return self.lines
+
+    def _lay_out(self) -> None:
+        metrics = QFontMetricsF(self.title_font)
+        width = self.size().width()
+        if width > 0:
+            lines = wrap_to_fit(self.text, width, metrics.horizontalAdvance)
+        else:  # not laid out yet
+            lines = (" ".join(self.text.split()),) if self.text.strip() else ()
+        if lines == self.lines and self.baselines:
+            return
+        self.lines = lines
+        gap = FONT_LINE_GAP_EM * self.em / 2 if len(lines) > 1 else 0.0
+        baselines: list[float] = []
+        y = 0.0
+        descent = 0.0
+        for line in lines:
+            ink = metrics.tightBoundingRect(line)
+            ascent = max(FONT_ASCENT_EM * self.em, -ink.top()) + gap
+            y += descent + ascent
+            baselines.append(y)
+            descent = max(FONT_DESCENT_EM * self.em, ink.bottom()) + gap
+        self.baselines = tuple(baselines)
+        height = y + self.pad if lines else 0.0
+        if height != self.maximumHeight() or not lines:
+            self.setMinimumHeight(height)
+            self.setMaximumHeight(height)
+            self.setPreferredHeight(height)
+            self.on_height(height)
         self.update()
 
-    def shown_text(self) -> str:
-        """The title as drawn: shortened to the width of the plot if it is wider."""
-        metrics = QFontMetricsF(self.title_font)
-        return shorten_to_fit(self.text, self.size().width(), metrics.horizontalAdvance)
+    def resizeEvent(self, event: Any) -> None:  # noqa: N802 (Qt API)
+        super().resizeEvent(event)
+        self._lay_out()
 
     def paint(self, painter: QPainter, *_args: Any) -> None:
-        text = self.shown_text()
-        if not text:
+        if not self.lines:
             return
-        width = QFontMetricsF(self.title_font).horizontalAdvance(text)
+        metrics = QFontMetricsF(self.title_font)
         painter.setFont(self.title_font)
         painter.setPen(self.title_color)
-        painter.drawText(QPointF((self.size().width() - width) / 2, self.ascent), text)
+        for line, baseline in zip(self.lines, self.baselines, strict=True):
+            width = metrics.horizontalAdvance(line)
+            painter.drawText(QPointF((self.size().width() - width) / 2, baseline), line)
 
 
 @dataclass
@@ -518,7 +555,7 @@ class ChartView(QWidget):
         # pyqtgraph's label is let go (setTitle must not be used).
         self.plot_item.layout.removeItem(self.plot_item.titleLabel)
         self.plot_item.titleLabel.setParentItem(None)
-        self.title = ChartTitle()
+        self.title = ChartTitle(lambda h: self.plot_item.layout.setRowFixedHeight(0, h))
         self.title.setParentItem(self.plot_item)
         self.plot_item.titleLabel = self.title
         self.plot_item.layout.addItem(self.title, 0, 1)
@@ -637,7 +674,6 @@ class ChartView(QWidget):
             self._px(spec.text_size * TITLE_SCALE),
             self._px(TITLE_PAD_PT),
         )
-        plot.layout.setRowFixedHeight(0, self.title.maximumHeight())
         tick = max(1, round(self._px(TICK_LENGTH_PT)))
         for name, axis_spec in (("bottom", spec.x_axis), ("left", spec.y_axis)):
             axis = plot.getAxis(name)
@@ -678,26 +714,30 @@ class ChartView(QWidget):
         nothing else (the Y axis, the legend, the title) gives them room."""
         pad = self._px(PAGE_PAD_PT)
         left, top, right = self._margins
-        self.plot_widget.ci.setContentsMargins(pad + left, pad + top, pad + right, pad)
+        right += pad
+        if self._legend_shown and not self._legend_below:
+            right = 0.0  # all the room goes between the plot and the legend (_place_legend)
+        self.plot_widget.ci.setContentsMargins(pad + left, pad + top, right, pad)
 
     def _update_margins(self) -> None:
         if self.spec is None:
             return
         bottom, left_axis = self._axis("bottom"), self._axis("left")
         before, after = bottom.overflow
-        legend = self.legend.width() if self._legend_shown and not self._legend_below else 0.0
         above = self.title.size().height() if self.title.isVisible() else 0.0
         wanted = (
             max(0.0, before - left_axis.width()),
             max(0.0, left_axis.overflow[0] - above),
-            max(0.0, after - legend),
+            max(0.0, after),
         )
         # Grow at once, shrink only by more than a pixel: the room changes the plot's
         # width, which moves the labels a little.
-        if all(abs(a - b) <= 1.0 for a, b in zip(wanted, self._margins, strict=True)):
+        pairs = list(zip(wanted, self._margins, strict=True))
+        if not any(a > b + 0.01 or a < b - 1.0 for a, b in pairs):
             return
         self._margins = wanted
         self._set_margins()
+        self._place_legend()
 
     def _legend_wanted(self, spec: ChartSpec) -> bool:
         return spec.show_legend and any(s.in_legend for s in spec.series)
@@ -734,13 +774,17 @@ class ChartView(QWidget):
             layout.addItem(self.legend, 1, 0)
             layout.layout.setAlignment(self.legend, Qt.AlignmentFlag.AlignHCenter)
         else:
-            # As Matplotlib's layout: padding on both sides of the gap after the plot,
-            # and the legend's own border left and right.
-            self.legend.layout.setContentsMargins(2 * pad + border, 0, border, 0)
+            # As Matplotlib's constrained layout: the legend's frame against the page
+            # edge, and before it the room for tick labels that reach past the end of
+            # the X axis, the plot's padding and the legend's (on both its sides); the
+            # legend's own border left and right.
+            overflow = self._margins[2]
+            self.legend.layout.setContentsMargins(3 * pad + border + overflow, 0, border, 0)
             layout.addItem(self.legend, 0, 1)
             layout.layout.setAlignment(self.legend, Qt.AlignmentFlag.AlignTop)
         self._legend_below = bool(columns)
         self.legend.updateSize()
+        self._set_margins()
 
     def _draw_xy(self, spec: ChartSpec, data: ChartData, colors: ColorScheme) -> None:
         plot = self.plot_item

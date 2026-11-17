@@ -33,7 +33,7 @@ from tests.unit.charts_tables import DOSES, column_table, replicate_table, sigmo
 PLOT_THRESHOLD = 0.01
 """Largest miss allowed in the plot area (measured: 0.0000 for every graph)."""
 PAGE_THRESHOLD = 0.12
-"""Largest miss allowed on the page (measured: at most 0.088). See IMAGE_DIFF.md."""
+"""Largest miss allowed on the page (measured: at most 0.037). See IMAGE_DIFF.md."""
 FAILED = Path(__file__).parents[2] / "build" / "image-diff"
 
 
@@ -80,8 +80,8 @@ def _bars(variant: ChartVariant) -> tuple[ChartSpec, ChartData]:
 
 
 def _long_title(title: str) -> tuple[ChartSpec, ChartData]:
-    """A title wider than the plot of a square page with a legend: shortened with an
-    ellipsis to the plot's width in both renderers."""
+    """A title wider than the plot of a square page with a legend: broken into lines
+    as wide as the plot at most, in both renderers."""
     spec, data = _scatter()
     return replace(spec, title=title, aspect_ratio="square", show_legend=True), data
 
@@ -112,7 +112,9 @@ def _turned_bars(aspect_ratio: str, legend: bool) -> tuple[ChartSpec, ChartData]
 
 LAYOUTS = {
     "title-dose-by-sex-and-time": lambda: _long_title("Dose by sex and time"),
-    "title-response-of-cells-to-dose": lambda: _long_title("Response of cells to dose"),
+    "title-six-lines": lambda: _long_title(
+        "Response of HeLa cells to increasing doses of cisplatin"
+    ),
     "turned-labels-square-legend": lambda: _turned_bars("square", True),
     "turned-labels-square-no-legend": lambda: _turned_bars("square", False),
     "turned-labels-wide-legend": lambda: _turned_bars("wide", True),

@@ -79,6 +79,9 @@ FONT_DESCENT_EM = 492 / 2048
 its baseline. Matplotlib's line of text is ``FONT_ASCENT_EM + FONT_DESCENT_EM`` (1 em)
 high, where Qt's is the font's line height (1.16 em); the Graph panel lays out axis
 titles and turned tick labels with Matplotlib's."""
+FONT_LINE_GAP_EM = 410 / 2048
+"""DejaVu Sans's typographic line gap. Matplotlib adds half of it above and below each
+line of a text of several lines: the lines of a wrapped title are 1.2 em apart."""
 ELLIPSIS = "…"
 LEGEND_SAMPLE_EM = 1.6
 """Width of a legend entry's sample (symbol, line or patch), in ems of the text size."""
@@ -273,6 +276,31 @@ def shorten_to_fit(text: str, width: float, measure: Callable[[str], float]) -> 
         else:
             high = middle - 1
     return text[:low].rstrip() + ELLIPSIS
+
+
+def wrap_to_fit(text: str, width: float, measure: Callable[[str], float]) -> tuple[str, ...]:
+    """``text`` broken into lines no wider than ``width``, between words, filling each
+    line before starting the next. A single word wider than ``width`` gets a line of its
+    own, shortened with an ellipsis (:func:`shorten_to_fit`). ``measure`` gives the width
+    of a text in the units of ``width``; each renderer measures with its own font engine,
+    both on DejaVu Sans, so they break a title alike (DESIGN.md: the page leaves room for
+    everything it shows)."""
+    words = text.split()
+    if not words:
+        return ()
+    if measure(" ".join(words)) <= width:
+        return (" ".join(words),)
+    lines: list[str] = []
+    line = ""
+    for word in words:
+        joined = f"{line} {word}" if line else word
+        if not line or measure(joined) <= width:
+            line = joined
+            continue
+        lines.append(line)
+        line = word
+    lines.append(line)
+    return tuple(shorten_to_fit(line, width, measure) for line in lines)
 
 
 ANGLED_PITCH_EM = 1.6
@@ -498,4 +526,5 @@ __all__ = (
     "page_px",
     "points_to_px",
     "shorten_to_fit",
+    "wrap_to_fit",
 )

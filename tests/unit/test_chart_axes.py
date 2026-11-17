@@ -1,5 +1,6 @@
 """The page and axes shared by the screen and export renderers."""
 
+import itertools
 import math
 from dataclasses import replace
 
@@ -11,6 +12,7 @@ from curvis.charts.axes import (
     ELLIPSIS,
     FONT_ASCENT_EM,
     FONT_DESCENT_EM,
+    FONT_LINE_GAP_EM,
     PADDING,
     axes_layout,
     chart_font_path,
@@ -21,6 +23,7 @@ from curvis.charts.axes import (
     nice_step,
     page_px,
     shorten_to_fit,
+    wrap_to_fit,
 )
 from curvis.charts.builder import default_spec
 from curvis.charts.data import compute, gather
@@ -224,6 +227,7 @@ def test_font_metrics_are_dejavu_sans_typographic_ones() -> None:
     os2, em = font.get_sfnt_table("OS/2"), font.get_sfnt_table("head")["unitsPerEm"]
     assert os2["sTypoAscender"] / em == FONT_ASCENT_EM
     assert -os2["sTypoDescender"] / em == FONT_DESCENT_EM
+    assert os2["sTypoLineGap"] / em == FONT_LINE_GAP_EM
 
 
 def width(text: str) -> float:
@@ -255,3 +259,33 @@ def test_a_shortened_text_fits_and_keeps_the_most_it_can(text: str, room: float)
     assert width(shown) <= room or kept == ""
     longer = text[: len(kept) + 1].rstrip() + ELLIPSIS
     assert width(longer) > room or len(longer) <= len(shown)
+
+
+def test_a_title_that_fits_stays_on_one_line() -> None:
+    assert wrap_to_fit("Dose by sex", 11, width) == ("Dose by sex",)
+    assert wrap_to_fit("  ", 11, width) == ()
+
+
+def test_a_title_too_wide_breaks_between_words() -> None:
+    assert wrap_to_fit("Dose by sex and time", 11, width) == ("Dose by sex", "and time")
+    assert wrap_to_fit("Response of cells to dose", 13, width) == (
+        "Response of",
+        "cells to dose",
+    )
+
+
+def test_a_word_wider_than_the_line_is_shortened() -> None:
+    assert wrap_to_fit("Concentration of IL-6", 8, width) == ("Concent" + ELLIPSIS, "of IL-6")
+
+
+@given(
+    st.lists(st.text("abcdefgh", min_size=1, max_size=9), min_size=1, max_size=8), st.floats(4, 40)
+)
+def test_wrapped_lines_fit_and_keep_the_words(words: list[str], room: float) -> None:
+    lines = wrap_to_fit(" ".join(words), room, width)
+    assert all(width(line) <= room for line in lines)
+    if all(width(word) <= room for word in words):
+        assert " ".join(lines).split() == words
+        # Greedy: the first word of each line did not fit on the line before.
+        for before, after in itertools.pairwise(lines):
+            assert width(f"{before} {after.split()[0]}") > room
