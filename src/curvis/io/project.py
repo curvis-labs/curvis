@@ -48,7 +48,7 @@ from curvis.data import (
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -177,6 +177,18 @@ def _tick_label_angles(data: dict[str, Any]) -> dict[str, Any]:
             axis = graph.get(key)
             if isinstance(axis, dict):
                 axis.setdefault("label_angle", "auto")
+    return data
+
+
+@register_migration(7)
+def _interaction_graphs(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 8 lets a graph name the analysis it draws (``analysis_id``: the two-way
+    ANOVA of an interaction graph). Graphs of format 7 draw no analysis."""
+    document = data.get("document")
+    graphs = document.get("graphs") if isinstance(document, dict) else None
+    for graph in graphs if isinstance(graphs, list) else []:
+        if isinstance(graph, dict):
+            graph.setdefault("analysis_id", None)
     return data
 
 

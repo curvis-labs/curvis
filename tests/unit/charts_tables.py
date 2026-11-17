@@ -70,3 +70,49 @@ def sigmoid_table() -> Table:
         )
         column.values.flags.writeable = False
     return table
+
+
+TWO_WAY = {
+    ("Control", "Male"): ([5.1, 5.4, 4.9], [5.3, 5.0, 5.2]),
+    ("Low", "Male"): ([6.0, 6.3, 5.8], [6.1, 5.9, 6.4]),
+    ("High", "Male"): ([6.8, 7.1, 6.5], [7.3, 6.9, 7.0]),
+    ("Control", "Female"): ([5.0, 5.6, 5.2], [4.8, 5.3, 5.1]),
+    ("Low", "Female"): ([5.3, 5.5, 5.1], [5.6, 5.2, 5.4]),
+    ("High", "Female"): ([5.6, 5.9, 5.3], [6.1, 5.8, 5.5]),
+}
+
+
+def two_way_table() -> Table:
+    """Categories Male and Female (factor "Sex"), each with replicate groups Control,
+    Low and High of two columns (unit mM)."""
+    from curvis.data import CategoryGroup
+
+    categories = {name: CategoryGroup(name) for name in ("Male", "Female")}
+    groups: list[ReplicateGroup] = []
+    columns: list[Column] = []
+    for (name, category), replicates in TWO_WAY.items():
+        group = ReplicateGroup(name, categories[category].id, id=f"{name}_{category}")
+        groups.append(group)
+        for i, values in enumerate(replicates, 1):
+            columns.append(
+                Column.new(
+                    f"{name} {category} {i}", ColumnRole.Y, values, unit="mM", group_id=group.id
+                )
+            )
+    table = Table("Assay", columns, groups, list(categories.values()))
+    table.category_factor = "Sex"
+    table.check()
+    return table
+
+
+def two_way_analysis(table: Table) -> Analysis:
+    from curvis.analysis.compare.two_way_analysis import TwoWayParams
+
+    inputs = tuple(g.id for g in table.replicate_groups)
+    return Analysis("two_way_anova", table.id, inputs, TwoWayParams("Dose"), id="anova")
+
+
+def two_way_result(table: Table, analysis: Analysis):  # type: ignore[no-untyped-def]
+    """The analysis' result, computed as the scheduler would."""
+    kind = analysis.analysis_type
+    return kind.run(kind.gather(table, analysis), analysis.params)

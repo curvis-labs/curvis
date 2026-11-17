@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_anova",
+  "case": "missing",
+  "description": "Two incomplete subjects are left out; an empty row is ignored.",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [5.2000000000000002, 6, "NaN", 5.7999999999999998, 4.9000000000000004, 6.2999999999999998, 5.5, "NaN"],
+      [6.0999999999999996, 7, 6.4000000000000004, 7.7000000000000002, "NaN", 7.2000000000000002, 6.5999999999999996, "NaN"],
+      [5, 5.9000000000000004, 5.0999999999999996, 6.4000000000000004, 5.2999999999999998, 6.7999999999999998, 5.7000000000000002, "NaN"]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n_subjects": 5,
+    "n_incomplete": 2,
+    "mean": [5.7599999999999998, 6.9199999999999999, 5.96],
+    "df_treatment": 2,
+    "df_subjects": 4,
+    "df_error": 8,
+    "ss_treatment": 3.8453333333333339,
+    "ss_subjects": 3.530666666666666,
+    "ss_error": 0.56133333333333346,
+    "ms_treatment": 1.922666666666667,
+    "ms_subjects": 0.88266666666666649,
+    "ms_error": 0.070166666666666683,
+    "f": 27.401425178147267,
+    "p_value": 0.00026329494917728599,
+    "gg_epsilon": 0.93207717833158865,
+    "gg_df_treatment": 1.8641543566631773,
+    "gg_df_error": 7.4566174266527092,
+    "gg_p_value": 0.00040328644475363446
+  },
+  "kinds": {
+    "n_subjects": "exact",
+    "n_incomplete": "exact",
+    "mean": "statistic",
+    "df_treatment": "exact",
+    "df_subjects": "exact",
+    "df_error": "exact",
+    "ss_treatment": "statistic",
+    "ss_subjects": "statistic",
+    "ss_error": "statistic",
+    "ms_treatment": "statistic",
+    "ms_subjects": "statistic",
+    "ms_error": "statistic",
+    "f": "statistic",
+    "p_value": "p_value",
+    "gg_epsilon": "statistic",
+    "gg_df_treatment": "statistic",
+    "gg_df_error": "statistic",
+    "gg_p_value": "p_value"
+  }
+}

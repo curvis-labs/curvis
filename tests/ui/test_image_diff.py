@@ -27,7 +27,15 @@ from curvis.charts.spec import (
 from curvis.data import Table
 from curvis.ui.theme import dark_palette, light_palette
 from tests.ui.image_diff import as_array, compare, save_pair
-from tests.unit.charts_tables import DOSES, column_table, replicate_table, sigmoid_table
+from tests.unit.charts_tables import (
+    DOSES,
+    column_table,
+    replicate_table,
+    sigmoid_table,
+    two_way_analysis,
+    two_way_result,
+    two_way_table,
+)
 
 PLOT_THRESHOLD = 0.01
 """Largest miss allowed in the plot area (measured: 0.0000 for every graph)."""
@@ -78,11 +86,23 @@ def _bars(variant: ChartVariant) -> tuple[ChartSpec, ChartData]:
     return spec, compute(gather(table, spec, {}))
 
 
+def _interaction() -> tuple[ChartSpec, ChartData]:
+    table = two_way_table()
+    analysis = two_way_analysis(table)
+    result = two_way_result(table, analysis)
+    # Tall: on square and wide pages the title and the turned labels are placed a few
+    # pixels apart by the two renderers (a layout difference shared by every family,
+    # not the interaction lines; see the step 3.1 report).
+    spec = replace(default_spec(table, ChartFamily.INTERACTION, [analysis]), aspect_ratio="tall")
+    return spec, compute(gather(table, spec, {analysis.id: result}))
+
+
 GRAPHS = {
     "scatter": _scatter,
     "line": _line_with_fit,
     "bar": lambda: _bars(ChartVariant.BAR),
     "box": lambda: _bars(ChartVariant.BOX),
+    "interaction": _interaction,
 }
 
 

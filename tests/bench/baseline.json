@@ -513,6 +513,69 @@
       ]
     },
     {
+      "name": "test_repeated_measures_anova_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_repeated_measures_anova_10k_points",
+      "stats": {
+        "min": 0.0004876339999952961
+      },
+      "runs": [
+        {
+          "min": 0.0005115649999964944,
+          "median": 0.000543992000004323
+        },
+        {
+          "min": 0.0004876339999952961,
+          "median": 0.0005168179999941458
+        },
+        {
+          "min": 0.0004880110000158311,
+          "median": 0.0005195180000328037
+        }
+      ]
+    },
+    {
+      "name": "test_two_way_anova_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_two_way_anova_10k_points",
+      "stats": {
+        "min": 0.0003782239999736703
+      },
+      "runs": [
+        {
+          "min": 0.00037950000000819273,
+          "median": 0.0004047689999993054
+        },
+        {
+          "min": 0.0003820610000104807,
+          "median": 0.00040658000000348693
+        },
+        {
+          "min": 0.0003782239999736703,
+          "median": 0.00040609700005234117
+        }
+      ]
+    },
+    {
+      "name": "test_two_way_anova_analysis_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_two_way_anova_analysis_10k_points",
+      "stats": {
+        "min": 0.09876354099998252
+      },
+      "runs": [
+        {
+          "min": 0.10025177800000051,
+          "median": 0.10130681299999367
+        },
+        {
+          "min": 0.09876354099998252,
+          "median": 0.09940116300001023
+        },
+        {
+          "min": 0.09956169299999829,
+          "median": 0.10059972199996992
+        }
+      ]
+    },
+    {
       "name": "test_4pl_12_points_by_20_series",
       "fullname": "tests/bench/test_fit.py::test_4pl_12_points_by_20_series",
       "stats": {

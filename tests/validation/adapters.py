@@ -186,6 +186,149 @@ def holm_pairwise(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
     }
 
 
+def _rm(inputs: Mapping[str, Any]) -> Any:
+    from curvis.analysis.compare.rm_anova import rm_anova
+
+    return rm_anova(inputs["treatments"])
+
+
+@adapter("rm_anova")
+def rm_anova(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/rm_anova.R: the ANOVA table and Greenhouse-Geisser."""
+    r = _rm(inputs)
+    return {
+        "n_subjects": r.n_subjects,
+        "n_incomplete": r.n_incomplete,
+        "mean": r.means,
+        "df_treatment": r.df_treatment,
+        "df_subjects": r.df_subjects,
+        "df_error": r.df_error,
+        "ss_treatment": r.ss_treatment,
+        "ss_subjects": r.ss_subjects,
+        "ss_error": r.ss_error,
+        "ms_treatment": r.ms_treatment,
+        "ms_subjects": r.ms_subjects,
+        "ms_error": r.ms_error,
+        "f": r.f,
+        "p_value": r.p_value,
+        "gg_epsilon": r.gg_epsilon,
+        "gg_df_treatment": r.gg_df_treatment,
+        "gg_df_error": r.gg_df_error,
+        "gg_p_value": r.gg_p_value,
+    }
+
+
+def _comparisons(rows: Any, *, pair: bool = True) -> dict[str, list[float]]:
+    out: dict[str, list[float]] = {}
+    if pair:
+        out["group_i"] = [c.i for c in rows]
+        out["group_j"] = [c.j for c in rows]
+    else:
+        out["group"] = [c.j for c in rows]
+    out["difference"] = [c.difference for c in rows]
+    out["se"] = [c.se for c in rows]
+    return out
+
+
+@adapter("rm_tukey")
+def rm_tukey(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/rm_anova.R: Tukey on the pooled RM error."""
+    from curvis.analysis.compare.anova import tukey
+
+    rows = tukey(_rm(inputs).pooled)
+    return {
+        **_comparisons(rows),
+        "q": [c.statistic for c in rows],
+        "p_value": [c.p_value for c in rows],
+        "ci_lower": [c.ci_lower for c in rows],
+        "ci_upper": [c.ci_upper for c in rows],
+    }
+
+
+@adapter("rm_dunnett")
+def rm_dunnett(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/rm_anova.R: Dunnett against the control, pooled RM error."""
+    from curvis.analysis.compare.anova import dunnett as run
+
+    rows = run(_rm(inputs).pooled, int(inputs["control"]))
+    return {
+        **_comparisons(rows, pair=False),
+        "t": [c.statistic for c in rows],
+        "p_value": [c.p_value for c in rows],
+        "ci_lower": [c.ci_lower for c in rows],
+        "ci_upper": [c.ci_upper for c in rows],
+    }
+
+
+@adapter("rm_holm")
+def rm_holm(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/rm_anova.R: pairwise t tests on the RM error, Holm-corrected."""
+    from curvis.analysis.compare.anova import holm_pairwise as run
+
+    r = _rm(inputs)
+    rows = run(r.pooled)
+    return {
+        **_comparisons(rows),
+        "t": [c.statistic for c in rows],
+        "df": r.df_error,
+        "p_unadjusted": [c.p_unadjusted for c in rows],
+        "p_value": [c.p_value for c in rows],
+    }
+
+
+def _two_way(inputs: Mapping[str, Any]) -> Any:
+    from curvis.analysis.compare.two_way_anova import two_way_anova
+
+    return two_way_anova(inputs["cells"])
+
+
+@adapter("two_way_anova")
+def two_way_anova(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/two_way_anova.R: the Type III ANOVA table."""
+    r = _two_way(inputs)
+    out: dict[str, npt.ArrayLike] = {
+        "n": r.n.ravel(),
+        "cell_mean": r.cell_means.ravel(),
+        "marginal_mean_a": r.marginal_means_a,
+        "marginal_mean_b": r.marginal_means_b,
+        "df_residual": r.df_residual,
+        "ss_residual": r.ss_residual,
+        "ms_residual": r.ms_residual,
+    }
+    for name, effect in (("a", r.a), ("b", r.b), ("interaction", r.interaction)):
+        out[f"df_{name}"] = effect.df
+        out[f"ss_{name}"] = effect.ss
+        out[f"ms_{name}"] = effect.ms
+        out[f"f_{name}"] = effect.f
+        out[f"p_{name}"] = effect.p_value
+    return out
+
+
+def _two_way_tukey(inputs: Mapping[str, Any], factor: str) -> Mapping[str, npt.ArrayLike]:
+    from curvis.analysis.compare.two_way_anova import tukey_marginal
+
+    rows = tukey_marginal(_two_way(inputs), factor)
+    return {
+        **_comparisons(rows),
+        "q": [c.statistic for c in rows],
+        "p_value": [c.p_value for c in rows],
+        "ci_lower": [c.ci_lower for c in rows],
+        "ci_upper": [c.ci_upper for c in rows],
+    }
+
+
+@adapter("two_way_tukey_a")
+def two_way_tukey_a(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/two_way_anova.R: Tukey on the marginal means of factor A."""
+    return _two_way_tukey(inputs, "a")
+
+
+@adapter("two_way_tukey_b")
+def two_way_tukey_b(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/two_way_anova.R: Tukey on the marginal means of factor B."""
+    return _two_way_tukey(inputs, "b")
+
+
 @adapter("mann_whitney")
 def mann_whitney(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
     """validation/r/scripts/mann_whitney.R: Mann-Whitney U test."""

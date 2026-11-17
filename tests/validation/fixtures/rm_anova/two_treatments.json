@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_anova",
+  "case": "two_treatments",
+  "description": "Two treatments: F = t^2 of the paired t test, epsilon = 1.",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [-2.420644049409062, -0.87604880121041628, -3.3184710222646125, 2.4878178499073389, 0.30761202805541954, 4.4195646648759697, 0.36149811161125311, -1.9885615946621309, 1.0862740918542777],
+      [0.49154057880839375, -0.34598220140107627, -2.2159710701536537, 4.0640600943392897, 2.1696065137001579, 4.8410394170900046, 2.1210378677156134, -0.35279407107139799, 1.4789326759864596]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n_subjects": 9,
+    "n_incomplete": 0,
+    "mean": [0.0065601420842263574, 1.3612744227793101],
+    "df_treatment": 1,
+    "df_subjects": 8,
+    "df_error": 8,
+    "ss_treatment": 8.2586285204363925,
+    "ss_subjects": 86.026913970589121,
+    "ss_error": 2.757569682643584,
+    "ms_treatment": 8.2586285204363925,
+    "ms_subjects": 10.75336424632364,
+    "ms_error": 0.34469621033044801,
+    "f": 23.959150907168777,
+    "p_value": 0.0012016291674094993,
+    "gg_epsilon": 1,
+    "gg_df_treatment": 1,
+    "gg_df_error": 8,
+    "gg_p_value": 0.0012016291674094993
+  },
+  "kinds": {
+    "n_subjects": "exact",
+    "n_incomplete": "exact",
+    "mean": "statistic",
+    "df_treatment": "exact",
+    "df_subjects": "exact",
+    "df_error": "exact",
+    "ss_treatment": "statistic",
+    "ss_subjects": "statistic",
+    "ss_error": "statistic",
+    "ms_treatment": "statistic",
+    "ms_subjects": "statistic",
+    "ms_error": "statistic",
+    "f": "statistic",
+    "p_value": "p_value",
+    "gg_epsilon": "statistic",
+    "gg_df_treatment": "statistic",
+    "gg_df_error": "statistic",
+    "gg_p_value": "p_value"
+  }
+}

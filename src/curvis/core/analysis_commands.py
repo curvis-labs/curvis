@@ -127,18 +127,25 @@ def remove_analysis(doc: Document, analysis_id: str) -> Command:
     summary = f"Delete analysis ({name.lower()})"
     command: Command = SetAnalysis(analysis, summary, remove=True)
     overlaid = overlaid_on(doc, analysis_id)
-    if not overlaid:
+    drawing = drawn_by(doc, analysis_id)
+    if not overlaid and not drawing:
         return command
-    graphs = [
+    graphs: list[Command] = [
         SetGraph(
             replace(g, overlays=tuple(o for o in g.overlays if o.analysis_id != analysis_id)),
             "Remove fit",
         )
         for g in overlaid
     ]
+    graphs += [SetGraph(g, "Delete interaction graph", remove=True) for g in drawing]
     return CommandGroup(summary, [*graphs, command])
 
 
 def overlaid_on(doc: Document, analysis_id: str) -> list[ChartSpec]:
     """The graphs that draw the fitted curves of ``analysis_id``."""
     return [g for g in doc.graphs if any(o.analysis_id == analysis_id for o in g.overlays)]
+
+
+def drawn_by(doc: Document, analysis_id: str) -> list[ChartSpec]:
+    """The graphs that draw the results of ``analysis_id`` (interaction graphs)."""
+    return [g for g in doc.graphs if g.analysis_id == analysis_id]

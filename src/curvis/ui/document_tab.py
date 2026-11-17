@@ -281,7 +281,7 @@ class DocumentTab(QWidget):
     def delete_analysis(self, analysis_id: str | None = None) -> bool:
         """Delete ``analysis_id`` (default: the one shown) after a warning, as an
         undoable step. Its fitted curves leave the graphs that show them."""
-        from curvis.core import overlaid_on, remove_analysis
+        from curvis.core import drawn_by, overlaid_on, remove_analysis
         from curvis.ui.close_table_dialog import DeleteDialog
 
         analysis_id = analysis_id or self.current_analysis_id
@@ -299,6 +299,9 @@ class DocumentTab(QWidget):
         items = (
             [f"Its fitted curves on {graphs} graph{'s' if graphs > 1 else ''}"] if graphs else []
         )
+        drawing = len(drawn_by(self.document, analysis_id))
+        if drawing:
+            items.append(f"{drawing} interaction graph{'s' if drawing > 1 else ''} drawn from it")
         dialog = DeleteDialog(
             "Delete analysis",
             f"Deleting “{name}” removes the analysis and its results from the project.",
@@ -380,7 +383,7 @@ class DocumentTab(QWidget):
         from curvis.core import add_graph
 
         table = self.document.table(self.table_view.model().table_id)
-        problem = family_problem(table, family)
+        problem = family_problem(table, family, self.document.analyses)
         if problem is not None:
             self.message.emit(f"{problem}.")
             return False

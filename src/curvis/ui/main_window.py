@@ -1114,7 +1114,11 @@ class MainWindow(QMainWindow):
         tables = tab.document.tables if tab is not None else []
         table = next((t for t in tables if t.id == shown), None)  # None while it is removed
         for action_id, family in FAMILY_ACTIONS.items():
-            problem = family_problem(table, family) if table is not None else NO_TABLE
+            problem = (
+                family_problem(table, family, tab.document.analyses)
+                if table is not None and tab is not None
+                else NO_TABLE
+            )
             action = a(action_id)
             action.setEnabled(problem is None)
             label = f"&{family.label}"
@@ -1134,7 +1138,8 @@ class MainWindow(QMainWindow):
             action = self.registry.action(action_id)
             problem = NO_GRAPH_TO_CHANGE
             if spec is not None and tab is not None:
-                problem = variant_problem(tab.document.table(spec.table_id), variant) or ""
+                table = tab.document.table(spec.table_id)
+                problem = variant_problem(table, variant, spec) or ""
             action.setChecked(spec is not None and spec.variant is variant)
             action.setEnabled(not problem)
             action.setText(text if not problem else f"{text}\t{problem}")

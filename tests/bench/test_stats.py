@@ -84,3 +84,42 @@ def test_mann_whitney_exact_49_by_49(benchmark: Any) -> None:
     kind = base.get("mann_whitney")
     result = benchmark(kind.run, data, kind.default_params())
     assert result.notes[0].startswith("The P value is exact")
+
+
+def test_repeated_measures_anova_10k_points(benchmark: Any) -> None:
+    """2,500 subjects × 4 treatments, Greenhouse-Geisser correction (the default)."""
+    from curvis.analysis.compare.rm_anova import rm_anova
+
+    rng = np.random.default_rng(2)
+    subject = rng.normal(0, 2, N_POINTS // 4)
+    columns = [subject + 10 + 0.1 * j + rng.normal(0, 1, N_POINTS // 4) for j in range(4)]
+    r = benchmark(rm_anova, columns)
+    assert r.n_subjects == N_POINTS // 4
+    assert benchmark.stats.stats.mean < TARGET_S
+
+
+def test_two_way_anova_10k_points(benchmark: Any) -> None:
+    """A 4 × 5 design of 500 values per cell, Type III sums of squares."""
+    from curvis.analysis.compare.two_way_anova import two_way_anova
+
+    rng = np.random.default_rng(3)
+    cells = [[rng.normal(10 + i + 0.5 * j, 2, N_POINTS // 20) for j in range(5)] for i in range(4)]
+    r = benchmark(two_way_anova, cells)
+    assert r.df_residual == N_POINTS - 20
+    assert benchmark.stats.stats.mean < TARGET_S
+
+
+def test_two_way_anova_analysis_10k_points(benchmark: Any) -> None:
+    """The whole analysis as the app runs it, with Tukey's test for both factors."""
+    from curvis.analysis.compare.two_way_analysis import TwoWayParams
+
+    rng = np.random.default_rng(4)
+    series = tuple(
+        SeriesData(f"s{i}{j}", f"A{i}", (rng.normal(10 + i + 0.5 * j, 2, N_POINTS // 20),), f"B{j}")
+        for j in range(5)
+        for i in range(4)
+    )
+    data = AnalysisInputs("T", N_POINTS // 20, series, category_factor="B")
+    kind = base.get("two_way_anova")
+    result = benchmark.pedantic(kind.run, (data, TwoWayParams()), rounds=5, iterations=1)
+    assert sum(t.title.startswith("Tukey") for t in result.tables) == 2

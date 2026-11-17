@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_anova",
+  "case": "n_two",
+  "description": "Two subjects, three treatments (df_error = 2).",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [1.2, 2.8999999999999999],
+      [2, 3.1000000000000001],
+      [3.3999999999999999, 5.5999999999999996]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n_subjects": 2,
+    "n_incomplete": 0,
+    "mean": [2.0499999999999998, 2.5499999999999998, 4.5],
+    "df_treatment": 2,
+    "df_subjects": 1,
+    "df_error": 2,
+    "ss_treatment": 6.7033333333333349,
+    "ss_subjects": 4.1666666666666661,
+    "ss_error": 0.30333333333333312,
+    "ms_treatment": 3.3516666666666675,
+    "ms_subjects": 4.1666666666666661,
+    "ms_error": 0.15166666666666656,
+    "f": 22.09890109890112,
+    "p_value": 0.043292102759276849,
+    "gg_epsilon": 0.50000000000000011,
+    "gg_df_treatment": 1.0000000000000002,
+    "gg_df_error": 1.0000000000000002,
+    "gg_p_value": 0.13343477071803714
+  },
+  "kinds": {
+    "n_subjects": "exact",
+    "n_incomplete": "exact",
+    "mean": "statistic",
+    "df_treatment": "exact",
+    "df_subjects": "exact",
+    "df_error": "exact",
+    "ss_treatment": "statistic",
+    "ss_subjects": "statistic",
+    "ss_error": "statistic",
+    "ms_treatment": "statistic",
+    "ms_subjects": "statistic",
+    "ms_error": "statistic",
+    "f": "statistic",
+    "p_value": "p_value",
+    "gg_epsilon": "statistic",
+    "gg_df_treatment": "statistic",
+    "gg_df_error": "statistic",
+    "gg_p_value": "p_value"
+  }
+}

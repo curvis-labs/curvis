@@ -81,6 +81,12 @@ _VARIANT_FAMILY = {
 }
 
 
+XY_VARIANTS = frozenset({ChartVariant.SCATTER, ChartVariant.LINE, ChartVariant.INTERACTION})
+"""Variants drawn as points with error bars (an interaction graph draws its lines so)."""
+LINE_VARIANTS = frozenset({ChartVariant.LINE, ChartVariant.INTERACTION})
+"""Variants that always join their points with a line."""
+
+
 class ErrorBars(StrEnum):
     """What a series' error bars show."""
 
@@ -233,6 +239,9 @@ class ChartSpec:
     text_size: float = DEFAULT_TEXT_SIZE
     overlays: tuple[FitOverlay, ...] = ()
     show_legend: bool = True
+    analysis_id: str | None = None
+    """The two-way ANOVA an interaction graph draws (Interaction family only). Its series
+    are the category groups of the table: one line per level of the second factor."""
     id: str = field(default_factory=new_id)
 
     def __post_init__(self) -> None:
@@ -276,6 +285,8 @@ def spec_problem(spec: ChartSpec) -> str | None:
     """Why ``spec`` is not a valid chart spec, or None."""
     if spec.variant.family is not spec.family:
         return f"variant {spec.variant} does not belong to family {spec.family}"
+    if (spec.family is ChartFamily.INTERACTION) != (spec.analysis_id is not None):
+        return "an interaction graph, and only one, names the two-way ANOVA it draws"
     sources = [s.source for s in spec.series]
     if len(set(sources)) != len(sources):
         return "a series is listed twice"
@@ -335,6 +346,7 @@ def spec_to_json(spec: ChartSpec) -> dict[str, Any]:
             {"analysis_id": o.analysis_id, "show_band": o.show_band} for o in spec.overlays
         ],
         "show_legend": spec.show_legend,
+        "analysis_id": spec.analysis_id,
     }
 
 
@@ -402,9 +414,14 @@ def spec_from_json(data: Any) -> ChartSpec:
                 for o in _list(obj.get("overlays", []), "overlays")
             ),
             show_legend=_bool(obj.get("show_legend", family is ChartFamily.XY), "show_legend"),
+            analysis_id=_optional_str(obj.get("analysis_id"), "analysis_id"),
         )
     except TypeError as exc:  # pragma: no cover - guarded by the checks above
         raise ValueError(str(exc)) from None
+
+
+def _optional_str(value: Any, name: str) -> str | None:
+    return None if value is None else _str(value, name)
 
 
 def _series_from_json(data: Any) -> SeriesSpec:

@@ -51,8 +51,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from curvis.analysis.base import Analysis, analysis_labels
 from curvis.analysis.result import Result
-from curvis.charts.builder import default_series, error_column_of, series_source
+from curvis.charts.builder import (
+    default_series_of,
+    error_column_of,
+    first_factor_name,
+    graph_series_names,
+    is_fit,
+    two_way_analyses,
+    with_fit,
+)
 from curvis.charts.colors import SCHEMES, scheme
 from curvis.charts.data import ChartData, compute, gather
 from curvis.charts.spec import (
@@ -74,7 +83,7 @@ from curvis.charts.spec import (
     Symbol,
 )
 from curvis.core import Document
-from curvis.data import Table, series
+from curvis.data import Table
 from curvis.ui.dialogs import (
     FIELD_WIDTH,
     DialogSkeleton,
@@ -120,6 +129,7 @@ LINE_LABELS = {
 CATEGORY_NOTE = "Bar and box graphs use only the color, error bars and legend of a series."
 BOX_NOTE = "Box plots use only the color and legend of a series."
 CATEGORY_AXIS_NOTE = "The X axis of a bar or box graph shows the series by name."
+LEVEL_AXIS_NOTE = "The X axis of an interaction graph shows the levels of the first factor."
 BAR_LOG_NOTE = "Bars start at 0, which a log axis cannot show."
 Y_ANGLE_NOTE = "Y axis labels are always horizontal."
 FIT_PREFIX = "fit:"
@@ -164,6 +174,7 @@ def data_key(spec: ChartSpec) -> object:
         spec.x_axis.scale,
         spec.y_axis.scale,
         tuple((o.analysis_id, o.show_band) for o in spec.overlays),
+        spec.analysis_id,
     )
 
 
@@ -264,7 +275,8 @@ class FormatDialog(QDialog):
         self._node = f"{PREVIEW_NODE}:{graph_id}"
         self._pending_key: object = None
         self._problems: dict[str, str] = {}
-        self._names = {series_source(s): s.name for s in series(self.table)}
+        self._names = graph_series_names(self.table, self.original)
+        self._labels = analysis_labels(document.analyses_of(self.table.id))
         self.setWindowTitle("Format graph")
         self._build()
         size_workbench(self)
@@ -344,6 +356,16 @@ class FormatDialog(QDialog):
         form.addRow(buddy_label("Si&ze", self.width_spin), size_row)
         self.show_legend = QCheckBox("Show le&gend")
         form.addRow("", self.show_legend)
+        # Interaction graphs: which two-way ANOVA of the table the graph draws.
+        self.anova_combo = QComboBox()
+        self.anova_combo.setAccessibleName("Two-way ANOVA drawn")
+        for analysis in two_way_analyses(self.table, self.document.analyses):
+            self.anova_combo.addItem(self._labels[analysis.id], analysis.id)
+        self.anova_label = buddy_label("A&NOVA", self.anova_combo)
+        form.addRow(self.anova_label, self.anova_combo)
+        interaction = self.original.family is ChartFamily.INTERACTION
+        self.anova_label.setVisible(interaction)
+        self.anova_combo.setVisible(interaction)
         outer.addLayout(form)
         outer.addStretch(1)
         self.title_edit.textEdited.connect(lambda text: self._edit(title=text))
@@ -351,6 +373,7 @@ class FormatDialog(QDialog):
         self.width_spin.valueChanged.connect(lambda _v: self._on_size_changed())
         self.height_spin.valueChanged.connect(lambda _v: self._on_size_changed())
         self.show_legend.toggled.connect(lambda on: self._edit(show_legend=on))
+        self.anova_combo.currentIndexChanged.connect(lambda _i: self._on_anova_chosen())
         return box
 
     def _build_axes_list(self) -> QGroupBox:
@@ -601,6 +624,8 @@ class FormatDialog(QDialog):
             spin.setEnabled(spec.aspect_ratio == CUSTOM_ASPECT)
         with QSignalBlocker(self.show_legend):
             self.show_legend.setChecked(spec.show_legend)
+        with QSignalBlocker(self.anova_combo):
+            self.anova_combo.setCurrentIndex(self.anova_combo.findData(spec.analysis_id))
         with QSignalBlocker(self.scheme_combo):
             self.scheme_combo.setCurrentIndex(max(0, self.scheme_combo.findData(spec.color_scheme)))
         with QSignalBlocker(self.text_size):
@@ -636,13 +661,15 @@ class FormatDialog(QDialog):
         self._show_problem()
 
     def _update_axis_enabled(self, key: str) -> None:
-        categorical_x = self.spec.family is ChartFamily.BAR and key == "x_axis"
+        levels_x = self.spec.family is ChartFamily.INTERACTION and key == "x_axis"
+        categorical_x = (self.spec.family is ChartFamily.BAR and key == "x_axis") or levels_x
         bars_y = self.spec.variant is ChartVariant.BAR and key == "y_axis"
         for widget in (self.axis_from, self.axis_to, self.linear, self.log):
             widget.setEnabled(not categorical_x)
         self.log.setEnabled(not (categorical_x or bars_y))
         self.label_angle.setEnabled(key == "x_axis")
-        notes = [CATEGORY_AXIS_NOTE if categorical_x else BAR_LOG_NOTE if bars_y else ""]
+        axis_note = LEVEL_AXIS_NOTE if levels_x else CATEGORY_AXIS_NOTE
+        notes = [axis_note if categorical_x else BAR_LOG_NOTE if bars_y else ""]
         if key == "y_axis":
             notes.append(Y_ANGLE_NOTE)
         note = " ".join(n for n in notes if n)
@@ -670,10 +697,7 @@ class FormatDialog(QDialog):
         self._load_series_options()
 
     def _fit_name(self, overlay: FitOverlay) -> str:
-        try:
-            return self.document.analysis(overlay.analysis_id).analysis_type.name
-        except KeyError:
-            return "analysis no longer in the project"
+        return self._labels.get(overlay.analysis_id, "analysis no longer in the project")
 
     def selected_fits(self) -> list[str]:
         """Analysis ids of the selected fitted curves, in the graph's order."""
@@ -939,18 +963,61 @@ class FormatDialog(QDialog):
     # --- series: add, remove, order ---------------------------------------------------------
 
     def _missing_sources(self) -> list[str]:
+        """Series of the table, then curve fits of the table (as FIT_PREFIX + id), that
+        the graph does not show."""
         shown = {s.source for s in self.spec.series}
-        return [source for source in self._names if source not in shown]
+        missing = [source for source in self._names if source not in shown]
+        return missing + [FIT_PREFIX + a.id for a in self._missing_fits()]
+
+    def _missing_fits(self) -> list[Analysis]:
+        if self.spec.family is not ChartFamily.XY:
+            return []
+        shown = {o.analysis_id for o in self.spec.overlays}
+        return [
+            a for a in self.document.analyses_of(self.table.id) if is_fit(a) and a.id not in shown
+        ]
 
     def _fill_add_menu(self) -> None:
         self.add_menu.clear()
-        for source in self._missing_sources():
-            action = self.add_menu.addAction(self._names[source])
-            action.triggered.connect(lambda _c=False, source=source: self.add_series(source))
+        shown = {s.source for s in self.spec.series}
+        for source in self._names:
+            if source not in shown:
+                action = self.add_menu.addAction(self._names[source])
+                action.triggered.connect(lambda _c=False, source=source: self.add_series(source))
+        fits = self._missing_fits()
+        if fits and self.add_menu.actions():
+            self.add_menu.addSeparator()
+        for analysis in fits:
+            action = self.add_menu.addAction(f"Fitted curve: {self._labels[analysis.id]}")
+            action.triggered.connect(lambda _c=False, a=analysis: self.add_fit(a))
+
+    def add_fit(self, analysis: Analysis) -> None:
+        """Lay the fitted curves of ``analysis`` over the graph again."""
+        self._apply(with_fit(self.spec, analysis))
+        self._fill_series_list([FIT_PREFIX + analysis.id])
+
+    def _on_anova_chosen(self) -> None:
+        """Draw another two-way ANOVA of the table. The X axis title follows the first
+        factor's name unless it was typed."""
+        analysis_id = self.anova_combo.currentData()
+        if not isinstance(analysis_id, str) or analysis_id == self.spec.analysis_id:
+            return
+        x_axis = self.spec.x_axis
+        old, new = self._factor_name(self.spec.analysis_id), self._factor_name(analysis_id)
+        if x_axis.title == old:
+            x_axis = replace(x_axis, title=new)
+        self._apply(replace(self.spec, analysis_id=analysis_id, x_axis=x_axis))
+        self._load_axis()
+
+    def _factor_name(self, analysis_id: str | None) -> str:
+        try:
+            return first_factor_name(self.document.analysis(analysis_id or ""))
+        except KeyError:
+            return ""
 
     def add_series(self, source: str) -> None:
         """Add the table's series ``source`` at the end, in the next colour and symbol."""
-        defaults = {s.source: s for s in default_series(self.table)}
+        defaults = {s.source: s for s in default_series_of(self.table, self.spec)}
         style = defaults[source]
         index = len(self.spec.series)
         style = replace(

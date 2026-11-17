@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "analysis": "two_way_anova",
+  "case": "no_effects",
+  "description": "3 x 2 design with equal true means.",
+  "generated_by": {
+    "script": "validation/r/scripts/two_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "cells": [
+      [
+        [2.5776793091559087, 3.8075854249416179, 4.444200346703929, 3.8767101263136436, 1.4459202877757984],
+        [4.4630412700458821, 3.9345526032927896, 3.7562013791008879, 4.2054393714036156, 3.3569682724061121]
+      ],
+      [
+        [2.106679392006618, 3.7162056569399629, 1.8515629047649589, 2.9219186846353904, 5.0968301770394771],
+        [3.9557035908700389, 3.7082438372789683, 3.745101440539778, 4.5022712502567384, 5.3307044753444401]
+      ],
+      [
+        [3.195235323559948, 5.6833673833524996, 4.3741690599700647, 2.864913246485421, 2.1760787092315708],
+        [5.9224285188181787, 2.7479583043430087, 1.7459042270796474, 2.9659986547730126, 2.6752366854553902]
+      ]
+    ]
+  },
+  "expected": {
+    "n": [5, 5, 5, 5, 5, 5],
+    "cell_mean": [3.2304190989781794, 3.9432405792498573, 3.1386393630772815, 4.2484049188579931, 3.6587527445199006, 3.2115052780938473],
+    "marginal_mean_a": [3.5868298391140181, 3.6935221409676373, 3.435129011306874],
+    "marginal_mean_b": [3.3426037355251204, 3.8010502587338992],
+    "df_a": 2,
+    "df_b": 1,
+    "df_interaction": 2,
+    "df_residual": 24,
+    "ss_a": 0.33721132629360207,
+    "ss_b": 1.5762991098166308,
+    "ss_interaction": 3.2730117595796226,
+    "ss_residual": 33.069511915475658,
+    "ms_a": 0.16860566314680103,
+    "ms_b": 1.5762991098166308,
+    "ms_interaction": 1.6365058797898113,
+    "ms_residual": 1.3778963298114857,
+    "f_a": 0.12236454913111533,
+    "f_b": 1.1439896280384818,
+    "f_interaction": 1.1876843303688216,
+    "p_a": 0.88537421667275817,
+    "p_b": 0.29545059417100417,
+    "p_interaction": 0.32221995772877438
+  },
+  "kinds": {
+    "n": "exact",
+    "cell_mean": "statistic",
+    "marginal_mean_a": "statistic",
+    "marginal_mean_b": "statistic",
+    "df_a": "exact",
+    "df_b": "exact",
+    "df_interaction": "exact",
+    "df_residual": "exact",
+    "ss_a": "statistic",
+    "ss_b": "statistic",
+    "ss_interaction": "statistic",
+    "ss_residual": "statistic",
+    "ms_a": "statistic",
+    "ms_b": "statistic",
+    "ms_interaction": "statistic",
+    "ms_residual": "statistic",
+    "f_a": "statistic",
+    "f_b": "statistic",
+    "f_interaction": "statistic",
+    "p_a": "p_value",
+    "p_b": "p_value",
+    "p_interaction": "p_value"
+  }
+}

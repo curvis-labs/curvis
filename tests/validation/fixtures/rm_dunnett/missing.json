@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_dunnett",
+  "case": "missing",
+  "description": "Two incomplete subjects are left out; an empty row is ignored.",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "multcomp": "1.4.32",
+      "mvtnorm": "1.4.2",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [5.2000000000000002, 6, "NaN", 5.7999999999999998, 4.9000000000000004, 6.2999999999999998, 5.5, "NaN"],
+      [6.0999999999999996, 7, 6.4000000000000004, 7.7000000000000002, "NaN", 7.2000000000000002, 6.5999999999999996, "NaN"],
+      [5, 5.9000000000000004, 5.0999999999999996, 6.4000000000000004, 5.2999999999999998, 6.7999999999999998, 5.7000000000000002, "NaN"]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group": [1, 2],
+    "difference": [1.1600000000000001, 0.20000000000000018],
+    "se": [0.16753109164172086, 0.16753109164172086],
+    "t": [6.924087873078248, 1.1938082539790094],
+    "p_value": [0.00022624307321295509, 0.42160012757349397],
+    "ci_lower": [0.71222095825338472, -0.24777904174661525],
+    "ci_upper": [1.6077790417466156, 0.6477790417466156]
+  },
+  "kinds": {
+    "group": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "t": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}

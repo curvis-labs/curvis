@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_anova",
+  "case": "large_offset",
+  "description": "Small spread on a large offset.",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [999999.89908069046, 1000000.0736449001, 999999.86166334513, 1000000.3037867411, 1000000.1414906128, 999999.85539848497],
+      [1000000.1436472088, 1000000.2259936705, 1000000.1891208234, 1000000.61680948, 1000000.3650920412, 1000000.1830981337],
+      [1000000.0157702976, 1000000.1664237309, 999999.97882314608, 1000000.4581629755, 1000000.1696298035, 999999.83643873839]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n_subjects": 6,
+    "n_incomplete": 0,
+    "mean": [1000000.0225107957, 1000000.2872935596, 1000000.1042081154],
+    "df_treatment": 2,
+    "df_subjects": 5,
+    "df_error": 10,
+    "ss_treatment": 0.22060928799394841,
+    "ss_subjects": 0.52231870689414317,
+    "ss_error": 0.030799531199151138,
+    "ms_treatment": 0.11030464399697421,
+    "ms_subjects": 0.10446374137882863,
+    "ms_error": 0.0030799531199151137,
+    "f": 35.813741216948877,
+    "p_value": 2.7594211540437762e-05,
+    "gg_epsilon": 0.78902185179969031,
+    "gg_df_treatment": 1.5780437035993806,
+    "gg_df_error": 7.8902185179969031,
+    "gg_p_value": 0.00016098149351969376
+  },
+  "kinds": {
+    "n_subjects": "exact",
+    "n_incomplete": "exact",
+    "mean": "statistic",
+    "df_treatment": "exact",
+    "df_subjects": "exact",
+    "df_error": "exact",
+    "ss_treatment": "statistic",
+    "ss_subjects": "statistic",
+    "ss_error": "statistic",
+    "ms_treatment": "statistic",
+    "ms_subjects": "statistic",
+    "ms_error": "statistic",
+    "f": "statistic",
+    "p_value": "p_value",
+    "gg_epsilon": "statistic",
+    "gg_df_treatment": "statistic",
+    "gg_df_error": "statistic",
+    "gg_p_value": "p_value"
+  }
+}

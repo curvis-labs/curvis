@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "analysis": "two_way_anova",
+  "case": "identical",
+  "description": "Every cell has the same values: all F = 0, P = 1.",
+  "generated_by": {
+    "script": "validation/r/scripts/two_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "cells": [
+      [
+        [2.5, 3.1000000000000001, 4.7000000000000002],
+        [2.5, 3.1000000000000001, 4.7000000000000002],
+        [2.5, 3.1000000000000001, 4.7000000000000002]
+      ],
+      [
+        [2.5, 3.1000000000000001, 4.7000000000000002],
+        [2.5, 3.1000000000000001, 4.7000000000000002],
+        [2.5, 3.1000000000000001, 4.7000000000000002]
+      ]
+    ]
+  },
+  "expected": {
+    "n": [3, 3, 3, 3, 3, 3],
+    "cell_mean": [3.4333333333333336, 3.4333333333333336, 3.4333333333333336, 3.4333333333333336, 3.4333333333333336, 3.4333333333333336],
+    "marginal_mean_a": [3.4333333333333336, 3.4333333333333336],
+    "marginal_mean_b": [3.4333333333333336, 3.4333333333333336, 3.4333333333333336],
+    "df_a": 1,
+    "df_b": 2,
+    "df_interaction": 2,
+    "df_residual": 12,
+    "ss_a": 0,
+    "ss_b": 0,
+    "ss_interaction": 0,
+    "ss_residual": 15.520000000000001,
+    "ms_a": 0,
+    "ms_b": 0,
+    "ms_interaction": 0,
+    "ms_residual": 1.2933333333333334,
+    "f_a": 0,
+    "f_b": 0,
+    "f_interaction": 0,
+    "p_a": 1,
+    "p_b": 1,
+    "p_interaction": 1
+  },
+  "kinds": {
+    "n": "exact",
+    "cell_mean": "statistic",
+    "marginal_mean_a": "statistic",
+    "marginal_mean_b": "statistic",
+    "df_a": "exact",
+    "df_b": "exact",
+    "df_interaction": "exact",
+    "df_residual": "exact",
+    "ss_a": "statistic",
+    "ss_b": "statistic",
+    "ss_interaction": "statistic",
+    "ss_residual": "statistic",
+    "ms_a": "statistic",
+    "ms_b": "statistic",
+    "ms_interaction": "statistic",
+    "ms_residual": "statistic",
+    "f_a": "statistic",
+    "f_b": "statistic",
+    "f_interaction": "statistic",
+    "p_a": "p_value",
+    "p_b": "p_value",
+    "p_interaction": "p_value"
+  }
+}
