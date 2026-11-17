@@ -14,6 +14,7 @@ from curvis.analysis.base import (
     params_to_json,
 )
 from curvis.analysis.compare.anova_analysis import AnovaParams
+from curvis.analysis.compare.kruskal_analysis import KruskalParams
 from curvis.analysis.compare.ttest_analysis import TTestParams
 from curvis.analysis.result import Result, Value, grids
 from curvis.data import Column, Table
@@ -164,6 +165,71 @@ def test_mann_whitney_states_the_method() -> None:
     result = run("mann_whitney", big)
     assert value(result, "P value method") == "Normal approximation with continuity correction"
     assert "because a group has 50 or more values" in result.notes[0]
+
+
+# --- Kruskal-Wallis ---------------------------------------------------------------------
+
+
+def test_kruskal_wallis_with_dunn_of_every_pair_by_default() -> None:
+    result = run("kruskal_wallis", inputs(A, B, C))
+    assert result.method == "Kruskal-Wallis test"
+    assert [t.title for t in result.tables] == ["Groups", "Dunn's multiple comparisons test"]
+    dunn = result.tables[-1]
+    assert [row[0] for row in dunn.rows] == ["Drug − Control", "Other − Control", "Other − Drug"]
+    for row in dunn.rows:
+        assert row[4] >= row[3]  # type: ignore[operator]
+    assert result.summary.startswith(
+        "The distributions of the groups differ significantly (H(2) = "
+    )
+    assert "comparisons of every pair" in result.notes[1]
+    distinct = inputs(("A", [1.0, 2.0, 3.0]), ("B", [4.0, 5.0, 6.0]), ("C", [7.0, 8.0, 9.0]))
+    assert len(run("kruskal_wallis", distinct).notes) == 2  # no note about ties
+
+
+def test_kruskal_wallis_against_the_chosen_control() -> None:
+    result = run("kruskal_wallis", inputs(A, B, C), posthoc="control", control="other")
+    assert [row[0] for row in result.tables[-1].rows] == ["Control − Other", "Drug − Other"]
+    assert "2 comparisons of each group against Other" in result.notes[1]
+    for control in ("", "unticked"):
+        result = run("kruskal_wallis", inputs(A, B, C), posthoc="control", control=control)
+        assert [row[0] for row in result.tables[-1].rows] == [
+            "Drug − Control",
+            "Other − Control",
+        ]
+
+
+def test_kruskal_wallis_notes_ties_and_warns_about_few_values() -> None:
+    result = run("kruskal_wallis", inputs(("A", [1.0, 2.0]), ("B", [2.0, 3.0, 3.0]), C))
+    assert "H and Dunn's z are corrected for tied values." in result.notes
+    assert any("A has only 2 values" in w for w in result.warnings)
+
+
+def test_kruskal_wallis_errors() -> None:
+    with pytest.raises(AnalysisError, match="All values are the same"):
+        run("kruskal_wallis", inputs(("A", [1.0, 1.0]), ("B", [1.0, 1.0]), ("C", [1.0])))
+    with pytest.raises(AnalysisError, match="B has no values"):
+        run("kruskal_wallis", inputs(A, ("B", [np.nan] * 6), C))
+    with pytest.raises(AnalysisError, match="at least 3 series"):
+        run("kruskal_wallis", inputs(A, B))
+
+
+def test_kruskal_wallis_needs_three_series() -> None:
+    table = Table(
+        "T",
+        [Column.new(n, "Y", [1, 2, 3], id=n.lower()) for n in ("A", "B", "C")],
+    )
+    kind = base.get("kruskal_wallis")
+    assert not kind.can_run(two_column_table())
+    assert kind.can_run(table)
+    assert kind.check(table, ["a", "b"], kind.default_params()) == (
+        "Tick at least 3 series to compare."
+    )
+    assert kind.check(table, ["a", "b", "c"], kind.default_params()) is None
+
+
+def test_kruskal_params_store_the_control_by_id() -> None:
+    params = KruskalParams(posthoc="control", control="col-7")
+    assert params_from_json(KruskalParams, params_to_json(params)) == params
 
 
 # --- availability ----------------------------------------------------------------------

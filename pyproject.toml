@@ -56,7 +56,7 @@ allowed-confusables = ["−", "×", "–"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 # Heavy libraries are imported inside functions so start-up stays fast (CLAUDE.md rule 9).
-banned-module-level-imports = ["matplotlib", "statsmodels", "lifelines", "lmfit"]
+banned-module-level-imports = ["matplotlib", "statsmodels", "lifelines", "lmfit", "scikit_posthocs"]
 
 [tool.mypy]
 python_version = "3.12"

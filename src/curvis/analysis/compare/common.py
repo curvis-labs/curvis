@@ -85,7 +85,7 @@ class GroupComparison(AnalysisType):
     """Base class of the analyses that compare ticked series as groups."""
 
     family = Family.COMPARE
-    imports = STAT_IMPORTS
+    imports: ClassVar[tuple[str, ...]] = STAT_IMPORTS
     min_groups: ClassVar[int] = 2
     max_groups: ClassVar[int | None] = None
 

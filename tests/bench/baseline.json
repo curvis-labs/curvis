@@ -820,6 +820,48 @@
           "median": 0.2564403055010013
         }
       ]
+    },
+    {
+      "name": "test_kruskal_wallis_with_dunn_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_kruskal_wallis_with_dunn_10k_points",
+      "stats": {
+        "min": 0.017103225511510896
+      },
+      "runs": [
+        {
+          "min": 0.017103225511510896,
+          "median": 0.018791868048377524
+        },
+        {
+          "min": 0.01835993192418191,
+          "median": 0.018730406345505914
+        },
+        {
+          "min": 0.017791514938358885,
+          "median": 0.019375700023309534
+        }
+      ]
+    },
+    {
+      "name": "test_kruskal_wallis_with_dunn_vs_control_10k_points",
+      "fullname": "tests/bench/test_stats.py::test_kruskal_wallis_with_dunn_vs_control_10k_points",
+      "stats": {
+        "min": 0.015332329982776682
+      },
+      "runs": [
+        {
+          "min": 0.015332329982776682,
+          "median": 0.01989449097872176
+        },
+        {
+          "min": 0.016763871125168965,
+          "median": 0.018473978819648972
+        },
+        {
+          "min": 0.016880614471938598,
+          "median": 0.019200926820740278
+        }
+      ]
     }
   ]
 }
