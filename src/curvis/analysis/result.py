@@ -186,6 +186,22 @@ class FittedCurve:
 
 
 @dataclass(frozen=True)
+class CellMeans:
+    """The cells of a two-way design, for the interaction chart: per level of factor A
+    (``a``) and factor B (``b``), the n, mean, SD and SEM of the cell's values."""
+
+    factor_a: str
+    factor_b: str
+    levels_a: tuple[str, ...]
+    levels_b: tuple[str, ...]
+    n: tuple[tuple[int, ...], ...]
+    """n[i][j]: level i of factor A at level j of factor B; likewise below."""
+    mean: tuple[tuple[float, ...], ...]
+    sd: tuple[tuple[float, ...], ...]
+    sem: tuple[tuple[float, ...], ...]
+
+
+@dataclass(frozen=True)
 class Result:
     """What an analysis found."""
 
@@ -201,6 +217,8 @@ class Result:
     """Extra secondary sentences shown under the results."""
     curves: tuple[FittedCurve, ...] = ()
     """Fitted curves, for graphs (curve fits only)."""
+    cells: CellMeans | None = None
+    """The cells of a two-way design, for the interaction chart (two-way ANOVA only)."""
 
     @property
     def has_p_values(self) -> bool:

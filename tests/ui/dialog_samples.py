@@ -102,6 +102,56 @@ def grouped_document() -> Document:
     return doc
 
 
+TWO_WAY_CELLS = {
+    ("Control", "Male"): ([5.1, 5.4, 4.9], [5.3, 5.0, 5.2]),
+    ("Drug", "Male"): ([6.8, 7.1, 6.5], [7.3, 6.9, 7.0]),
+    ("Control", "Female"): ([5.0, 5.6, 5.2], [4.8, 5.3, 5.1]),
+    ("Drug", "Female"): ([5.6, 5.9, 5.3], [6.1, 5.8, 5.5]),
+}
+
+
+def add_two_way_layout(doc: Document, table_id: str) -> None:
+    """Add to table ``table_id`` the layout of a two-way ANOVA: categories Male and
+    Female (factor "Sex"), each holding replicate groups Control and Drug of two
+    columns."""
+    from curvis.core import AddColumn, GroupColumns, RenameCategoryFactor, SetCategory
+
+    for (group, category), replicates in TWO_WAY_CELLS.items():
+        ids = []
+        for i, values in enumerate(replicates, 1):
+            column = Column.new(f"{group} {category[0]}{i}", ColumnRole.Y, values)
+            doc.execute(AddColumn(table_id, column))
+            ids.append(column.id)
+        group_id = f"{group}_{category}"
+        doc.execute(GroupColumns(table_id, ids, group, group_id=group_id))
+        doc.execute(SetCategory(table_id, [group_id], category))
+    doc.execute(RenameCategoryFactor(table_id, "Sex"))
+
+
+def two_way_document() -> Document:
+    """A document whose table "t" is laid out for two-way ANOVA (add_two_way_layout)."""
+    doc = Document()
+    doc.execute(AddTable(Table("Data 1", [], id="t")))
+    add_two_way_layout(doc, "t")
+    doc.undo_stack.clear()
+    return doc
+
+
+def _analyze_two_way(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(two_way_document(), "t")
+    dialog.set_analysis_type("two_way_anova")
+    return dialog
+
+
+def _analyze_repeated(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.set_analysis_type("one_way_anova")
+    combo = dialog.forms["one_way_anova"].fields["design"]
+    assert isinstance(combo, QComboBox)
+    combo.setCurrentIndex(combo.findData("repeated"))
+    return dialog
+
+
 def _analyze(ctx: Context) -> QDialog:
     dialog = AnalyzeDialog(grouped_document(), "t", recent=["descriptive_statistics"])
     dialog.set_analysis_type("descriptive_statistics")
@@ -311,6 +361,8 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "analyze_nothing_ticked": _analyze_nothing_ticked,
     "analyze_t_test": _analyze_t_test,
     "analyze_anova_dunnett": _analyze_anova_dunnett,
+    "analyze_repeated": _analyze_repeated,
+    "analyze_two_way": _analyze_two_way,
     "analyze_fit": _analyze_fit,
     "analyze_fit_advanced": _analyze_fit_advanced,
     "constants": _constants,

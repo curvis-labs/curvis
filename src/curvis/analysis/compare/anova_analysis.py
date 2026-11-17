@@ -1,4 +1,11 @@
-"""The ordinary one-way ANOVA analysis, with Tukey's, Dunnett's or Holm's post-hoc test."""
+"""The one-way ANOVA analysis, ordinary or repeated measures, with Tukey's, Dunnett's or
+Holm's post-hoc test.
+
+Repeated measures: each row is a subject, matched across the ticked series value by
+value (series with several replicate columns are matched column by column, as the
+paired t test does). Rows with a missing value are left out. The Greenhouse-Geisser
+correction is applied by default; the post-hoc tests use the pooled error.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +29,8 @@ from curvis.analysis.compare.anova import (
     tukey,
 )
 from curvis.analysis.compare.common import (
+    FEW_VALUES,
+    FloatArray,
     GroupComparison,
     few_values_warnings,
     group_values,
@@ -31,10 +40,25 @@ from curvis.analysis.compare.common import (
     significant,
     zero_variance_warnings,
 )
+from curvis.analysis.compare.rm_anova import RMAnovaStats, complete_rows, rm_anova
 from curvis.analysis.result import Cell, Kind, Result, ResultColumn, ResultTable, Value
 from curvis.data import Table
 
 METHOD = "Ordinary one-way ANOVA"
+RM_METHOD = "Repeated-measures one-way ANOVA"
+GG = "Greenhouse-Geisser correction"
+ORDINARY = "ordinary"
+REPEATED = "repeated"
+"""Repeated measures with the Greenhouse-Geisser correction (the default for RM)."""
+REPEATED_SPHERICAL = "repeated_sphericity"
+"""Repeated measures assuming sphericity (no correction)."""
+DESIGN_CHOICES = (
+    (ORDINARY, "Ordinary: independent groups"),
+    (REPEATED, "Repeated measures, matched by row (Greenhouse-Geisser correction)"),
+    (REPEATED_SPHERICAL, "Repeated measures, matched by row, assume sphericity"),
+)
+LOW_EPSILON = 0.75
+"""Below this Greenhouse-Geisser epsilon, sphericity looks violated."""
 TUKEY = "tukey"
 DUNNETT = "dunnett"
 HOLM = "holm"
@@ -52,6 +76,7 @@ POSTHOC_CHOICES = (
 
 @dataclass(frozen=True)
 class AnovaParams(Params):
+    design: str = param(ORDINARY, "De&sign", choices=DESIGN_CHOICES)
     posthoc: str = param(TUKEY, "&Post-hoc test", choices=POSTHOC_CHOICES)
     control: str = param("", "&Control group", from_inputs=True, enabled_when=("posthoc", DUNNETT))
 
@@ -63,11 +88,24 @@ class OneWayAnova(GroupComparison):
     params_type = AnovaParams
     min_groups = 2
 
+    def check(self, table: Table, inputs: Sequence[str], params: Params) -> str | None:
+        problem = super().check(table, inputs, params)
+        if problem is not None:
+            return problem
+        assert isinstance(params, AnovaParams)
+        chosen = self.selected(table, inputs)
+        if _repeated(params) and len({c.n_replicates for c in chosen}) > 1:
+            return "For repeated measures, tick series with the same number of columns."
+        return None
+
     def describe(self, table: Table, inputs: Sequence[str], params: Params) -> str:
         assert isinstance(params, AnovaParams)
         chosen = self.selected(table, inputs)
         names = [c.name for c in chosen]
-        start = f"{METHOD} of {name_list(names)}, followed by {POSTHOC_METHODS[params.posthoc]}"
+        method = METHOD
+        if _repeated(params):
+            method = RM_METHOD + (f" with the {GG}" if params.design == REPEATED else "")
+        start = f"{method} of {name_list(names)}, followed by {POSTHOC_METHODS[params.posthoc]}"
         if params.posthoc == DUNNETT:
             control = input_param(params, "control", [c.id for c in chosen])
             control_name = next((c.name for c in chosen if c.id == control), "")
@@ -83,6 +121,8 @@ class OneWayAnova(GroupComparison):
         for name, group in zip(names, groups, strict=True):
             if not (group == group).any():  # all missing
                 raise AnalysisError(f"{name} has no values. Enter data or untick it.")
+        if _repeated(params):
+            return _run_repeated(inputs, params, groups, names)
         a = one_way_anova(groups)
         if a.df_within == 0:
             raise AnalysisError(
@@ -93,15 +133,7 @@ class OneWayAnova(GroupComparison):
             raise AnalysisError(
                 "The values do not vary within any group, so the ANOVA cannot be computed."
             )
-        ids = [s.id for s in inputs.series]
-        if params.posthoc == DUNNETT:
-            control_id = input_param(params, "control", ids)
-            control = ids.index(control_id) if control_id in ids else 0
-            comparisons = dunnett(a, control)
-        elif params.posthoc == HOLM:
-            comparisons = holm_pairwise(a)
-        else:
-            comparisons = tukey(a)
+        comparisons = _posthoc(a, inputs, params)
         posthoc = POSTHOC_METHODS[params.posthoc]
         hits = sum(significant(c.p_value) for c in comparisons)
         verdict = (
@@ -126,6 +158,130 @@ class OneWayAnova(GroupComparison):
             _posthoc_table(posthoc, params.posthoc, comparisons, names),
         )
         return Result(METHOD, summary, tuple(warnings), values, tables)
+
+
+def _repeated(params: AnovaParams) -> bool:
+    return params.design in (REPEATED, REPEATED_SPHERICAL)
+
+
+def _posthoc(a: AnovaStats, inputs: AnalysisInputs, params: AnovaParams) -> list[Comparison]:
+    ids = [s.id for s in inputs.series]
+    if params.posthoc == DUNNETT:
+        control_id = input_param(params, "control", ids)
+        control = ids.index(control_id) if control_id in ids else 0
+        return dunnett(a, control)
+    if params.posthoc == HOLM:
+        return holm_pairwise(a)
+    return tukey(a)
+
+
+def _run_repeated(
+    inputs: AnalysisInputs, params: AnovaParams, groups: Sequence[FloatArray], names: list[str]
+) -> Result:
+    if len({len(g) for g in groups}) > 1:
+        raise AnalysisError("For repeated measures every series needs the same number of columns.")
+    _complete, incomplete = complete_rows(groups)
+    if len(_complete) < 2:
+        raise AnalysisError(
+            "Repeated measures needs at least 2 rows with a value in every series "
+            f"(there {'is' if len(_complete) == 1 else 'are'} {len(_complete)})."
+        )
+    r = rm_anova(groups)
+    if not r.defined:
+        raise AnalysisError(
+            "Each row differs from the others by the same amount in every series, so "
+            "nothing is left to test against."
+        )
+    corrected = params.design == REPEATED
+    p = r.gg_p_value if corrected else r.p_value
+    df_t = r.gg_df_treatment if corrected else r.df_treatment
+    df_e = r.gg_df_error if corrected else r.df_error
+    method = f"{RM_METHOD} ({GG})" if corrected else RM_METHOD
+    a = r.pooled
+    comparisons = _posthoc(a, inputs, params)
+    posthoc = POSTHOC_METHODS[params.posthoc]
+    hits = sum(significant(c.p_value) for c in comparisons)
+    verdict = "differ significantly" if significant(p) else "do not differ significantly"
+    test = f"F({_df(df_t)}, {_df(df_e)}) = {number(r.f)}, {p_text(p)}"
+    verb = "is" if hits == 1 else "are"
+    summary = (
+        f"The means {verdict} across the {r.k} matched series ({test}); {hits} of "
+        f"{len(comparisons)} comparisons {verb} significant in {posthoc}."
+    )
+    warnings: list[str] = []
+    if incomplete:
+        rows = "row was" if incomplete == 1 else "rows were"
+        warnings.append(
+            f"{incomplete} {rows} left out because of missing values: repeated measures "
+            f"needs a value in every series. The analysis uses the {r.n_subjects} "
+            "complete rows."
+        )
+    if r.n_subjects < FEW_VALUES:
+        warnings.append(
+            f"Only {r.n_subjects} complete rows. With fewer than {FEW_VALUES} subjects the "
+            "test has little power and its assumptions cannot be checked."
+        )
+    if not corrected and r.gg_epsilon < LOW_EPSILON:
+        warnings.append(
+            f"Greenhouse-Geisser epsilon is {number(r.gg_epsilon)}, so the variances of "
+            "the differences look unequal (sphericity is violated) and the P value may be "
+            "too small. Choose the Greenhouse-Geisser correction."
+        )
+    values = (
+        Value("P value", p, Kind.P_VALUE),
+        Value("F", r.f),
+        Value("DF numerator", df_t, Kind.NUMBER if corrected else Kind.INTEGER),
+        Value("DF denominator", df_e, Kind.NUMBER if corrected else Kind.INTEGER),
+        Value("Greenhouse-Geisser epsilon", r.gg_epsilon),
+        Value(
+            "P value, sphericity assumed" if corrected else "P value, Greenhouse-Geisser",
+            r.p_value if corrected else r.gg_p_value,
+            Kind.P_VALUE,
+        ),
+        Value("Number of subjects (rows)", r.n_subjects, Kind.INTEGER),
+    )
+    tables = (
+        _rm_table(r),
+        _groups_table(a, names),
+        _posthoc_table(posthoc, params.posthoc, comparisons, names),
+    )
+    return Result(method, summary, tuple(warnings), values, tables)
+
+
+def _df(df: float) -> str:
+    return str(int(df)) if float(df).is_integer() else number(df)
+
+
+def _rm_table(r: RMAnovaStats) -> ResultTable:
+    columns = (
+        ResultColumn("Source", Kind.TEXT),
+        ResultColumn("SS"),
+        ResultColumn("DF", Kind.INTEGER),
+        ResultColumn("MS"),
+        ResultColumn("F"),
+        ResultColumn("P value", Kind.P_VALUE),
+    )
+    rows: tuple[tuple[Cell, ...], ...] = (
+        (
+            "Treatment (between series)",
+            r.ss_treatment,
+            r.df_treatment,
+            r.ms_treatment,
+            r.f,
+            r.p_value,
+        ),
+        ("Subjects (between rows)", r.ss_subjects, r.df_subjects, r.ms_subjects, None, None),
+        ("Residual", r.ss_error, r.df_error, r.ms_error, None, None),
+        (
+            "Total",
+            r.ss_treatment + r.ss_subjects + r.ss_error,
+            r.n_subjects * r.k - 1,
+            None,
+            None,
+            None,
+        ),
+    )
+    return ResultTable("ANOVA table (sphericity assumed)", columns, rows)
 
 
 def _anova_table(a: AnovaStats) -> ResultTable:

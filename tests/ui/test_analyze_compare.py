@@ -134,3 +134,97 @@ def test_one_click_runs_a_t_test(
     grid = panel.grids[0].grid
     assert grid.title == "Unpaired t test with Welch's correction"
     assert grid.shown[0][0] == "P value" and grid.shown[0][2] == "**"
+
+
+# --- repeated measures and two-way ANOVA (step 3.1) -------------------------------
+
+
+def test_repeated_measures_is_a_design_of_one_way_anova(qtbot: QtBot) -> None:
+    dialog = dialog_for(qtbot, three_groups())
+    dialog.set_analysis_type(ANOVA)
+    design = combo(dialog, "design")
+    assert design.currentData() == "ordinary"
+    assert [design.itemData(i) for i in range(design.count())] == [
+        "ordinary",
+        "repeated",
+        "repeated_sphericity",
+    ]
+    choose(design, "repeated")
+    assert dialog.summary.text().startswith(
+        "Repeated-measures one-way ANOVA with the Greenhouse-Geisser correction of Control, "
+        "Drug and Other"
+    )
+    assert dialog.ok_button.isEnabled()
+    assert dialog.params() == AnovaParams(design="repeated", control="c")
+
+
+def test_one_click_runs_repeated_measures(
+    two_series_tab: DocumentTab, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tab = two_series_tab
+
+    def setup(dialog: AnalyzeDialog) -> None:
+        dialog.set_analysis_type(ANOVA)
+        choose(combo(dialog, "design"), "repeated")
+
+    run_dialog(monkeypatch, setup)
+    tab.analyze()
+    settle(qtbot, tab)
+    grid = tab.results_panel.grids[0].grid
+    assert grid.title == "Repeated-measures one-way ANOVA (Greenhouse-Geisser correction)"
+    labels = [row[0] for row in grid.shown]
+    assert "Greenhouse-Geisser epsilon" in labels
+    assert "P value, sphericity assumed" in labels
+
+
+@pytest.fixture
+def two_way_tab(window: MainWindow) -> DocumentTab:
+    from curvis.core import RemoveColumn
+    from tests.ui.dialog_samples import add_two_way_layout
+
+    tab = window.new_document()
+    doc = tab.document
+    table = doc.tables[0]
+    for column in list(table.columns):
+        doc.execute(RemoveColumn(table.id, column.id))
+    add_two_way_layout(doc, table.id)
+    return tab
+
+
+def test_two_way_lists_the_series_with_their_category(qtbot: QtBot) -> None:
+    from tests.ui.dialog_samples import two_way_document
+
+    dialog = AnalyzeDialog(two_way_document(), "t")
+    qtbot.addWidget(dialog)
+    assert "two_way_anova" in dialog.radios
+    dialog.set_analysis_type("two_way_anova")
+    tree = dialog.tree
+    names = [tree.topLevelItem(i).text(0) for i in range(tree.topLevelItemCount())]
+    assert names == ["Control (Male)", "Drug (Male)", "Control (Female)", "Drug (Female)"]
+    assert dialog.summary.text().startswith(
+        "Two-way ANOVA (Type III sums of squares) of Group (Control and Drug) and Sex "
+        "(Male and Female)"
+    )
+    assert dialog.ok_button.isEnabled()
+    dialog.set_checked(["Control_Male", "Drug_Male", "Control_Female"])
+    assert not dialog.ok_button.isEnabled()
+    assert dialog.skeleton.feedback.text() == (
+        "Female has no series named Drug. Each category needs the same series."
+    )
+
+
+def test_one_click_runs_two_way_anova(
+    two_way_tab: DocumentTab, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tab = two_way_tab
+    run_dialog(monkeypatch, lambda dialog: dialog.set_analysis_type("two_way_anova"))
+    tab.analyze()
+    settle(qtbot, tab)
+    panel = tab.results_panel
+    assert panel.combo.currentText().startswith("Two-way ANOVA")
+    reading = panel.content.findChild(QLabel, "reading") if panel.content else None
+    assert reading is not None
+    assert reading.text().startswith("Group is significant (F(1, 20) = ")
+    titles = [g.grid.title for g in panel.grids]
+    assert "ANOVA table (Type III sums of squares)" in titles
+    assert "Tukey's multiple comparisons test: Group" in titles

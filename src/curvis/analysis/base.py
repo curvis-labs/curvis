@@ -43,6 +43,7 @@ BUILTIN_MODULES = (
     "curvis.analysis.descriptive",
     "curvis.analysis.compare.ttest_analysis",
     "curvis.analysis.compare.anova_analysis",
+    "curvis.analysis.compare.two_way_analysis",
     "curvis.analysis.compare.mann_whitney_analysis",
     "curvis.analysis.fit.analyses",
 )
@@ -251,6 +252,8 @@ class SeriesData:
     name: str
     columns: tuple[FloatArray, ...]
     """One array per replicate column, all of the table's length."""
+    category: str = ""
+    """The name of the series' category group (two-way ANOVA), or ""."""
 
 
 @dataclass(frozen=True)
@@ -262,6 +265,8 @@ class AnalysisInputs:
     series: tuple[SeriesData, ...]
     x: FloatArray | None = None
     x_name: str = ""
+    category_factor: str = ""
+    """The name of the factor whose levels are the category groups (two-way ANOVA)."""
 
 
 def series_choices(table: Table) -> list[InputChoice]:
