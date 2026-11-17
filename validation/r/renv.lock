@@ -405,6 +405,16 @@
       ],
       "Hash": "5c0359193ea75eae6087c0f1ca72a1dc"
     },
+    "dunn.test": {
+      "Package": "dunn.test",
+      "Version": "1.4.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "rlang"
+      ],
+      "Hash": "fcbaa68fd6ca97e06eaa0caba426cf1c"
+    },
     "emmeans": {
       "Package": "emmeans",
       "Version": "2.0.4",

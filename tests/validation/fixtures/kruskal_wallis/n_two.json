@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "analysis": "kruskal_wallis",
+  "case": "n_two",
+  "description": "n = 2 per group. Kruskal-Wallis with Dunn's test, Holm-adjusted.",
+  "generated_by": {
+    "script": "validation/r/scripts/kruskal_wallis.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "dunn.test": "1.4.2",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1.1000000000000001, 2.2999999999999998],
+      [3.3999999999999999, 4.5999999999999996],
+      [5.2000000000000002, 6.7999999999999998]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [2, 2, 2],
+    "median": [1.7, 4, 6],
+    "mean_rank": [1.5, 3.5, 5.5],
+    "h": 4.571428571428573,
+    "df": 2,
+    "p_value": 0.10170139230422676
+  },
+  "kinds": {
+    "n": "exact",
+    "median": "statistic",
+    "mean_rank": "statistic",
+    "h": "statistic",
+    "df": "exact",
+    "p_value": "p_value"
+  }
+}

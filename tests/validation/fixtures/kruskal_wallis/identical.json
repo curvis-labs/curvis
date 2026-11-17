@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "analysis": "kruskal_wallis",
+  "case": "identical",
+  "description": "Every group holds the same values: H = 0, P = 1. Kruskal-Wallis with Dunn's test, Holm-adjusted.",
+  "generated_by": {
+    "script": "validation/r/scripts/kruskal_wallis.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "dunn.test": "1.4.2",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [2.2000000000000002, 3.3999999999999999, 5.0999999999999996, 6],
+      [2.2000000000000002, 3.3999999999999999, 5.0999999999999996, 6],
+      [2.2000000000000002, 3.3999999999999999, 5.0999999999999996, 6]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [4, 4, 4],
+    "median": [4.25, 4.25, 4.25],
+    "mean_rank": [6.5, 6.5, 6.5],
+    "h": 0,
+    "df": 2,
+    "p_value": 1
+  },
+  "kinds": {
+    "n": "exact",
+    "median": "statistic",
+    "mean_rank": "statistic",
+    "h": "statistic",
+    "df": "exact",
+    "p_value": "p_value"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "analysis": "kruskal_wallis",
+  "case": "single_value_group",
+  "description": "One group has a single value. Kruskal-Wallis with Dunn's test, Holm-adjusted.",
+  "generated_by": {
+    "script": "validation/r/scripts/kruskal_wallis.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "dunn.test": "1.4.2",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [4.2000000000000002],
+      [3.5725619577057879, 5.1603231740982407, 6.3490592273425488, 4.5028780333408891, 4.1220462467353016, 5.6365572533204311],
+      [6.0684575250254502, 5.871156794359738, 7.4764148383343167, 5.643864875110939, 6.6894810484971234, 5.8308262528811392, 4.0468542240007999]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n": [1, 6, 7],
+    "median": [4.2000000000000002, 4.8316006037195649, 5.871156794359738],
+    "mean_rank": [4, 5.666666666666667, 9.5714285714285712],
+    "h": 3.5687074829932044,
+    "df": 2,
+    "p_value": 0.16790553632547772
+  },
+  "kinds": {
+    "n": "exact",
+    "median": "statistic",
+    "mean_rank": "statistic",
+    "h": "statistic",
+    "df": "exact",
+    "p_value": "p_value"
+  }
+}
