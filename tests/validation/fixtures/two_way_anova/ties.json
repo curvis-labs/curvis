@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "analysis": "two_way_anova",
+  "case": "ties",
+  "description": "Repeated values within and across cells.",
+  "generated_by": {
+    "script": "validation/r/scripts/two_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "cells": [
+      [
+        [3, 3, 4, 4],
+        [4, 4, 5, 5]
+      ],
+      [
+        [4, 4, 4, 5],
+        [6, 6, 7, 7]
+      ]
+    ]
+  },
+  "expected": {
+    "n": [4, 4, 4, 4],
+    "cell_mean": [3.5, 4.5, 4.25, 6.5],
+    "marginal_mean_a": [4, 5.375],
+    "marginal_mean_b": [3.875, 5.5],
+    "df_a": 1,
+    "df_b": 1,
+    "df_interaction": 1,
+    "df_residual": 12,
+    "ss_a": 7.5625,
+    "ss_b": 10.5625,
+    "ss_interaction": 1.5625,
+    "ss_residual": 3.75,
+    "ms_a": 7.5625,
+    "ms_b": 10.5625,
+    "ms_interaction": 1.5625,
+    "ms_residual": 0.3125,
+    "f_a": 24.199999999999999,
+    "f_b": 33.799999999999997,
+    "f_interaction": 5,
+    "p_a": 0.00035419252390054212,
+    "p_b": 8.2929899363950478e-05,
+    "p_interaction": 0.045115364499094389
+  },
+  "kinds": {
+    "n": "exact",
+    "cell_mean": "statistic",
+    "marginal_mean_a": "statistic",
+    "marginal_mean_b": "statistic",
+    "df_a": "exact",
+    "df_b": "exact",
+    "df_interaction": "exact",
+    "df_residual": "exact",
+    "ss_a": "statistic",
+    "ss_b": "statistic",
+    "ss_interaction": "statistic",
+    "ss_residual": "statistic",
+    "ms_a": "statistic",
+    "ms_b": "statistic",
+    "ms_interaction": "statistic",
+    "ms_residual": "statistic",
+    "f_a": "statistic",
+    "f_b": "statistic",
+    "f_interaction": "statistic",
+    "p_a": "p_value",
+    "p_b": "p_value",
+    "p_interaction": "p_value"
+  }
+}

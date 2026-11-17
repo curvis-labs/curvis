@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_anova",
+  "case": "missing_many",
+  "description": "Most rows have a missing value: 3 complete subjects of 10.",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [1, "NaN", 2.2000000000000002, 3.1000000000000001, "NaN", 2.6000000000000001, "NaN", 1.8999999999999999, "NaN", 2.3999999999999999],
+      [1.8, 2.1000000000000001, "NaN", 3.8999999999999999, 2.7999999999999998, 3, 3, 2.7000000000000002, "NaN", "NaN"],
+      [2.5, 2.8999999999999999, 3.2999999999999998, 3.7000000000000002, 3.6000000000000001, 3.3999999999999999, "NaN", "NaN", 3, 3.1000000000000001],
+      [2.2000000000000002, 2, 2.8999999999999999, 4.4000000000000004, "NaN", 3.1000000000000001, 3.2000000000000002, "NaN", 2.7999999999999998, 3]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n_subjects": 3,
+    "n_incomplete": 7,
+    "mean": [2.2333333333333334, 2.8999999999999999, 3.2000000000000002, 3.2333333333333334],
+    "df_treatment": 3,
+    "df_subjects": 2,
+    "df_error": 6,
+    "ss_treatment": 1.9358333333333335,
+    "ss_subjects": 7.3266666666666689,
+    "ss_error": 0.52666666666666662,
+    "ms_treatment": 0.64527777777777784,
+    "ms_subjects": 3.6633333333333344,
+    "ms_error": 0.087777777777777774,
+    "f": 7.3512658227848116,
+    "p_value": 0.019603421261454191,
+    "gg_epsilon": 0.58207423988061935,
+    "gg_df_treatment": 1.746222719641858,
+    "gg_df_error": 3.4924454392837161,
+    "gg_p_value": 0.057155319022437749
+  },
+  "kinds": {
+    "n_subjects": "exact",
+    "n_incomplete": "exact",
+    "mean": "statistic",
+    "df_treatment": "exact",
+    "df_subjects": "exact",
+    "df_error": "exact",
+    "ss_treatment": "statistic",
+    "ss_subjects": "statistic",
+    "ss_error": "statistic",
+    "ms_treatment": "statistic",
+    "ms_subjects": "statistic",
+    "ms_error": "statistic",
+    "f": "statistic",
+    "p_value": "p_value",
+    "gg_epsilon": "statistic",
+    "gg_df_treatment": "statistic",
+    "gg_df_error": "statistic",
+    "gg_p_value": "p_value"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "analysis": "rm_anova",
+  "case": "constant",
+  "description": "Every value is the same.",
+  "generated_by": {
+    "script": "validation/r/scripts/rm_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "treatments": [
+      [2, 2, 2, 2],
+      [2, 2, 2, 2],
+      [2, 2, 2, 2]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "n_subjects": 4,
+    "n_incomplete": 0,
+    "mean": [2, 2, 2],
+    "df_treatment": 2,
+    "df_subjects": 3,
+    "df_error": 6,
+    "ss_treatment": 0,
+    "ss_subjects": 0,
+    "ss_error": 0,
+    "ms_treatment": 0,
+    "ms_subjects": 0,
+    "ms_error": 0,
+    "f": "NaN",
+    "p_value": "NaN",
+    "gg_epsilon": "NaN",
+    "gg_df_treatment": "NaN",
+    "gg_df_error": "NaN",
+    "gg_p_value": "NaN"
+  },
+  "kinds": {
+    "n_subjects": "exact",
+    "n_incomplete": "exact",
+    "mean": "statistic",
+    "df_treatment": "exact",
+    "df_subjects": "exact",
+    "df_error": "exact",
+    "ss_treatment": "statistic",
+    "ss_subjects": "statistic",
+    "ss_error": "statistic",
+    "ms_treatment": "statistic",
+    "ms_subjects": "statistic",
+    "ms_error": "statistic",
+    "f": "statistic",
+    "p_value": "p_value",
+    "gg_epsilon": "statistic",
+    "gg_df_treatment": "statistic",
+    "gg_df_error": "statistic",
+    "gg_p_value": "p_value"
+  }
+}

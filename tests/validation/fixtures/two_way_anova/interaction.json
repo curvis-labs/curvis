@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "analysis": "two_way_anova",
+  "case": "interaction",
+  "description": "2 x 2 crossover interaction, 6 values per cell.",
+  "generated_by": {
+    "script": "validation/r/scripts/two_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "car": "3.1.5",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "cells": [
+      [
+        [6.3350430053257956, 6.006178132750378, 3.8894814504156443, 5.1725694199105217, 4.5298577536389617, 4.9193111161193963],
+        [10.06337119334518, 6.9154905685192736, 7.6677215429896179, 10.058519840682866, 7.851837167777636, 7.7878645036966505]
+      ],
+      [
+        [7.3073621066868659, 9.783415597710702, 7.6813475886260241, 8.7597889342147717, 9.2028412664352199, 8.6752856681188177],
+        [5.255078819892824, 5.0506107299230507, 4.9408160106050252, 3.9864334348981805, 5.8497806945943633, 6.0578937518286322]
+      ]
+    ]
+  },
+  "expected": {
+    "n": [6, 6, 6, 6],
+    "cell_mean": [5.1420734796934493, 8.3908008028352032, 8.5683401936320678, 5.1901022402903463],
+    "marginal_mean_a": [6.7664371412643263, 6.8792212169612075],
+    "marginal_mean_b": [6.8552068366627585, 6.7904515215627743],
+    "df_a": 1,
+    "df_b": 1,
+    "df_interaction": 1,
+    "df_residual": 20,
+    "ss_a": 0.076321486384798368,
+    "ss_b": 0.025159505002189123,
+    "ss_interaction": 65.875003163576565,
+    "ss_residual": 20.123168731373035,
+    "ms_a": 0.076321486384798368,
+    "ms_b": 0.025159505002189123,
+    "ms_interaction": 65.875003163576565,
+    "ms_residual": 1.0061584365686518,
+    "f_a": 0.075854342229719832,
+    "f_b": 0.025005510154038697,
+    "f_interaction": 65.471799240915885,
+    "p_a": 0.78582153817492417,
+    "p_b": 0.87593905904600944,
+    "p_interaction": 9.7746805561855194e-08
+  },
+  "kinds": {
+    "n": "exact",
+    "cell_mean": "statistic",
+    "marginal_mean_a": "statistic",
+    "marginal_mean_b": "statistic",
+    "df_a": "exact",
+    "df_b": "exact",
+    "df_interaction": "exact",
+    "df_residual": "exact",
+    "ss_a": "statistic",
+    "ss_b": "statistic",
+    "ss_interaction": "statistic",
+    "ss_residual": "statistic",
+    "ms_a": "statistic",
+    "ms_b": "statistic",
+    "ms_interaction": "statistic",
+    "ms_residual": "statistic",
+    "f_a": "statistic",
+    "f_b": "statistic",
+    "f_interaction": "statistic",
+    "p_a": "p_value",
+    "p_b": "p_value",
+    "p_interaction": "p_value"
+  }
+}

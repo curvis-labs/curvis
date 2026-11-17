@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "analysis": "two_way_tukey_a",
+  "case": "large_offset",
+  "description": "Small spread on a large offset.",
+  "generated_by": {
+    "script": "validation/r/scripts/two_way_anova.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "emmeans": "2.0.4",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "cells": [
+      [
+        [999999.9616371002, 1000000.0092438863, 999999.99165438395, 1000000.1006086501],
+        [1000000.2815638493, 1000000.2074689028, 1000000.2735483072, 1000000.2253900783]
+      ],
+      [
+        [1000000.2217616847, 1000000.2868907902, 1000000.1547894757, 1000000.2365049979],
+        [1000000.4386324484, 1000000.3577250097, 1000000.4305077622, 1000000.3897827825]
+      ]
+    ]
+  },
+  "expected": {
+    "group_i": [0],
+    "group_j": [1],
+    "difference": [0.18318497412838042],
+    "se": [0.024078687620267308],
+    "q": [10.759003103527292],
+    "p_value": [6.2665382072288762e-06],
+    "ci_lower": [0.13072202061979254],
+    "ci_upper": [0.23564792763696829]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "difference": "statistic",
+    "se": "statistic",
+    "q": "statistic",
+    "p_value": "p_value",
+    "ci_lower": "ci",
+    "ci_upper": "ci"
+  }
+}
