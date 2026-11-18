@@ -525,7 +525,7 @@ Make a plan first. When done, report validation results.
 ### Step 3.2 — Kruskal-Wallis with Dunn's test
 
 **Done when**
-- [ ] Matches R fixtures, including ties; Dunn post-hoc works for all pairs and vs. control, Holm-corrected.
+- [x] Matches R fixtures, including ties; Dunn post-hoc works for all pairs and vs. control, Holm-corrected.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.2 in docs/PHASES.md.
