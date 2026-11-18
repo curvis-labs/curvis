@@ -122,7 +122,6 @@ dependencies = [
     { name = "pyarrow" },
     { name = "pyqtgraph" },
     { name = "pyside6" },
-    { name = "scikit-posthocs" },
     { name = "scipy" },
 ]
 
@@ -138,6 +137,7 @@ dev = [
     { name = "pytest-benchmark" },
     { name = "pytest-qt" },
     { name = "ruff" },
+    { name = "scikit-posthocs" },
 ]
 
 [package.metadata]
@@ -150,7 +150,6 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=26.0.0" },
     { name = "pyqtgraph", specifier = ">=0.13.7" },
     { name = "pyside6", specifier = ">=6.8" },
-    { name = "scikit-posthocs", specifier = ">=0.11" },
     { name = "scipy", specifier = ">=1.14" },
 ]
 
@@ -164,6 +163,7 @@ dev = [
     { name = "pytest-benchmark", specifier = ">=5.1" },
     { name = "pytest-qt", specifier = ">=4.4" },
     { name = "ruff", specifier = ">=0.8" },
+    { name = "scikit-posthocs", specifier = ">=0.11" },
 ]
 
 [[package]]

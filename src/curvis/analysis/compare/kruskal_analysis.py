@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import ClassVar
 
 from curvis.analysis.base import (
     AnalysisError,
@@ -16,7 +15,6 @@ from curvis.analysis.base import (
     register,
 )
 from curvis.analysis.compare.common import (
-    STAT_IMPORTS,
     GroupComparison,
     few_values_warnings,
     group_values,
@@ -50,7 +48,6 @@ class KruskalWallis(GroupComparison):
     method = METHOD
     params_type = KruskalParams
     min_groups = 3
-    imports: ClassVar[tuple[str, ...]] = (*STAT_IMPORTS, "scikit_posthocs")
 
     def describe(self, table: Table, inputs: Sequence[str], params: Params) -> str:
         assert isinstance(params, KruskalParams)

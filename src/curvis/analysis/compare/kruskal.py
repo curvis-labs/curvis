@@ -7,8 +7,10 @@ Validated against R (validation/r/scripts/kruskal_wallis.R): ``kruskal.test``,
 - H is corrected for ties; P is the upper tail of chi-square on k - 1 df (no exact P).
   With every value the same H and P are not defined (NaN), as in R.
 - Dunn's z for groups i < j is (Rbar_j - Rbar_i) / sqrt(S2 (1/n_i + 1/n_j)) with
-  S2 = N (N + 1) / 12 - sum(t^3 - t) / (12 (N - 1)); P = 2 P(Z >= |z|), from
-  ``scikit_posthocs.posthoc_dunn``.
+  S2 = N (N + 1) / 12 - sum(t^3 - t) / (12 (N - 1)); P = 2 P(Z >= |z|) from the
+  standard normal distribution. (scikit-posthocs' ``posthoc_dunn`` gives the same P
+  values; the tests use it as a cross-check, but the app does not import it: it loads
+  pandas, matplotlib and statsmodels.)
 - Holm: over all k (k - 1) / 2 pairs, or over the k - 1 comparisons with the control.
 """
 
@@ -18,7 +20,6 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import pairwise
-from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -98,6 +99,8 @@ def dunn(kw: KruskalStats, control: int | None = None) -> list[DunnComparison]:
     """Dunn's test of all pairs (``control`` None) or of each group against ``control``,
     Holm-adjusted over the comparisons made. Against a control, i is the control and j
     the other group, in group order."""
+    from scipy import stats
+
     k = kw.k
     if control is None:
         chosen = pairs(k)
@@ -105,32 +108,18 @@ def dunn(kw: KruskalStats, control: int | None = None) -> list[DunnComparison]:
         if not 0 <= control < k:
             raise ValueError(f"control {control} is not a group")
         chosen = [(control, g) for g in range(k) if g != control]
-    raw = _dunn_p_matrix(kw)
     rows: list[tuple[int, int, float, float, float]] = []
     for i, j in chosen:
         diff = float(kw.mean_ranks[j] - kw.mean_ranks[i])
         if kw.defined:
             ni, nj = kw.samples[i].n, kw.samples[j].n
             z = diff / math.sqrt(kw.s2 * (1 / ni + 1 / nj))
+            p = float(2 * stats.norm.sf(abs(z)))
         else:
-            z = math.nan
-        rows.append((i, j, diff, z, float(raw[i, j])))
+            z = p = math.nan
+        rows.append((i, j, diff, z, p))
     adjusted = holm_adjust([r[4] for r in rows]) if kw.defined else [math.nan] * len(rows)
     return [
         DunnComparison(i, j, diff, z, p, adj)
         for (i, j, diff, z, p), adj in zip(rows, adjusted, strict=True)
     ]
-
-
-def _dunn_p_matrix(kw: KruskalStats) -> FloatArray:
-    """Unadjusted two-sided P values of Dunn's test for every pair, as a k x k matrix."""
-    if not kw.defined:
-        return np.full((kw.k, kw.k), np.nan)
-    import scikit_posthocs
-
-    # A list of groups is labelled 1..k in order.
-    table: Any = scikit_posthocs.posthoc_dunn(
-        [s.values for s in kw.samples], p_adjust=None, sort=False
-    )
-    order = list(range(1, kw.k + 1))
-    return np.asarray(table.loc[order, order].to_numpy(), dtype=np.float64)
