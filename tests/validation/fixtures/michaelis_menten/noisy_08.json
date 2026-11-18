@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "analysis": "michaelis_menten",
+  "case": "noisy_08",
+  "description": "Noise SD 10% of Vmax, 1 replicate(s), 6 concentrations.",
+  "generated_by": {
+    "script": "validation/r/scripts/michaelis_menten.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [1, 2, 5, 10, 20, 50],
+    "y": [
+      [23.764469012107334, 32.487345537013987, 53.941235049896214, 77.666379130740651, 104.08146354185668, 101.64009251292973]
+    ],
+    "fixed": {},
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 3, 6, 12]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [6],
+    "df": [4],
+    "vmax": [117.98574624515157],
+    "vmax_se": [7.5218537458408505],
+    "vmax_ci_lower": [97.101732230498058],
+    "vmax_ci_upper": [138.8697602598051],
+    "km": [5.0157368386990244],
+    "km_se": [1.0625465034932113],
+    "km_ci_lower": [2.0656348000302676],
+    "km_ci_upper": [7.9658388773677817],
+    "r_squared": [0.97117221392820241],
+    "sy_x": [6.5251730962918666],
+    "band_fit": [0, 44.157791836003312, 64.263924223748546, 83.207031723820975],
+    "band_lower": [0, 33.314805896243314, 53.988833076791167, 74.3912560379583],
+    "band_upper": [0, 55.000777775763311, 74.539015370705926, 92.022807409683651]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "vmax": "parameter",
+    "vmax_se": "parameter",
+    "vmax_ci_lower": "ci",
+    "vmax_ci_upper": "ci",
+    "km": "parameter",
+    "km_se": "parameter",
+    "km_ci_lower": "ci",
+    "km_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

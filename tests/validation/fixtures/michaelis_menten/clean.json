@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "analysis": "michaelis_menten",
+  "case": "clean",
+  "description": "9 substrate concentrations, 2 replicates, noise 1% of Vmax.",
+  "generated_by": {
+    "script": "validation/r/scripts/michaelis_menten.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [0.25, 0.5, 1, 2, 4, 8, 16, 32, 64],
+    "y": [
+      [3.581233725745109, 9.3406292858765614, 12.473402725830422, 31.245178780372989, 48.168681481581572, 68.749795014173827, 85.682760905514414, 99.83113883574903, 108.71968342879423],
+      [4.5112801058649366, 8.4837362382461059, 17.555179148481038, 31.515203235206847, 50.207463431837617, 69.187372009252968, 87.560846902651676, 100.67676229120687, 110.0702219052651]
+    ],
+    "fixed": {},
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 1, 5, 20, 50]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [18],
+    "df": [16],
+    "vmax": [119.03028091539235],
+    "vmax_se": [1.0867578841850565],
+    "vmax_ci_lower": [116.72645711773798],
+    "vmax_ci_upper": [121.33410471304673],
+    "km": [5.8567614783236523],
+    "km_se": [0.17968669523782199],
+    "km_ci_lower": [5.475842700889439],
+    "km_ci_upper": [6.2376802557578657],
+    "r_squared": [0.9985934973429903],
+    "sy_x": [1.5159979717880134],
+    "band_fit": [0, 17.359548132406815, 54.818502346692128, 92.068978564990303, 106.54957230342156],
+    "band_lower": [0, 16.634540700938384, 53.56665324684608, 90.993568305352767, 105.00405706392273],
+    "band_upper": [0, 18.084555563875245, 56.070351446538176, 93.144388824627839, 108.09508754292038]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "vmax": "parameter",
+    "vmax_se": "parameter",
+    "vmax_ci_lower": "ci",
+    "vmax_ci_upper": "ci",
+    "km": "parameter",
+    "km_se": "parameter",
+    "km_ci_lower": "ci",
+    "km_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}
