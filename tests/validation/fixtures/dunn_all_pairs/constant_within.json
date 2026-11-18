@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "analysis": "dunn_all_pairs",
+  "case": "constant_within",
+  "description": "Each group is constant, the groups differ. Kruskal-Wallis with Dunn's test, Holm-adjusted.",
+  "generated_by": {
+    "script": "validation/r/scripts/kruskal_wallis.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "dunn.test": "1.4.2",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [2, 2, 2],
+      [5, 5, 5, 5],
+      [9, 9, 9]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group_i": [0, 0, 1],
+    "group_j": [1, 2, 2],
+    "mean_rank_diff": [3.5, 7, 3.5],
+    "z": [1.6035674514745466, 3.0000000000000004, 1.6035674514745466],
+    "p_unadjusted": [0.10880943004054563, 0.0026997960632601853, 0.10880943004054563],
+    "p_value": [0.21761886008109127, 0.0080993881897805549, 0.21761886008109127]
+  },
+  "kinds": {
+    "group_i": "exact",
+    "group_j": "exact",
+    "mean_rank_diff": "statistic",
+    "z": "statistic",
+    "p_unadjusted": "p_value",
+    "p_value": "p_value"
+  }
+}

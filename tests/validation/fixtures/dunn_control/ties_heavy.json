@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "analysis": "dunn_control",
+  "case": "ties_heavy",
+  "description": "Four groups of scores 1 to 5: few distinct values, many ties. Kruskal-Wallis with Dunn's test, Holm-adjusted.",
+  "generated_by": {
+    "script": "validation/r/scripts/kruskal_wallis.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "dunn.test": "1.4.2",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [2, 3, 2, 1, 2, 1, 4, 3, 1, 2, 2, 3, 4, 1, 2],
+      [2, 4, 1, 3, 3, 1, 3, 3, 1, 5, 4, 1],
+      [3, 3, 3, 3, 4, 4, 4, 4, 2, 5, 5, 2, 4, 2, 2, 5, 4, 4],
+      [3, 4, 4, 2, 2, 3, 2, 4, 3, 2]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group": [1, 2, 3],
+    "mean_rank_diff": [5.2416666666666671, 16.922222222222224, 9.2666666666666657],
+    "z": [0.86966097740976123, 3.1103446828626948, 1.458563629235671],
+    "p_unadjusted": [0.38448570359894058, 0.0018686914268921356, 0.1446852502126168],
+    "p_value": [0.38448570359894058, 0.0056060742806764065, 0.2893705004252336]
+  },
+  "kinds": {
+    "group": "exact",
+    "mean_rank_diff": "statistic",
+    "z": "statistic",
+    "p_unadjusted": "p_value",
+    "p_value": "p_value"
+  }
+}

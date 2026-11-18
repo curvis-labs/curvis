@@ -123,3 +123,22 @@ def test_two_way_anova_analysis_10k_points(benchmark: Any) -> None:
     kind = base.get("two_way_anova")
     result = benchmark.pedantic(kind.run, (data, TwoWayParams()), rounds=5, iterations=1)
     assert sum(t.title.startswith("Tukey") for t in result.tables) == 2
+
+
+def run_kruskal(benchmark: Any, posthoc: str) -> None:
+    kind = base.get("kruskal_wallis")
+    kind.run(groups(4, 10), kind.default_params())  # import scikit-posthocs first
+    data = groups(4, N_POINTS // 4)
+    params = replace(kind.default_params(), posthoc=posthoc)
+    result = benchmark(kind.run, data, params)
+    assert len(result.tables[-1].rows) == (6 if posthoc == "all_pairs" else 3)
+    assert benchmark.stats.stats.mean < TARGET_S
+
+
+def test_kruskal_wallis_with_dunn_10k_points(benchmark: Any) -> None:
+    """Kruskal-Wallis and Dunn's test of all pairs, 4 groups of 2,500."""
+    run_kruskal(benchmark, "all_pairs")
+
+
+def test_kruskal_wallis_with_dunn_vs_control_10k_points(benchmark: Any) -> None:
+    run_kruskal(benchmark, "control")

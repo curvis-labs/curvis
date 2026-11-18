@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QComboBox, QLabel
 from pytestqt.qtbot import QtBot
 
 from curvis.analysis.compare.anova_analysis import AnovaParams
+from curvis.analysis.compare.kruskal_analysis import KruskalParams
 from curvis.core import AddColumn, Document, GroupColumns
 from curvis.data import Column
 from curvis.ui.analyze_dialog import AnalyzeDialog
@@ -14,6 +15,7 @@ from curvis.ui.main_window import MainWindow
 from tests.ui.test_analyze import dialog_for, doc_with, run_dialog, settle
 
 ANOVA = "one_way_anova"
+KRUSKAL = "kruskal_wallis"
 
 
 def three_groups() -> Document:
@@ -24,8 +26,8 @@ def three_groups() -> Document:
     )
 
 
-def combo(dialog: AnalyzeDialog, name: str) -> QComboBox:
-    widget = dialog.forms[ANOVA].fields[name]
+def combo(dialog: AnalyzeDialog, name: str, analysis: str = ANOVA) -> QComboBox:
+    widget = dialog.forms[analysis].fields[name]
     assert isinstance(widget, QComboBox)
     return widget
 
@@ -45,6 +47,7 @@ def test_the_comparisons_are_offered_for_two_or_more_series(qtbot: QtBot) -> Non
         "t_test",
         ANOVA,
         "mann_whitney",
+        KRUSKAL,
     ]
 
 
@@ -228,3 +231,78 @@ def test_one_click_runs_two_way_anova(
     titles = [g.grid.title for g in panel.grids]
     assert "ANOVA table (Type III sums of squares)" in titles
     assert "Tukey's multiple comparisons test: Group" in titles
+
+
+# --- Kruskal-Wallis with Dunn's test (step 3.2) ---------------------------------------
+
+
+def test_kruskal_wallis_needs_three_series(qtbot: QtBot) -> None:
+    dialog = dialog_for(qtbot, three_groups())
+    dialog.set_analysis_type(KRUSKAL)
+    assert dialog.ok_button.isEnabled()
+    dialog.set_checked(["c", "d"])
+    assert not dialog.ok_button.isEnabled()
+    assert "at least 3 series" in dialog.skeleton.feedback.text()
+
+
+def test_kruskal_wallis_control_is_only_for_the_control_option(qtbot: QtBot) -> None:
+    dialog = dialog_for(qtbot, three_groups())
+    dialog.set_analysis_type(KRUSKAL)
+    control = combo(dialog, "control", KRUSKAL)
+    assert items(control) == ["Control", "Drug", "Other"]
+    assert not control.isEnabled()
+    assert "of every pair, Holm-adjusted" in dialog.summary.text()
+    choose(combo(dialog, "posthoc", KRUSKAL), "control")
+    assert control.isEnabled()
+    choose(control, "o")
+    assert "against Other, Holm-adjusted" in dialog.summary.text()
+    assert dialog.params() == KruskalParams(posthoc="control", control="o")
+
+
+@pytest.fixture
+def three_series_tab(two_series_tab: DocumentTab) -> DocumentTab:
+    doc = two_series_tab.document
+    table = doc.tables[0]
+    doc.execute(AddColumn(table.id, Column.new("Other", "Y", [4.9, 5.1, 5.6, 5.4], id="o")))
+    return two_series_tab
+
+
+def test_one_click_runs_kruskal_wallis_with_dunn_of_every_pair(
+    three_series_tab: DocumentTab, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tab = three_series_tab
+    run_dialog(monkeypatch, lambda dialog: dialog.set_analysis_type(KRUSKAL))
+    tab.analyze()
+    settle(qtbot, tab)
+    panel = tab.results_panel
+    assert panel.content is not None
+    reading = panel.content.findChild(QLabel, "reading")
+    assert reading is not None
+    assert reading.text().startswith(
+        "The distributions of the groups differ significantly (H(2) = "
+    )
+    titles = [g.grid.title for g in panel.grids]
+    assert titles[0] == "Kruskal-Wallis test"
+    assert titles[-1] == "Dunn's multiple comparisons test"
+    assert [row[0] for row in panel.grids[-1].grid.shown] == [
+        "Drug − Control",
+        "Other − Control",
+        "Other − Drug",
+    ]
+
+
+def test_kruskal_wallis_against_a_control(
+    three_series_tab: DocumentTab, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tab = three_series_tab
+
+    def setup(dialog: AnalyzeDialog) -> None:
+        dialog.set_analysis_type(KRUSKAL)
+        choose(combo(dialog, "posthoc", KRUSKAL), "control")
+        choose(combo(dialog, "control", KRUSKAL), "d")
+
+    run_dialog(monkeypatch, setup)
+    tab.analyze()
+    settle(qtbot, tab)
+    rows = tab.results_panel.grids[-1].grid.shown
+    assert [row[0] for row in rows] == ["Control − Drug", "Other − Drug"]

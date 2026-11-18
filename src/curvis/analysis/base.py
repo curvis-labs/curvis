@@ -45,6 +45,7 @@ BUILTIN_MODULES = (
     "curvis.analysis.compare.anova_analysis",
     "curvis.analysis.compare.two_way_analysis",
     "curvis.analysis.compare.mann_whitney_analysis",
+    "curvis.analysis.compare.kruskal_analysis",
     "curvis.analysis.fit.analyses",
 )
 """Modules that register the built-in analysis types when imported."""

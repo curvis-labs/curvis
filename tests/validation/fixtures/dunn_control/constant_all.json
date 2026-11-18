@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "analysis": "dunn_control",
+  "case": "constant_all",
+  "description": "Every value is the same: H, z and P are not defined (NaN). Kruskal-Wallis with Dunn's test, Holm-adjusted.",
+  "generated_by": {
+    "script": "validation/r/scripts/kruskal_wallis.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "dunn.test": "1.4.2",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [4, 4, 4],
+      [4, 4, 4, 4],
+      [4, 4]
+    ],
+    "control": 0
+  },
+  "expected": {
+    "group": [1, 2],
+    "mean_rank_diff": [0, 0],
+    "z": ["NaN", "NaN"],
+    "p_unadjusted": ["NaN", "NaN"],
+    "p_value": ["NaN", "NaN"]
+  },
+  "kinds": {
+    "group": "exact",
+    "mean_rank_diff": "statistic",
+    "z": "statistic",
+    "p_unadjusted": "p_value",
+    "p_value": "p_value"
+  }
+}

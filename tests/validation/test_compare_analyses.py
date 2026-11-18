@@ -334,3 +334,46 @@ def test_two_way_tukey_tables(path: Path) -> None:
             "ci_upper": column(table, "Upper 95% CI"),
         },
     )
+
+
+@pytest.mark.parametrize("path", paths("kruskal_wallis"), ids=ids)
+def test_kruskal_wallis_analysis(path: Path) -> None:
+    fixture = load_fixture(path)
+    result = run(fixture, "kruskal_wallis")
+    got: dict[str, npt.ArrayLike] = {}
+    if result is not None:
+        v = values_of(result)
+        groups = result.tables[0]
+        got = {
+            "p_value": v["P value"],
+            "h": v["Kruskal-Wallis H"],
+            "df": v["DF"],
+            "n": column(groups, "n"),
+            "median": column(groups, "Median"),
+            "mean_rank": column(groups, "Mean rank"),
+        }
+    check(fixture, result, got)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [p for a in ("dunn_all_pairs", "dunn_control") for p in paths(a)],
+    ids=lambda p: f"{p.parent.name}/{p.stem}",
+)
+def test_dunn_tables(path: Path) -> None:
+    fixture = load_fixture(path)
+    params: dict[str, object] = {}
+    if fixture.analysis == "dunn_control":
+        params = {"posthoc": "control", "control": f"s{int(fixture.inputs['control'])}"}
+    result = run(fixture, "kruskal_wallis", **params)
+    got: dict[str, npt.ArrayLike] = {}
+    if result is not None:
+        table = result.tables[-1]
+        assert table.title == "Dunn's multiple comparisons test"
+        got = {
+            "mean_rank_diff": column(table, "Mean rank difference"),
+            "z": column(table, "z"),
+            "p_unadjusted": column(table, "Unadjusted P value"),
+            "p_value": column(table, "Adjusted P value"),
+        }
+    check(fixture, result, got)
