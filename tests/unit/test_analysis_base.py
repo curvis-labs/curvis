@@ -160,7 +160,8 @@ def test_the_dialog_falls_back_to_a_family_that_has_analyses() -> None:
 def test_runnable_filters_by_family_and_table() -> None:
     t = table("X", "Y")
     assert [k.id for k in runnable(t, Family.FIT)] == [
-        "linear_regression", "polynomial_regression", "hill_4pl", "hill_3pl", "test_fit"
+        "linear_regression", "polynomial_regression", "hill_4pl", "hill_3pl", "biphasic",
+        "exp_association", "exp_decay", "michaelis_menten", "bell_shaped", "gaussian", "test_fit"
     ]  # fmt: skip
     assert runnable(t, Family.SURVIVAL) == []
 

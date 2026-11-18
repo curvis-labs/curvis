@@ -50,7 +50,7 @@ NEEDS_SURVIVAL = "Needs a Time + Event pair"
 SURVIVAL_LATER = "Survival graphs are not available yet"
 NEEDS_TWO_WAY = "Needs a two-way ANOVA"
 
-DOSE_RESPONSE_TYPES = ("hill_4pl", "hill_3pl")
+DOSE_RESPONSE_TYPES = ("hill_4pl", "hill_3pl", "biphasic", "bell_shaped")
 
 
 TWO_WAY = "two_way_anova"

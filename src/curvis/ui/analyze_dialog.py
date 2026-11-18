@@ -16,6 +16,7 @@ with :func:`~curvis.core.add_analysis` or :func:`~curvis.core.edit_analysis`.
 from __future__ import annotations
 
 import dataclasses
+import math
 from collections.abc import Sequence
 from typing import Any
 
@@ -27,6 +28,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDoubleSpinBox,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -72,6 +74,9 @@ from curvis.ui.dialogs import (
 
 _ID = Qt.ItemDataRole.UserRole
 _N_COLUMN = 1
+ONE_COLUMN_MAX = 4
+"""Rows of analyses in one column; a family with more lists them in several columns
+(the dialog's minimum size has room for four rows)."""
 
 
 class ParamsForm(QWidget):
@@ -348,9 +353,12 @@ class AnalyzeDialog(QDialog):
         self._family_pages: dict[Family, int] = {}
         for family, kinds in self.types.items():
             page = QWidget()
-            page_layout = QVBoxLayout(page)
+            page_layout = QGridLayout(page)
             page_layout.setContentsMargins(0, 0, 0, 0)
-            for kind in kinds:
+            # A long list (the curve fits) goes in columns of at most ONE_COLUMN_MAX
+            # rows, filled top to bottom.
+            per_column = math.ceil(len(kinds) / math.ceil(len(kinds) / ONE_COLUMN_MAX))
+            for index, kind in enumerate(kinds):
                 row = QHBoxLayout()
                 radio = QRadioButton(kind.label)
                 radio.setProperty("analysis_type", kind.id)
@@ -364,7 +372,8 @@ class AnalyzeDialog(QDialog):
                     self.badges[kind.id] = badge
                     row.addWidget(badge)
                 row.addStretch(1)
-                page_layout.addLayout(row)
+                page_layout.addLayout(row, index % per_column, index // per_column)
+            page_layout.setRowStretch(per_column, 1)
             self._family_pages[family] = self.analysis_stack.addWidget(page)
         layout.addWidget(self.analysis_stack)
         self.radio_group.buttonToggled.connect(self._on_radio_toggled)
