@@ -31,10 +31,20 @@ These apply to every model below (and to the 4PL and 3PL,
 - **Confidence band.** Fitted value ± t(0.975, df) · sqrt(g V gᵀ), with g the gradient of
   the model in the free parameters at that X (the delta method).
 - **No fit.** There are fewer points than free parameters; the fit does not converge;
-  or it converges where the data do not determine the parameters: a parameter has no
-  effect on the curve, JᵀJ is numerically singular (reciprocal condition number of the
+  or it converges where the data do not determine the parameters: every Y value is the
+  same (with more than one free parameter), a parameter has no effect on the curve (its
+  column of J is 0, or so small that changing the parameter by max(|value|, 1) moves
+  the curve by less than 1e-12 times the RMS of Y, as for the LogEC50 of a phase whose
+  span is ~1e-16), JᵀJ is numerically singular (reciprocal condition number of the
   column-scaled JᵀJ below 1e-12), or two parameters are correlated with |r| > 0.9999.
-  Such a fit reports no parameters.
+  Such a fit reports no parameters. (The R scripts reach the same verdicts on every
+  fixture: there, `nlsLM` does not converge on constant data or on data without a
+  minimum, or JᵀJ is singular.)
+- **Automatic initial values.** Every model is linear in some of its parameters once
+  the others are fixed. Curvis searches a grid of the nonlinear ones (K or Km on a log
+  grid; Center × SD; pairs of LogEC50s at nine quantiles of X, slopes 1), solves the
+  linear ones exactly at each grid point, and starts from the best; if that fit is not
+  OK, it tries the next best, up to five starts.
 - **df = 0** (as many points as free parameters): the curve goes through every point;
   the parameters are reported, but there is no SE, CI, Sy.x or band.
 
