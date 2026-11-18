@@ -540,7 +540,7 @@ Make a plan first. When done, report validation results.
 ### Step 3.3 — Remaining curve fits
 
 **Done when**
-- [ ] Biphasic dose-response, exponential association, exponential decay, Michaelis-Menten, bell-shaped and Gaussian fits match R fixtures and converge on realistic noisy data.
+- [x] Biphasic dose-response, exponential association, exponential decay, Michaelis-Menten, bell-shaped and Gaussian fits match R fixtures and converge on realistic noisy data.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.3 in docs/PHASES.md.
