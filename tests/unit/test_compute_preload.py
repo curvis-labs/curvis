@@ -128,7 +128,7 @@ def test_a_waiting_job_does_not_wait_for_idle(
 def test_every_target_ends_with_itself() -> None:
     from curvis.analysis.base import light_imports
 
-    assert set(ORDER) == set(light_imports())
+    assert set(ORDER) == {*light_imports(), "polars", "pyarrow"}
     for target, names in ORDER.items():
         assert names[-1] == target
         assert len(set(names)) == len(names)

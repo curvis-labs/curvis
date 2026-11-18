@@ -666,7 +666,8 @@ class MainWindow(QMainWindow):
 
         node = f"open:{_file_key(path)}"
         self._pending_opens[node] = path
-        job = Job(_load_project, (str(path),), imports=("curvis.io.project",))
+        # pyarrow first, so it loads a step at a time (curvis.compute.import_order).
+        job = Job(_load_project, (str(path),), imports=("pyarrow", "curvis.io.project"))
         self.scheduler.submit(node, job, delay_ms=0)
 
     @property
