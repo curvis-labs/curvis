@@ -639,6 +639,132 @@
       ]
     },
     {
+      "name": "test_biphasic_12_points_by_20_series",
+      "fullname": "tests/bench/test_fit.py::test_biphasic_12_points_by_20_series",
+      "stats": {
+        "min": 0.18042959777400527
+      },
+      "runs": [
+        {
+          "min": 0.18042959777400527,
+          "median": 0.19148759195659873
+        },
+        {
+          "min": 0.25103941439109606,
+          "median": 0.2959057524162659
+        },
+        {
+          "min": 0.18957999533056638,
+          "median": 0.2075324576426505
+        }
+      ]
+    },
+    {
+      "name": "test_bell_shaped_12_points_by_20_series",
+      "fullname": "tests/bench/test_fit.py::test_bell_shaped_12_points_by_20_series",
+      "stats": {
+        "min": 0.16458021065782713
+      },
+      "runs": [
+        {
+          "min": 0.16673602327330356,
+          "median": 0.16845602643367835
+        },
+        {
+          "min": 0.16458021065782713,
+          "median": 0.17090467224356282
+        },
+        {
+          "min": 0.18055512924623415,
+          "median": 0.18928216077377658
+        }
+      ]
+    },
+    {
+      "name": "test_exp_association_12_points_by_20_series",
+      "fullname": "tests/bench/test_fit.py::test_exp_association_12_points_by_20_series",
+      "stats": {
+        "min": 0.09757761251679765
+      },
+      "runs": [
+        {
+          "min": 0.09757761251679765,
+          "median": 0.10252876274573906
+        },
+        {
+          "min": 0.11812708372048701,
+          "median": 0.15617632438555637
+        },
+        {
+          "min": 0.10180511346054344,
+          "median": 0.10903649058825847
+        }
+      ]
+    },
+    {
+      "name": "test_exp_decay_12_points_by_20_series",
+      "fullname": "tests/bench/test_fit.py::test_exp_decay_12_points_by_20_series",
+      "stats": {
+        "min": 0.09281156706778808
+      },
+      "runs": [
+        {
+          "min": 0.09347821969666022,
+          "median": 0.10692118228821393
+        },
+        {
+          "min": 0.09364108145077443,
+          "median": 0.12159768199919734
+        },
+        {
+          "min": 0.09281156706778808,
+          "median": 0.12706680109397497
+        }
+      ]
+    },
+    {
+      "name": "test_michaelis_menten_12_points_by_20_series",
+      "fullname": "tests/bench/test_fit.py::test_michaelis_menten_12_points_by_20_series",
+      "stats": {
+        "min": 0.07771085523891323
+      },
+      "runs": [
+        {
+          "min": 0.07771085523891323,
+          "median": 0.08075675677966544
+        },
+        {
+          "min": 0.08423465317685824,
+          "median": 0.09486876472100449
+        },
+        {
+          "min": 0.07874572776091221,
+          "median": 0.08513997170438868
+        }
+      ]
+    },
+    {
+      "name": "test_gaussian_12_points_by_20_series",
+      "fullname": "tests/bench/test_fit.py::test_gaussian_12_points_by_20_series",
+      "stats": {
+        "min": 0.12842716920745445
+      },
+      "runs": [
+        {
+          "min": 0.12842716920745445,
+          "median": 0.13203023321006804
+        },
+        {
+          "min": 0.13124382538676443,
+          "median": 0.138809338131695
+        },
+        {
+          "min": 0.13038628130409324,
+          "median": 0.1360434984788554
+        }
+      ]
+    },
+    {
       "name": "test_xy_redraw_after_data_edit",
       "fullname": "tests/bench/test_graph.py::test_xy_redraw_after_data_edit",
       "stats": {
