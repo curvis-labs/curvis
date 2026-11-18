@@ -259,3 +259,16 @@ def test_warm_up_builds_the_formula_parser_on_a_worker_thread(
     qtbot.waitUntil(lambda: not window.scheduler.busy)
     assert parser._lark is not None
     assert built_on and built_on[0] is not threading.main_thread()
+
+
+def test_after_the_warm_up_the_analysis_modules_are_preloaded(
+    qtbot: QtBot, window: MainWindow, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from curvis.analysis.base import light_imports
+
+    requested: list[tuple[str, ...]] = []
+    monkeypatch.setattr(window.scheduler.preloader, "preload", requested.append)
+    with qtbot.waitSignal(window.warm_up_done):
+        window.warm_up_formulas()
+    assert requested == [light_imports()]
+    assert "scipy.stats" in requested[0]

@@ -687,9 +687,17 @@ class MainWindow(QMainWindow):
 
         self.scheduler.submit(FORMULA_WARM_UP, Job(warm_up), delay_ms=0)
 
+    def _warm_up_finished(self) -> None:
+        self.warm_up_done.emit()  # start-up ends here (app.py freezes start-up objects)
+        # Then the analyses' modules load whenever the user is idle, a step at a time,
+        # so the first analysis does not wait for them (curvis.compute.preload).
+        from curvis.analysis.base import light_imports
+
+        self.scheduler.preloader.preload(light_imports())
+
     def _on_job_finished(self, node: str, result: object) -> None:
         if node == FORMULA_WARM_UP:
-            self.warm_up_done.emit()
+            self._warm_up_finished()
             return
         if node in self._pending_imports:
             self._finish_import(*self._pending_imports.pop(node), result)
@@ -703,7 +711,7 @@ class MainWindow(QMainWindow):
 
     def _on_job_failed(self, node: str, error: JobError) -> None:
         if node == FORMULA_WARM_UP:
-            self.warm_up_done.emit()
+            self._warm_up_finished()
             return
         if node in self._pending_imports:
             source, _tab, _table = self._pending_imports.pop(node)

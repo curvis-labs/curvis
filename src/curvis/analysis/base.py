@@ -470,6 +470,13 @@ def types() -> list[AnalysisType]:
     return sorted(_TYPES.values(), key=key)
 
 
+def light_imports() -> tuple[str, ...]:
+    """The modules that light analysis types import on the main thread before they run
+    (their ``imports``), in the order of :func:`types`."""
+    names = [m for t in types() if t.weight == "light" for m in t.imports]
+    return tuple(dict.fromkeys(names))
+
+
 def in_family(family: Family) -> list[AnalysisType]:
     return [t for t in types() if t.family is family]
 

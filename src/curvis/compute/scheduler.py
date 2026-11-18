@@ -6,18 +6,20 @@ pending job (waiting out the debounce delay) and one live run; a newer submit fo
 node replaces the pending job and cancels the older run.
 
 Results and errors are delivered on the main thread through the ``finished`` and
-``failed`` signals. While a scheduler is alive, Python's garbage collector runs on the
-main thread only (:mod:`curvis.compute.gc_main_thread`), so a collection triggered on a
-worker cannot delete Qt objects there. A job that raises, cannot be pickled, or kills
-its worker process reports a :class:`~curvis.compute.jobs.JobError`; it never takes the
-app down.
+``failed`` signals. A light job whose :attr:`~curvis.compute.jobs.Job.imports` are not
+loaded yet first waits while the :class:`~curvis.compute.preload.Preloader` imports them
+on the main thread, a step at a time, so the window keeps responding.
+
+While a scheduler is alive, Python's garbage collector runs on the main thread only
+(:mod:`curvis.compute.gc_main_thread`), so a collection triggered on a worker cannot
+delete Qt objects there. A job that raises, cannot be pickled, or kills its worker
+process reports a :class:`~curvis.compute.jobs.JobError`; it never takes the app down.
 """
 
 from __future__ import annotations
 
 import contextlib
 import functools
-import importlib
 import multiprocessing
 import os
 import time
@@ -40,6 +42,7 @@ from curvis.compute.jobs import (
     Weight,
     set_current_flag,
 )
+from curvis.compute.preload import Preloader, Waiter
 
 DEBOUNCE_MS = 150
 """Default delay between the last submit for a node and the start of its job."""
@@ -63,16 +66,6 @@ def _run_light(job: JobLike, flag: CancelFlag) -> Any:
         return job()
     finally:
         set_current_flag(None)
-
-
-def _import_on_main_thread(job: JobLike) -> None:
-    """Import the modules a light job needs before a worker thread runs it."""
-    if not isinstance(job, Job):
-        return
-    for name in job.imports:
-        # A module that fails to import is left to the job, which then reports the error.
-        with contextlib.suppress(Exception):
-            importlib.import_module(name)
 
 
 def _default_processes() -> int:
@@ -111,6 +104,10 @@ class Scheduler(QObject):
         self._timers: dict[str, QTimer] = {}
         self._runs: dict[str, _Run] = {}  # the current run of each node
         self._live: set[_Run] = set()  # every run whose future is not done yet
+        # Light jobs waiting for the preloader to import their modules, per node.
+        self._importing: dict[str, tuple[Job, Waiter]] = {}
+        self.preloader = Preloader(self)
+        """Imports the modules of light jobs on the main thread, in small steps."""
         self._closed = False
         self._done.connect(self._on_done, Qt.ConnectionType.QueuedConnection)
         # Workers run Python: an automatic collection there could delete Qt objects.
@@ -159,12 +156,12 @@ class Scheduler(QObject):
 
     def is_busy(self, node_id: str) -> bool:
         """True while the node has a pending or running job."""
-        return node_id in self._pending or node_id in self._runs
+        return node_id in self._pending or node_id in self._importing or node_id in self._runs
 
     @property
     def busy(self) -> bool:
         """True while any node has a pending or running job."""
-        return bool(self._pending or self._runs)
+        return bool(self._pending or self._importing or self._runs)
 
     def start_process_pool(self) -> None:
         """Start the worker processes now rather than on the first heavy job."""
@@ -195,6 +192,8 @@ class Scheduler(QObject):
             timer.stop()
         self._timers.clear()
         self._pending.clear()
+        self._importing.clear()
+        self.preloader.stop()
         for run in list(self._runs.values()):
             self._stop(run)
         self._runs.clear()
@@ -215,6 +214,9 @@ class Scheduler(QObject):
         if timer is not None:
             timer.stop()
         self._pending.pop(node_id, None)
+        importing = self._importing.pop(node_id, None)
+        if importing is not None:
+            self.preloader.discard(importing[1])
         run = self._runs.pop(node_id, None)
         if run is not None:
             self._stop(run)
@@ -248,7 +250,11 @@ class Scheduler(QObject):
 
     def _start(self, node_id: str, job: JobLike, weight: Weight) -> None:
         if weight == "light":
-            _import_on_main_thread(job)
+            if isinstance(job, Job) and not self.preloader.is_ready(job.imports):
+                # Imported on the main thread (see curvis.compute.jobs), step by step.
+                ready = functools.partial(self._imports_ready, node_id, job)
+                self._importing[node_id] = (job, self.preloader.ensure(job.imports, ready))
+                return
             flag = CancelFlag()
             run = _Run(node_id, weight, flag)
             run.future = self._threads.submit(_run_light, job, flag)
@@ -258,6 +264,14 @@ class Scheduler(QObject):
         self._live.add(run)
         self.started.emit(node_id)
         run.future.add_done_callback(lambda _future: self._notify_done(run))
+
+    def _imports_ready(self, node_id: str, job: Job) -> None:
+        importing = self._importing.get(node_id)
+        if importing is None or importing[0] is not job or self._closed:
+            return  # superseded or cancelled while its modules were imported
+        del self._importing[node_id]
+        # A module that failed to import is left to the job, which then reports the error.
+        self._start(node_id, job, "light")
 
     def _start_heavy(self, node_id: str, job: JobLike) -> _Run:
         assert isinstance(job, Job)
