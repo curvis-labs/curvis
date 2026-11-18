@@ -259,6 +259,53 @@ def test_a_light_job_import_that_fails_is_reported_by_the_job(
     assert rec.failed[0][1].error_type == "ModuleNotFoundError"
 
 
+@pytest.fixture
+def probe_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """A module that is not imported yet, so a job that names it waits for the preloader."""
+    (tmp_path / "curvis_probe_wait.py").write_text("VALUE = 1\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.delitem(sys.modules, "curvis_probe_wait", raising=False)
+    return "curvis_probe_wait"
+
+
+def test_a_light_job_starts_once_its_imports_are_loaded(
+    qtbot: QtBot, scheduler: Scheduler, rec: Recorder, probe_module: str
+) -> None:
+    scheduler.submit("n", Job(jobs.add, (1, 2), imports=(probe_module,)), delay_ms=0)
+    assert rec.started == [] and scheduler.is_busy("n") and scheduler.busy
+    assert probe_module not in sys.modules  # imported later, between events
+    qtbot.waitUntil(lambda: bool(rec.finished))
+    assert rec.started == ["n"] and rec.results == [3]
+    assert not scheduler.busy
+
+
+def test_a_light_job_with_loaded_imports_starts_at_once(
+    scheduler: Scheduler, rec: Recorder
+) -> None:
+    scheduler.submit("n", Job(jobs.add, (1, 2), imports=("json",)), delay_ms=0)
+    assert rec.started == ["n"]
+
+
+def test_a_newer_job_replaces_one_waiting_for_its_imports(
+    qtbot: QtBot, scheduler: Scheduler, rec: Recorder, probe_module: str
+) -> None:
+    scheduler.submit("n", Job(jobs.add, (1, 2), imports=(probe_module,)), delay_ms=0)
+    scheduler.submit("n", Job(jobs.add, (10, 20), imports=(probe_module,)), delay_ms=0)
+    qtbot.waitUntil(lambda: bool(rec.finished))
+    qtbot.wait(50)
+    assert rec.started == ["n"] and rec.results == [30]
+
+
+def test_cancelling_a_job_waiting_for_its_imports(
+    qtbot: QtBot, scheduler: Scheduler, rec: Recorder, probe_module: str
+) -> None:
+    scheduler.submit("n", Job(jobs.add, (1, 2), imports=(probe_module,)), delay_ms=0)
+    scheduler.cancel("n")
+    assert rec.cancelled == ["n"] and not scheduler.busy
+    qtbot.wait(100)
+    assert rec.started == [] and rec.finished == []
+
+
 def test_light_job_error_is_reported(qtbot: QtBot, scheduler: Scheduler, rec: Recorder) -> None:
     scheduler.submit("n", Job(jobs.boom, ("bad input",)), delay_ms=0)
     qtbot.waitUntil(lambda: bool(rec.failed))

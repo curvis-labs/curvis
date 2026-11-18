@@ -530,7 +530,7 @@ Make a plan first. When done, report validation results.
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.2 in docs/PHASES.md.
 
-Implement Kruskal-Wallis for 3+ groups with Dunn's post-hoc test (all pairs or vs. a chosen control, Holm-corrected) using SciPy and scikit-posthocs.
+Implement Kruskal-Wallis for 3+ groups with Dunn's post-hoc test (all pairs or vs. a chosen control, Holm-corrected) using SciPy and scikit-posthocs. (Later: Dunn's P values are computed from z with SciPy; scikit-posthocs is a test-only cross-check, so the first run does not load pandas, matplotlib and statsmodels.)
 
 Order of work: R fixtures first (kruskal.test, dunn.test or PMCMRplus::kwAllPairsDunnTest with p.adjust "holm"), with ties and unequal group sizes. Show me the scripts, generate fixtures, then implement until tests/validation passes.
 

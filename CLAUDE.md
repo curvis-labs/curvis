@@ -15,7 +15,7 @@ Priorities, in order: **correct statistics**, **an easy UI**, **fast processing*
 | UI | PySide6 (Qt 6). Qt model/view for tables |
 | Data | NumPy arrays per column; Polars for import and bulk operations; Apache Arrow (pyarrow) on disk |
 | Excel import | `fastexcel` (.xlsx), `xlrd` (.xls) |
-| Statistics | SciPy, statsmodels, scikit-posthocs (Dunn) |
+| Statistics | SciPy, statsmodels; scikit-posthocs only in tests (cross-check of Dunn) |
 | Curve fitting | lmfit |
 | Survival | lifelines |
 | Live plots | pyqtgraph |

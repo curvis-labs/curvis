@@ -16,6 +16,7 @@ from scipy import special, stats
 
 import curvis.analysis.compare.distributions as dist
 from curvis.analysis.compare.anova import holm_adjust, one_way_anova, tukey
+from curvis.analysis.compare.kruskal import dunn, kruskal_wallis
 from curvis.analysis.compare.mann_whitney import mann_whitney, rank_sum_distribution
 from curvis.analysis.compare.samples import sample
 from curvis.analysis.compare.ttest import Problem, TTestKind, t_test
@@ -191,3 +192,24 @@ def test_large_groups_use_the_normal_approximation() -> None:
     expected = stats.mannwhitneyu(a, b, method="asymptotic", use_continuity=True)
     assert r.u == expected.statistic
     assert r.p_value == pytest.approx(expected.pvalue, rel=1e-10)
+
+
+# --- Dunn's test -----------------------------------------------------------------------
+
+
+@settings(max_examples=60, deadline=None)
+@given(
+    st.lists(st.lists(st.integers(0, 6).map(float), min_size=1, max_size=9), min_size=3, max_size=5)
+)
+def test_dunn_p_values_match_scikit_posthocs(groups: list[list[float]]) -> None:
+    """Curvis computes Dunn's P from z; scikit-posthocs' posthoc_dunn is the cross-check.
+    Small integers give many ties."""
+    import scikit_posthocs
+
+    kw = kruskal_wallis(groups)
+    if not kw.defined:
+        return
+    table = scikit_posthocs.posthoc_dunn(groups, p_adjust=None, sort=False)
+    for c in dunn(kw):
+        expected = float(table.loc[c.i + 1, c.j + 1])
+        assert c.p_unadjusted == pytest.approx(expected, rel=1e-12, abs=1e-300)

@@ -8,7 +8,9 @@ the arguments are passed through shared memory instead of being pickled.
 A light job that needs a heavy third-party module (Polars, PyArrow, ...) names it in
 :attr:`Job.imports`. The scheduler imports those modules on the main thread before the
 job starts: loading an extension module on a worker thread while PySide6's import hook
-and the Qt event loop run on the main thread can crash the interpreter.
+and the Qt event loop run on the main thread can crash the interpreter. So that the
+window keeps responding, the imports run in small steps between events
+(:mod:`curvis.compute.preload`).
 """
 
 from __future__ import annotations
