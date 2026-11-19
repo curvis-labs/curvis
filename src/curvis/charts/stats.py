@@ -71,7 +71,7 @@ def bw_nrd0(x: FloatArray) -> float:
     lo = min(hi, float(q3 - q1) / 1.34)
     if not lo:
         lo = hi or abs(float(x[0])) or 1.0
-    return 0.9 * lo * n ** (-0.2)
+    return 0.9 * lo * math.pow(n, -0.2)
 
 
 def kde(x: FloatArray, bw: float, grid: FloatArray) -> FloatArray:
