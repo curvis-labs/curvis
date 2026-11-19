@@ -80,7 +80,10 @@ def fakes() -> Iterator[None]:
 
 
 def table(*roles: str) -> Table:
-    return Table("T", [Column.new(f"c{i}", role, [1.0, 2.0]) for i, role in enumerate(roles)])
+    def values(role: str) -> list[float]:
+        return [1.0, 0.0] if role == "Event" else [1.0, 2.0]  # an Event column holds 0 or 1
+
+    return Table("T", [Column.new(f"c{i}", role, values(role)) for i, role in enumerate(roles)])
 
 
 def test_the_first_analysis_is_registered() -> None:

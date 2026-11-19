@@ -10,8 +10,8 @@ Validated against R's ``survival::survfit(conf.type = "log-log")`` and
   ``aeqSurv``).
 - At each distinct time t (events and censorings), n at risk is the number with time
   ≥ t; a censoring at the time of an event counts as at risk for it.
-- The standard error of S is S·σ, with Greenwood's σ² = Σ d / (n (n − d)).
-- The interval is log-log: S^exp(∓z σ / log S). Where S is 1 it is [1, 1]; where S is
+- The standard error of S is S·sigma, with Greenwood's sigma² = sum of d / (n (n − d)).
+- The interval is log-log: S^exp(∓z sigma / log S). Where S is 1 it is [1, 1]; where S is
   0 (every subject left had an event) there is no interval and no SE (NaN), as in R.
 - The median is the first time S ≤ 0.5, or the midpoint of a stretch where S is 0.5
   (:func:`quantile_time`, R's ``findq``); its interval is the same on the lower and

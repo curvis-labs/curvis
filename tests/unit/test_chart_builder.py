@@ -125,6 +125,15 @@ def test_family_problems() -> None:
 ROLES = st.sampled_from(list(ColumnRole))
 
 
+def allowed(role: ColumnRole, values: list[float]) -> list[float]:
+    """``values`` made valid for ``role``: times 0 or more, events 0 or 1."""
+    if role is ColumnRole.TIME:
+        return [abs(v) for v in values]
+    if role is ColumnRole.EVENT:
+        return [v if v != v else float(abs(v) >= 1) for v in values]
+    return values
+
+
 @given(
     st.lists(
         st.tuples(ROLES, st.lists(st.floats(allow_nan=True), min_size=3, max_size=3)), max_size=6
@@ -136,7 +145,7 @@ def test_every_table_gives_a_spec_or_a_reason(
     table = Table(
         "T",
         [
-            Column.new(f"C{i}", role, values if role.is_numeric else ["x"] * 3)
+            Column.new(f"C{i}", role, allowed(role, values) if role.is_numeric else ["x"] * 3)
             for i, (role, values) in enumerate(columns)
         ],
     )

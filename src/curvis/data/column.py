@@ -248,6 +248,3 @@ class Column:
         expected = np.dtype(np.float64) if self.role.is_numeric else np.dtype(object)
         if self.values.dtype != expected:
             raise ValueError(f"column '{self.name}' holds {self.values.dtype}, expected {expected}")
-        bad = role_problem(self.values, self.role)
-        if bad is not None:
-            raise ValueError(f"column '{self.name}', row {bad[0] + 1}: {bad[1]}")

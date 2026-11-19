@@ -118,11 +118,19 @@ def test_role_change_from_text_checks_converted_values() -> None:
         d.execute(SetColumnRole(table.id, table.columns[1].id, E))
 
 
-def test_column_check_refuses_bad_values() -> None:
-    column = Column.new("A", Y, [1, 2])
-    column.role = E
-    with pytest.raises(ValueError, match="row 2"):
-        column.check()
+def test_bad_values_from_an_older_project_load_and_the_analysis_says_why() -> None:
+    """Entry is checked, but loading is not: a project saved before step 3.4 may hold an
+    Event column with other values. It opens, and Kaplan-Meier refuses with the row."""
+    from curvis.analysis import base
+    from curvis.analysis.base import AnalysisError
+
+    table = make(("t", T, [1, 2]), ("A", Y, [1, 2]))
+    table.columns[1].role = E  # as a loaded file can hold it
+    table.check()
+    kind = base.get("kaplan_meier")
+    analysis = base.Analysis(kind.id, table.id, kind.default_inputs(table), kind.default_params())
+    with pytest.raises(AnalysisError, match=r"A: Events must be 1 \(event\) or 0 .* \(row 2\)"):
+        kind.run(kind.gather(table, analysis), analysis.params)
 
 
 # --- Kaplan-Meier core --------------------------------------------------------------------
