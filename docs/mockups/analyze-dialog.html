@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analyze dialog options</title>
+<!--
+  Three proposals for the analysis chooser and the Advanced options of the Analyze dialog,
+  drawn in the style of index.html (palette of curvis.ui.theme, 1:1, docs/DESIGN.md).
+  Generated mockup; a picture to choose from, not code to copy.
+-->
+<style>
+  :root, :root[data-theme="light"] {
+    --window: #f4f6f8; --text: #1d3557; --base: #ffffff; --altbase: #e0f2f1;
+    --secondary: #667085; --error: #b3261e; --link: #007a7a; --highlight: #007a7a;
+    --hl-text: #ffffff; --button: #e9edf2; --border: #b9c1cc; --frame: #c3cad4;
+    --disabled: #9aa3b0; --canvas: #d5dbe3; --note: #1d3557; --mark: #e8590c;
+    --s1: #0072b2; --s2: #e69f00; --s3: #009e73;
+  }
+  :root[data-theme="dark"] {
+    --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+    --secondary: #9aa8bc; --error: #ff8080; --link: #00a6a6; --highlight: #00a6a6;
+    --hl-text: #0f1f33; --button: #1d3557; --border: #2e4a70; --frame: #0a1626;
+    --disabled: #5e7491; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+    --s1: #0072b2; --s2: #e69f00; --s3: #009e73;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+      --secondary: #9aa8bc; --error: #ff8080; --link: #00a6a6; --highlight: #00a6a6;
+      --hl-text: #0f1f33; --button: #1d3557; --border: #2e4a70; --frame: #0a1626;
+      --disabled: #5e7491; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+      --s1: #0072b2; --s2: #e69f00; --s3: #009e73;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--note);
+         font: 13px/1.4 system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  header.page { padding: 20px 24px 8px; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header.page h1 { font-size: 20px; margin: 0; color: var(--note); }
+  header.page p { margin: 0; flex: 1 1 320px; }
+  .switch button { font: inherit; padding: 4px 12px; border: 1px solid var(--border);
+                   background: var(--button); color: var(--text); border-radius: 3px; cursor: pointer; }
+  .switch button[aria-pressed="true"] { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  section.board { padding: 16px 24px 32px 40px; overflow-x: auto; }
+  section.board > h2 { font-size: 16px; margin: 8px 0 12px; color: var(--note); }
+  .row { display: flex; gap: 24px; align-items: flex-start; }
+  .notes { width: 300px; flex: none; }
+  .notes ol { margin: 0; padding-left: 22px; }
+  .notes li { margin-bottom: 6px; }
+  .notes li::marker { color: var(--mark); font-weight: 700; }
+
+  /* --- the drawn widgets (Fusion-like) --- */
+  .win { flex: none; background: var(--window); color: var(--text); border: 1px solid var(--frame);
+         box-shadow: 0 8px 28px rgba(0,0,0,.28); font-size: 13px; position: relative; }
+  .titlebar { height: 30px; display: flex; align-items: center; justify-content: center;
+              border-bottom: 1px solid var(--frame); font-weight: 600; }
+  .body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+  .tab { padding: 5px 14px; border: 1px solid var(--border); border-bottom: none; margin-right: -1px;
+         background: var(--button); border-radius: 3px 3px 0 0; }
+  .tab.on { background: var(--window); position: relative; top: 1px; font-weight: 600; }
+  .tab.hidden { display: none; }
+  u { text-decoration: underline; text-underline-offset: 2px; }
+  .secondary { color: var(--secondary); }
+  .cols { display: flex; gap: 16px; flex: 1; min-height: 0; }
+  .col { flex: 1 1 0; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .group { border: 1px solid var(--border); border-radius: 3px; padding: 14px 8px 8px; position: relative;
+           display: flex; flex-direction: column; gap: 8px; }
+  .group > .legend { position: absolute; top: -9px; left: 8px; background: var(--window); padding: 0 4px; }
+  .grow { flex: 1; }
+  .list { background: var(--base); border: 1px solid var(--border); overflow: hidden; }
+  .list .h { display: flex; background: var(--button); border-bottom: 1px solid var(--border); }
+  .list .h div, .list .r div { padding: 3px 6px; }
+  .list .r { display: flex; align-items: center; }
+  .list .r.sel { background: var(--highlight); color: var(--hl-text); }
+  .list .r.dim { color: var(--disabled); }
+  .c1 { flex: 1; } .c2 { width: 64px; } .c3 { width: 90px; text-align: right; }
+  .cb { display: inline-block; width: 13px; height: 13px; border: 1px solid var(--border); background: var(--base);
+        vertical-align: -2px; margin-right: 6px; border-radius: 2px; position: relative; }
+  .cb.on::after { content: ""; position: absolute; left: 3px; top: 0px; width: 4px; height: 8px;
+                  border: solid var(--text); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .cb.part::after { content: ""; position: absolute; left: 2px; top: 5px; width: 7px; height: 2px; background: var(--text); }
+  .rb { display: inline-block; width: 13px; height: 13px; border: 1px solid var(--border); background: var(--base);
+        border-radius: 50%; vertical-align: -2px; margin-right: 6px; position: relative; }
+  .rb.on::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--text); }
+  .btn { display: inline-block; text-align: center; padding: 4px 12px; min-width: 76px;
+         border: 1px solid var(--border); background: var(--button); border-radius: 3px; white-space: nowrap; }
+  .btn.def { border-color: var(--highlight); box-shadow: inset 0 0 0 1px var(--highlight); }
+  .btn.seg { min-width: 0; border-radius: 0; margin-right: -1px; }
+  .btn.seg.on { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  .btn.dis { color: var(--disabled); }
+  .field { display: inline-block; background: var(--base); border: 1px solid var(--border); border-radius: 2px;
+           padding: 3px 6px; min-width: 120px; }
+  .field.combo::after { content: "▾"; float: right; margin-left: 10px; color: var(--secondary); }
+  .field.w60 { min-width: 64px; }
+  .form { display: grid; grid-template-columns: max-content 1fr; gap: 8px 12px; align-items: center; }
+  .indent { padding-left: 20px; }
+  .line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .buttonrow { display: flex; align-items: center; gap: 8px; }
+  .buttonrow .spacer { flex: 1; }
+  .feedback { min-height: 19px; display: flex; gap: 6px; align-items: center; }
+  .warn::before { content: "⚠"; color: var(--text); }
+  .err { color: var(--error); }
+  .err::before { content: "⛔"; }
+  .advanced { display: flex; align-items: center; gap: 4px; }
+  .advanced::before { content: "▸"; color: var(--secondary); }
+  .summary { background: var(--base); border: 1px solid var(--border); padding: 8px; }
+  .m { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--mark); color: #fff;
+       font: 700 11px/18px system-ui, sans-serif; text-align: center; z-index: 2; box-shadow: 0 0 0 2px var(--window); }
+  .ref { color: var(--link); }
+
+  /* main-window frame for the Results panel */
+  .mw { display: flex; flex-direction: column; }
+  .mw .menubar { display: flex; gap: 16px; padding: 4px 10px; border-bottom: 1px solid var(--border); }
+  .mw .main { display: flex; flex: 1; min-height: 0; }
+  .grid { flex: 1; background: var(--base); border-right: 1px solid var(--border); overflow: hidden; }
+  .grid table, .res table { border-collapse: collapse; width: 100%; }
+  .grid th { background: var(--button); border: 1px solid var(--border); font-weight: 400; padding: 2px 6px;
+             text-align: left; white-space: nowrap; }
+  .grid th small { display: block; color: var(--text); }
+  .grid td { border: 1px solid var(--border); padding: 2px 6px; text-align: right; }
+  .grid td.calc { background: var(--altbase); }
+  .dock { width: 460px; flex: none; display: flex; flex-direction: column; }
+  .dock .dt { display: flex; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--border); gap: 8px; }
+  .res { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+  .res h3 { margin: 0; font-size: 13px; }
+  .res .reading { font-size: 14px; }
+  .res table { background: var(--base); border: 1px solid var(--border); }
+  .res th { text-align: left; font-weight: 600; background: var(--button); padding: 3px 6px; border-bottom: 1px solid var(--border); }
+  .res td { padding: 3px 6px; border-bottom: 1px solid var(--altbase); }
+  .res td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .res tr.sel td { background: var(--highlight); color: var(--hl-text); }
+  .badge { border: 1px solid var(--border); border-radius: 9px; padding: 0 8px; font-size: 12px; color: var(--secondary); }
+  .empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--secondary); padding: 24px; }
+  .preview { background: var(--base); border: 1px solid var(--border); flex: 1; display: flex; }
+  .preview svg { width: 100%; height: 100%; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+
+  /* --- additions for the analysis-chooser versions --- */
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+         color: var(--mark); border: 1px solid var(--mark); border-radius: 3px; padding: 0 6px; margin-right: 8px; }
+  .lede { max-width: 1240px; margin: 0 0 14px; }
+  .glist { background: var(--base); border: 1px solid var(--border); overflow: hidden; }
+  .glist .gh { padding: 6px 8px 2px; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+               text-transform: uppercase; color: var(--secondary); }
+  .glist .gi { padding: 3px 8px 3px 18px; display: flex; gap: 8px; align-items: baseline; }
+  .glist .gi .sub { color: var(--secondary); font-size: 12px; margin-left: auto; white-space: nowrap; }
+  .glist .gi.sel { background: var(--highlight); color: var(--hl-text); }
+  .glist .gi.sel .sub { color: var(--hl-text); opacity: .85; }
+  .glist .more { padding: 2px 8px 4px 18px; color: var(--disabled); }
+  .ptable { display: grid; grid-template-columns: 22px 1fr 110px; gap: 4px 8px; align-items: center;
+            background: var(--base); border: 1px solid var(--border); padding: 6px 8px; }
+  .ptable .hd { color: var(--secondary); font-size: 12px; }
+  .field.off { color: var(--disabled); }
+  .field.num { min-width: 0; text-align: right; }
+  .field.search::before { content: "⌕"; color: var(--secondary); margin-right: 6px; }
+  .open { display: flex; align-items: center; gap: 4px; }
+  .open::before { content: "▾"; color: var(--secondary); }
+  .gallery { display: flex; gap: 14px; }
+  .gallery .fam { display: flex; flex-direction: column; gap: 4px; }
+  .gallery .fam > .gh { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--secondary); }
+  .gallery .cards { display: flex; gap: 6px; }
+  .card { width: 76px; background: var(--base); border: 1px solid var(--border); border-radius: 4px;
+          padding: 4px 4px 3px; text-align: center; font-size: 12px; line-height: 1.2; }
+  .card svg { width: 60px; height: 32px; display: block; margin: 0 auto 2px; }
+  .card svg path { fill: none; stroke: var(--s1); stroke-width: 2; }
+  .card svg line { stroke: var(--border); stroke-width: 1; }
+  .card.sel { border-color: var(--highlight); box-shadow: inset 0 0 0 1px var(--highlight); background: var(--altbase); }
+  .card .badge { font-size: 10px; padding: 0 5px; }
+  .plot { background: var(--base); border: 1px solid var(--border); }
+  .plot svg { display: block; width: 100%; height: 130px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--border); border-radius: 12px; padding: 1px 10px; background: var(--button); }
+  .chip.on { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  .popup { position: absolute; z-index: 3; background: var(--base); border: 1px solid var(--border);
+           box-shadow: 0 6px 18px rgba(0,0,0,.25); width: 410px; }
+  .eq { font-family: "Cambria Math", "STIX Two Math", Georgia, serif; font-size: 13px; }
+  .compare-mini { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
+
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Analyze dialog — three ways to choose an analysis</h1>
+  <p>All four boards show the same case: <i>Fit a curve</i>, three dose-response series ticked, Hill 4PL chosen, top fixed at 100 and the fit limited to X from −9 to −5. Orange numbers point to the notes.</p>
+  <div class="switch" role="group" aria-label="Theme">
+    <button type="button" data-set="light">Light</button>
+    <button type="button" data-set="dark">Dark</button>
+  </div>
+</header>
+<section class="board"><h2><span class="tag">Now</span>Current dialog — 11 radio buttons, two text fields to type</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+<div class="tabs">
+  <div class="tab">C<u>o</u>mpare groups</div>
+  <div class="tab on">Fit a c<u>u</u>rve</div>
+</div>
+<div class="secondary">Fit a line or curve to each Y series against X.</div>
+<div class="cols"><div class="col">
+<div class="group grow">
+  <div class="legend">Data</div>
+  <div class="list grow">
+    <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
+    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;log[Agonist] (X)</div><div class="c2" style="text-align:right">–</div></div>
+  </div>
+  <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
+</div>
+</div><div class="col">
+<div class="group">
+  <div class="legend">Analysis</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px 8px;font-size:12.5px">
+    <div><span class="rb"></span>Li<u>n</u>ear regression</div><div><span class="rb"></span>Exponential ass<u>o</u>ciation</div><div><span class="rb"></span>Ga<u>u</u>ssian</div>
+    <div><span class="rb"></span><u>P</u>olynomial regression</div><div><span class="rb"></span>Exponential deca<u>y</u></div><div></div>
+    <div><span class="rb on"></span>Hill <u>4</u>PL <span class="badge">recent</span></div><div><span class="rb"></span><u>M</u>ichaelis-Menten</div><div></div>
+    <div><span class="rb"></span><u>3</u>PL (bottom 0)</div><div><span class="rb"></span><u>B</u>iphasic</div><div></div>
+    <div></div><div><span class="rb"></span>B<u>e</u>ll-shaped</div><div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="legend">Options</div>
+  <div><span class="cb on"></span>X values are lo<u>g</u>10(concentration)</div>
+  <div class="open"><span><u>A</u>dvanced</span></div>
+  <div class="form indent">
+    <span>Fit only <u>X</u> from … to … (empty: all)</span><span class="field">−9 to −5</span>
+    <span><u>F</u>ix parameters (e.g. bottom = 0)</span><span class="field">top = 100</span>
+  </div>
+</div>
+
+<div class="group grow">
+  <div class="legend">What will run</div>
+  <div class="summary grow">Hill 4PL fit (variable slope) of Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5. Reports bottom, EC50 and Hill slope.</div>
+</div>
+</div></div>
+<div class="feedback"></div>
+<div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
+</div></div><div class="notes"><p>For comparison. The radio grid fills top to bottom in columns of four, so related models (4PL, 3PL, Biphasic) are split across columns, and the advanced options need the exact syntax <code>top = 100</code> and <code>-9 to -5</code>.</p></div></div></section>
+<section class="board"><h2><span class="tag">A</span>Grouped list + parameter table — the smallest change</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+<div class="tabs">
+  <div class="tab">C<u>o</u>mpare groups</div>
+  <div class="tab on">Fit a c<u>u</u>rve</div>
+</div>
+<div class="secondary">Fit a line or curve to each Y series against X.</div>
+<div class="cols"><div class="col">
+<div class="group grow">
+  <div class="legend">Data</div>
+  <div class="list grow">
+    <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
+    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;log[Agonist] (X)</div><div class="c2" style="text-align:right">–</div></div>
+  </div>
+  <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
+</div>
+<span class="m" style="left:448px;top:92px">2</span></div><div class="col">
+<div class="group">
+  <div class="legend">Analysis</div>
+  <div class="field search">Type to filter…</div>
+  <div class="glist">
+    <div class="gh">Recent</div>
+    <div class="gi sel">Hill 4PL (variable slope)<span class="sub">EC50, Hill slope, top, bottom</span></div>
+    <div class="gh">Linear</div>
+    <div class="gi">Linear regression<span class="sub">slope, intercept, R²</span></div>
+    <div class="gi">Polynomial regression<span class="sub">degree 2–6</span></div>
+    <div class="gh">Dose-response</div>
+    <div class="gi">3PL (bottom fixed at 0)<span class="sub">EC50, Hill slope, top</span></div>
+    <div class="gi">Biphasic dose-response<span class="sub">two EC50s</span></div>
+    <div class="more">▾ Kinetics (3) · Shape-based (2)</div>
+  </div>
+</div>
+
+<div class="group">
+  <div class="legend">Options</div>
+  <div><span class="cb on"></span>X values are lo<u>g</u>10(concentration)</div>
+  <div class="open"><span><u>A</u>dvanced</span></div>
+  <div class="indent" style="display:flex;flex-direction:column;gap:8px">
+    <div class="ptable">
+      <span class="hd">Fix</span><span class="hd">Parameter</span><span class="hd">Value</span>
+      <span class="cb"></span><span>Bottom</span><span class="field num off">fitted</span>
+      <span class="cb on"></span><span>Top</span><span class="field num">100</span>
+      <span class="cb"></span><span>EC50</span><span class="field num off">fitted</span>
+      <span class="cb"></span><span>Hill slope</span><span class="field num off">fitted</span>
+    </div>
+    <div class="line">Fit only X from <span class="field combo w60">−9</span> to <span class="field combo w60">−5</span>
+      <span class="secondary">uses 30 of 35 points</span></div>
+  </div>
+</div>
+
+<div class="group grow">
+  <div class="legend">What will run</div>
+  <div class="summary grow">Hill 4PL fit (variable slope) of Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5. Reports bottom, EC50 and Hill slope.</div>
+</div>
+</div></div>
+<div class="feedback"></div>
+<div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
+<span class="m" style="left:470px;top:82px">1</span><span class="m" style="left:448px;top:322px">3</span><span class="m" style="left:448px;top:412px">4</span></div></div><div class="notes">
+<ol>
+  <li><b>A grouped list replaces the radio grid.</b> The sub-families from SPEC.md (Linear, Dose-response, Kinetics, Shape-based) become section headers, with recently used analyses on top. Each row says in a few words what the analysis reports.</li>
+  <li><b>Filter field.</b> Type “ec50” or “decay” to narrow the list; arrow keys move, Enter runs. Long sections can be collapsed (▾).</li>
+  <li><b>Fix parameters becomes a table.</b> The parameter names come from the model, so nothing has to be typed or spelled right. Ticking <i>Fix</i> enables the value field; the last free parameter can't be unticked.</li>
+  <li><b>X range: two drop-downs</b> listing the X values in the table (you can still type), with a live count of the points used.</li>
+</ol>
+<p><b>Effort:</b> smallest change. Uses only QListView/QTreeView and stock widgets; the stored strings (<code>"top = 100"</code>, <code>"-9 to -5"</code>) and saved projects stay as they are.</p>
+<p><b>Compare groups</b> would show the same list with sections <i>Describe</i>, <i>Two groups</i>, <i>Three or more groups</i>.</p>
+</div></div></section>
+<section class="board"><h2><span class="tag">B</span>Curve gallery + range on a data preview — the most visual</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+<div class="tabs">
+  <div class="tab">C<u>o</u>mpare groups</div>
+  <div class="tab on">Fit a c<u>u</u>rve</div>
+</div>
+<div class="secondary">Fit a line or curve to each Y series against X.</div>
+<div class="gallery"><div class="fam"><div class="gh">Linear</div><div class="cards"><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 28 L56 4"/></svg>Linear</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 6 Q30 52 56 6"/></svg>Polynomial</div></div></div><div class="fam"><div class="gh">Dose-response</div><div class="cards"><div class="card sel"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 27 C30 27 30 5 56 5"/></svg>Hill 4PL<br><span class="badge">recent</span></div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 30 C30 30 30 6 56 6"/></svg>3PL</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 28 C12 28 12 17 24 17 C34 17 36 5 56 5"/></svg>Biphasic</div></div></div><div class="fam"><div class="gh">Kinetics</div><div class="cards"><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 29 C14 8 24 5 56 5"/></svg>Association</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 4 C14 25 24 28 56 28"/></svg>Decay</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 30 C8 14 22 7 56 5"/></svg>Michaelis-Menten</div></div></div><div class="fam"><div class="gh">Shape</div><div class="cards"><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 28 C12 28 12 6 22 6 L38 6 C46 6 46 28 56 28"/></svg>Bell-shaped</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 28 C20 28 22 4 30 4 C38 4 40 28 56 28"/></svg>Gaussian</div></div></div></div><div class="secondary">Hill 4PL: <span class="eq">Y = Bottom + (Top − Bottom) / (1 + 10<sup>(logEC50 − X)·HillSlope</sup>)</span></div><div class="cols" style="margin-top:4px"><div class="col">
+<div class="group grow">
+  <div class="legend">Data</div>
+  <div class="list grow">
+    <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
+    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;log[Agonist] (X)</div><div class="c2" style="text-align:right">–</div></div>
+  </div>
+  <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
+</div>
+</div><div class="col" style="flex:1.4 1 0">
+<div class="group">
+  <div class="legend">Options</div>
+  <div><span class="cb on"></span>X values are lo<u>g</u>10(concentration)</div>
+  <div class="open"><span><u>A</u>dvanced</span></div>
+  <div class="indent" style="display:flex;flex-direction:column;gap:6px">
+    <div class="line"><span>Parameters</span><span class="chips">
+      <span class="chip">Bottom: fit</span><span class="chip on">Top = 100</span>
+      <span class="chip">EC50: fit</span><span class="chip">Hill slope: fit</span></span></div>
+    <div class="plot"><svg viewBox="0 0 420 130" preserveAspectRatio="none"><rect x="30" y="8" width="69.1" height="110" fill="var(--canvas)" opacity=".7"/><rect x="375.5" y="8" width="34.5" height="110" fill="var(--canvas)" opacity=".7"/><line x1="30" y1="118" x2="410" y2="118" stroke="var(--border)"/><line x1="30" y1="8" x2="30" y2="118" stroke="var(--border)"/><circle cx="30.0" cy="114.0" r="2.6" fill="var(--s1)"/><circle cx="64.5" cy="106.8" r="2.6" fill="var(--s1)"/><circle cx="99.1" cy="108.4" r="2.6" fill="var(--s1)"/><circle cx="133.6" cy="108.9" r="2.6" fill="var(--s1)"/><circle cx="168.2" cy="106.0" r="2.6" fill="var(--s1)"/><circle cx="202.7" cy="85.1" r="2.6" fill="var(--s1)"/><circle cx="237.3" cy="60.5" r="2.6" fill="var(--s1)"/><circle cx="271.8" cy="35.9" r="2.6" fill="var(--s1)"/><circle cx="306.4" cy="24.0" r="2.6" fill="var(--s1)"/><circle cx="340.9" cy="21.1" r="2.6" fill="var(--s1)"/><circle cx="375.5" cy="12.6" r="2.6" fill="var(--s1)"/><circle cx="410.0" cy="14.2" r="2.6" fill="var(--s1)"/><circle cx="30.0" cy="111.0" r="2.6" fill="var(--s2)"/><circle cx="64.5" cy="113.0" r="2.6" fill="var(--s2)"/><circle cx="99.1" cy="105.8" r="2.6" fill="var(--s2)"/><circle cx="133.6" cy="107.4" r="2.6" fill="var(--s2)"/><circle cx="168.2" cy="107.9" r="2.6" fill="var(--s2)"/><circle cx="202.7" cy="105.0" r="2.6" fill="var(--s2)"/><circle cx="237.3" cy="93.1" r="2.6" fill="var(--s2)"/><circle cx="271.8" cy="59.5" r="2.6" fill="var(--s2)"/><circle cx="306.4" cy="34.9" r="2.6" fill="var(--s2)"/><circle cx="340.9" cy="23.0" r="2.6" fill="var(--s2)"/><circle cx="375.5" cy="20.1" r="2.6" fill="var(--s2)"/><circle cx="410.0" cy="11.6" r="2.6" fill="var(--s2)"/><circle cx="30.0" cy="107.8" r="2.6" fill="var(--s3)"/><circle cx="64.5" cy="109.2" r="2.6" fill="var(--s3)"/><circle cx="99.1" cy="109.3" r="2.6" fill="var(--s3)"/><circle cx="133.6" cy="105.2" r="2.6" fill="var(--s3)"/><circle cx="168.2" cy="81.7" r="2.6" fill="var(--s3)"/><circle cx="202.7" cy="55.5" r="2.6" fill="var(--s3)"/><circle cx="237.3" cy="33.1" r="2.6" fill="var(--s3)"/><circle cx="271.8" cy="23.5" r="2.6" fill="var(--s3)"/><circle cx="306.4" cy="12.6" r="2.6" fill="var(--s3)"/><circle cx="340.9" cy="13.5" r="2.6" fill="var(--s3)"/><circle cx="375.5" cy="15.1" r="2.6" fill="var(--s3)"/><circle cx="410.0" cy="17.0" r="2.6" fill="var(--s3)"/><line x1="99.1" y1="8" x2="99.1" y2="118" stroke="var(--highlight)" stroke-width="2"/><line x1="375.5" y1="8" x2="375.5" y2="118" stroke="var(--highlight)" stroke-width="2"/><rect x="95.1" y="56" width="8" height="18" rx="2" fill="var(--highlight)"/><rect x="371.5" y="56" width="8" height="18" rx="2" fill="var(--highlight)"/><text x="30" y="128" font-size="9" fill="var(--secondary)">−10</text><text x="392" y="128" font-size="9" fill="var(--secondary)">−4.5</text></svg></div>
+    <div class="line">X from <span class="field w60 num">−9</span> to <span class="field w60 num">−5</span>
+      <span class="secondary">drag the handles · 30 of 35 points</span></div>
+  </div>
+</div>
+
+<div class="group">
+  <div class="legend">What will run</div>
+  <div class="summary grow">Hill 4PL fit (variable slope) of Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5. Reports bottom, EC50 and Hill slope.</div>
+</div>
+</div></div>
+<div class="feedback"></div>
+<div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
+<span class="m" style="left:-26px;top:96px">1</span><span class="m" style="left:-26px;top:170px">2</span><span class="m" style="left:366px;top:310px">3</span><span class="m" style="left:366px;top:400px">4</span></div></div><div class="notes">
+<ol>
+  <li><b>A gallery of curve shapes.</b> Each model is a card with a thumbnail of its shape, grouped by sub-family. People recognise “rises and levels off” faster than they remember a model's name. Arrow keys move between cards.</li>
+  <li><b>The equation of the selected model</b> sits under the gallery, so it's clear what will be fitted before Run.</li>
+  <li><b>Parameter chips.</b> Click a chip to switch it between <i>fit</i> and <i>fixed at …</i> (a small pop-up with one number field).</li>
+  <li><b>X range on a preview of the data.</b> Drag the two handles over the points of the ticked series, or type in From/To. Points outside the range are dimmed.</li>
+</ol>
+<p><b>Effort:</b> the largest. The thumbnails are static icons, but the range preview is a small pyqtgraph plot inside the dialog, which goes beyond the spec (needs a SPEC/DESIGN change and a benchmark for opening the dialog). Without the preview, the From/To fields from version A remain.</p>
+<p><b>Compare groups</b> fits a gallery less well: it would fall back to the list of version A.</p>
+</div></div></section>
+<section class="board"><h2><span class="tag">C</span>Search drop-down + always-visible parameters — the most compact</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+<div class="tabs">
+  <div class="tab">C<u>o</u>mpare groups</div>
+  <div class="tab on">Fit a c<u>u</u>rve</div>
+</div>
+<div class="secondary">Fit a line or curve to each Y series against X.</div>
+<div class="cols"><div class="col">
+<div class="group grow">
+  <div class="legend">Data</div>
+  <div class="list grow">
+    <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
+    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;log[Agonist] (X)</div><div class="c2" style="text-align:right">–</div></div>
+  </div>
+  <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
+</div>
+</div><div class="col">
+<div class="group">
+  <div class="legend">Analysis</div>
+  <div class="field combo" style="position:relative">Hill 4PL (variable slope)</div>
+  <div class="line"><span class="secondary">Suggested:</span>
+    <span class="chip on">Hill 4PL</span><span class="chip">3PL</span><span class="chip">Linear regression</span></div>
+</div>
+
+<div class="group">
+  <div class="legend">Options</div>
+  <div><span class="cb on"></span>X values are lo<u>g</u>10(concentration)</div>
+  <div class="ptable" style="grid-template-columns: 1fr auto 90px">
+    <span class="hd">Parameter</span><span class="hd"></span><span class="hd">Value</span>
+    <span>Bottom</span><span class="line" style="gap:0"><span class="btn seg on" style="border-radius:3px 0 0 3px">Fit</span><span class="btn seg" style="border-radius:0 3px 3px 0">Fix</span></span><span class="field num off">—</span>
+    <span>Top</span><span class="line" style="gap:0"><span class="btn seg" style="border-radius:3px 0 0 3px">Fit</span><span class="btn seg on" style="border-radius:0 3px 3px 0">Fix</span></span><span class="field num">100</span>
+    <span>EC50</span><span class="line" style="gap:0"><span class="btn seg on" style="border-radius:3px 0 0 3px">Fit</span><span class="btn seg" style="border-radius:0 3px 3px 0">Fix</span></span><span class="field num off">—</span>
+    <span>Hill slope</span><span class="line" style="gap:0"><span class="btn seg on" style="border-radius:3px 0 0 3px">Fit</span><span class="btn seg" style="border-radius:0 3px 3px 0">Fix</span></span><span class="field num off">—</span>
+  </div>
+  <div class="form">
+    <span>Points</span><span class="line" style="gap:0"><span class="btn seg" style="border-radius:3px 0 0 3px">All</span><span class="btn seg on" style="border-radius:0 3px 3px 0">X range</span></span>
+    <span></span><span class="line">from <span class="field combo w60">−9</span> to <span class="field combo w60">−5</span><span class="secondary">30 of 35 points</span></span>
+  </div>
+  <div class="advanced"><span><u>A</u>dvanced</span></div>
+</div>
+
+<div class="group grow">
+  <div class="legend">What will run</div>
+  <div class="summary grow">Hill 4PL fit (variable slope) of Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5. Reports bottom, EC50 and Hill slope.</div>
+</div>
+</div></div>
+<div class="feedback"></div>
+<div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
+<span class="m" style="left:448px;top:92px">1</span><span class="m" style="left:448px;top:152px">2</span><span class="m" style="left:448px;top:374px">3</span><span class="m" style="left:448px;top:418px">4</span></div></div><div class="notes">
+<ol>
+  <li><b>One drop-down instead of a list.</b> The dialog opens with a sensible analysis already chosen, so the 11 options stay out of sight until you ask for them (shown opened below the dialog).</li>
+  <li><b>Search inside the drop-down</b> matches names and what they report (“ec5” finds every model with an EC50). <b>Suggestion chips</b> under it: the best fit for the data plus recently used ones, one click each.</li>
+  <li><b>The parameters are always visible</b> with a Fit / Fix switch per parameter. Fixing a parameter is common for dose-response fits, so it moves out of Advanced; nothing to type except the value.</li>
+  <li><b>Points: All / X range</b> as a switch, with From/To drop-downs of the X values only when needed. Advanced keeps the rare options.</li>
+</ol>
+<p><b>Effort:</b> medium. A searchable QComboBox with a custom popup view; the rest are stock widgets. Moving <i>Fix parameters</i> out of Advanced is a change to the DESIGN rule that the common case needs no options; it stays one click on Run.</p>
+<p><b>Compare groups</b> would use the same drop-down, with suggestions like “One-way ANOVA (4 groups ticked)”.</p>
+</div></div><div style="margin-top:20px"><p style="margin:0 0 8px"><b>The drop-down opened</b> (marker 2), after typing “ec5”:</p>
+<div class="popup" style="position:relative">
+  <div style="padding:6px"><div class="field search">ec5</div></div>
+  <div class="glist" style="border:none;border-top:1px solid var(--border)">
+    <div class="gh">Dose-response</div>
+    <div class="gi sel">Hill 4PL (variable slope)<span class="sub">EC50, Hill slope, top, bottom</span></div>
+    <div class="gi">3PL (bottom fixed at 0)<span class="sub">EC50, Hill slope, top</span></div>
+    <div class="gi">Biphasic dose-response<span class="sub">two EC50s</span></div>
+    <div class="gh">Shape-based</div>
+    <div class="gi">Bell-shaped dose-response<span class="sub">two EC50s, plateau</span></div>
+    <div class="more">4 of 11 analyses match “ec5”</div>
+  </div>
+</div>
+</div></section>
+<script>
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll(".switch button");
+    function show(theme) {
+      root.setAttribute("data-theme", theme);
+      buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.set === theme)); });
+      try { localStorage.setItem("curvis-mockup-theme", theme); } catch (e) {}
+    }
+    var start = null;
+    try { start = localStorage.getItem("curvis-mockup-theme"); } catch (e) {}
+    if (!start) start = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    buttons.forEach(function (b) { b.addEventListener("click", function () { show(b.dataset.set); }); });
+    show(start);
+  })();
+</script>
+</body>
+</html>
