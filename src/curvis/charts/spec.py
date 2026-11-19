@@ -223,6 +223,18 @@ DEFAULT_TEXT_SIZE = 10.0
 """Chart text size in points."""
 MIN_TEXT_SIZE, MAX_TEXT_SIZE = 4.0, 72.0
 
+
+@dataclass(frozen=True)
+class GraphDefaults:
+    """What a new graph copies from the Settings ("New graphs")."""
+
+    aspect_ratio: str = DEFAULT_ASPECT
+    custom_size: tuple[float, float] | None = None
+    palette: ColorScheme = CURVIS
+    font: str = DEFAULT_FONT
+    text_size: float = DEFAULT_TEXT_SIZE
+
+
 _HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 

@@ -423,7 +423,7 @@ def _histogram(inputs: ChartInputs) -> tuple[HistogramData, int]:
     groups = [np.concatenate(s.columns) if s.columns else np.empty(0) for s in inputs.series]
     found = histogram_bins(groups, bins.mode, bins.count, bins.width, bins.start)
     counts = tuple((s.source, c) for s, c in zip(inputs.series, found.counts, strict=True))
-    names = tuple(s.name for s in inputs.series)
+    names = tuple(f"{s.name} · {s.category}" if s.category else s.name for s in inputs.series)
     return HistogramData(found.breaks, counts, names), sum(found.n_outside)
 
 

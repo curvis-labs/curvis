@@ -187,7 +187,7 @@ def test_deleting_the_anova_deletes_its_interaction_graphs() -> None:
 def test_export_draws_lines_with_markers() -> None:
     import matplotlib
 
-    from curvis.charts.render_mpl.export import RC_PARAMS
+    from curvis.charts.render_mpl.figure import RC_PARAMS
     from curvis.charts.render_mpl.figure import make_figure
 
     table, spec, result = setup()

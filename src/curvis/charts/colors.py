@@ -13,12 +13,20 @@ editor are kept in the Settings (``Settings.palettes``).
 from __future__ import annotations
 
 import re
+import uuid
 from dataclasses import dataclass, replace
 
 HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 MAX_PALETTE_COLORS = 24
 CUSTOM_ID = "custom"
 """Id of a palette that is no built-in scheme (made in the palette editor)."""
+USER_PREFIX = "user:"
+"""Ids of the palettes the user saved in the Settings start with this."""
+
+
+def new_palette_id() -> str:
+    """A new id for a palette the user saves."""
+    return f"{USER_PREFIX}{uuid.uuid4().hex}"
 
 
 @dataclass(frozen=True)
@@ -142,7 +150,9 @@ __all__ = (
     "DEFAULT_SCHEME",
     "MAX_PALETTE_COLORS",
     "SCHEMES",
+    "USER_PREFIX",
     "ColorScheme",
+    "new_palette_id",
     "normalized",
     "palette_problem",
     "recolored",

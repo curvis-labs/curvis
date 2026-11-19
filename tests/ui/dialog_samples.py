@@ -236,6 +236,44 @@ def _settings(ctx: Context) -> QDialog:
     return SettingsDialog(ctx.settings)
 
 
+def _settings_tab(index: int) -> Callable[[Context], QDialog]:
+    def make(ctx: Context) -> QDialog:
+        dialog = SettingsDialog(ctx.settings)
+        dialog.tabs.setCurrentIndex(index)
+        return dialog
+
+    return make
+
+
+def _palette(_ctx: Context) -> QDialog:
+    from curvis.charts.colors import CURVIS
+    from curvis.ui.palette_dialog import PaletteDialog
+
+    return PaletteDialog(CURVIS)
+
+
+def _format_variant(variant_name: str, section: int = 0) -> Callable[[Context], QDialog]:
+    """The Format dialog of a bar-family graph of category groups, as ``variant_name``."""
+
+    def make(ctx: Context) -> QDialog:
+        from curvis.charts.builder import default_spec, with_variant
+        from curvis.charts.spec import ChartFamily, ChartVariant
+        from curvis.core import add_graph
+        from curvis.ui.format_dialog import FormatDialog
+        from tests.unit.charts_tables import two_way_table
+
+        table = two_way_table()
+        doc = Document()
+        doc.execute(AddTable(table))
+        spec = with_variant(default_spec(table, ChartFamily.BAR), ChartVariant(variant_name), table)
+        doc.execute(add_graph(doc, spec))
+        dialog = FormatDialog(doc, spec.id, scheduler=ctx.scheduler)
+        dialog.set_section(section)
+        return dialog
+
+    return make
+
+
 def _close_table(_ctx: Context) -> QDialog:
     from curvis.analysis.base import Analysis
     from curvis.analysis.compare.ttest_analysis import TTestParams
@@ -389,6 +427,9 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "constants": _constants,
     "constant_editor": _constant_editor,
     "settings": _settings,
+    "settings_new_graphs": _settings_tab(1),
+    "settings_results": _settings_tab(2),
+    "palette": _palette,
     "close_table": _close_table,
     "close_table_plain": _close_table_plain,
     "delete_analysis": _delete_analysis,
@@ -398,6 +439,11 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "format_series": _format(2),
     "format_colors": _format(3),
     "format_bar_series": _format_bar_series,
+    "format_grouped_bar": _format_variant("bar"),
+    "format_violin": _format_variant("violin"),
+    "format_histogram": _format_variant("histogram"),
+    "format_hbar_axes": _format_variant("horizontal_bar", 1),
+    "format_column_scatter_series": _format_variant("column_scatter", 2),
     "format_bad_range": _format_bad_range,
     "export_graph": _export,
     "crash": _crash,

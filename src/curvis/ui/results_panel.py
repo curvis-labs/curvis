@@ -44,7 +44,15 @@ from PySide6.QtWidgets import (
 )
 
 from curvis.analysis.base import analysis_labels
-from curvis.analysis.result import STARS_FOOTNOTE, Grid, Result, grids
+from curvis.analysis.result import (
+    DEFAULT_P_DISPLAY,
+    STARS_FOOTNOTE,
+    Grid,
+    PDisplay,
+    Result,
+    grids,
+    render_p,
+)
 from curvis.core import Document
 from curvis.ui.dialogs import SECTION_SPACING, SPACING, secondary_label
 from curvis.ui.table.clipboard import to_tsv
@@ -215,6 +223,8 @@ class ResultsPanel(QWidget):
         self.document = document
         self.engine = engine
         self.table_id: str | None = None
+        self.p_display = DEFAULT_P_DISPLAY
+        """How P values are shown (Settings, Results)."""
         self.grids: list[ResultGrid] = []
         self.warning_rows: list[QWidget] = []
         self.error_row: QWidget | None = None
@@ -272,6 +282,12 @@ class ResultsPanel(QWidget):
     def current_id(self) -> str | None:
         data = self.combo.currentData()
         return str(data) if data else None
+
+    def set_p_display(self, display: PDisplay) -> None:
+        """Show P values as ``display`` (the results are not run again)."""
+        if display is not self.p_display:
+            self.p_display = display
+            self._show()
 
     def set_table(self, table_id: str | None) -> None:
         self.table_id = table_id
@@ -364,7 +380,7 @@ class ResultsPanel(QWidget):
             label.setForegroundRole(QPalette.ColorRole.BrightText)
             layout.addWidget(self.error_row)
         elif result is not None:
-            reading = QLabel(result.summary, content)
+            reading = QLabel(render_p(result.summary, self.p_display), content)
             reading.setObjectName("reading")
             reading.setWordWrap(True)
             reading.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -374,11 +390,13 @@ class ResultsPanel(QWidget):
             layout.addWidget(reading)
             for warning in result.warnings:
                 row, _label = _icon_row(
-                    QStyle.StandardPixmap.SP_MessageBoxWarning, warning, content
+                    QStyle.StandardPixmap.SP_MessageBoxWarning,
+                    render_p(warning, self.p_display),
+                    content,
                 )
                 self.warning_rows.append(row)
                 layout.addWidget(row)
-            for section in grids(result):
+            for section in grids(result, self.p_display):
                 layout.addSpacing(SECTION_SPACING - SPACING)
                 heading = QLabel(section.title or result.method, content)
                 bold = heading.font()

@@ -2,8 +2,10 @@
 
 A workbench dialog (docs/DESIGN.md §1, mockup in docs/mockups/index.html, board 3):
 
-- the sections as tabs: **Graph** (title, size, legend), **Axes**, **Series** and
-  **Colors and text**, each with one sentence on what it changes;
+- the sections as tabs: **Graph** (title, size, legend, and for bar-family graphs the
+  clusters of category groups, individual values, violin ends and histogram bins),
+  **Axes**, **Series** and **Colors and text** (color scheme, palette editor, chart
+  font and text size), each with one sentence on what it changes;
 - the items to format on the left (the axes; the series, several at once, with Add…,
   Remove, Move up and Move down), their options on the right. Graph and Colors and text
   have nothing to pick, so their options take the left column;
@@ -46,6 +48,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QSizePolicy,
+    QSpinBox,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -61,22 +64,31 @@ from curvis.charts.builder import (
     is_fit,
     two_way_analyses,
     with_fit,
+    with_grouping,
     with_palette,
 )
-from curvis.charts.colors import SCHEMES, scheme
+from curvis.charts.colors import SCHEMES, ColorScheme
 from curvis.charts.data import ChartData, compute, gather
+from curvis.charts.fonts import FONTS
 from curvis.charts.spec import (
     ASPECT_LABELS,
     ASPECT_PRESETS,
     CUSTOM_ASPECT,
+    GROUPABLE_VARIANTS,
+    HORIZONTAL_VARIANTS,
+    MAX_BINS,
     MAX_TEXT_SIZE,
     MIN_TEXT_SIZE,
+    POINTS_VARIANTS,
     AxisSpec,
+    BinMode,
     ChartFamily,
     ChartSpec,
     ChartVariant,
     ErrorBars,
     FitOverlay,
+    Grouping,
+    HistogramBins,
     LabelAngle,
     LineStyle,
     Scale,
@@ -85,6 +97,7 @@ from curvis.charts.spec import (
 )
 from curvis.core import Document
 from curvis.data import Table
+from curvis.data import series as _table_series
 from curvis.ui.dialogs import (
     FIELD_WIDTH,
     DialogSkeleton,
@@ -109,7 +122,7 @@ DESCRIPTIONS = (
     "Titles, ranges, labels and scales of the axes.",
     "Symbols, lines, colors, error bars and fitted curves. Select several series to change "
     "them together.",
-    "The color scheme and the size of the graph's text.",
+    "The colors, the font and the size of the graph's text.",
 )
 MIXED = "Mixed"
 AUTO = "Auto"
@@ -127,12 +140,17 @@ LINE_LABELS = {
     LineStyle.DASH: "– – Dashed",
     LineStyle.DOT: "··· Dotted",
 }
-CATEGORY_NOTE = "Bar and box graphs use only the color, error bars and legend of a series."
-BOX_NOTE = "Box plots use only the color and legend of a series."
+CATEGORY_NOTE = "Bar graphs use only the color, error bars and legend of a series."
+POINTS_NOTE = "The symbol and its size draw the individual values."
+BOX_NOTE = "Box plots and violins use only the color and legend of a series."
+HISTOGRAM_NOTE = "Histograms use only the color and legend of a series."
+SCATTER_NOTE = "A column scatter uses the symbol, color, error bars and legend of a series."
 SURVIVAL_NOTE = "Survival curves are steps; Size sets the length of the ticks at censored times."
-CATEGORY_AXIS_NOTE = "The X axis of a bar or box graph shows the series by name."
+CATEGORY_AXIS_NOTE = "This axis shows the series by name."
+COUNT_AXIS_NOTE = "This axis counts the values in each bin."
 LEVEL_AXIS_NOTE = "The X axis of an interaction graph shows the levels of the first factor."
 BAR_LOG_NOTE = "Bars start at 0, which a log axis cannot show."
+HISTOGRAM_LOG_NOTE = "Histogram bins are equally wide, so this axis stays linear."
 Y_ANGLE_NOTE = "Y axis labels are always horizontal."
 FIT_PREFIX = "fit:"
 """Item data of a fitted curve in the series list: the prefix and the analysis id."""
@@ -142,6 +160,15 @@ LAST_SERIES = "A graph needs at least one series."
 PREVIEW_NODE = "format-preview"
 SIZE_RANGE = (1.0, 50.0)
 """Smallest and largest custom page side, in cm."""
+GRAPH_PALETTE = "graph"
+"""Item data of the graph's own colors in the color scheme list."""
+GROUPING_LABELS = {
+    Grouping.NONE: "Not grouped",
+    Grouping.BY_SERIES: "By series, colored by {factor}",
+    Grouping.BY_CATEGORY: "By {factor}, colored by series",
+}
+BIN_LABELS = {BinMode.AUTO: "Auto", BinMode.COUNT: "Number of bins", BinMode.WIDTH: "Bin width"}
+GROUPING_NEEDS_CATEGORIES = "Put series in category groups to cluster them."
 
 type Problem = str | None
 
@@ -263,9 +290,12 @@ class FormatDialog(QDialog):
         scheduler: Scheduler | None = None,
         results: Mapping[str, Result] | None = None,
         data: ChartData | None = None,
+        palettes: Sequence[ColorScheme] = (),
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self._palettes = list(palettes)
+        """The palettes the user saved in the Settings, offered next to the built-in ones."""
         self.document = document
         self.original: ChartSpec = document.graph(graph_id)
         self.spec: ChartSpec = self.original
@@ -372,6 +402,7 @@ class FormatDialog(QDialog):
         interaction = self.original.family is ChartFamily.INTERACTION
         self.anova_label.setVisible(interaction)
         self.anova_combo.setVisible(interaction)
+        self._build_bar_options(form)
         outer.addLayout(form)
         outer.addStretch(1)
         self.title_edit.textEdited.connect(lambda text: self._edit(title=text))
@@ -382,6 +413,79 @@ class FormatDialog(QDialog):
         self.show_bands.toggled.connect(lambda on: self._edit(show_bands=on))
         self.anova_combo.currentIndexChanged.connect(lambda _i: self._on_anova_chosen())
         return box
+
+    def _build_bar_options(self, form: Any) -> None:
+        """The options of bar-family graphs, shown for the variants they apply to."""
+        variant = self.original.variant
+        factor = self.table.category_factor or "category"
+        self.grouping = QComboBox()
+        for choice, text in GROUPING_LABELS.items():
+            self.grouping.addItem(text.format(factor=factor), choice)
+        self.grouping_label = buddy_label("Cl&usters", self.grouping)
+        form.addRow(self.grouping_label, self.grouping)
+        has_categories = any(s.category_id is not None for s in _table_series(self.table)) and bool(
+            self.table.category_groups
+        )
+        self.grouping.setEnabled(has_categories)
+        self.grouping.setToolTip("" if has_categories else GROUPING_NEEDS_CATEGORIES)
+        for widget in (self.grouping_label, self.grouping):
+            widget.setVisible(variant in GROUPABLE_VARIANTS)
+        self.show_points = QCheckBox("Show individual &values")
+        self.show_points.setToolTip("Draw each value as a symbol over the bar, box or violin")
+        form.addRow("", self.show_points)
+        self.show_points.setVisible(variant in POINTS_VARIANTS)
+        self.violin_trim = QCheckBox("Tri&m violins at the smallest and largest value")
+        self.violin_trim.setToolTip(
+            "Off: the outline reaches three bandwidths further, as R's density() does"
+        )
+        form.addRow("", self.violin_trim)
+        self.violin_trim.setVisible(variant is ChartVariant.VIOLIN)
+        self.bin_mode = QComboBox()
+        for mode, text in BIN_LABELS.items():
+            self.bin_mode.addItem(text, mode)
+        self.bin_mode.setToolTip("Auto chooses the bins as R's hist() does")
+        self.bin_count = QSpinBox()
+        self.bin_count.setRange(1, MAX_BINS)
+        self.bin_count.setMaximumWidth(FIELD_WIDTH)
+        self.bin_count.setAccessibleName("Number of bins")
+        bins_row = QHBoxLayout()
+        bins_row.addWidget(self.bin_mode)
+        bins_row.addWidget(self.bin_count)
+        bins_row.addStretch(1)
+        self.bins_label = buddy_label("&Bins", self.bin_mode)
+        form.addRow(self.bins_label, bins_row)
+        self.bin_width = QLineEdit()
+        self.bin_start = QLineEdit()
+        width_row = QHBoxLayout()
+        for edit, name in ((self.bin_width, "Bin width"), (self.bin_start, "First bin starts at")):
+            edit.setMaximumWidth(FIELD_WIDTH)
+            edit.setAccessibleName(name)
+        width_row.addWidget(self.bin_width)
+        self.bin_start_label = buddy_label("sta&rting at", self.bin_start)
+        width_row.addWidget(self.bin_start_label)
+        width_row.addWidget(self.bin_start)
+        width_row.addStretch(1)
+        self.bin_width_label = buddy_label("Wi&dth", self.bin_width)
+        form.addRow(self.bin_width_label, width_row)
+        histogram = variant is ChartVariant.HISTOGRAM
+        bin_widgets: tuple[QWidget, ...] = (
+            self.bins_label,
+            self.bin_mode,
+            self.bin_count,
+            self.bin_width_label,
+            self.bin_width,
+            self.bin_start_label,
+            self.bin_start,
+        )
+        for bin_widget in bin_widgets:
+            bin_widget.setVisible(histogram)
+        self.grouping.activated.connect(lambda _i: self._on_grouping_chosen())
+        self.show_points.toggled.connect(lambda on: self._edit(show_points=on))
+        self.violin_trim.toggled.connect(lambda on: self._edit(violin_trim=on))
+        self.bin_mode.activated.connect(lambda _i: self._edit_bins())
+        self.bin_count.valueChanged.connect(lambda _v: self._edit_bins())
+        self.bin_width.textEdited.connect(lambda _t: self._edit_bins())
+        self.bin_start.textEdited.connect(lambda _t: self._edit_bins())
 
     def _build_axes_list(self) -> QGroupBox:
         box = QGroupBox("Axes")
@@ -524,9 +628,19 @@ class FormatDialog(QDialog):
         outer = QVBoxLayout(box)
         form = form_layout()
         self.scheme_combo = QComboBox()
-        for scheme_id, found in SCHEMES.items():
-            self.scheme_combo.addItem(found.name, scheme_id)
-        form.addRow(buddy_label("Color sc&heme", self.scheme_combo), self.scheme_combo)
+        self.scheme_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.edit_colors = QPushButton("Edit c&olors…")
+        self.edit_colors.setToolTip("Change the colors of this graph's palette")
+        scheme_row = QHBoxLayout()
+        scheme_row.addWidget(self.scheme_combo)
+        scheme_row.addWidget(self.edit_colors)
+        scheme_row.addStretch(1)
+        form.addRow(buddy_label("Color sc&heme", self.scheme_combo), scheme_row)
+        self.font_combo = QComboBox()
+        for font in FONTS.values():
+            text = f"{font.family} ({font.note})" if font.note else font.family
+            self.font_combo.addItem(text, font.id)
+        form.addRow(buddy_label("Chart &font", self.font_combo), self.font_combo)
         self.text_size = QDoubleSpinBox()
         self.text_size.setRange(MIN_TEXT_SIZE, MAX_TEXT_SIZE)
         self.text_size.setDecimals(1)
@@ -536,10 +650,17 @@ class FormatDialog(QDialog):
         form.addRow(buddy_label("Chart text si&ze", self.text_size), self.text_size)
         outer.addLayout(form)
         outer.addWidget(
-            secondary_label("More color schemes and a palette editor come in a later version.")
+            secondary_label(
+                "A new color scheme recolors the series in turn. Your own palettes are "
+                "made in Settings, New graphs."
+            )
         )
         outer.addStretch(1)
         self.scheme_combo.activated.connect(lambda _i: self._on_scheme_chosen())
+        self.edit_colors.clicked.connect(self.edit_palette)
+        self.font_combo.activated.connect(
+            lambda _i: self._edit(font=str(self.font_combo.currentData()))
+        )
         self.text_size.valueChanged.connect(lambda v: self._edit(text_size=float(v)))
         return box
 
@@ -584,6 +705,13 @@ class FormatDialog(QDialog):
                 self.height_spin,
                 self.show_legend,
                 self.show_bands,
+                self.grouping,
+                self.show_points,
+                self.violin_trim,
+                self.bin_mode,
+                self.bin_count,
+                self.bin_width,
+                self.bin_start,
             ]
         elif section == AXES:
             widgets += [
@@ -612,7 +740,7 @@ class FormatDialog(QDialog):
                 self.error_bars,
             ]
         else:
-            widgets += [self.scheme_combo, self.text_size]
+            widgets += [self.scheme_combo, self.edit_colors, self.font_combo, self.text_size]
         assert self.skeleton.ok_button is not None
         widgets.append(self.skeleton.ok_button)
         set_tab_order(widgets)
@@ -636,8 +764,25 @@ class FormatDialog(QDialog):
             self.show_bands.setChecked(spec.show_bands)
         with QSignalBlocker(self.anova_combo):
             self.anova_combo.setCurrentIndex(self.anova_combo.findData(spec.analysis_id))
-        with QSignalBlocker(self.scheme_combo):
-            self.scheme_combo.setCurrentIndex(max(0, self.scheme_combo.findData(spec.palette.id)))
+        self._fill_schemes()
+        with QSignalBlocker(self.font_combo):
+            self.font_combo.setCurrentIndex(max(0, self.font_combo.findData(spec.font)))
+        with QSignalBlocker(self.grouping):
+            self.grouping.setCurrentIndex(max(0, self.grouping.findData(spec.grouping)))
+        with QSignalBlocker(self.show_points):
+            self.show_points.setChecked(spec.show_points)
+        with QSignalBlocker(self.violin_trim):
+            self.violin_trim.setChecked(spec.violin_trim)
+        bins = spec.bins
+        with QSignalBlocker(self.bin_mode):
+            self.bin_mode.setCurrentIndex(self.bin_mode.findData(bins.mode))
+        with QSignalBlocker(self.bin_count):
+            self.bin_count.setValue(bins.count)
+        for edit, value in ((self.bin_width, bins.width), (self.bin_start, bins.start)):
+            if _number(edit.text()) != value:
+                with QSignalBlocker(edit):
+                    edit.setText(f"{value:g}")
+        self._update_bins_enabled()
         with QSignalBlocker(self.text_size):
             self.text_size.setValue(spec.text_size)
         self._fill_series_list()
@@ -671,15 +816,30 @@ class FormatDialog(QDialog):
         self._show_problem()
 
     def _update_axis_enabled(self, key: str) -> None:
+        variant = self.spec.variant
         levels_x = self.spec.family is ChartFamily.INTERACTION and key == "x_axis"
-        categorical_x = (self.spec.family is ChartFamily.BAR and key == "x_axis") or levels_x
-        bars_y = self.spec.variant is ChartVariant.BAR and key == "y_axis"
+        histogram = variant is ChartVariant.HISTOGRAM
+        category_key = "y_axis" if variant in HORIZONTAL_VARIANTS else "x_axis"
+        categorical = (
+            self.spec.family is ChartFamily.BAR and not histogram and key == category_key
+        ) or levels_x
+        bars = variant in (ChartVariant.BAR, ChartVariant.HORIZONTAL_BAR) and not categorical
         for widget in (self.axis_from, self.axis_to, self.linear, self.log):
-            widget.setEnabled(not categorical_x)
-        self.log.setEnabled(not (categorical_x or bars_y))
+            widget.setEnabled(not categorical)
+        self.log.setEnabled(not (categorical or bars or histogram))
         self.label_angle.setEnabled(key == "x_axis")
         axis_note = LEVEL_AXIS_NOTE if levels_x else CATEGORY_AXIS_NOTE
-        notes = [axis_note if categorical_x else BAR_LOG_NOTE if bars_y else ""]
+        if categorical:
+            first = axis_note
+        elif bars:
+            first = BAR_LOG_NOTE
+        elif histogram:
+            first = (
+                f"{COUNT_AXIS_NOTE} {HISTOGRAM_LOG_NOTE}" if key == "y_axis" else HISTOGRAM_LOG_NOTE
+            )
+        else:
+            first = ""
+        notes = [first]
         if key == "y_axis":
             notes.append(Y_ANGLE_NOTE)
         note = " ".join(n for n in notes if n)
@@ -787,14 +947,28 @@ class FormatDialog(QDialog):
                     spin.setValue(value)
         self._fill_colors(styles)
         self._fill_error_bars(styles)
+        variant = self.spec.variant
         category = self.spec.family is ChartFamily.BAR
-        box = self.spec.variant is ChartVariant.BOX
+        box = variant in (ChartVariant.BOX, ChartVariant.VIOLIN)
+        histogram = variant is ChartVariant.HISTOGRAM
+        scatter = variant is ChartVariant.COLUMN_SCATTER
+        points = scatter or (self.spec.show_points and variant in POINTS_VARIANTS)
         survival = self.spec.family is ChartFamily.SURVIVAL
         for widget in (self.symbol, self.symbol_size, self.line_style, self.line_width):
             widget.setEnabled(not category)
-        self.symbol.setEnabled(not category and not survival)
-        self.error_bars.setEnabled(not box and not survival)
-        note = BOX_NOTE if box else CATEGORY_NOTE if category else SURVIVAL_NOTE if survival else ""
+        self.symbol.setEnabled((not category or points) and not survival)
+        self.symbol_size.setEnabled(not category or points)
+        self.error_bars.setEnabled(not box and not survival and not histogram)
+        if histogram:
+            note = HISTOGRAM_NOTE
+        elif scatter:
+            note = SCATTER_NOTE
+        elif category:
+            note = BOX_NOTE if box else CATEGORY_NOTE
+            if points:
+                note = f"{note} {POINTS_NOTE}"
+        else:
+            note = SURVIVAL_NOTE if survival else ""
         self.series_note.setText(note)
         self.series_note.setVisible(bool(note))
 
@@ -963,9 +1137,91 @@ class FormatDialog(QDialog):
         self._apply(replace(self.spec, series=tuple(styles)))
         self._load_series_options()
 
+    # --- colors, font, bar-family options ---------------------------------------------------
+
+    def _scheme_choices(self) -> list[ColorScheme]:
+        """The built-in schemes and the user's palettes; first the graph's own colors when
+        they are none of them."""
+        found = [*SCHEMES.values(), *self._palettes]
+        if not any(p.same_colors(self.spec.palette) for p in found):
+            found.insert(0, self.spec.palette)
+        return found
+
+    def _fill_schemes(self) -> None:
+        with QSignalBlocker(self.scheme_combo):
+            self.scheme_combo.clear()
+            current = 0
+            for index, palette in enumerate(self._scheme_choices()):
+                ours = not any(p.same_colors(palette) for p in (*SCHEMES.values(), *self._palettes))
+                name = (
+                    f"This graph's colors ({palette.name})"
+                    if ours and palette.name
+                    else ("This graph's colors" if ours else palette.name)
+                )
+                self.scheme_combo.addItem(_swatch(palette.series_color(0)), name, index)
+                if palette.same_colors(self.spec.palette):
+                    current = index if current == 0 else current
+            self.scheme_combo.setCurrentIndex(current)
+
     def _on_scheme_chosen(self) -> None:
-        scheme_id = str(self.scheme_combo.currentData())
-        self._apply(with_palette(self.spec, scheme(scheme_id)))
+        index = self.scheme_combo.currentData()
+        choices = self._scheme_choices()
+        if not isinstance(index, int) or not 0 <= index < len(choices):
+            return
+        self._apply(with_palette(self.spec, choices[index]))
+        self._fill_schemes()
+        self._fill_series_list()
+
+    def _ask_palette(self, palette: ColorScheme) -> ColorScheme | None:
+        """Show the palette editor for this graph; the edited palette or None (tests
+        replace it)."""
+        from curvis.ui.palette_dialog import PaletteDialog
+
+        dialog = PaletteDialog(palette, title="Edit colors", ok_text="Use", parent=self)
+        try:
+            return dialog.edited if dialog.exec() == QDialog.DialogCode.Accepted else None
+        finally:
+            dialog.deleteLater()
+
+    def edit_palette(self) -> None:
+        """Edit the colors of this graph's palette; its series are recolored in turn."""
+        edited = self._ask_palette(self.spec.palette)
+        if edited is None or edited == self.spec.palette:
+            return
+        self._apply(with_palette(self.spec, edited))
+        self._fill_schemes()
+        self._fill_series_list()
+
+    def _on_grouping_chosen(self) -> None:
+        grouping = Grouping(self.grouping.currentData())
+        if grouping is self.spec.grouping:
+            return
+        self._apply(with_grouping(self.spec, grouping, self.table))
+        self._fill_series_list()
+
+    def _update_bins_enabled(self) -> None:
+        mode = BinMode(self.bin_mode.currentData())
+        self.bin_count.setEnabled(mode is BinMode.COUNT)
+        for widget in (self.bin_width, self.bin_start):
+            widget.setEnabled(mode is BinMode.WIDTH)
+
+    def _edit_bins(self) -> None:
+        self._update_bins_enabled()
+        mode = BinMode(self.bin_mode.currentData())
+        width, start = _number(self.bin_width.text()), _number(self.bin_start.text())
+        if mode is BinMode.WIDTH and (width is None or width <= 0 or start is None):
+            self._problems["bins"] = "Type a bin width above 0 and the start of the first bin."
+            self._show_problem()
+            return
+        self._problems.pop("bins", None)
+        old = self.spec.bins
+        bins = HistogramBins(
+            mode,
+            self.bin_count.value(),
+            width if width is not None and width > 0 else old.width,
+            start if start is not None else old.start,
+        )
+        self._edit(bins=bins)
         self._fill_series_list()
 
     # --- series: add, remove, order ---------------------------------------------------------

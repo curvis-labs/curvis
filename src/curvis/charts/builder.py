@@ -27,15 +27,13 @@ shows it next to the disabled family.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 from curvis.analysis.base import Analysis, Family, rows_match_x, x_column_id
 from curvis.charts.colors import CURVIS, ColorScheme, recolored
-from curvis.charts.fonts import DEFAULT_FONT
 from curvis.charts.grouping import Entry, grouped_layout
 from curvis.charts.spec import (
-    DEFAULT_ASPECT,
-    DEFAULT_TEXT_SIZE,
+    GROUPABLE_VARIANTS,
     HORIZONTAL_VARIANTS,
     SYMBOL_CYCLE,
     AxisSpec,
@@ -44,6 +42,7 @@ from curvis.charts.spec import (
     ChartVariant,
     ErrorBars,
     FitOverlay,
+    GraphDefaults,
     Grouping,
     LabelAngle,
     LineStyle,
@@ -69,17 +68,6 @@ INTERACTION_ONLY = "An interaction graph keeps its type"
 SURVIVAL_ONLY = "A survival graph keeps its type"
 SURVIVAL_Y_TITLE = "Survival probability"
 HISTOGRAM_Y_TITLE = "Number of values"
-
-
-@dataclass(frozen=True)
-class GraphDefaults:
-    """What a new graph copies from the Settings ("New graphs")."""
-
-    aspect_ratio: str = DEFAULT_ASPECT
-    custom_size: tuple[float, float] | None = None
-    palette: ColorScheme = CURVIS
-    font: str = DEFAULT_FONT
-    text_size: float = DEFAULT_TEXT_SIZE
 
 
 def two_way_analyses(table: Table, analyses: Sequence[Analysis]) -> list[Analysis]:
@@ -383,6 +371,7 @@ def with_variant(spec: ChartSpec, variant: ChartVariant, table: Table) -> ChartS
         if variant is ChartVariant.HISTOGRAM and spec.variant is not ChartVariant.HISTOGRAM:
             # Overlaid series need their names: a legend when there are several.
             changed = replace(changed, show_legend=len(spec.series) > 1)
+        changed = _recolor_for(changed, spec, table)
         return _with_bar_axes(changed, category, value, table)
     if spec.family is ChartFamily.BAR:
         # Back to the upright layout first, so the X axis is the categories' again.
@@ -427,6 +416,22 @@ def with_fit(spec: ChartSpec, analysis: Analysis) -> ChartSpec:
     ):
         new = replace(new, x_axis=replace(axis, scale=Scale.LOG))
     return new
+
+
+def _recolor_for(changed: ChartSpec, before: ChartSpec, table: Table) -> ChartSpec:
+    """Colours that suit ``changed``'s variant when it is grouped and ``before``'s was
+    not, or the other way round: a grouped graph colours by category (or series name),
+    one that cannot be grouped (histogram, column scatter) gives each series its own.
+    The grouping is kept, so it comes back with a type that can be grouped."""
+    if changed.grouping is Grouping.NONE:
+        return changed
+    was = before.variant in GROUPABLE_VARIANTS
+    now = changed.variant in GROUPABLE_VARIANTS
+    if was == now:
+        return changed
+    if now:
+        return with_grouping(changed, changed.grouping, table)
+    return replace(with_grouping(changed, Grouping.NONE, table), grouping=changed.grouping)
 
 
 def _bar_axes(spec: ChartSpec) -> tuple[AxisSpec, AxisSpec]:

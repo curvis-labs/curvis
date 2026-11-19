@@ -35,17 +35,15 @@ def test_xy_variants_render(variant: ChartVariant) -> None:
     assert 0 < left < left + width < 340 and 0 < top < top + height < 226
 
 
-@pytest.mark.parametrize("variant", [ChartVariant.BAR, ChartVariant.BOX])
+BAR_FAMILY = [v for v in ChartVariant if v.family is ChartFamily.BAR]
+
+
+@pytest.mark.parametrize("variant", BAR_FAMILY)
 def test_bar_variants_render(variant: ChartVariant) -> None:
+    """Every variant of the Bar family exports (none says it cannot be drawn)."""
     spec, data = bars(variant)
     image, _box = render_image(spec, data, 96)
     assert image.shape[2] == 4
-
-
-def test_unsupported_variants_say_so() -> None:
-    spec, data = bars(ChartVariant.BAR)
-    with pytest.raises(ValueError, match="cannot be exported"):
-        render_image(replace(spec, variant=ChartVariant.VIOLIN), data, 96)
 
 
 def test_png_has_the_page_size_and_resolution(tmp_path: Path) -> None:

@@ -11,7 +11,8 @@ from pytestqt.qtbot import QtBot
 
 from curvis.analysis.base import Analysis
 from curvis.analysis.fit.analyses import Hill4Params
-from curvis.charts.render_qt.chart_view import BoxItem, ChartView
+from curvis.charts.marks import Rect
+from curvis.charts.render_qt.chart_view import ChartView, MarksItem
 from curvis.charts.spec import ChartFamily, ChartVariant, FitOverlay, Scale
 from curvis.core import AddTable, SetCellValue, add_analysis, edit_graph
 from curvis.ui.close_table_dialog import DeleteDialog
@@ -166,7 +167,11 @@ def test_bar_and_box(window: MainWindow, qtbot: QtBot) -> None:
     box = replace(tab.document.graphs[0], variant=ChartVariant.BOX)
     tab.document.execute(edit_graph(tab.document, box))
     settle(qtbot, tab)
-    assert any(isinstance(item, BoxItem) for item in chart.plot_item.items)
+    marks = [item for item in chart.plot_item.items if isinstance(item, MarksItem)]
+    assert len(marks) == 1
+    # A box (Q1 to Q3) per series, lightly filled in its colour.
+    boxes = [s for s in marks[0]._marks.shapes if isinstance(s, Rect)]
+    assert len(boxes) == len(chart.spec.series) and all(b.fill_alpha < 1 for b in boxes)
     text = chart.tooltip_at(vb.mapViewToScene(QPointF(1.0, 6.0)))
     assert text is not None and text.startswith("Treated\nMaximum: 7")
 
