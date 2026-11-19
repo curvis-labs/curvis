@@ -25,7 +25,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QSettings, Signal
 
 from curvis.analysis.result import DEFAULT_P_DISPLAY, PDisplay
-from curvis.charts.colors import CURVIS, SCHEMES, ColorScheme, normalized, palette_problem
+from curvis.charts.colors import CURVIS, ColorScheme, normalized, palette_problem
 from curvis.charts.fonts import DEFAULT_FONT, FONTS
 from curvis.charts.spec import (
     ASPECT_PRESETS,
@@ -94,10 +94,6 @@ def _checked(palette: ColorScheme) -> ColorScheme:
     if problem is not None:
         raise ValueError(problem)
     return normalized(palette)
-
-
-def builtin_palettes() -> list[ColorScheme]:
-    return list(SCHEMES.values())
 
 
 def _same_file_key(path: Path) -> str:

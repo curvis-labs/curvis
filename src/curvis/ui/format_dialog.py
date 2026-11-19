@@ -204,6 +204,9 @@ def data_key(spec: ChartSpec) -> object:
         spec.y_axis.scale,
         tuple((o.analysis_id, o.show_band) for o in spec.overlays),
         spec.analysis_id,
+        spec.show_points,
+        spec.violin_trim,
+        spec.bins,
     )
 
 

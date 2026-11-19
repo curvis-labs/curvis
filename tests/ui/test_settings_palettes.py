@@ -228,3 +228,30 @@ def test_horizontal_bars_name_the_series_on_the_y_axis(qtbot: QtBot) -> None:
     dialog.axes_list.setCurrentRow(1)  # Y: the series
     assert not dialog.axis_from.isEnabled()
     assert dialog.axis_note.text().startswith("This axis shows the series by name")
+
+
+def test_the_preview_recomputes_for_violin_ends_and_bins(qtbot: QtBot) -> None:
+    dialog = _format(qtbot, ChartVariant.VIOLIN, "spread")
+
+    def low_end() -> float:
+        data = dialog._data
+        assert data is not None and data.categories[0].violin is not None
+        return float(data.categories[0].violin.grid[0])
+
+    qtbot.waitUntil(lambda: dialog._data is not None, timeout=10_000)
+    trimmed = low_end()
+    dialog.violin_trim.setChecked(False)
+    qtbot.waitUntil(lambda: low_end() < trimmed, timeout=10_000)
+
+    hist = _format(qtbot, ChartVariant.HISTOGRAM, "spread")
+    qtbot.waitUntil(lambda: hist._data is not None and hist._data.histogram is not None)
+    index = hist.bin_mode.findData(BinMode.COUNT)
+    hist.bin_mode.setCurrentIndex(index)
+    hist.bin_mode.activated.emit(index)
+    hist.bin_count.setValue(4)
+
+    def bins() -> int:
+        found = hist._data.histogram if hist._data is not None else None
+        return len(found.breaks) - 1 if found is not None else 0
+
+    qtbot.waitUntil(lambda: bins() == 4, timeout=10_000)

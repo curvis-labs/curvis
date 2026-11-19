@@ -334,8 +334,6 @@ GRAPH_TYPES = (
     ChartVariant.HISTOGRAM,
 )
 """The types a graph can be changed to (Change graph type)."""
-TOOLBAR_TYPES = (ChartVariant.SCATTER, ChartVariant.LINE, ChartVariant.BAR, ChartVariant.BOX)
-"""The types on the Graph panel's toolbar (SPEC.md); the others are in the menu."""
 
 
 def variant_problem(
