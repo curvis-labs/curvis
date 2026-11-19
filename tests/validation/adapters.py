@@ -605,3 +605,27 @@ def box_stats(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
         "q3": [b.q3 for b in found],
         "max": [b.max for b in found],
     }
+
+
+@adapter("kaplan_meier")
+def kaplan_meier(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/kaplan_meier.R: the Kaplan-Meier estimate (log-log CI)."""
+    from curvis.analysis.survival.km import kaplan_meier as km
+
+    r = km(inputs["time"], inputs["event"])
+    return {
+        "n": r.n,
+        "n_events": r.n_events,
+        "time": r.time,
+        "n_risk": r.n_risk,
+        "n_event": r.n_event,
+        "n_censor": r.n_censor,
+        "survival": r.survival,
+        "std_err": r.std_err,
+        "lower": r.lower,
+        "upper": r.upper,
+        "median": r.median,
+        "median_lower": r.median_lower,
+        "median_upper": r.median_upper,
+        "risk_n": r.at_risk(inputs["risk_times"]),
+    }

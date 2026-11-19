@@ -6,6 +6,9 @@
 # Definitions:
 # - Input: follow-up times (>= 0) and events (1 = event, 0 = censored). A subject with a
 #   missing time or event (NaN) is left out, as survfit's na.action does.
+# - Times that differ only by rounding are one time (survfit's default timefix = TRUE,
+#   survival:::aeqSurv): distinct times whose gap is at most sqrt(.Machine$double.eps),
+#   absolutely or relative to the mean of the distinct times, become the smaller one.
 # - The estimate (survival::survfit(Surv(time, event) ~ 1)), at each distinct time t_j
 #   (events and censorings, in increasing order):
 #     n_j = number with time >= t_j (at risk), d_j = events at t_j, c_j = censored at t_j,
@@ -55,10 +58,11 @@ km_case <- function(case, description, time, event, risk_times = NULL) {
                            conf.int = 0.95)
 
   # The estimate by the formulas, as a check of the definitions.
-  times <- sort(unique(t_ok))
-  n_risk <- vapply(times, function(t) sum(t_ok >= t), numeric(1))
-  n_event <- vapply(times, function(t) sum(t_ok == t & e_ok == 1), numeric(1))
-  n_censor <- vapply(times, function(t) sum(t_ok == t & e_ok == 0), numeric(1))
+  t_fix <- survival::aeqSurv(survival::Surv(t_ok, e_ok))[, 1]
+  times <- sort(unique(t_fix))
+  n_risk <- vapply(times, function(t) sum(t_fix >= t), numeric(1))
+  n_event <- vapply(times, function(t) sum(t_fix == t & e_ok == 1), numeric(1))
+  n_censor <- vapply(times, function(t) sum(t_fix == t & e_ok == 0), numeric(1))
   surv <- cumprod(1 - n_event / n_risk)
   sigma <- sqrt(cumsum(n_event / (n_risk * (n_risk - n_event))))
   stopifnot(
@@ -166,3 +170,7 @@ km_case("large", "200 subjects, times rounded to whole days: many ties, 30% cens
         time = round(rweibull(200, shape = 1.3, scale = 40)),
         event = rbinom(200, 1, 0.7),
         risk_times = c(0, 20, 40, 60, 80, 100, 120))
+
+km_case("near_ties", "Times that differ only by rounding (0.1 + 0.2 and 0.3, 1 and 1 + 1e-10) are one time.",
+        time = c(0.1 + 0.2, 0.3, 1, 1 + 1e-10, 2, 2.5, 3 * (1 + 1e-9), 3, 5, 6),
+        event = c(1, 0, 1, 1, 0, 1, 1, 1, 0, 1))
