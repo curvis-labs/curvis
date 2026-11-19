@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Analyze dialog options</title>
+<title>Analyze dialog redesign</title>
 <!--
-  Three proposals for the analysis chooser and the Advanced options of the Analyze dialog,
-  drawn in the style of index.html (palette of curvis.ui.theme, 1:1, docs/DESIGN.md).
-  Generated mockup; a picture to choose from, not code to copy.
+  Proposal for the Analyze dialog: a grouped analysis list, options under the data, and an
+  "About this analysis" panel. Drawn in the style of index.html (palette of curvis.ui.theme, 1:1,
+  docs/DESIGN.md). Numbered markers refer to the list of changes. A picture, not code to copy.
 -->
 <style>
   :root, :root[data-theme="light"] {
@@ -178,18 +178,33 @@
   .eq { font-family: "Cambria Math", "STIX Two Math", Georgia, serif; font-size: 13px; }
   .compare-mini { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
 
+
+  .mi { display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: var(--mark); color: #fff;
+        font: 700 11px/18px system-ui, sans-serif; text-align: center; vertical-align: 1px; margin: 0 4px;
+        flex: none; }
+  .scroll { position: relative; }
+  .scroll .bar { position: absolute; right: 1px; top: 1px; bottom: 1px; width: 10px; background: var(--window);
+                 border-left: 1px solid var(--border); }
+  .scroll .bar::after { content: ""; position: absolute; left: 2px; right: 2px; top: 2px; height: 46%;
+                        border-radius: 3px; background: var(--border); }
+  .scroll .glist .gi { padding-right: 18px; }
+  .about .k { color: var(--secondary); }
+  .changes { columns: 2; column-gap: 32px; max-width: 1240px; padding-left: 22px; margin: 0; }
+  .changes li { break-inside: avoid; margin-bottom: 8px; }
+  .changes li::marker { color: var(--mark); font-weight: 700; }
+
 </style>
 </head>
 <body>
 <header class="page">
-  <h1>Analyze dialog — three ways to choose an analysis</h1>
-  <p>All four boards show the same case: <i>Fit a curve</i>, three dose-response series ticked, Hill 4PL chosen, top fixed at 100 and the fit limited to X from −9 to −5. Orange numbers point to the notes.</p>
+  <h1>Analyze dialog — redesign</h1>
+  <p>The current dialog, then the new one for a curve fit and for a group comparison, both at the default size of 900 × 640. Orange numbers are the changes, listed at the bottom.</p>
   <div class="switch" role="group" aria-label="Theme">
     <button type="button" data-set="light">Light</button>
     <button type="button" data-set="dark">Dark</button>
   </div>
 </header>
-<section class="board"><h2><span class="tag">Now</span>Current dialog — 11 radio buttons, two text fields to type</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+<section class="board"><h2><span class="tag">Now</span>Current dialog</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
 <div class="tabs">
   <div class="tab">C<u>o</u>mpare groups</div>
   <div class="tab on">Fit a c<u>u</u>rve</div>
@@ -235,8 +250,8 @@
 </div></div>
 <div class="feedback"></div>
 <div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
-</div></div><div class="notes"><p>For comparison. The radio grid fills top to bottom in columns of four, so related models (4PL, 3PL, Biphasic) are split across columns, and the advanced options need the exact syntax <code>top = 100</code> and <code>-9 to -5</code>.</p></div></div></section>
-<section class="board"><h2><span class="tag">A</span>Grouped list + parameter table — the smallest change</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+</div></div><div class=notes><p>For comparison. The radio grid fills top to bottom in columns of four, so related models (4PL, 3PL, Biphasic) are split across columns, and the advanced options need the exact syntax <code>top = 100</code> and <code>-9 to -5</code>.</p></div></div></section>
+<section class="board"><h2><span class="tag">New</span>Fit a curve — Hill 4PL, top fixed at 100, X from −9 to −5</h2><div class="row"><div class="win" style="width:900px;height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
 <div class="tabs">
   <div class="tab">C<u>o</u>mpare groups</div>
   <div class="tab on">Fit a c<u>u</u>rve</div>
@@ -247,192 +262,96 @@
   <div class="legend">Data</div>
   <div class="list grow">
     <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
-    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div>
-    <div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div>
-    <div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div><div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div><div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
     <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;log[Agonist] (X)</div><div class="c2" style="text-align:right">–</div></div>
   </div>
   <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
 </div>
-
 <div class="group">
-  <div class="legend">Options</div>
+  <div class="legend">Options<span class="mi">4</span></div>
   <div><span class="cb on"></span>X values are lo<u>g</u>10(concentration)</div>
-  <div class="line"><span>Fit only <u>X</u> from</span><span class="field w60 num">−9</span> to <span class="field w60 num">−5</span>
-    <span class="secondary">30 of 35 points</span></div>
+  <div class="line"><span>Fit only <u>X</u> from</span><span class="field w60 num">−9</span><span>to</span><span class="field w60 num">−5</span>
+    <span class="secondary">30 of 35 points</span><span class="mi">5</span></div>
   <div class="open"><span><u>A</u>dvanced</span></div>
-  <div class="indent">
-    <div class="ptable">
+  <div class="indent" style="display:flex;gap:4px;align-items:flex-start">
+    <div class="ptable" style="flex:1;padding:4px 8px;gap:3px 8px">
       <span class="hd">Fix</span><span class="hd">Parameter</span><span class="hd">Value</span>
       <span class="cb"></span><span>Bottom</span><span class="field num off">fitted</span>
       <span class="cb on"></span><span>Top</span><span class="field num">100</span>
       <span class="cb"></span><span>EC50</span><span class="field num off">fitted</span>
       <span class="cb"></span><span>Hill slope</span><span class="field num off">fitted</span>
-    </div>
+    </div><span class="mi">6</span>
   </div>
-</div>
-</div><div class="col">
+</div></div><div class="col">
 <div class="group">
-  <div class="legend">Analysis</div>
-  <div class="field search">Type to filter…</div>
-  <div class="glist">
-    <div class="gh">Recent</div>
-    <div class="gi sel">Hill 4PL (variable slope)<span class="sub">EC50, Hill slope, top, bottom</span></div>
-    <div class="gh">Linear</div>
-    <div class="gi">Linear regression<span class="sub">slope, intercept, R²</span></div>
-    <div class="gi">Polynomial regression<span class="sub">degree 2–6</span></div>
-    <div class="gh">Dose-response</div>
-    <div class="gi">3PL (bottom fixed at 0)<span class="sub">EC50, Hill slope, top</span></div>
-    <div class="gi">Biphasic dose-response<span class="sub">two EC50s</span></div>
-    <div class="more">▾ Kinetics (3) · Shape-based (2)</div>
-  </div>
+  <div class="legend">Analysis<span class="mi">1</span></div>
+  <div class="line" style="flex-wrap:nowrap"><div class="field search" style="flex:1">Type to filter…</div><span class="mi">2</span></div>
+  <div style="display:flex;gap:4px;align-items:flex-start"><div class="scroll" style="flex:1"><div class="glist" style="height:150px"><div class="gh">Recent</div><div class="gi sel">Hill 4PL (variable slope)<span class="sub">EC50, Hill slope, top, bottom</span></div><div class="gh">Linear</div><div class="gi">Linear regression<span class="sub">slope, intercept, R²</span></div><div class="gi">Polynomial regression<span class="sub">degree 2–6</span></div><div class="gh">Dose-response</div><div class="gi">3PL (bottom fixed at 0)<span class="sub">EC50, Hill slope, top</span></div></div><div class="bar"></div></div><span class="mi">3</span></div>
 </div>
-
-<div class="group grow">
-  <div class="legend">Model and what will run</div>
+<div class="group grow about">
+  <div class="legend">About this analysis<span class="mi">7</span></div>
   <div class="eq" style="font-size:14px">Y = Bottom + (Top − Bottom) / (1 + 10<sup>(logEC50 − X) · HillSlope</sup>)</div>
-  <div class="plot"><svg viewBox="0 0 400 190" style="display:block;width:100%;height:auto"><line x1="40" y1="165" x2="385" y2="165" stroke="var(--border)"/><line x1="40" y1="12" x2="40" y2="165" stroke="var(--border)"/><line x1="40" y1="30" x2="385" y2="30" stroke="var(--highlight)" stroke-width="1.5" stroke-dasharray="5 3"/><line x1="40" y1="150" x2="385" y2="150" stroke="var(--secondary)" stroke-dasharray="3 3"/><line x1="210" y1="90.0" x2="210" y2="165" stroke="var(--secondary)" stroke-dasharray="3 3"/><line x1="172" y1="130.0" x2="248" y2="50.0" stroke="var(--secondary)"/><polyline points="40.0,149.9 43.4,149.9 46.8,149.9 50.2,149.9 53.6,149.8 57.0,149.8 60.4,149.8 63.8,149.7 67.2,149.7 70.6,149.7 74.0,149.6 77.4,149.5 80.8,149.5 84.2,149.4 87.6,149.3 91.0,149.2 94.4,149.1 97.8,148.9 101.2,148.8 104.6,148.6 108.0,148.3 111.4,148.1 114.8,147.8 118.2,147.5 121.6,147.1 125.0,146.7 128.4,146.2 131.8,145.6 135.2,145.0 138.6,144.2 142.0,143.4 145.4,142.5 148.8,141.4 152.2,140.2 155.6,138.8 159.0,137.3 162.4,135.6 165.8,133.7 169.2,131.6 172.6,129.3 176.0,126.7 179.4,123.9 182.8,120.9 186.2,117.6 189.6,114.2 193.0,110.5 196.4,106.6 199.8,102.6 203.2,98.5 206.6,94.3 210.0,90.0 213.4,85.7 216.8,81.5 220.2,77.4 223.6,73.4 227.0,69.5 230.4,65.8 233.8,62.4 237.2,59.1 240.6,56.1 244.0,53.3 247.4,50.7 250.8,48.4 254.2,46.3 257.6,44.4 261.0,42.7 264.4,41.2 267.8,39.8 271.2,38.6 274.6,37.5 278.0,36.6 281.4,35.8 284.8,35.0 288.2,34.4 291.6,33.8 295.0,33.3 298.4,32.9 301.8,32.5 305.2,32.2 308.6,31.9 312.0,31.7 315.4,31.4 318.8,31.2 322.2,31.1 325.6,30.9 329.0,30.8 332.4,30.7 335.8,30.6 339.2,30.5 342.6,30.5 346.0,30.4 349.4,30.3 352.8,30.3 356.2,30.3 359.6,30.2 363.0,30.2 366.4,30.2 369.8,30.1 373.2,30.1 376.6,30.1 380.0,30.1" fill="none" stroke="var(--s1)" stroke-width="2.5"/><circle cx="210" cy="90.0" r="3.5" fill="var(--s1)"/><text x="46" y="24" font-size="11" font-weight="700" fill="var(--highlight)">Top = 100 (fixed)</text><text x="300" y="144" font-size="11" fill="var(--secondary)">Bottom</text><text x="216" y="180" font-size="11" fill="var(--secondary)">EC50</text><text x="224" y="120.0" font-size="11" fill="var(--secondary)">Hill slope: steepness at EC50</text><text x="34" y="180" font-size="10" fill="var(--secondary)" text-anchor="end">X</text><text x="30" y="16" font-size="10" fill="var(--secondary)" text-anchor="end">Y</text></svg></div>
-  <div>Fits Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5. Reports bottom, EC50 and Hill slope.</div>
-  <div class="secondary">Use when the response rises or falls between two plateaus as log dose increases.</div>
-</div>
-</div></div>
+  <div style="display:flex;gap:4px;align-items:flex-start"><div class="plot" style="flex:1"><svg viewBox="0 0 400 122" style="display:block;width:100%;height:auto"><line x1="40" y1="102" x2="385" y2="102" stroke="var(--border)"/><line x1="40" y1="6" x2="40" y2="102" stroke="var(--border)"/><line x1="40" y1="20" x2="385" y2="20" stroke="var(--highlight)" stroke-width="1.5" stroke-dasharray="5 3"/><line x1="40" y1="90" x2="385" y2="90" stroke="var(--secondary)" stroke-dasharray="3 3"/><line x1="210" y1="55.0" x2="210" y2="102" stroke="var(--secondary)" stroke-dasharray="3 3"/><polyline points="40.0,90.0 43.4,90.0 46.8,90.0 50.2,90.0 53.6,89.9 57.0,89.9 60.4,89.9 63.8,89.9 67.2,89.9 70.6,89.9 74.0,89.9 77.4,89.8 80.8,89.8 84.2,89.8 87.6,89.8 91.0,89.7 94.4,89.7 97.8,89.6 101.2,89.5 104.6,89.5 108.0,89.4 111.4,89.3 114.8,89.1 118.2,89.0 121.6,88.8 125.0,88.6 128.4,88.4 131.8,88.1 135.2,87.8 138.6,87.5 142.0,87.1 145.4,86.6 148.8,86.1 152.2,85.4 155.6,84.7 159.0,83.9 162.4,83.0 165.8,81.9 169.2,80.7 172.6,79.4 176.0,77.9 179.4,76.3 182.8,74.4 186.2,72.5 189.6,70.3 193.0,68.0 196.4,65.6 199.8,63.1 203.2,60.4 206.6,57.7 210.0,55.0 213.4,52.3 216.8,49.6 220.2,46.9 223.6,44.4 227.0,42.0 230.4,39.7 233.8,37.5 237.2,35.6 240.6,33.7 244.0,32.1 247.4,30.6 250.8,29.3 254.2,28.1 257.6,27.0 261.0,26.1 264.4,25.3 267.8,24.6 271.2,23.9 274.6,23.4 278.0,22.9 281.4,22.5 284.8,22.2 288.2,21.9 291.6,21.6 295.0,21.4 298.4,21.2 301.8,21.0 305.2,20.9 308.6,20.7 312.0,20.6 315.4,20.5 318.8,20.5 322.2,20.4 325.6,20.3 329.0,20.3 332.4,20.2 335.8,20.2 339.2,20.2 342.6,20.2 346.0,20.1 349.4,20.1 352.8,20.1 356.2,20.1 359.6,20.1 363.0,20.1 366.4,20.1 369.8,20.0 373.2,20.0 376.6,20.0 380.0,20.0" fill="none" stroke="var(--s1)" stroke-width="2.5"/><circle cx="210" cy="55.0" r="3.5" fill="var(--s1)"/><text x="46" y="15" font-size="11" font-weight="700" fill="var(--highlight)">Top = 100 (fixed)</text><text x="380" y="85" font-size="11" fill="var(--secondary)" text-anchor="end">Bottom</text><text x="222" y="67.0" font-size="11" fill="var(--secondary)">Hill slope: steepness at EC50</text><text x="210" y="115" font-size="11" fill="var(--secondary)" text-anchor="middle">EC50</text><text x="34" y="115" font-size="10" fill="var(--secondary)" text-anchor="end">X</text><text x="32" y="12" font-size="10" fill="var(--secondary)" text-anchor="end">Y</text></svg></div><span class="mi">8</span></div>
+  <div>Fits Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5.</div>
+  <div class="secondary">Use when the response rises or falls between two plateaus as log dose increases.<span class="mi">9</span></div>
+</div></div></div>
 <div class="feedback"></div>
 <div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
-<span class="m" style="left:448px;top:92px">1</span><span class="m" style="left:448px;top:124px">2</span><span class="m" style="left:-26px;top:482px">3</span><span class="m" style="left:-26px;top:562px">4</span><span class="m" style="left:448px;top:402px">5</span></div></div><div class="notes">
-<ol>
-  <li><b>A grouped list replaces the radio grid.</b> The sub-families from SPEC.md (Linear, Dose-response, Kinetics, Shape-based) become section headers, with recently used analyses on top. Each row says in a few words what the analysis reports.</li>
-  <li><b>Filter field.</b> Type “ec50” or “decay” to narrow the list; arrow keys move, Enter runs. Long sections can be collapsed (▾).</li>
-  <li><b>Options on the left, under the data.</b> Choosing what to fit (data, X range, fixed values) sits in one column. The X range is two number fields directly under the log checkbox; empty means no limit, with a live count of the points used.</li>
-  <li><b>Fix parameters becomes a table</b> in Advanced. The parameter names come from the model, so nothing has to be typed or spelled right. Ticking <i>Fix</i> enables the value field; the last free parameter can't be unticked.</li>
-  <li><b>One panel for the model and what will run:</b> the equation, a sketch of the curve with its parameters marked (a fixed one in the accent colour with its value; it updates as you tick <i>Fix</i>), the sentence that says what will run, and when to use the model. For tests (Compare groups) the sketch is replaced by the null hypothesis and assumptions, e.g. “H₀: all group means are equal. Assumes normal data with equal SDs.”</li>
-</ol>
-<p>The sketch is a fixed drawing per model (an SVG icon, with labels), not a fit of your data, so it costs no computation and stays within the spec.</p>
-<p><b>Effort:</b> smallest change. Uses only QListView/QTreeView and stock widgets; the stored strings (<code>"top = 100"</code>, <code>"-9 to -5"</code>) and saved projects stay as they are.</p>
-<p><b>Compare groups</b> would show the same list with sections <i>Describe</i>, <i>Two groups</i>, <i>Three or more groups</i>.</p>
-</div></div></section>
-<section class="board"><h2><span class="tag">B</span>Curve gallery + range on a data preview — the most visual</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+</div></div></div></section>
+<section class="board"><h2><span class="tag">New</span>Compare groups — one-way ANOVA with Dunnett's test</h2><div class="row"><div class="win" style="width:900px;height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
 <div class="tabs">
-  <div class="tab">C<u>o</u>mpare groups</div>
-  <div class="tab on">Fit a c<u>u</u>rve</div>
+  <div class="tab on">C<u>o</u>mpare groups</div>
+  <div class="tab">Fit a c<u>u</u>rve</div>
 </div>
-<div class="secondary">Fit a line or curve to each Y series against X.</div>
-<div class="gallery"><div class="fam"><div class="gh">Linear</div><div class="cards"><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 28 L56 4"/></svg>Linear</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 6 Q30 52 56 6"/></svg>Polynomial</div></div></div><div class="fam"><div class="gh">Dose-response</div><div class="cards"><div class="card sel"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 27 C30 27 30 5 56 5"/></svg>Hill 4PL<br><span class="badge">recent</span></div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 30 C30 30 30 6 56 6"/></svg>3PL</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 28 C12 28 12 17 24 17 C34 17 36 5 56 5"/></svg>Biphasic</div></div></div><div class="fam"><div class="gh">Kinetics</div><div class="cards"><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 29 C14 8 24 5 56 5"/></svg>Association</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 4 C14 25 24 28 56 28"/></svg>Decay</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 30 C8 14 22 7 56 5"/></svg>Michaelis-Menten</div></div></div><div class="fam"><div class="gh">Shape</div><div class="cards"><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 28 C12 28 12 6 22 6 L38 6 C46 6 46 28 56 28"/></svg>Bell-shaped</div><div class="card"><svg viewBox="0 0 60 32"><line x1="2" y1="30" x2="58" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><path d="M4 28 C20 28 22 4 30 4 C38 4 40 28 56 28"/></svg>Gaussian</div></div></div></div><div class="secondary">Hill 4PL: <span class="eq">Y = Bottom + (Top − Bottom) / (1 + 10<sup>(logEC50 − X)·HillSlope</sup>)</span></div><div class="cols" style="margin-top:4px"><div class="col">
-<div class="group grow">
-  <div class="legend">Data</div>
-  <div class="list grow">
-    <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
-    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div>
-    <div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div>
-    <div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
-    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;log[Agonist] (X)</div><div class="c2" style="text-align:right">–</div></div>
-  </div>
-  <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
-</div>
-</div><div class="col" style="flex:1.4 1 0">
-<div class="group">
-  <div class="legend">Options</div>
-  <div><span class="cb on"></span>X values are lo<u>g</u>10(concentration)</div>
-  <div class="open"><span><u>A</u>dvanced</span></div>
-  <div class="indent" style="display:flex;flex-direction:column;gap:6px">
-    <div class="line"><span>Parameters</span><span class="chips">
-      <span class="chip">Bottom: fit</span><span class="chip on">Top = 100</span>
-      <span class="chip">EC50: fit</span><span class="chip">Hill slope: fit</span></span></div>
-    <div class="plot"><svg viewBox="0 0 420 130" preserveAspectRatio="none"><rect x="30" y="8" width="69.1" height="110" fill="var(--canvas)" opacity=".7"/><rect x="375.5" y="8" width="34.5" height="110" fill="var(--canvas)" opacity=".7"/><line x1="30" y1="118" x2="410" y2="118" stroke="var(--border)"/><line x1="30" y1="8" x2="30" y2="118" stroke="var(--border)"/><circle cx="30.0" cy="114.0" r="2.6" fill="var(--s1)"/><circle cx="64.5" cy="106.8" r="2.6" fill="var(--s1)"/><circle cx="99.1" cy="108.4" r="2.6" fill="var(--s1)"/><circle cx="133.6" cy="108.9" r="2.6" fill="var(--s1)"/><circle cx="168.2" cy="106.0" r="2.6" fill="var(--s1)"/><circle cx="202.7" cy="85.1" r="2.6" fill="var(--s1)"/><circle cx="237.3" cy="60.5" r="2.6" fill="var(--s1)"/><circle cx="271.8" cy="35.9" r="2.6" fill="var(--s1)"/><circle cx="306.4" cy="24.0" r="2.6" fill="var(--s1)"/><circle cx="340.9" cy="21.1" r="2.6" fill="var(--s1)"/><circle cx="375.5" cy="12.6" r="2.6" fill="var(--s1)"/><circle cx="410.0" cy="14.2" r="2.6" fill="var(--s1)"/><circle cx="30.0" cy="111.0" r="2.6" fill="var(--s2)"/><circle cx="64.5" cy="113.0" r="2.6" fill="var(--s2)"/><circle cx="99.1" cy="105.8" r="2.6" fill="var(--s2)"/><circle cx="133.6" cy="107.4" r="2.6" fill="var(--s2)"/><circle cx="168.2" cy="107.9" r="2.6" fill="var(--s2)"/><circle cx="202.7" cy="105.0" r="2.6" fill="var(--s2)"/><circle cx="237.3" cy="93.1" r="2.6" fill="var(--s2)"/><circle cx="271.8" cy="59.5" r="2.6" fill="var(--s2)"/><circle cx="306.4" cy="34.9" r="2.6" fill="var(--s2)"/><circle cx="340.9" cy="23.0" r="2.6" fill="var(--s2)"/><circle cx="375.5" cy="20.1" r="2.6" fill="var(--s2)"/><circle cx="410.0" cy="11.6" r="2.6" fill="var(--s2)"/><circle cx="30.0" cy="107.8" r="2.6" fill="var(--s3)"/><circle cx="64.5" cy="109.2" r="2.6" fill="var(--s3)"/><circle cx="99.1" cy="109.3" r="2.6" fill="var(--s3)"/><circle cx="133.6" cy="105.2" r="2.6" fill="var(--s3)"/><circle cx="168.2" cy="81.7" r="2.6" fill="var(--s3)"/><circle cx="202.7" cy="55.5" r="2.6" fill="var(--s3)"/><circle cx="237.3" cy="33.1" r="2.6" fill="var(--s3)"/><circle cx="271.8" cy="23.5" r="2.6" fill="var(--s3)"/><circle cx="306.4" cy="12.6" r="2.6" fill="var(--s3)"/><circle cx="340.9" cy="13.5" r="2.6" fill="var(--s3)"/><circle cx="375.5" cy="15.1" r="2.6" fill="var(--s3)"/><circle cx="410.0" cy="17.0" r="2.6" fill="var(--s3)"/><line x1="99.1" y1="8" x2="99.1" y2="118" stroke="var(--highlight)" stroke-width="2"/><line x1="375.5" y1="8" x2="375.5" y2="118" stroke="var(--highlight)" stroke-width="2"/><rect x="95.1" y="56" width="8" height="18" rx="2" fill="var(--highlight)"/><rect x="371.5" y="56" width="8" height="18" rx="2" fill="var(--highlight)"/><text x="30" y="128" font-size="9" fill="var(--secondary)">−10</text><text x="392" y="128" font-size="9" fill="var(--secondary)">−4.5</text></svg></div>
-    <div class="line">X from <span class="field w60 num">−9</span> to <span class="field w60 num">−5</span>
-      <span class="secondary">drag the handles · 30 of 35 points</span></div>
-  </div>
-</div>
-
-<div class="group">
-  <div class="legend">What will run</div>
-  <div class="summary grow">Hill 4PL fit (variable slope) of Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5. Reports bottom, EC50 and Hill slope.</div>
-</div>
-</div></div>
-<div class="feedback"></div>
-<div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
-<span class="m" style="left:-26px;top:96px">1</span><span class="m" style="left:-26px;top:170px">2</span><span class="m" style="left:366px;top:310px">3</span><span class="m" style="left:366px;top:400px">4</span></div></div><div class="notes">
-<ol>
-  <li><b>A gallery of curve shapes.</b> Each model is a card with a thumbnail of its shape, grouped by sub-family. People recognise “rises and levels off” faster than they remember a model's name. Arrow keys move between cards.</li>
-  <li><b>The equation of the selected model</b> sits under the gallery, so it's clear what will be fitted before Run.</li>
-  <li><b>Parameter chips.</b> Click a chip to switch it between <i>fit</i> and <i>fixed at …</i> (a small pop-up with one number field).</li>
-  <li><b>X range on a preview of the data.</b> Drag the two handles over the points of the ticked series, or type in From/To. Points outside the range are dimmed.</li>
-</ol>
-<p><b>Effort:</b> the largest. The thumbnails are static icons, but the range preview is a small pyqtgraph plot inside the dialog, which goes beyond the spec (needs a SPEC/DESIGN change and a benchmark for opening the dialog). Without the preview, the From/To fields from version A remain.</p>
-<p><b>Compare groups</b> fits a gallery less well: it would fall back to the list of version A.</p>
-</div></div></section>
-<section class="board"><h2><span class="tag">C</span>Search drop-down + always-visible parameters — the most compact</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
-<div class="tabs">
-  <div class="tab">C<u>o</u>mpare groups</div>
-  <div class="tab on">Fit a c<u>u</u>rve</div>
-</div>
-<div class="secondary">Fit a line or curve to each Y series against X.</div>
+<div class="secondary">Test whether the means or medians of two or more groups differ.</div>
 <div class="cols"><div class="col">
 <div class="group grow">
   <div class="legend">Data</div>
   <div class="list grow">
     <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
-    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div>
-    <div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div>
-    <div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
-    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;log[Agonist] (X)</div><div class="c2" style="text-align:right">–</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Control</div><div class="c2" style="text-align:right">6</div></div><div class="r sel"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">6</div></div><div class="r"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">6</div></div><div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">5</div></div>
+    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;Dose (X)</div><div class="c2" style="text-align:right">–</div></div>
   </div>
   <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
 </div>
-</div><div class="col">
 <div class="group">
-  <div class="legend">Analysis</div>
-  <div class="field combo" style="position:relative">Hill 4PL (variable slope)</div>
-  <div class="line"><span class="secondary">Suggested:</span>
-    <span class="chip on">Hill 4PL</span><span class="chip">3PL</span><span class="chip">Linear regression</span></div>
-</div>
-
-<div class="group">
-  <div class="legend">Options</div>
-  <div><span class="cb on"></span>X values are lo<u>g</u>10(concentration)</div>
-  <div class="ptable" style="grid-template-columns: 1fr auto 90px">
-    <span class="hd">Parameter</span><span class="hd"></span><span class="hd">Value</span>
-    <span>Bottom</span><span class="line" style="gap:0"><span class="btn seg on" style="border-radius:3px 0 0 3px">Fit</span><span class="btn seg" style="border-radius:0 3px 3px 0">Fix</span></span><span class="field num off">—</span>
-    <span>Top</span><span class="line" style="gap:0"><span class="btn seg" style="border-radius:3px 0 0 3px">Fit</span><span class="btn seg on" style="border-radius:0 3px 3px 0">Fix</span></span><span class="field num">100</span>
-    <span>EC50</span><span class="line" style="gap:0"><span class="btn seg on" style="border-radius:3px 0 0 3px">Fit</span><span class="btn seg" style="border-radius:0 3px 3px 0">Fix</span></span><span class="field num off">—</span>
-    <span>Hill slope</span><span class="line" style="gap:0"><span class="btn seg on" style="border-radius:3px 0 0 3px">Fit</span><span class="btn seg" style="border-radius:0 3px 3px 0">Fix</span></span><span class="field num off">—</span>
-  </div>
+  <div class="legend">Options<span class="mi">4</span></div>
   <div class="form">
-    <span>Points</span><span class="line" style="gap:0"><span class="btn seg" style="border-radius:3px 0 0 3px">All</span><span class="btn seg on" style="border-radius:0 3px 3px 0">X range</span></span>
-    <span></span><span class="line">from <span class="field combo w60">−9</span> to <span class="field combo w60">−5</span><span class="secondary">30 of 35 points</span></span>
+    <span>De<u>s</u>ign</span><span class="field combo">Ordinary</span>
+    <span><u>P</u>ost-hoc test</span><span class="field combo">Dunnett (vs. control)</span>
+    <span><u>C</u>ontrol group</span><span class="field combo">Control</span>
   </div>
-  <div class="advanced"><span><u>A</u>dvanced</span></div>
+</div></div><div class="col">
+<div class="group">
+  <div class="legend">Analysis<span class="mi">1</span></div>
+  <div class="line" style="flex-wrap:nowrap"><div class="field search" style="flex:1">Type to filter…</div><span class="mi">2</span></div>
+  <div style="display:flex;gap:4px;align-items:flex-start"><div class="scroll" style="flex:1"><div class="glist" style="height:150px"><div class="gh">Recent</div><div class="gi">t test<span class="sub">two groups, means</span></div><div class="gh">Three or more groups</div><div class="gi sel">One-way ANOVA<span class="sub">means, post-hoc tests</span></div><div class="gi">Kruskal-Wallis test<span class="sub">medians, non-parametric</span></div><div class="gi">Two-way ANOVA<span class="sub">two factors</span></div><div class="gh">Two groups</div></div><div class="bar"></div></div><span class="mi">3</span></div>
 </div>
-
-<div class="group grow">
-  <div class="legend">What will run</div>
-  <div class="summary grow">Hill 4PL fit (variable slope) of Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5. Reports bottom, EC50 and Hill slope.</div>
-</div>
-</div></div>
+<div class="group grow about">
+  <div class="legend">About this analysis<span class="mi">7</span></div>
+  <div><span class="k">Null hypothesis:</span> the four group means are equal.</div>
+  <div><span class="k">Assumes:</span> values are independent and roughly normal within each group, with similar SDs.<span class="mi">10</span></div>
+  <div>Runs an ordinary one-way ANOVA on Control, Drug A, Drug B and Drug C, then Dunnett's multiple comparisons test of each group against Control.</div>
+  <div class="secondary">Use when comparing the means of three or more groups. For skewed data or outliers, use the Kruskal-Wallis test.<span class="mi">9</span></div>
+</div></div></div>
 <div class="feedback"></div>
 <div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
-<span class="m" style="left:448px;top:92px">1</span><span class="m" style="left:448px;top:152px">2</span><span class="m" style="left:448px;top:374px">3</span><span class="m" style="left:448px;top:418px">4</span></div></div><div class="notes">
-<ol>
-  <li><b>One drop-down instead of a list.</b> The dialog opens with a sensible analysis already chosen, so the 11 options stay out of sight until you ask for them (shown opened below the dialog).</li>
-  <li><b>Search inside the drop-down</b> matches names and what they report (“ec5” finds every model with an EC50). <b>Suggestion chips</b> under it: the best fit for the data plus recently used ones, one click each.</li>
-  <li><b>The parameters are always visible</b> with a Fit / Fix switch per parameter. Fixing a parameter is common for dose-response fits, so it moves out of Advanced; nothing to type except the value.</li>
-  <li><b>Points: All / X range</b> as a switch, with From/To drop-downs of the X values only when needed. Advanced keeps the rare options.</li>
+</div></div></div></section>
+<section class="board"><h2>Changes</h2>
+<ol class="changes">
+  <li><b>A grouped list replaces the radio grid.</b> The sub-families from SPEC.md become section headers (Linear, Dose-response, Kinetics, Shape-based; for tests Describe, Two groups, Three or more groups), with recently used analyses in a <i>Recent</i> section on top instead of a “recent” badge. Each row says in a few words what the analysis reports. Only analyses the table supports are listed, as now.</li>
+  <li><b>Filter field</b> above the list. Typing “ec50” or “decay” narrows the list to matching names and descriptions; arrow keys move through it and Enter runs.</li>
+  <li><b>The list scrolls</b> after about six rows, so the dialog keeps its 900 × 640 size (DESIGN.md) with Advanced open. Sections can be collapsed.</li>
+  <li><b>Options move to the left column, under the data.</b> What to analyze and how (series, X range, fixed values) now sit in one column; the right column is about the chosen analysis.</li>
+  <li><b>The X range is two number fields</b> directly under the log checkbox, out of Advanced. Empty means no limit; the count of points used updates as you type. Replaces the text field “Fit only X from … to … (empty: all)”.</li>
+  <li><b>Fix parameters becomes a table</b> in Advanced: one row per model parameter with a <i>Fix</i> checkbox and a value. Names come from the model, so nothing has to be typed or spelled right. The last free parameter can't be unticked. Replaces the text field “Fix parameters (e.g. bottom = 0)”.</li>
+  <li><b>“About this analysis” replaces “What will run”.</b> One panel for the chosen analysis: the equation (fits) or the hypothesis (tests), then the sentence that says what will run, as now.</li>
+  <li><b>Sketch of the model</b> with its parameters marked. A fixed parameter is drawn in the accent colour with its value and updates as you tick <i>Fix</i>. It is a fixed drawing per model, not a fit of the data, so it costs no computation.</li>
+  <li><b>A “use when” line</b> in plain language, pointing to the alternative where there is one (e.g. Kruskal-Wallis for skewed data).</li>
+  <li><b>Tests show the null hypothesis and assumptions</b> in place of the equation and sketch.</li>
 </ol>
-<p><b>Effort:</b> medium. A searchable QComboBox with a custom popup view; the rest are stock widgets. Moving <i>Fix parameters</i> out of Advanced is a change to the DESIGN rule that the common case needs no options; it stays one click on Run.</p>
-<p><b>Compare groups</b> would use the same drop-down, with suggestions like “One-way ANOVA (4 groups ticked)”.</p>
-</div></div><div style="margin-top:20px"><p style="margin:0 0 8px"><b>The drop-down opened</b> (marker 2), after typing “ec5”:</p>
-<div class="popup" style="position:relative">
-  <div style="padding:6px"><div class="field search">ec5</div></div>
-  <div class="glist" style="border:none;border-top:1px solid var(--border)">
-    <div class="gh">Dose-response</div>
-    <div class="gi sel">Hill 4PL (variable slope)<span class="sub">EC50, Hill slope, top, bottom</span></div>
-    <div class="gi">3PL (bottom fixed at 0)<span class="sub">EC50, Hill slope, top</span></div>
-    <div class="gi">Biphasic dose-response<span class="sub">two EC50s</span></div>
-    <div class="gh">Shape-based</div>
-    <div class="gi">Bell-shaped dose-response<span class="sub">two EC50s, plateau</span></div>
-    <div class="more">4 of 11 analyses match “ec5”</div>
-  </div>
-</div>
-</div></section>
+<p class="lede" style="margin-top:12px"><b>Stays the same:</b> the family tabs, the data list, the Run/Cancel row and feedback line, the stored parameters (<code>"top = 100"</code>, <code>"-9 to -5"</code>) and so every saved project. Needs a small edit to DESIGN.md (the right column has no “What will run” box any more) and to SPEC.md (the equation, sketch and use-when text per analysis).</p>
+</section>
 <script>
   (function () {
     var root = document.documentElement;
