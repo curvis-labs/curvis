@@ -578,7 +578,7 @@ Make a plan first. When done, report validation results.
 
 **Done when**
 - [ ] Horizontal bar, violin, histogram and grouped bar/horizontal bar/box/violin charts work and export.
-- [ ] Color schemes, palette editor, custom size, and all settings in SPEC.md work.
+- [ ] Color schemes, palette editor, custom size, chart font, and all settings in SPEC.md work (the import decimal mark comes in step 3.6).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.5 in docs/PHASES.md.
@@ -586,7 +586,11 @@ Read CLAUDE.md, docs/SPEC.md and step 3.5 in docs/PHASES.md.
 Complete graphs and settings from SPEC.md:
 - Chart variants: horizontal bar, violin, histogram (with bin control), and grouped bar, horizontal bar, box and violin for category groups, in both renderers, with image-diff tests.
 - Color schemes for charts and a palette editor; default palette for new columns and series.
-- Settings: default chart aspect ratio, chart text size, default palette (theme and decimal places exist already).
+- Chart font in the chart spec and the Format dialog, drawn the same by both renderers.
+- Settings: default graph size, chart font, chart text size, default palette, P-value display, default export format and PNG resolution, and Reset to defaults (theme, decimal places and crash log exist already). New graphs copy the graph settings into their chart spec; existing graphs never change when a setting changes. Tests for both.
+
+Decisions to confirm with me before coding:
+- Which fonts the chart font offers, and which are bundled so that screen, export and image-diff tests match on every platform (licences must allow bundling).
 
 Make a plan first. When done, report what you built and image-diff results.
 ```
@@ -596,6 +600,7 @@ Make a plan first. When done, report what you built and image-diff results.
 **Done when**
 - [ ] .xlsx and .xls import through the same preview dialog (sheet picker added).
 - [ ] Data tables from Prism .pzfx and .prism files import with sensible column roles and groups.
+- [ ] The preview dialog has a decimal mark choice (auto-detect, point, comma) with its default in Settings.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.6 in docs/PHASES.md.
@@ -604,6 +609,7 @@ Extend import:
 - Excel: .xlsx via fastexcel, .xls via xlrd, through the existing preview dialog with an added sheet picker.
 - Prism .pzfx: data tables are XML at the start of the file. Map Prism table types (XY, column, grouped, survival) and subcolumns (replicates, mean/SD/N) to Curvis roles, replicate groups and category groups. Use the open-source R package pzfx as a reference for the structure; do not copy its code.
 - Prism .prism: data is stored as CSV inside the file with JSON metadata. Import data tables the same way.
+- Decimal mark: add auto-detect, point or comma to the preview dialog for CSV/TSV and for text cells in Excel, and a default decimal mark in Settings. Auto-detect must not mistake a thousands separator for a decimal mark (e.g. "1,234"); when unsure, use the Settings default and say so in the preview. Tests with semicolon-delimited, comma-decimal files.
 - Analyses and graph styling are not imported; show a short note saying so.
 - Tests with real Prism files I will put in tests/data/prism (ask me for them before you start). Never include Prism files you did not receive from me.
 
