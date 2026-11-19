@@ -99,6 +99,47 @@ def test_missing_extra_and_shape(tmp_path: Path) -> None:
     }
 
 
+def fitted(tmp_path: Path) -> Path:
+    """A fit with a parameter near 0 (|value| < SE), one far from 0, and a statistic."""
+    return write(
+        tmp_path,
+        expected={"bottom": [0.1], "bottom_se": [2.0], "top": [100.0], "top_se": [1.5],
+                  "r_squared": [0.01]},
+        kinds={"bottom": "parameter", "bottom_se": "parameter", "top": "parameter",
+               "top_se": "parameter", "r_squared": "statistic"},
+    )  # fmt: skip
+
+
+FIT = {"bottom": [0.1], "bottom_se": [2.0], "top": [100.0], "top_se": [1.5], "r_squared": [0.01]}
+
+
+def test_a_parameter_smaller_than_its_se_is_compared_on_the_scale_of_the_se(
+    tmp_path: Path,
+) -> None:
+    fixture = load_fixture(fitted(tmp_path))
+    # 1e-6 of the SE (2.0) is 2e-6: 1.2e-6 off is inside, although it is 1.2e-5 of 0.1.
+    assert compare(fixture, dict(FIT, bottom=[0.1 + 1.2e-6])) == []
+    [mismatch] = compare(fixture, dict(FIT, bottom=[0.1 + 2.2e-6]))
+    assert mismatch.output == "bottom"
+    assert mismatch.source == "parameter, scaled by SE 2"
+
+
+def test_a_parameter_larger_than_its_se_stays_relative(tmp_path: Path) -> None:
+    fixture = load_fixture(fitted(tmp_path))
+    assert compare(fixture, dict(FIT, top=[100.0 * (1 + 0.9e-6)])) == []
+    [mismatch] = compare(fixture, dict(FIT, top=[100.0 * (1 + 1.1e-6)]))
+    assert (mismatch.output, mismatch.source) == ("top", "parameter")
+
+
+def test_the_se_rule_applies_only_to_parameters_with_an_se(tmp_path: Path) -> None:
+    fixture = load_fixture(fitted(tmp_path))
+    # The SE itself has no SE, and a statistic is not a parameter: both stay relative.
+    [se] = compare(fixture, dict(FIT, bottom_se=[2.0 * (1 + 1.1e-6)]))
+    assert (se.output, se.source) == ("bottom_se", "parameter")
+    [r2] = compare(fixture, dict(FIT, r_squared=[0.01 * (1 + 1.1e-8)]))
+    assert (r2.output, r2.source) == ("r_squared", "statistic")
+
+
 def test_exception_overrides_the_kind(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(tolerances.EXCEPTIONS, "demo/*:mean", 1e-3)
     fixture = load_fixture(write(tmp_path))

@@ -21,11 +21,10 @@ TOLERANCES: dict[str, float] = {
 # Example: "dunnett/*:p_value": 1e-5. Each key must appear in TOLERANCES.md.
 EXCEPTIONS: dict[str, float] = {
     # Flat least-squares minima: double precision fixes these only to ~1e-6 (step 3.3).
-    "biphasic/noisy_04:bottom": 1e-5,
+    # (Their parameters, Bottom and Y0, are within the SE rule of harness.py.)
     "biphasic/noisy_04:bottom_se": 1e-5,
     "biphasic/noisy_04:ec50_2": 1e-5,
     "biphasic/noisy_04:band_fit": 1e-5,
-    "exp_association/noisy_09:y0": 1e-5,
     "exp_association/noisy_09:band_fit": 1e-5,
 }
 

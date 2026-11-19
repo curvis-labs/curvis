@@ -10,6 +10,11 @@ Comparison rules, per value:
 - Kind "exact" must be equal.
 - Otherwise ``|actual - expected| <= tolerance * |expected|`` (purely relative, so an
   expected 0 needs an actual 0).
+- Except for a fitted parameter whose standard error the fixture also holds (kind
+  "parameter", with an output named ``<name>_se``): ``|actual - expected| <= tolerance *
+  max(|expected|, SE)``, SE being R's. A parameter estimate smaller than its SE is
+  indistinguishable from 0, and double precision fixes it only to about 1e-6 of the SE,
+  not of the value (approved by the project owner, 2026-11-19; see TOLERANCES.md).
 """
 
 from __future__ import annotations
@@ -144,19 +149,34 @@ def compare(fixture: Fixture, actual: Mapping[str, npt.ArrayLike]) -> list[Misma
             continue
         kind = fixture.kinds[output]
         tolerance, source = tolerance_for(fixture.id, output, kind)
+        se = _standard_error(fixture, output, kind)
         for index in np.ndindex(expected.shape):
             e, a = float(expected[index]), float(got[index])
-            if not _within(e, a, tolerance):
-                mismatches.append(Mismatch(output, index, e, a, tolerance, source))
+            by_se = se is not None and float(se[index]) > abs(e)
+            scale = float(se[index]) if se is not None and by_se else abs(e)
+            if not _within(e, a, tolerance, scale):
+                shown = f"{source}, scaled by SE {scale:.3g}" if by_se else source
+                mismatches.append(Mismatch(output, index, e, a, tolerance, shown))
     return mismatches
 
 
-def _within(expected: float, actual: float, tolerance: float) -> bool:
+def _standard_error(fixture: Fixture, output: str, kind: str) -> npt.NDArray[np.float64] | None:
+    """R's SE of a fitted parameter output, or None when the rule does not apply (not a
+    parameter, no ``<output>_se`` in the fixture, or a shape that does not match)."""
+    if kind != "parameter":
+        return None
+    se = fixture.expected.get(f"{output}_se")
+    if se is None or se.shape != fixture.expected[output].shape:
+        return None
+    return np.where(np.isfinite(se), np.abs(se), 0.0)
+
+
+def _within(expected: float, actual: float, tolerance: float, scale: float | None = None) -> bool:
     if math.isnan(expected) or math.isnan(actual):
         return math.isnan(expected) and math.isnan(actual)
     if math.isinf(expected) or math.isinf(actual):
         return expected == actual
-    return abs(actual - expected) <= tolerance * abs(expected)
+    return abs(actual - expected) <= tolerance * (abs(expected) if scale is None else scale)
 
 
 def _shown(path: Path) -> str:
