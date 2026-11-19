@@ -80,7 +80,7 @@ Graphs are drawn directly from a data table. You pick a chart family from the to
 | Chart family | Variants |
 | --- | --- |
 | XY | Scatter and line plots with SD or SEM error bars, and fitted curves overlaid |
-| Bar | Bar, horizontal bar, box, violin, scatter and histogram; grouped bar, horizontal bar, box and violin for category groups; option to show individual values with symbols |
+| Bar | Bar, horizontal bar, box, violin (trimmed at the data range or not), scatter and histogram (automatic bins, a number of bins, or a bin width and start); grouped bar, horizontal bar, box and violin for category groups, clustered by replicate group (colored by category) or by category (colored by replicate group); option to show individual values with symbols |
 | Survival | Kaplan-Meier step curves with confidence bands |
 | Interaction | Plot of two-way ANOVA results |
 
@@ -90,7 +90,7 @@ The Format dialog controls:
 - Each axis: title, range, label, linear or log scale, and the angle of the X tick labels (Auto, horizontal, 45° or 90°; Auto turns them when they do not fit side by side)
 - Each series: symbol, symbol size, line style, line width, color, error-bar type and whether it is listed in the legend; series can be added, removed and reordered
 - Fitted curves laid over the graph, listed with the series; they can be removed
-- Color scheme, chart font and chart text size
+- Color scheme, chart font (DejaVu Sans, Liberation Sans, Liberation Serif or Inter, bundled with Curvis so a graph looks the same on screen, in exports and on every computer) and chart text size
 
 The graph's page leaves room for everything it shows: tick labels that reach past the plot get a margin, turned labels too long for the page are shortened with "…", and a legend too wide for the right of the plot goes under it.
 

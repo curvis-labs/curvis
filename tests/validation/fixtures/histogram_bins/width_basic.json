@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "analysis": "histogram_bins",
+  "case": "width_basic",
+  "description": "Bins 0.5 wide from 0.",
+  "generated_by": {
+    "script": "validation/r/scripts/histogram_bins.R",
+    "r_version": "R version 4.3.3 (2024-02-29)",
+    "platform": "x86_64-pc-linux-gnu",
+    "packages": {
+      "graphics": "4.3.3",
+      "jsonlite": "1.8.8",
+      "stats": "4.3.3"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [0.10000000000000001, 0.5, 0.59999999999999998, 1, 1.2, 2.4900000000000002, 2.5, 3]
+    ],
+    "bins": "width",
+    "width": 0.5,
+    "start": 0
+  },
+  "expected": {
+    "breaks": [0, 0.5, 1, 1.5, 2, 2.5, 3],
+    "counts": [
+      [2, 2, 1, 0, 2, 1]
+    ],
+    "n_outside": [0]
+  },
+  "kinds": {
+    "breaks": "statistic",
+    "counts": "exact",
+    "n_outside": "exact"
+  }
+}
