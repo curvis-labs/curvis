@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "kaplan_meier",
+  "case": "missing",
+  "description": "Missing times and events: those subjects are left out. Kaplan-Meier, 95% CI log-log.",
+  "generated_by": {
+    "script": "validation/r/scripts/kaplan_meier.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1",
+      "survival": "3.8.6"
+    }
+  },
+  "inputs": {
+    "time": [2, "NaN", 4, 5, 7, 8, "NaN", 11, 13, 16],
+    "event": [1, 1, "NaN", 1, 0, 1, 0, "NaN", 1, 0],
+    "risk_times": [0, 5, 10, 15, 20]
+  },
+  "expected": {
+    "n": 6,
+    "n_events": 4,
+    "time": [2, 5, 7, 8, 13, 16],
+    "n_risk": [6, 5, 4, 3, 2, 1],
+    "n_event": [1, 1, 0, 1, 1, 0],
+    "n_censor": [0, 0, 1, 0, 0, 1],
+    "survival": [0.83333333333333337, 0.66666666666666674, 0.66666666666666674, 0.44444444444444448, 0.22222222222222224, 0.22222222222222224],
+    "std_err": [0.15214515486254615, 0.19245008972987529, 0.19245008972987529, 0.22222222222222224, 0.19245008972987526, 0.19245008972987526],
+    "lower": [0.273122849928356, 0.19461663680623487, 0.19461663680623487, 0.066186753146412466, 0.0095691365390372877, 0.0095691365390372877],
+    "upper": [0.97471242669089353, 0.90443416432251644, 0.90443416432251644, 0.78490836714795853, 0.61472052328762383, 0.61472052328762383],
+    "median": 8,
+    "median_lower": 2,
+    "median_upper": "NaN",
+    "risk_n": [6, 5, 2, 1, 0]
+  },
+  "kinds": {
+    "n": "exact",
+    "n_events": "exact",
+    "time": "exact",
+    "n_risk": "exact",
+    "n_event": "exact",
+    "n_censor": "exact",
+    "survival": "statistic",
+    "std_err": "statistic",
+    "lower": "ci",
+    "upper": "ci",
+    "median": "statistic",
+    "median_lower": "ci",
+    "median_upper": "ci",
+    "risk_n": "exact"
+  }
+}

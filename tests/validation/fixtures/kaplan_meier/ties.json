@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "kaplan_meier",
+  "case": "ties",
+  "description": "Tied times: several events at one time, and events and censorings at one time. Kaplan-Meier, 95% CI log-log.",
+  "generated_by": {
+    "script": "validation/r/scripts/kaplan_meier.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1",
+      "survival": "3.8.6"
+    }
+  },
+  "inputs": {
+    "time": [2, 3, 3, 3, 5, 5, 6, 8, 8, 8, 8, 10, 12, 12, 15],
+    "event": [1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0],
+    "risk_times": [0, 5, 10, 15]
+  },
+  "expected": {
+    "n": 15,
+    "n_events": 9,
+    "time": [2, 3, 5, 6, 8, 10, 12, 15],
+    "n_risk": [15, 14, 11, 9, 8, 4, 3, 1],
+    "n_event": [1, 2, 1, 1, 2, 1, 1, 0],
+    "n_censor": [0, 1, 1, 0, 2, 0, 1, 1],
+    "survival": [0.93333333333333335, 0.79999999999999993, 0.72727272727272718, 0.6464646464646463, 0.48484848484848475, 0.36363636363636354, 0.24242424242424235, 0.24242424242424235],
+    "std_err": [0.064406118871953064, 0.10327955589886444, 0.11672121368035578, 0.12872029091692297, 0.13825676335555956, 0.14755145997814209, 0.13953892461292208, 0.13953892461292208],
+    "lower": [0.61264124377487184, 0.49982398165575453, 0.42523151727322517, 0.34397405232863448, 0.20873603977720293, 0.10856223327618078, 0.043217114142981995, 0.043217114142981995],
+    "upper": [0.99033223665001691, 0.93071729405411741, 0.88816780636717685, 0.83667357489687522, 0.71569473813504403, 0.63073294882339137, 0.52771151222746193, 0.52771151222746193],
+    "median": 8,
+    "median_lower": 3,
+    "median_upper": "NaN",
+    "risk_n": [15, 11, 4, 1]
+  },
+  "kinds": {
+    "n": "exact",
+    "n_events": "exact",
+    "time": "exact",
+    "n_risk": "exact",
+    "n_event": "exact",
+    "n_censor": "exact",
+    "survival": "statistic",
+    "std_err": "statistic",
+    "lower": "ci",
+    "upper": "ci",
+    "median": "statistic",
+    "median_lower": "ci",
+    "median_upper": "ci",
+    "risk_n": "exact"
+  }
+}

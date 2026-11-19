@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "kaplan_meier",
+  "case": "all_events_same_time",
+  "description": "Constant data: every subject has an event at the same time. Kaplan-Meier, 95% CI log-log.",
+  "generated_by": {
+    "script": "validation/r/scripts/kaplan_meier.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1",
+      "survival": "3.8.6"
+    }
+  },
+  "inputs": {
+    "time": [5, 5, 5, 5],
+    "event": [1, 1, 1, 1],
+    "risk_times": [0, 1, 2, 3, 4, 5]
+  },
+  "expected": {
+    "n": 4,
+    "n_events": 4,
+    "time": [5],
+    "n_risk": [4],
+    "n_event": [4],
+    "n_censor": [0],
+    "survival": [0],
+    "std_err": ["NaN"],
+    "lower": ["NaN"],
+    "upper": ["NaN"],
+    "median": 5,
+    "median_lower": "NaN",
+    "median_upper": "NaN",
+    "risk_n": [4, 4, 4, 4, 4, 4]
+  },
+  "kinds": {
+    "n": "exact",
+    "n_events": "exact",
+    "time": "exact",
+    "n_risk": "exact",
+    "n_event": "exact",
+    "n_censor": "exact",
+    "survival": "statistic",
+    "std_err": "statistic",
+    "lower": "ci",
+    "upper": "ci",
+    "median": "statistic",
+    "median_lower": "ci",
+    "median_upper": "ci",
+    "risk_n": "exact"
+  }
+}

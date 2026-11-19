@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "kaplan_meier",
+  "case": "time_zero",
+  "description": "Events and a censoring at time 0. Kaplan-Meier, 95% CI log-log.",
+  "generated_by": {
+    "script": "validation/r/scripts/kaplan_meier.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1",
+      "survival": "3.8.6"
+    }
+  },
+  "inputs": {
+    "time": [0, 0, 0, 2, 4, 5, 7, 9],
+    "event": [1, 1, 0, 1, 0, 1, 1, 0],
+    "risk_times": [0, 2, 4, 6, 8, 10]
+  },
+  "expected": {
+    "n": 8,
+    "n_events": 5,
+    "time": [0, 2, 4, 5, 7, 9],
+    "n_risk": [8, 5, 4, 3, 2, 1],
+    "n_event": [2, 1, 0, 1, 1, 0],
+    "n_censor": [1, 0, 1, 0, 0, 1],
+    "survival": [0.75, 0.60000000000000009, 0.60000000000000009, 0.40000000000000002, 0.20000000000000001, 0.20000000000000001],
+    "std_err": [0.15309310892394862, 0.18165902124584954, 0.18165902124584954, 0.2033060090930254, 0.17416467303484176, 0.17416467303484176],
+    "lower": [0.31480711370551911, 0.195495866084998, 0.195495866084998, 0.066029774327536178, 0.0095837938487639551, 0.0095837938487639551],
+    "upper": [0.93089831709062754, 0.85225434576220904, 0.85225434576220904, 0.73422534499178249, 0.57273648555154777, 0.57273648555154777],
+    "median": 5,
+    "median_lower": 0,
+    "median_upper": "NaN",
+    "risk_n": [8, 5, 4, 2, 1, 0]
+  },
+  "kinds": {
+    "n": "exact",
+    "n_events": "exact",
+    "time": "exact",
+    "n_risk": "exact",
+    "n_event": "exact",
+    "n_censor": "exact",
+    "survival": "statistic",
+    "std_err": "statistic",
+    "lower": "ci",
+    "upper": "ci",
+    "median": "statistic",
+    "median_lower": "ci",
+    "median_upper": "ci",
+    "risk_n": "exact"
+  }
+}
