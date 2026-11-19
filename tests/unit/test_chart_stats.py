@@ -7,8 +7,8 @@ import math
 import numpy as np
 import pytest
 
+from curvis.charts.spec import BinMode
 from curvis.charts.stats import (
-    BinMode,
     bin_counts,
     histogram_bins,
     kde,

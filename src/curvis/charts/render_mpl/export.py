@@ -1,9 +1,10 @@
 """Export a graph as PNG, SVG or PDF at the size of its page.
 
 - **PNG** at the resolution asked for (dots per inch, stored in the file).
-- **PDF** with DejaVu Sans embedded (TrueType), so it prints the same everywhere.
-- **SVG** with the text kept as text in DejaVu Sans, so it stays editable; it looks right
-  where that font is installed.
+- **PDF** with the graph's font embedded (TrueType), so it prints the same everywhere.
+- **SVG** with the text kept as text in the graph's font, so it stays editable; it looks
+  right where that font is installed. Liberation Sans and Serif name Arial and Times New
+  Roman after them, which have the same letter widths.
 
 :func:`export_graph` is a module-level function of picklable arguments, so the scheduler
 can run it in a worker process (CLAUDE.md rule 5). The file is written to a temporary
@@ -23,7 +24,7 @@ import numpy as np
 import numpy.typing as npt
 
 from curvis.charts.data import ChartData
-from curvis.charts.render_mpl.figure import RC_PARAMS, make_figure
+from curvis.charts.render_mpl.figure import chart_rc, make_figure
 from curvis.charts.spec import ChartSpec
 
 DEFAULT_DPI = 300
@@ -61,7 +62,7 @@ def export_graph(
         metadata = {"Creator": "Curvis", "Producer": "Curvis", "CreationDate": None}
     elif fmt is ExportFormat.PNG:
         metadata = {"Software": "Curvis"}
-    with matplotlib.rc_context(cast(Any, RC_PARAMS)):
+    with matplotlib.rc_context(cast(Any, chart_rc(spec))):
         fig = make_figure(spec, data)
         handle, temporary = tempfile.mkstemp(
             prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
@@ -91,7 +92,7 @@ def render_image(
     import matplotlib
     from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-    with matplotlib.rc_context(cast(Any, RC_PARAMS)):
+    with matplotlib.rc_context(cast(Any, chart_rc(spec))):
         fig = make_figure(spec, data)
         fig.set_dpi(dpi)
         canvas: Any = FigureCanvasAgg(fig)

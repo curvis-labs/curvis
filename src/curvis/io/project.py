@@ -32,7 +32,15 @@ import pyarrow as pa
 from curvis import __version__
 from curvis.analysis import base as analysis_base
 from curvis.analysis.base import Analysis, params_from_json, params_to_json
-from curvis.charts.spec import OLD_ASPECTS, ChartSpec, spec_from_json, spec_to_json
+from curvis.charts.colors import scheme
+from curvis.charts.fonts import DEFAULT_FONT
+from curvis.charts.spec import (
+    OLD_ASPECTS,
+    ChartSpec,
+    palette_to_json,
+    spec_from_json,
+    spec_to_json,
+)
 from curvis.core.calculations import CalculatedColumn, Calculation, CalculationKind
 from curvis.core.change_log import ChangeLog, ChangeLogEntry
 from curvis.core.constants import JsonValue, ProjectConstant
@@ -48,7 +56,7 @@ from curvis.data import (
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -201,6 +209,27 @@ def _survival_bands(data: dict[str, Any]) -> dict[str, Any]:
     for graph in graphs if isinstance(graphs, list) else []:
         if isinstance(graph, dict):
             graph.setdefault("show_bands", True)
+    return data
+
+
+@register_migration(9)
+def _graph_palettes_and_fonts(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 10 keeps a copy of each graph's colours (``palette``) instead of the name
+    of a colour scheme, and stores its chart font, grouping, individual values, violin
+    trimming and histogram bins. Format 9 graphs drew with the named scheme in DejaVu
+    Sans, ungrouped, without individual values: they keep exactly that look."""
+    document = data.get("document")
+    graphs = document.get("graphs") if isinstance(document, dict) else None
+    for graph in graphs if isinstance(graphs, list) else []:
+        if not isinstance(graph, dict):
+            continue
+        name = graph.pop("color_scheme", "curvis")
+        graph.setdefault("palette", palette_to_json(scheme(name if isinstance(name, str) else "")))
+        graph.setdefault("font", DEFAULT_FONT)
+        graph.setdefault("grouping", "none")
+        graph.setdefault("show_points", False)
+        graph.setdefault("violin_trim", True)
+        graph.setdefault("bins", {"mode": "auto", "count": 10, "width": 1.0, "start": 0.0})
     return data
 
 

@@ -12,6 +12,12 @@ Statistics shown on graphs:
 - Bar: the mean of all of a series' values with their SD or SEM (also ``row_stats``).
 - Box: :func:`box_stats` — the quartiles by R's ``quantile(type = 6)`` (as GraphPad
   Prism) and whiskers from the minimum to the maximum (validated in ``box_stats``).
+- Violin: the outline is a Gaussian kernel density with R's default bandwidth, trimmed
+  at the data range or not (:func:`curvis.charts.stats.violin_density`, validated in
+  ``violin_density``); the median and quartiles are the box plot's.
+- Column scatter: every value, with the mean and its SD or SEM.
+- Histogram: bins shared by the series, as R's ``hist()`` or as typed
+  (:func:`curvis.charts.stats.histogram_bins`, validated in ``histogram_bins``).
 - Survival: Kaplan-Meier step curves of each Time + Event pair, their 95% confidence
   bands (log-log) and ticks at censored times, from
   :func:`curvis.analysis.survival.km.kaplan_meier` (validated in ``kaplan_meier``).
@@ -27,7 +33,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
@@ -35,7 +41,15 @@ import numpy.typing as npt
 from curvis.analysis.base import x_column_id
 from curvis.analysis.result import CellMeans, FittedCurve, Result
 from curvis.analysis.survival.km import KaplanMeier, kaplan_meier
-from curvis.charts.spec import ChartFamily, ChartSpec, ChartVariant, ErrorBars, Scale
+from curvis.charts.spec import (
+    HORIZONTAL_VARIANTS,
+    ChartFamily,
+    ChartSpec,
+    ChartVariant,
+    ErrorBars,
+    Scale,
+)
+from curvis.charts.stats import ViolinDensity, histogram_bins, violin_density
 from curvis.data import Table, name_key, row_stats, series, survival_pairs
 
 type FloatArray = npt.NDArray[np.float64]
@@ -57,6 +71,8 @@ class SeriesInput:
     """One array per replicate column."""
     error: FloatArray | None = None
     """The Error column's values (for :attr:`ErrorBars.ERROR_COLUMN`)."""
+    category: str | None = None
+    """Name of the series' category group (grouped bar-family graphs), or None."""
 
 
 @dataclass(frozen=True)
@@ -91,6 +107,7 @@ def gather(table: Table, spec: ChartSpec, results: Mapping[str, Result]) -> Char
     if spec.family is ChartFamily.SURVIVAL:
         return _gather_survival(table, spec)
     by_source = {s.group_id or s.column_ids[0]: s for s in series(table)}
+    category_names = {c.id: c.name for c in table.category_groups}
     inputs: list[SeriesInput] = []
     missing = 0
     for style in spec.series:
@@ -107,7 +124,8 @@ def gather(table: Table, spec: ChartSpec, results: Mapping[str, Result]) -> Char
         columns = tuple(
             np.array(table.column(c).values, dtype=np.float64) for c in found.column_ids
         )
-        inputs.append(SeriesInput(style.source, found.name, columns, error))
+        category = category_names.get(found.category_id or "")
+        inputs.append(SeriesInput(style.source, found.name, columns, error, category))
     x = None
     if spec.family is ChartFamily.XY:
         x_id = x_column_id(table)
@@ -219,6 +237,29 @@ class CategoryData:
     """How far a bar's error bar reaches below and above its mean. Bars show it only
     away from zero (above a positive mean, below a negative one), as GraphPad Prism
     does by default; 0 where there is none."""
+    category: str | None = None
+    """Name of the series' category group, or None."""
+    values: FloatArray = field(default_factory=lambda: np.empty(0))
+    """The values drawn as symbols (individual values, column scatter), in plot
+    coordinates, in table order; values a log axis cannot show are left out."""
+    violin: ViolinDensity | None = None
+    """Violins: the outline, in plot coordinates."""
+    plot_mean: float = math.nan
+    plot_low: float = math.nan
+    plot_high: float = math.nan
+    """Column scatter: the mean and the ends of its error bar (both ways), in plot
+    coordinates (NaN where a log axis cannot show them)."""
+
+
+@dataclass(frozen=True)
+class HistogramData:
+    """Histograms: the bins (in the units of the values) and each series' counts."""
+
+    breaks: FloatArray
+    counts: tuple[tuple[str, IntArray], ...]
+    """(source, counts per bin) of each series."""
+    names: tuple[str, ...] = ()
+    """The name of each series, in the order of ``counts``."""
 
 
 @dataclass(frozen=True)
@@ -274,6 +315,7 @@ class ChartData:
     """Interaction graphs: the levels of the first factor, at X = 0, 1, 2 …"""
     survival: tuple[SurvivalCurveData, ...] = ()
     """Survival graphs: one Kaplan-Meier curve per Time + Event pair."""
+    histogram: HistogramData | None = None
 
 
 # --- statistics ------------------------------------------------------------------------
@@ -360,8 +402,29 @@ def compute(inputs: ChartInputs) -> ChartData:
             s = "s" if dropped != 1 else ""
             notes.append(f"{dropped} point{s} at or below 0 cannot be shown on a log axis.")
         return ChartData(spec.family, spec.variant, xy=xy, curves=curves, notes=tuple(notes))
-    categories = _categories(inputs)
+    if spec.variant is ChartVariant.HISTOGRAM:
+        histogram, outside = _histogram(inputs)
+        if outside:
+            many = outside != 1
+            notes.append(
+                f"{outside} value{'s' if many else ''} below the start of the bins "
+                f"{'are' if many else 'is'} left out."
+            )
+        return ChartData(spec.family, spec.variant, notes=tuple(notes), histogram=histogram)
+    categories, dropped = _categories(inputs)
+    if dropped:
+        s = "s" if dropped != 1 else ""
+        notes.append(f"{dropped} value{s} at or below 0 cannot be shown on a log axis.")
     return ChartData(spec.family, spec.variant, categories=categories, notes=tuple(notes))
+
+
+def _histogram(inputs: ChartInputs) -> tuple[HistogramData, int]:
+    bins = inputs.spec.bins
+    groups = [np.concatenate(s.columns) if s.columns else np.empty(0) for s in inputs.series]
+    found = histogram_bins(groups, bins.mode, bins.count, bins.width, bins.start)
+    counts = tuple((s.source, c) for s, c in zip(inputs.series, found.counts, strict=True))
+    names = tuple(s.name for s in inputs.series)
+    return HistogramData(found.breaks, counts, names), sum(found.n_outside)
 
 
 def _xy(inputs: ChartInputs) -> tuple[tuple[XYSeriesData, ...], int]:
@@ -562,10 +625,28 @@ def _curves(inputs: ChartInputs) -> tuple[CurveData, ...]:
     return tuple(out)
 
 
-def _categories(inputs: ChartInputs) -> tuple[CategoryData, ...]:
+LOG_VALUE_VARIANTS = frozenset({ChartVariant.BOX, ChartVariant.VIOLIN, ChartVariant.COLUMN_SCATTER})
+"""Bar-family variants whose value axis can be logarithmic (bars start at 0)."""
+
+
+def _log10(value: float) -> float:
+    return math.log10(value) if value > 0 else math.nan
+
+
+def value_axis_scale(spec: ChartSpec) -> Scale:
+    """The scale a bar-family graph draws its values with."""
+    if spec.variant not in LOG_VALUE_VARIANTS:
+        return Scale.LINEAR
+    axis = spec.x_axis if spec.variant in HORIZONTAL_VARIANTS else spec.y_axis
+    return axis.scale
+
+
+def _categories(inputs: ChartInputs) -> tuple[tuple[CategoryData, ...], int]:
     spec = inputs.spec
-    y_scale = spec.y_axis.scale
+    scale = value_axis_scale(spec)
+    log = scale is Scale.LOG
     out: list[CategoryData] = []
+    dropped = 0
     for position, s in enumerate(inputs.series):
         style = spec.series_for(s.source)
         assert style is not None
@@ -573,12 +654,23 @@ def _categories(inputs: ChartInputs) -> tuple[CategoryData, ...]:
         mean, sd, sem, n = pooled_stats(values)
         error = {ErrorBars.SD: sd, ErrorBars.SEM: sem}.get(style.error_bars, math.nan)
         box = box_stats(values)
-        if y_scale is Scale.LOG and spec.variant is ChartVariant.BOX:
-            plot_box = box_stats(np.log10(values[values > 0]))
+        finite = values[np.isfinite(values)]
+        if log:
+            shown = finite[finite > 0]
+            dropped += len(finite) - len(shown)
+            plot_values = np.log10(shown)
+            plot_box = box_stats(plot_values)
         else:
-            plot_box = box
+            plot_values, plot_box = finite, box
         size = error if math.isfinite(error) and math.isfinite(mean) else 0.0
         err_low, err_high = (size, 0.0) if mean < 0 else (0.0, size)
+        violin = None
+        if spec.variant is ChartVariant.VIOLIN:
+            violin = violin_density(plot_values, trim=spec.violin_trim)
+        ends = (mean, mean - size, mean + size)
+        if log:
+            ends = (_log10(ends[0]), _log10(ends[1]), _log10(ends[2]))
+        draw_points = spec.show_points or spec.variant is ChartVariant.COLUMN_SCATTER
         out.append(
             CategoryData(
                 s.source,
@@ -592,9 +684,13 @@ def _categories(inputs: ChartInputs) -> tuple[CategoryData, ...]:
                 style.error_bars,
                 err_low,
                 err_high,
+                s.category,
+                plot_values if draw_points else np.empty(0),
+                violin,
+                *ends,
             )
         )
-    return tuple(out)
+    return tuple(out), dropped
 
 
 __all__ = (
@@ -603,6 +699,7 @@ __all__ = (
     "ChartData",
     "ChartInputs",
     "CurveData",
+    "HistogramData",
     "XYSeriesData",
     "box_stats",
     "compute",

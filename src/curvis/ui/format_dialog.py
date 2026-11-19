@@ -61,6 +61,7 @@ from curvis.charts.builder import (
     is_fit,
     two_way_analyses,
     with_fit,
+    with_palette,
 )
 from curvis.charts.colors import SCHEMES, scheme
 from curvis.charts.data import ChartData, compute, gather
@@ -636,7 +637,7 @@ class FormatDialog(QDialog):
         with QSignalBlocker(self.anova_combo):
             self.anova_combo.setCurrentIndex(self.anova_combo.findData(spec.analysis_id))
         with QSignalBlocker(self.scheme_combo):
-            self.scheme_combo.setCurrentIndex(max(0, self.scheme_combo.findData(spec.color_scheme)))
+            self.scheme_combo.setCurrentIndex(max(0, self.scheme_combo.findData(spec.palette.id)))
         with QSignalBlocker(self.text_size):
             self.text_size.setValue(spec.text_size)
         self._fill_series_list()
@@ -798,7 +799,7 @@ class FormatDialog(QDialog):
         self.series_note.setVisible(bool(note))
 
     def _fill_colors(self, styles: Sequence[SeriesSpec]) -> None:
-        colors = scheme(self.spec.color_scheme).series
+        colors = self.spec.palette.series
         current = {s.color for s in styles}
         with QSignalBlocker(self.color):
             self.color.clear_choices()
@@ -964,11 +965,7 @@ class FormatDialog(QDialog):
 
     def _on_scheme_chosen(self) -> None:
         scheme_id = str(self.scheme_combo.currentData())
-        colors = scheme(scheme_id)
-        styles = tuple(
-            replace(s, color=colors.series_color(i)) for i, s in enumerate(self.spec.series)
-        )
-        self._apply(replace(self.spec, color_scheme=scheme_id, series=styles))
+        self._apply(with_palette(self.spec, scheme(scheme_id)))
         self._fill_series_list()
 
     # --- series: add, remove, order ---------------------------------------------------------
@@ -1033,7 +1030,7 @@ class FormatDialog(QDialog):
         index = len(self.spec.series)
         style = replace(
             style,
-            color=scheme(self.spec.color_scheme).series_color(index),
+            color=self.spec.palette.series_color(index),
             line_style=self.spec.series[-1].line_style if self.spec.series else style.line_style,
         )
         if self.spec.family is ChartFamily.BAR and style.error_bars is ErrorBars.ERROR_COLUMN:

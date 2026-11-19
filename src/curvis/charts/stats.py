@@ -18,10 +18,11 @@ from __future__ import annotations
 import math
 import sys
 from dataclasses import dataclass
-from enum import StrEnum
 
 import numpy as np
 import numpy.typing as npt
+
+from curvis.charts.spec import BinMode
 
 type FloatArray = npt.NDArray[np.float64]
 
@@ -208,14 +209,6 @@ def pretty(
 def sturges(n: int) -> int:
     """R's ``nclass.Sturges``: ⌈log₂ n + 1⌉ classes."""
     return math.ceil(math.log2(n) + 1)
-
-
-class BinMode(StrEnum):
-    """How a histogram's bins are chosen (the Format dialog)."""
-
-    AUTO = "auto"
-    COUNT = "count"
-    WIDTH = "width"
 
 
 @dataclass(frozen=True)

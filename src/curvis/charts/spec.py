@@ -3,7 +3,9 @@
 A :class:`ChartSpec` is what the document stores for a graph (rule 2 of CLAUDE.md): its
 source table, chart family and variant, the series it draws with their style, both
 axes, title, aspect ratio, colour scheme, text size and the fitted curves laid over it.
-It holds no pixels and no computed values. The on-screen renderer
+It holds no pixels and no computed values. A graph keeps its own palette (a copy of
+the colours, not a name) and font, so it looks the same on every computer and does not
+change when the Settings change. The on-screen renderer
 (:mod:`curvis.charts.render_qt`) and the export renderer (step 2.8) both draw from it,
 and the Format dialog edits only the spec.
 
@@ -22,6 +24,8 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Any
 
+from curvis.charts.colors import CURVIS, ColorScheme, palette_problem
+from curvis.charts.fonts import DEFAULT_FONT, FONTS
 from curvis.data.ids import new_id
 
 
@@ -55,6 +59,8 @@ class ChartVariant(StrEnum):
     HORIZONTAL_BAR = "horizontal_bar"
     BOX = "box"
     VIOLIN = "violin"
+    COLUMN_SCATTER = "column_scatter"
+    """Each value as a symbol, with the mean and its error bars (Bar family)."""
     HISTOGRAM = "histogram"
     KAPLAN_MEIER = "kaplan_meier"
     INTERACTION = "interaction"
@@ -75,6 +81,7 @@ _VARIANT_FAMILY = {
     ChartVariant.HORIZONTAL_BAR: ChartFamily.BAR,
     ChartVariant.BOX: ChartFamily.BAR,
     ChartVariant.VIOLIN: ChartFamily.BAR,
+    ChartVariant.COLUMN_SCATTER: ChartFamily.BAR,
     ChartVariant.HISTOGRAM: ChartFamily.BAR,
     ChartVariant.KAPLAN_MEIER: ChartFamily.SURVIVAL,
     ChartVariant.INTERACTION: ChartFamily.INTERACTION,
@@ -85,6 +92,52 @@ XY_VARIANTS = frozenset({ChartVariant.SCATTER, ChartVariant.LINE, ChartVariant.I
 """Variants drawn as points with error bars (an interaction graph draws its lines so)."""
 LINE_VARIANTS = frozenset({ChartVariant.LINE, ChartVariant.INTERACTION})
 """Variants that always join their points with a line."""
+GROUPABLE_VARIANTS = frozenset(
+    {ChartVariant.BAR, ChartVariant.HORIZONTAL_BAR, ChartVariant.BOX, ChartVariant.VIOLIN}
+)
+"""Bar-family variants that can be grouped by category (SPEC.md, Graphs)."""
+POINTS_VARIANTS = frozenset(
+    {ChartVariant.BAR, ChartVariant.HORIZONTAL_BAR, ChartVariant.BOX, ChartVariant.VIOLIN}
+)
+"""Variants that can show each value with a symbol (a column scatter always does)."""
+HORIZONTAL_VARIANTS = frozenset({ChartVariant.HORIZONTAL_BAR})
+"""Variants with the categories on the vertical axis and the values along the horizontal."""
+
+
+class Grouping(StrEnum):
+    """How a bar-family graph of a table with category groups is laid out.
+
+    - ``BY_SERIES``: one cluster per series name (the first factor of two-way ANOVA, as
+      on an interaction graph), one bar per category in it, coloured by category.
+    - ``BY_CATEGORY``: one cluster per category, one bar per series in it, coloured by
+      series name.
+    """
+
+    NONE = "none"
+    BY_SERIES = "by_series"
+    BY_CATEGORY = "by_category"
+
+
+class BinMode(StrEnum):
+    """How a histogram's bins are chosen (curvis.charts.stats.histogram_bins)."""
+
+    AUTO = "auto"
+    """R's hist(): pretty() breaks with Sturges' number of classes."""
+    COUNT = "count"
+    """Exactly ``count`` equal bins from the smallest to the largest value."""
+    WIDTH = "width"
+    """Bins ``width`` wide from ``start``."""
+
+
+MAX_BINS = 500
+
+
+@dataclass(frozen=True)
+class HistogramBins:
+    mode: BinMode = BinMode.AUTO
+    count: int = 10
+    width: float = 1.0
+    start: float = 0.0
 
 
 class ErrorBars(StrEnum):
@@ -235,7 +288,10 @@ class ChartSpec:
     aspect_ratio: str = DEFAULT_ASPECT
     custom_size: tuple[float, float] | None = None
     """(width, height) in cm, for ``aspect_ratio == "custom"``."""
-    color_scheme: str = "curvis"
+    palette: ColorScheme = CURVIS
+    """The graph's own copy of its colours: page, ink and the colours new series get."""
+    font: str = DEFAULT_FONT
+    """Id of the chart font (curvis.charts.fonts.FONTS)."""
     text_size: float = DEFAULT_TEXT_SIZE
     overlays: tuple[FitOverlay, ...] = ()
     show_legend: bool = True
@@ -244,6 +300,14 @@ class ChartSpec:
     are the category groups of the table: one line per level of the second factor."""
     show_bands: bool = True
     """Survival graphs: draw the 95% confidence band of each curve."""
+    grouping: Grouping = Grouping.NONE
+    """Bar, horizontal bar, box and violin graphs of category groups: their clusters."""
+    show_points: bool = False
+    """Bar, horizontal bar, box and violin graphs: also draw each value as a symbol."""
+    violin_trim: bool = True
+    """Violins end at the smallest and largest value (False: 3 bandwidths further)."""
+    bins: HistogramBins = HistogramBins()
+    """Histograms: how the bins are chosen."""
     id: str = field(default_factory=new_id)
 
     def __post_init__(self) -> None:
@@ -316,6 +380,16 @@ def spec_problem(spec: ChartSpec) -> str | None:
         return f"unknown aspect ratio {spec.aspect_ratio!r}"
     if not (MIN_TEXT_SIZE <= spec.text_size <= MAX_TEXT_SIZE):
         return f"text size must be from {MIN_TEXT_SIZE:g} to {MAX_TEXT_SIZE:g} points"
+    if spec.font not in FONTS:
+        return f"unknown chart font {spec.font!r}"
+    problem = palette_problem(spec.palette)
+    if problem is not None:
+        return problem
+    bins = spec.bins
+    if not 1 <= bins.count <= MAX_BINS:
+        return f"a histogram has 1 to {MAX_BINS} bins"
+    if not (_positive(bins.width) and math.isfinite(bins.start)):
+        return "a bin width must be a positive number and its start a number"
     overlays = [o.analysis_id for o in spec.overlays]
     if len(set(overlays)) != len(overlays):
         return "a fit is overlaid twice"
@@ -342,7 +416,8 @@ def spec_to_json(spec: ChartSpec) -> dict[str, Any]:
         "title": spec.title,
         "aspect_ratio": spec.aspect_ratio,
         "custom_size": None if spec.custom_size is None else list(spec.custom_size),
-        "color_scheme": spec.color_scheme,
+        "palette": palette_to_json(spec.palette),
+        "font": spec.font,
         "text_size": spec.text_size,
         "overlays": [
             {"analysis_id": o.analysis_id, "show_band": o.show_band} for o in spec.overlays
@@ -350,7 +425,42 @@ def spec_to_json(spec: ChartSpec) -> dict[str, Any]:
         "show_legend": spec.show_legend,
         "analysis_id": spec.analysis_id,
         "show_bands": spec.show_bands,
+        "grouping": spec.grouping.value,
+        "show_points": spec.show_points,
+        "violin_trim": spec.violin_trim,
+        "bins": {
+            "mode": spec.bins.mode.value,
+            "count": spec.bins.count,
+            "width": spec.bins.width,
+            "start": spec.bins.start,
+        },
     }
+
+
+def palette_to_json(palette: ColorScheme) -> dict[str, Any]:
+    return {
+        "id": palette.id,
+        "name": palette.name,
+        "page": palette.page,
+        "ink": palette.ink,
+        "series": list(palette.series),
+    }
+
+
+def palette_from_json(data: Any) -> ColorScheme:
+    """A palette from a JSON object. Raises ``ValueError`` saying what is wrong."""
+    obj = _obj(data, "palette")
+    palette = ColorScheme(
+        _str(obj.get("id", "custom"), "palette id"),
+        _str(obj.get("name", ""), "palette name"),
+        page=_str(obj.get("page"), "palette page"),
+        ink=_str(obj.get("ink"), "palette ink"),
+        series=tuple(_str(c, "palette colour") for c in _list(obj.get("series"), "series")),
+    )
+    problem = palette_problem(palette)
+    if problem is not None:
+        raise ValueError(problem)
+    return palette
 
 
 def _series_to_json(s: SeriesSpec) -> dict[str, Any]:
@@ -407,7 +517,8 @@ def spec_from_json(data: Any) -> ChartSpec:
             title=_str(obj.get("title", ""), "title"),
             aspect_ratio=_str(obj.get("aspect_ratio", DEFAULT_ASPECT), "aspect_ratio"),
             custom_size=custom_size,
-            color_scheme=_str(obj.get("color_scheme", "curvis"), "color_scheme"),
+            palette=palette_from_json(obj["palette"]) if "palette" in obj else CURVIS,
+            font=_str(obj.get("font", DEFAULT_FONT), "font"),
             text_size=_num(obj.get("text_size", DEFAULT_TEXT_SIZE), "text_size"),
             overlays=tuple(
                 FitOverlay(
@@ -419,9 +530,27 @@ def spec_from_json(data: Any) -> ChartSpec:
             show_legend=_bool(obj.get("show_legend", family is ChartFamily.XY), "show_legend"),
             analysis_id=_optional_str(obj.get("analysis_id"), "analysis_id"),
             show_bands=_bool(obj.get("show_bands", True), "show_bands"),
+            grouping=_enum(Grouping, obj.get("grouping", Grouping.NONE), "grouping"),
+            show_points=_bool(obj.get("show_points", False), "show_points"),
+            violin_trim=_bool(obj.get("violin_trim", True), "violin_trim"),
+            bins=_bins_from_json(obj.get("bins", {})),
         )
     except TypeError as exc:  # pragma: no cover - guarded by the checks above
         raise ValueError(str(exc)) from None
+
+
+def _bins_from_json(data: Any) -> HistogramBins:
+    obj = _obj(data, "bins")
+    default = HistogramBins()
+    count = obj.get("count", default.count)
+    if isinstance(count, bool) or not isinstance(count, int):
+        raise ValueError("bins count must be a whole number")
+    return HistogramBins(
+        mode=_enum(BinMode, obj.get("mode", default.mode), "bins mode"),
+        count=count,
+        width=_num(obj.get("width", default.width), "bins width"),
+        start=_num(obj.get("start", default.start), "bins start"),
+    )
 
 
 def _optional_str(value: Any, name: str) -> str | None:

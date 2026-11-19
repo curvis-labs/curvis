@@ -11,8 +11,14 @@
   category groups), with SD error bars. An interaction graph keeps its type.
 
 New XY graphs show a legend; bar graphs name their bars on the X axis and show one only
-when the table has category groups. :func:`with_variant` changes the type of a graph
-(Scatter, Line, Bar, Box), keeping its series and their style.
+when the table has category groups, which a new bar graph is grouped by (one cluster per
+series name, coloured by category). :func:`with_variant` changes the type of a graph,
+keeping its series and their style; :func:`with_grouping` and :func:`with_palette`
+change its clusters and colours.
+
+A new graph copies its page size, palette, font and text size from
+:class:`GraphDefaults` (the Settings' "New graphs"), so later changes to the Settings
+never change it.
 
 :func:`family_problem` says why a table cannot be drawn in a family; the Plot menu
 shows it next to the disabled family.
@@ -21,13 +27,16 @@ shows it next to the disabled family.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from curvis.analysis.base import Analysis, Family, rows_match_x, x_column_id
-from curvis.charts.colors import DEFAULT_SCHEME, scheme
+from curvis.charts.colors import CURVIS, ColorScheme, recolored
+from curvis.charts.fonts import DEFAULT_FONT
+from curvis.charts.grouping import Entry, grouped_layout
 from curvis.charts.spec import (
     DEFAULT_ASPECT,
     DEFAULT_TEXT_SIZE,
+    HORIZONTAL_VARIANTS,
     SYMBOL_CYCLE,
     AxisSpec,
     ChartFamily,
@@ -35,6 +44,8 @@ from curvis.charts.spec import (
     ChartVariant,
     ErrorBars,
     FitOverlay,
+    Grouping,
+    LabelAngle,
     LineStyle,
     Scale,
     SeriesSpec,
@@ -57,6 +68,18 @@ TWO_WAY = "two_way_anova"
 INTERACTION_ONLY = "An interaction graph keeps its type"
 SURVIVAL_ONLY = "A survival graph keeps its type"
 SURVIVAL_Y_TITLE = "Survival probability"
+HISTOGRAM_Y_TITLE = "Number of values"
+
+
+@dataclass(frozen=True)
+class GraphDefaults:
+    """What a new graph copies from the Settings ("New graphs")."""
+
+    aspect_ratio: str = DEFAULT_ASPECT
+    custom_size: tuple[float, float] | None = None
+    palette: ColorScheme = CURVIS
+    font: str = DEFAULT_FONT
+    text_size: float = DEFAULT_TEXT_SIZE
 
 
 def two_way_analyses(table: Table, analyses: Sequence[Analysis]) -> list[Analysis]:
@@ -110,12 +133,12 @@ def series_source(s: Series) -> str:
 def default_series(
     table: Table,
     *,
-    color_scheme: str = DEFAULT_SCHEME,
+    palette: ColorScheme = CURVIS,
     error_bars: ErrorBars = DEFAULT_ERROR_BARS,
     line: bool = False,
 ) -> tuple[SeriesSpec, ...]:
     """A styled :class:`SeriesSpec` for each series of ``table``, left to right."""
-    colors = scheme(color_scheme)
+    colors = palette
     specs: list[SeriesSpec] = []
     for i, s in enumerate(series(table)):
         if s.group_id is not None:
@@ -140,12 +163,12 @@ def default_series(
 def interaction_series(
     table: Table,
     *,
-    color_scheme: str = DEFAULT_SCHEME,
+    palette: ColorScheme = CURVIS,
     error_bars: ErrorBars = DEFAULT_ERROR_BARS,
 ) -> tuple[SeriesSpec, ...]:
     """A styled line for each category group of ``table`` (a level of the second
     factor of a two-way ANOVA), left to right."""
-    colors = scheme(color_scheme)
+    colors = palette
     return tuple(
         SeriesSpec(
             source=c.id,
@@ -158,10 +181,10 @@ def interaction_series(
     )
 
 
-def survival_series(table: Table, *, color_scheme: str = DEFAULT_SCHEME) -> tuple[SeriesSpec, ...]:
+def survival_series(table: Table, *, palette: ColorScheme = CURVIS) -> tuple[SeriesSpec, ...]:
     """A styled step curve for each Time + Event pair of ``table``, left to right. The
     symbol is unused: censored subjects are marked with ticks."""
-    colors = scheme(color_scheme)
+    colors = palette
     return tuple(
         SeriesSpec(
             source=pair.source,
@@ -186,12 +209,13 @@ def graph_series_names(table: Table, spec: ChartSpec) -> dict[str, str]:
 
 
 def default_series_of(table: Table, spec: ChartSpec) -> tuple[SeriesSpec, ...]:
-    """The default style of everything ``spec`` can draw from ``table``."""
+    """The default style of everything ``spec`` can draw from ``table``, in the graph's
+    palette."""
     if spec.family is ChartFamily.INTERACTION:
-        return interaction_series(table)
+        return interaction_series(table, palette=spec.palette)
     if spec.family is ChartFamily.SURVIVAL:
-        return survival_series(table)
-    return default_series(table)
+        return survival_series(table, palette=spec.palette)
+    return default_series(table, palette=spec.palette)
 
 
 def is_fit(analysis: Analysis) -> bool:
@@ -213,11 +237,11 @@ def default_spec(
     analyses: Sequence[Analysis] = (),
     *,
     error_bars: ErrorBars = DEFAULT_ERROR_BARS,
-    aspect_ratio: str = DEFAULT_ASPECT,
-    text_size: float = DEFAULT_TEXT_SIZE,
+    defaults: GraphDefaults | None = None,
 ) -> ChartSpec:
     """A new graph of ``table`` in ``family``. ``analyses`` are the document's analyses;
-    the curve fits of this table among them are overlaid on an XY graph.
+    the curve fits of this table among them are overlaid on an XY graph. ``defaults``
+    (the Settings' "New graphs") give its size, palette, font and text size.
 
     Raises ``ValueError`` with :func:`family_problem`'s reason if the table cannot be
     drawn in that family.
@@ -225,6 +249,8 @@ def default_spec(
     problem = family_problem(table, family, analyses)
     if problem is not None:
         raise ValueError(f"{problem}.")
+    d = defaults if defaults is not None else GraphDefaults()
+    palette = d.palette
     found = series(table)
     if family is ChartFamily.INTERACTION:
         analysis = two_way_analyses(table, analyses)[-1]
@@ -233,12 +259,15 @@ def default_spec(
             table_id=table.id,
             family=family,
             variant=ChartVariant.INTERACTION,
-            series=interaction_series(table, error_bars=error_bars),
+            series=interaction_series(table, palette=palette, error_bars=error_bars),
             x_axis=AxisSpec(title=factor),
             y_axis=AxisSpec(title=_shared_unit(table, found)),
             title=table.name,
-            aspect_ratio=aspect_ratio,
-            text_size=text_size,
+            aspect_ratio=d.aspect_ratio,
+            custom_size=d.custom_size,
+            palette=d.palette,
+            font=d.font,
+            text_size=d.text_size,
             show_legend=True,
             analysis_id=analysis.id,
         )
@@ -248,12 +277,15 @@ def default_spec(
             table_id=table.id,
             family=family,
             variant=ChartVariant.KAPLAN_MEIER,
-            series=survival_series(table),
+            series=survival_series(table, palette=palette),
             x_axis=AxisSpec(title=column_title(table.column(pairs[0].time_id))),
             y_axis=AxisSpec(title=SURVIVAL_Y_TITLE),
             title=table.name,
-            aspect_ratio=aspect_ratio,
-            text_size=text_size,
+            aspect_ratio=d.aspect_ratio,
+            custom_size=d.custom_size,
+            palette=d.palette,
+            font=d.font,
+            text_size=d.text_size,
             show_legend=True,
         )
     if family is ChartFamily.XY:
@@ -266,36 +298,56 @@ def default_spec(
             table_id=table.id,
             family=family,
             variant=ChartVariant.SCATTER,
-            series=default_series(table, error_bars=error_bars),
+            series=default_series(table, palette=palette, error_bars=error_bars),
             x_axis=AxisSpec(
                 title=column_title(table.column(x_id)),
                 scale=Scale.LOG if log_x else Scale.LINEAR,
             ),
             y_axis=AxisSpec(title=y_title),
             title=table.name,
-            aspect_ratio=aspect_ratio,
-            text_size=text_size,
+            aspect_ratio=d.aspect_ratio,
+            custom_size=d.custom_size,
+            palette=d.palette,
+            font=d.font,
+            text_size=d.text_size,
             overlays=tuple(FitOverlay(a.id) for a in fits),
             show_legend=True,
         )
-    return ChartSpec(
+    bar = ChartSpec(
         table_id=table.id,
         family=family,
         variant=ChartVariant.BAR,
         series=tuple(
             replace(s, error_bars=error_bars, error_column=None)
-            for s in default_series(table, error_bars=error_bars)
+            for s in default_series(table, palette=palette, error_bars=error_bars)
         ),
         y_axis=AxisSpec(title=_shared_unit(table, found)),
         title=table.name,
-        aspect_ratio=aspect_ratio,
-        text_size=text_size,
+        aspect_ratio=d.aspect_ratio,
+        custom_size=d.custom_size,
+        palette=d.palette,
+        font=d.font,
+        text_size=d.text_size,
         show_legend=bool(table.category_groups),
     )
+    if any(s.category_id is not None for s in found):
+        bar = with_grouping(bar, Grouping.BY_SERIES, table)
+    return bar
 
 
-GRAPH_TYPES = (ChartVariant.SCATTER, ChartVariant.LINE, ChartVariant.BAR, ChartVariant.BOX)
+GRAPH_TYPES = (
+    ChartVariant.SCATTER,
+    ChartVariant.LINE,
+    ChartVariant.BAR,
+    ChartVariant.HORIZONTAL_BAR,
+    ChartVariant.BOX,
+    ChartVariant.VIOLIN,
+    ChartVariant.COLUMN_SCATTER,
+    ChartVariant.HISTOGRAM,
+)
 """The types a graph can be changed to (Change graph type)."""
+TOOLBAR_TYPES = (ChartVariant.SCATTER, ChartVariant.LINE, ChartVariant.BAR, ChartVariant.BOX)
+"""The types on the Graph panel's toolbar (SPEC.md); the others are in the menu."""
 
 
 def variant_problem(
@@ -325,6 +377,13 @@ def with_variant(spec: ChartSpec, variant: ChartVariant, table: Table) -> ChartS
     if problem is not None:
         raise ValueError(f"{problem}.")
     family = variant.family
+    if spec.family is ChartFamily.BAR and family is ChartFamily.BAR:
+        category, value = _bar_axes(spec)
+        return _with_bar_axes(replace(spec, variant=variant), category, value, table)
+    if spec.family is ChartFamily.BAR:
+        # Back to the upright layout first, so the X axis is the categories' again.
+        category, value = _bar_axes(spec)
+        spec = replace(spec, variant=ChartVariant.BAR, x_axis=category, y_axis=value)
     if family is spec.family:
         return replace(spec, variant=variant)
     if family is ChartFamily.BAR:
@@ -334,7 +393,8 @@ def with_variant(spec: ChartSpec, variant: ChartVariant, table: Table) -> ChartS
             else s
             for s in spec.series
         )
-        return replace(spec, family=family, variant=variant, series=series, x_axis=AxisSpec())
+        bar = replace(spec, family=family, variant=ChartVariant.BAR, series=series)
+        return _with_bar_axes(replace(bar, variant=variant), AxisSpec(), spec.y_axis, table)
     x_id = x_column_id(table)
     assert x_id is not None
     styled: list[SeriesSpec] = []
@@ -363,6 +423,70 @@ def with_fit(spec: ChartSpec, analysis: Analysis) -> ChartSpec:
     ):
         new = replace(new, x_axis=replace(axis, scale=Scale.LOG))
     return new
+
+
+def _bar_axes(spec: ChartSpec) -> tuple[AxisSpec, AxisSpec]:
+    """(category axis, value axis) of a bar-family graph, whichever way it is drawn.
+    A histogram's value axis is its X axis; it has no category axis."""
+    if spec.variant in HORIZONTAL_VARIANTS:
+        return spec.y_axis, spec.x_axis
+    if spec.variant is ChartVariant.HISTOGRAM:
+        return AxisSpec(), spec.x_axis
+    return spec.x_axis, spec.y_axis
+
+
+def _with_bar_axes(spec: ChartSpec, category: AxisSpec, value: AxisSpec, table: Table) -> ChartSpec:
+    """``spec`` with the category and value axes put where its variant draws them."""
+    if spec.variant in HORIZONTAL_VARIANTS:
+        return replace(spec, x_axis=value, y_axis=replace(category, label_angle=LabelAngle.AUTO))
+    if spec.variant is ChartVariant.HISTOGRAM:
+        if not value.title:
+            value = replace(value, title=_shared_unit(table, series(table)))
+        return replace(spec, x_axis=value, y_axis=AxisSpec(title=HISTOGRAM_Y_TITLE))
+    return replace(spec, x_axis=category, y_axis=value)
+
+
+def with_grouping(spec: ChartSpec, grouping: Grouping, table: Table) -> ChartSpec:
+    """``spec`` laid out with ``grouping``, its series recoloured to match: grouped, the
+    series of one colour (a category, or a series name) share the palette's colour of
+    that place; not grouped, each series takes the palette's colours in turn."""
+    if grouping is Grouping.NONE:
+        colors = [spec.palette.series_color(i) for i in range(len(spec.series))]
+    else:
+        colors = [
+            spec.palette.series_color(i)
+            for i in grouped_color_indexes(group_entries(spec, table), grouping)
+        ]
+    styled = tuple(replace(s, color=c) for s, c in zip(spec.series, colors, strict=True))
+    return replace(spec, grouping=grouping, series=styled)
+
+
+def group_entries(spec: ChartSpec, table: Table) -> list[Entry]:
+    """The series of ``spec`` as :mod:`curvis.charts.grouping` sees them."""
+    categories = {c.id: c.name for c in table.category_groups}
+    found = {series_source(s): s for s in series(table)}
+    entries = []
+    for s in spec.series:
+        known = found.get(s.source)
+        name = known.name if known is not None else ""
+        category = categories.get(known.category_id or "") if known is not None else None
+        entries.append(Entry(s.source, name, category))
+    return entries
+
+
+def grouped_color_indexes(entries: Sequence[Entry], grouping: Grouping) -> list[int]:
+    """The palette index of each entry's colour in a graph grouped by ``grouping``."""
+    found = grouped_layout(entries, grouping)
+    keys = [key for key, _name in found.legend()]
+    return [keys.index(p.color_key) for p in found.places]
+
+
+def with_palette(spec: ChartSpec, palette: ColorScheme) -> ChartSpec:
+    """``spec`` in ``palette``: the page, ink and series colours change; series that
+    shared a colour share the new one."""
+    colors = recolored([s.color for s in spec.series], palette)
+    styled = tuple(replace(s, color=c) for s, c in zip(spec.series, colors, strict=True))
+    return replace(spec, palette=palette, series=styled)
 
 
 def column_title(column: Column) -> str:

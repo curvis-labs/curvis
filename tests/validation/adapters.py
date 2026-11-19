@@ -655,7 +655,7 @@ def violin_density(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
 @adapter("histogram_bins")
 def histogram_bins(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
     """validation/r/scripts/histogram_bins.R: shared bin edges and counts per group."""
-    from curvis.charts.stats import BinMode
+    from curvis.charts.spec import BinMode
     from curvis.charts.stats import histogram_bins as bins
 
     found = bins(

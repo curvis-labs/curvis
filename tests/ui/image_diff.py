@@ -81,7 +81,7 @@ def draw_both(spec: ChartSpec, data: ChartData | None) -> tuple[Image.Image, Box
 
 def key_colors(spec: ChartSpec) -> list[tuple[int, int, int]]:
     """The ink and the colours of the shown series."""
-    hexes = {scheme(spec.color_scheme).ink, *(s.color for s in spec.series if s.visible)}
+    hexes = {spec.palette.ink, *(s.color for s in spec.series if s.visible)}
     return [_rgb(h) for h in sorted(hexes)]
 
 
@@ -166,7 +166,7 @@ def compare(spec: ChartSpec, data: ChartData | None) -> Diff:
     screen, screen_box, export, export_box = draw_both(spec, data)
     assert screen.size == export.size, (screen.size, export.size)
     colors = key_colors(spec)
-    page_color = _rgb(scheme(spec.color_scheme).page)
+    page_color = _rgb(spec.palette.page)
     plot_screen = crop(screen, screen_box)
     plot_export = crop(export, export_box)
     plot = miss(plot_screen, plot_export, colors, PLOT_RADIUS, page_color)

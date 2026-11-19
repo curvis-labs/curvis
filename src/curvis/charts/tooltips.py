@@ -11,7 +11,7 @@ import math
 import numpy as np
 
 from curvis.analysis.result import format_number
-from curvis.charts.data import CategoryData, SurvivalCurveData, XYSeriesData
+from curvis.charts.data import CategoryData, HistogramData, SurvivalCurveData, XYSeriesData
 from curvis.charts.spec import ChartVariant, ErrorBars
 
 _INTEGER_LIMIT = 1e15
@@ -62,9 +62,12 @@ def describe_cell(data: XYSeriesData, index: int, level: str, factor: str = "") 
 
 
 def describe_category(category: CategoryData, variant: ChartVariant) -> str:
-    """The tooltip of a bar or a box."""
-    lines = [category.name]
-    if variant is ChartVariant.BOX:
+    """The tooltip of a bar, box, violin or column of values."""
+    name = category.name
+    if category.category is not None:
+        name = f"{name} · {category.category}"
+    lines = [name]
+    if variant in (ChartVariant.BOX, ChartVariant.VIOLIN) and category.box.n:
         b = category.box
         lines += [
             f"Maximum: {typed(b.max)}",
@@ -128,3 +131,16 @@ def step_at(curve: SurvivalCurveData, px: float) -> int:
     """The step of ``curve`` in effect at plot X ``px``: the index of the last time at
     or before it, or -1 before the first time."""
     return int(np.searchsorted(curve.ptime, px, side="right")) - 1
+
+
+def describe_bin(histogram: HistogramData, source: str, index: int) -> str:
+    """The tooltip of bin ``index`` of a histogram's series ``source``: its range (the
+    right end included, and the left one for the first bin) and count."""
+    names = dict(zip((s for s, _c in histogram.counts), histogram.names, strict=False))
+    counts = dict(histogram.counts)[source]
+    low, high = float(histogram.breaks[index]), float(histogram.breaks[index + 1])
+    opening = "[" if index == 0 else "("
+    lines = [names.get(source, "")] if names.get(source) else []
+    lines.append(f"Bin: {opening}{computed(low)}, {computed(high)}]")
+    lines.append(f"Count: {int(counts[index])}")
+    return "\n".join(lines)
