@@ -15,6 +15,7 @@ from curvis.data.replicates import (
     series,
 )
 from curvis.data.roles import ColumnRole
+from curvis.data.survival import SurvivalPair, has_survival_pair, survival_pairs
 from curvis.data.table import DEFAULT_CATEGORY_FACTOR, Table
 
 __all__ = [
@@ -29,7 +30,9 @@ __all__ = [
     "ReplicateGroup",
     "ReplicateStats",
     "Series",
+    "SurvivalPair",
     "Table",
+    "has_survival_pair",
     "layout_error",
     "mean_ci",
     "name_error",
@@ -41,4 +44,5 @@ __all__ = [
     "role_values",
     "row_stats",
     "series",
+    "survival_pairs",
 ]

@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "kaplan_meier",
+  "case": "last_is_event",
+  "description": "The longest time is an event: S drops to 0. Kaplan-Meier, 95% CI log-log.",
+  "generated_by": {
+    "script": "validation/r/scripts/kaplan_meier.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1",
+      "survival": "3.8.6"
+    }
+  },
+  "inputs": {
+    "time": [1, 3, 4, 6, 9, 13],
+    "event": [1, 0, 1, 1, 0, 1],
+    "risk_times": [0, 2, 4, 6, 8, 10, 12, 14]
+  },
+  "expected": {
+    "n": 6,
+    "n_events": 4,
+    "time": [1, 3, 4, 6, 9, 13],
+    "n_risk": [6, 5, 4, 3, 2, 1],
+    "n_event": [1, 0, 1, 1, 0, 1],
+    "n_censor": [0, 1, 0, 0, 1, 0],
+    "survival": [0.83333333333333337, 0.83333333333333337, 0.625, 0.41666666666666663, 0.41666666666666663, 0],
+    "std_err": [0.15214515486254615, 0.15214515486254615, 0.21347814095749162, 0.22178776975932377, 0.22178776975932377, "NaN"],
+    "lower": [0.273122849928356, 0.273122849928356, 0.14185338993165508, 0.05599186485205291, 0.05599186485205291, "NaN"],
+    "upper": [0.97471242669089353, 0.97471242669089353, 0.89305060449857776, 0.76652221955057998, 0.76652221955057998, "NaN"],
+    "median": 6,
+    "median_lower": 1,
+    "median_upper": "NaN",
+    "risk_n": [6, 5, 4, 3, 2, 1, 1, 0]
+  },
+  "kinds": {
+    "n": "exact",
+    "n_events": "exact",
+    "time": "exact",
+    "n_risk": "exact",
+    "n_event": "exact",
+    "n_censor": "exact",
+    "survival": "statistic",
+    "std_err": "statistic",
+    "lower": "ci",
+    "upper": "ci",
+    "median": "statistic",
+    "median_lower": "ci",
+    "median_upper": "ci",
+    "risk_n": "exact"
+  }
+}

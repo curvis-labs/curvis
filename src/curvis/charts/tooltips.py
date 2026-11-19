@@ -1,4 +1,4 @@
-"""Tooltip text for a point, bar or box of a graph.
+"""Tooltip text for a point, bar, box or survival curve of a graph.
 
 Values typed in the table are shown exactly as in the table; values Curvis computed
 (means, SD, SEM, quartiles) with the 4 significant digits of the Results panel.
@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 from curvis.analysis.result import format_number
-from curvis.charts.data import CategoryData, XYSeriesData
+from curvis.charts.data import CategoryData, SurvivalCurveData, XYSeriesData
 from curvis.charts.spec import ChartVariant, ErrorBars
 
 _INTEGER_LIMIT = 1e15
@@ -77,3 +79,52 @@ def describe_category(category: CategoryData, variant: ChartVariant) -> str:
             lines.append(f"{category.error_bars.label}: {computed(category.error)}")
     lines.append(f"n: {category.n}")
     return "\n".join(lines)
+
+
+def _span(curve: SurvivalCurveData, index: int, time_name: str) -> str:
+    """The times a step of a survival curve covers: from its time to the next one."""
+    times = curve.km.time
+    start = 0.0 if index < 0 else float(times[index])
+    if index + 1 < len(times):
+        return f"{time_name}: {typed(start)} to {typed(float(times[index + 1]))}"
+    return f"{time_name}: {typed(start)}"
+
+
+def describe_step(curve: SurvivalCurveData, index: int, time_name: str = "Time") -> str:
+    """The tooltip of a step of a survival curve: ``index`` is the time it starts at
+    (an index into ``curve.km.time``), or -1 for the start of the curve (survival 1)."""
+    km = curve.km
+    lines = [curve.name, _span(curve, index, time_name)]
+    if index < 0:
+        lines += ["Survival: 1", f"At risk: {km.n}"]
+        return "\n".join(lines)
+    lines.append(f"Survival: {computed(float(km.survival[index]))}")
+    low, high = float(km.lower[index]), float(km.upper[index])
+    if not (math.isnan(low) or math.isnan(high)):
+        lines.append(f"95% CI: {computed(low)} to {computed(high)}")
+    lines.append(
+        f"At risk: {int(km.n_risk[index])}, events: {int(km.n_event[index])}, "
+        f"censored: {int(km.n_censor[index])}"
+    )
+    return "\n".join(lines)
+
+
+def describe_censored(curve: SurvivalCurveData, index: int, time_name: str = "Time") -> str:
+    """The tooltip of the censor tick at ``curve.km.time[index]``."""
+    km = curve.km
+    count = int(km.n_censor[index])
+    subjects = "subject" if count == 1 else "subjects"
+    return "\n".join(
+        [
+            f"{curve.name} · {count} censored {subjects}",
+            f"{time_name}: {typed(float(km.time[index]))}",
+            f"Survival: {computed(float(km.survival[index]))}",
+            f"At risk: {int(km.n_risk[index])}",
+        ]
+    )
+
+
+def step_at(curve: SurvivalCurveData, px: float) -> int:
+    """The step of ``curve`` in effect at plot X ``px``: the index of the last time at
+    or before it, or -1 before the first time."""
+    return int(np.searchsorted(curve.ptime, px, side="right")) - 1

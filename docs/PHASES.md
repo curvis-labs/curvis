@@ -555,15 +555,15 @@ Make a plan first. When done, report validation results and convergence rates on
 ### Step 3.4 — Survival: Kaplan-Meier
 
 **Done when**
-- [ ] Time + Event column pairs are supported; Kaplan-Meier curves and 95% CIs match R.
-- [ ] Survival step charts with confidence bands draw and export.
+- [x] Time + Event column pairs are supported; Kaplan-Meier curves and 95% CIs match R.
+- [x] Survival step charts with confidence bands draw and export.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.4 in docs/PHASES.md.
 
 Implement survival analysis:
 - Time + Event column pair role (event = 1, censored = 0), validated on entry.
-- Kaplan-Meier estimate with 95% confidence intervals using lifelines; results table of survival at each event time, median survival with CI, numbers at risk.
+- Kaplan-Meier estimate with 95% confidence intervals using lifelines; results table of survival at each event time, median survival with CI, numbers at risk. (Later: the estimate is computed with NumPy to R’s definitions; lifelines is a test-only cross-check, as its pandas overhead of ~11 ms per curve was too slow for graph redraws.)
 - Survival chart family: step curves with censoring ticks and confidence bands; legend toggling; export.
 
 Order of work: R fixtures first (survival::survfit), with ties, all-censored and single-event cases. Show me the scripts, then implement until tests/validation passes.

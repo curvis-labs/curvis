@@ -15,7 +15,8 @@ ticks come from :mod:`curvis.charts.axes`, as in the export renderer.
 - **Legend** to the right of the plot when the spec shows one, listing the series that
   are in the legend. Clicking an XY entry sends :attr:`ChartView.series_toggled`; the
   owner turns it into an undoable command, and the next render shows the result.
-- Hovering a point, bar or box shows its values as typed in the table
+- Hovering a point, bar or box shows its values as typed in the table; hovering a
+  survival curve shows the step under the pointer, and a censor tick its subjects
   (:mod:`curvis.charts.tooltips`).
 
 pyqtgraph is slow to import, so this module is only imported when a graph is shown.
@@ -40,6 +41,7 @@ from PySide6.QtGui import (
     QFontMetricsF,
     QImage,
     QPainter,
+    QPainterPath,
     QPen,
     QResizeEvent,
     QTransform,
@@ -79,7 +81,7 @@ from curvis.charts.axes import (
     wrap_to_fit,
 )
 from curvis.charts.colors import ColorScheme, scheme
-from curvis.charts.data import CategoryData, ChartData, XYSeriesData
+from curvis.charts.data import CategoryData, ChartData, SurvivalCurveData, XYSeriesData
 from curvis.charts.spec import (
     LINE_VARIANTS,
     XY_VARIANTS,
@@ -90,7 +92,14 @@ from curvis.charts.spec import (
     SeriesSpec,
     Symbol,
 )
-from curvis.charts.tooltips import describe_category, describe_cell, describe_point
+from curvis.charts.tooltips import (
+    describe_category,
+    describe_cell,
+    describe_censored,
+    describe_point,
+    describe_step,
+    step_at,
+)
 
 pg.setConfigOptions(antialias=True)
 
@@ -531,6 +540,8 @@ class _Drawn:
     """Position of each bar or box drawn, by source."""
     legend_sources: dict[int, str] = field(default_factory=dict)
     """id(item) -> series source, for legend clicks."""
+    survival: list[tuple[SurvivalCurveData, Any]] = field(default_factory=list)
+    """(survival curve, its step PlotDataItem)."""
 
 
 class ChartView(QWidget):
@@ -654,6 +665,8 @@ class ChartView(QWidget):
                 self._draw_xy(spec, data, colors)
             elif spec.variant in (ChartVariant.BAR, ChartVariant.BOX):
                 self._draw_categories(spec, data, colors)
+            elif spec.variant is ChartVariant.KAPLAN_MEIER:
+                self._draw_survival(spec, data)
             else:
                 self.message = UNSUPPORTED
         self._place_legend()
@@ -868,6 +881,50 @@ class ChartView(QWidget):
             bars.setVisible(shown and has_bars)
             self._drawn.xy.append((series, item))
 
+    def _draw_survival(self, spec: ChartSpec, data: ChartData) -> None:
+        """Kaplan-Meier steps, their confidence bands and a tick at each censored time.
+        Clicking a legend entry toggles the curve (with its band and ticks)."""
+        plot = self.plot_item
+        legend = self._legend_wanted(spec)
+        self._show_legend(legend)
+        styles = {s.source: s for s in spec.series}
+        for curve in data.survival:
+            style = styles.get(curve.source)
+            if style is None:
+                continue
+            color = QColor(style.color)
+            shown = style.visible and len(curve.px) > 0
+            if spec.show_bands:
+                upper = pg.PlotCurveItem(curve.px, _nan_to_edge(curve.high, curve.py))
+                lower = pg.PlotCurveItem(curve.px, _nan_to_edge(curve.low, curve.py))
+                fill = QColor(color)
+                fill.setAlphaF(BAND_ALPHA)
+                band = pg.FillBetweenItem(upper, lower, brush=fill)
+                band.setZValue(-1)
+                band.setVisible(shown)
+                plot.addItem(band)
+            line_style = style.line_style
+            if line_style is LineStyle.NONE:
+                line_style = LineStyle.SOLID  # a survival curve is always drawn
+            pen = pg.mkPen(color, width=self._px(style.line_width), style=_PEN_STYLES[line_style])
+            item = pg.PlotDataItem(curve.px, curve.py, name=curve.name, pen=pen)
+            item.setVisible(shown)
+            plot.addItem(item)
+            ticks = pg.ScatterPlotItem(
+                curve.censor_px,
+                curve.censor_py,
+                symbol=_censor_tick(),
+                size=self._px(style.size),
+                pen=pg.mkPen(color, width=self._px(style.line_width)),
+                brush=pg.mkBrush(None),
+            )
+            ticks.setVisible(shown)
+            plot.addItem(ticks)
+            self._drawn.legend_sources[id(item)] = curve.source
+            self._drawn.survival.append((curve, item))
+            if legend and style.in_legend:
+                self._add_legend_entry(item, curve.name)
+
     def _show_legend(self, shown: bool) -> None:
         if shown == self._legend_shown:
             return
@@ -992,7 +1049,8 @@ class ChartView(QWidget):
         return QRectF(top_left + offset, bottom_right + offset)
 
     def tooltip_at(self, scene_pos: QPointF) -> str | None:
-        """The tooltip for the point, bar or box under ``scene_pos`` (scene coordinates)."""
+        """The tooltip for the point, bar, box or survival curve under ``scene_pos``
+        (scene coordinates)."""
         if self.spec is None:
             return None
         vb = self.plot_item.vb
@@ -1000,6 +1058,8 @@ class ChartView(QWidget):
             return None
         if self._drawn.xy:
             return self._xy_tooltip(scene_pos)
+        if self._drawn.survival:
+            return self._survival_tooltip(scene_pos)
         if self._drawn.categories:
             point = vb.mapSceneToView(scene_pos)
             return self._category_tooltip(point.x(), point.y())
@@ -1026,6 +1086,51 @@ class ChartView(QWidget):
             return describe_cell(series, index, name, self.spec.x_axis.title)
         x_name = self.spec.x_axis.title or "X"
         return describe_point(series, index, x_name)
+
+    def _survival_tooltip(self, scene_pos: QPointF) -> str | None:
+        """A censor tick within reach names its subjects; otherwise the step line
+        nearest the pointer (within reach) shows its survival and numbers."""
+        assert self.spec is not None
+        vb = self.plot_item.vb
+        origin = vb.mapViewToScene(QPointF(0.0, 0.0))
+        unit = vb.mapViewToScene(QPointF(1.0, 1.0))
+        sx, sy = unit.x() - origin.x(), unit.y() - origin.y()
+        px, py = scene_pos.x(), scene_pos.y()
+        time_name = self.spec.x_axis.title or "Time"
+        best_tick: tuple[float, SurvivalCurveData, int] | None = None
+        best_step: tuple[float, SurvivalCurveData, int] | None = None
+        for curve, item in self._drawn.survival:
+            if not item.isVisible() or len(curve.px) == 0:
+                continue
+            if len(curve.censor_px):
+                tx = origin.x() + curve.censor_px * sx
+                ty = origin.y() + curve.censor_py * sy
+                distance = np.hypot(tx - px, ty - py)
+                k = int(np.argmin(distance))
+                if distance[k] <= HOVER_RADIUS_PX and (
+                    best_tick is None or distance[k] < best_tick[0]
+                ):
+                    best_tick = (float(distance[k]), curve, k)
+            x = origin.x() + curve.px * sx
+            y = origin.y() + curve.py * sy
+            if len(x) < 2:
+                continue
+            ax, ay, dx, dy = x[:-1], y[:-1], np.diff(x), np.diff(y)
+            length = dx * dx + dy * dy
+            with np.errstate(invalid="ignore", divide="ignore"):
+                t = np.clip(((px - ax) * dx + (py - ay) * dy) / length, 0.0, 1.0)
+            t = np.where(length > 0, t, 0.0)
+            distance = np.hypot(ax + t * dx - px, ay + t * dy - py)
+            k = int(np.argmin(distance))
+            if distance[k] <= HOVER_RADIUS_PX and (best_step is None or distance[k] < best_step[0]):
+                best_step = (float(distance[k]), curve, k)
+        if best_tick is not None:
+            _d, curve, k = best_tick
+            return describe_censored(curve, step_at(curve, float(curve.censor_px[k])), time_name)
+        if best_step is not None:
+            _d, curve, k = best_step
+            return describe_step(curve, step_at(curve, float(curve.px[k])), time_name)
+        return None
 
     def _category_tooltip(self, x: float, y: float) -> str | None:
         assert self.spec is not None
@@ -1121,6 +1226,16 @@ def _set_error_bars(bars: Any, series: XYSeriesData, cap: float) -> bool:
         beam=cap,
     )
     return True
+
+
+@functools.cache
+def _censor_tick() -> QPainterPath:
+    """A vertical stroke one symbol size long, as Matplotlib's "|" marker (pyqtgraph's
+    own "|" is a filled bar)."""
+    path = QPainterPath()
+    path.moveTo(0.0, -0.5)
+    path.lineTo(0.0, 0.5)
+    return path
 
 
 def _nan_to_edge(limit: Any, fit: Any) -> Any:

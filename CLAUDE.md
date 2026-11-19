@@ -17,7 +17,7 @@ Priorities, in order: **correct statistics**, **an easy UI**, **fast processing*
 | Excel import | `fastexcel` (.xlsx), `xlrd` (.xls) |
 | Statistics | SciPy, statsmodels; scikit-posthocs only in tests (cross-check of Dunn) |
 | Curve fitting | lmfit |
-| Survival | lifelines |
+| Survival | NumPy (Kaplan-Meier, validated against R); lifelines only in tests (cross-check) |
 | Live plots | pyqtgraph |
 | Export plots | Matplotlib (PNG, SVG, PDF) |
 | Formula parser | Lark (no `eval`, no `exec`, ever) |

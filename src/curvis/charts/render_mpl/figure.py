@@ -116,6 +116,8 @@ def make_figure(spec: ChartSpec, data: ChartData | None) -> Figure:
             _draw_xy(ax, spec, data, layout)
         elif spec.variant in (ChartVariant.BAR, ChartVariant.BOX):
             _draw_categories(ax, spec, data, colors, layout)
+        elif spec.variant is ChartVariant.KAPLAN_MEIER:
+            _draw_survival(ax, spec, data)
         else:
             raise ValueError(UNSUPPORTED)
     _legend(ax, spec, data, colors, layout)
@@ -308,6 +310,53 @@ def _draw_xy(ax: Axes, spec: ChartSpec, data: ChartData, layout: AxesLayout) -> 
             )
 
 
+# --- survival ----------------------------------------------------------------------------
+
+
+def _survival_line(style: SeriesSpec) -> LineStyle:
+    """A survival curve is always drawn, so "no line" means a solid one."""
+    return LineStyle.SOLID if style.line_style is LineStyle.NONE else style.line_style
+
+
+def _draw_survival(ax: Axes, spec: ChartSpec, data: ChartData) -> None:
+    styles = {s.source: s for s in spec.series}
+    for z, curve in enumerate(data.survival):
+        style = styles.get(curve.source)
+        if style is None or not style.visible or len(curve.px) == 0:
+            continue
+        if spec.show_bands:
+            ax.fill_between(
+                curve.px,
+                np.where(np.isfinite(curve.low), curve.low, curve.py),
+                np.where(np.isfinite(curve.high), curve.high, curve.py),
+                color=style.color,
+                alpha=BAND_ALPHA,
+                linewidth=0,
+                zorder=1,
+            )
+        line = _survival_line(style)
+        ax.plot(
+            curve.px,
+            curve.py,
+            color=style.color,
+            linewidth=style.line_width,
+            linestyle=_linestyle(line),
+            zorder=3 + 2 * z,
+        )
+        _dashes(ax.lines[-1], line, style.line_width)
+        if len(curve.censor_px):
+            ax.plot(
+                curve.censor_px,
+                curve.censor_py,
+                linestyle="None",
+                marker="|",
+                markersize=style.size,
+                markeredgewidth=style.line_width,
+                color=style.color,
+                zorder=4 + 2 * z,
+            )
+
+
 def _marker(style: SeriesSpec) -> dict[str, Any]:
     return {
         "marker": _MARKERS[style.symbol],
@@ -455,6 +504,18 @@ def _legend(
             _dashes(handle, line, style.line_width)
             handles.append(handle)
             names.append(series.name)
+    elif spec.variant is ChartVariant.KAPLAN_MEIER:
+        for curve in data.survival:
+            style = styles[curve.source]
+            if not (style.visible and style.in_legend):
+                continue
+            line = _survival_line(style)
+            handle = Line2D(
+                [], [], color=style.color, linewidth=style.line_width, linestyle=_linestyle(line)
+            )
+            _dashes(handle, line, style.line_width)
+            handles.append(handle)
+            names.append(curve.name)
     else:
         for c in data.categories:
             if c.source in layout.positions and styles[c.source].in_legend:

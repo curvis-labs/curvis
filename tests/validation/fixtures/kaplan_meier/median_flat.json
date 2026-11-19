@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "kaplan_meier",
+  "case": "median_flat",
+  "description": "S is exactly 0.5 over an interval: the median is a midpoint. Kaplan-Meier, 95% CI log-log.",
+  "generated_by": {
+    "script": "validation/r/scripts/kaplan_meier.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1",
+      "survival": "3.8.6"
+    }
+  },
+  "inputs": {
+    "time": [1, 2, 3, 4, 5, 6, 7, 8],
+    "event": [1, 1, 1, 1, 1, 1, 1, 1],
+    "risk_times": [0, 2, 4, 6, 8]
+  },
+  "expected": {
+    "n": 8,
+    "n_events": 8,
+    "time": [1, 2, 3, 4, 5, 6, 7, 8],
+    "n_risk": [8, 7, 6, 5, 4, 3, 2, 1],
+    "n_event": [1, 1, 1, 1, 1, 1, 1, 1],
+    "n_censor": [0, 0, 0, 0, 0, 0, 0, 0],
+    "survival": [0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125, 0],
+    "std_err": [0.11692679333668568, 0.15309310892394862, 0.17116329922036438, 0.17677669529663689, 0.17116329922036438, 0.15309310892394862, 0.11692679333668567, "NaN"],
+    "lower": [0.38700001403202522, 0.31480711370551911, 0.22933332242913168, 0.15203589029902395, 0.087006225101353196, 0.037066881631829869, 0.0065933250173264733, "NaN"],
+    "upper": [0.98139296587896596, 0.93089831709062754, 0.86069827691353873, 0.77486501206688874, 0.67436332656277942, 0.55808419128066844, 0.42270583252396876, "NaN"],
+    "median": 4.5,
+    "median_lower": 1,
+    "median_upper": 7,
+    "risk_n": [8, 7, 5, 3, 1]
+  },
+  "kinds": {
+    "n": "exact",
+    "n_events": "exact",
+    "time": "exact",
+    "n_risk": "exact",
+    "n_event": "exact",
+    "n_censor": "exact",
+    "survival": "statistic",
+    "std_err": "statistic",
+    "lower": "ci",
+    "upper": "ci",
+    "median": "statistic",
+    "median_lower": "ci",
+    "median_upper": "ci",
+    "risk_n": "exact"
+  }
+}

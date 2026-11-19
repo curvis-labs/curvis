@@ -9,10 +9,11 @@ from curvis.charts.builder import (
     NEEDS_TWO_WAY,
     NEEDS_X,
     NEEDS_Y,
-    SURVIVAL_LATER,
     default_spec,
     error_column_of,
     family_problem,
+    graph_series_names,
+    variant_problem,
     with_fit,
 )
 from curvis.charts.colors import CURVIS
@@ -117,12 +118,25 @@ def test_family_problems() -> None:
     survival = Table(
         "T", [Column.new("T", ColumnRole.TIME, [1]), Column.new("E", ColumnRole.EVENT, [1])]
     )
-    assert family_problem(survival, ChartFamily.SURVIVAL) == SURVIVAL_LATER
+    assert family_problem(survival, ChartFamily.SURVIVAL) is None
+    unpaired = Table(  # an Event column needs a Time column on its left
+        "T", [Column.new("E", ColumnRole.EVENT, [1]), Column.new("T", ColumnRole.TIME, [1])]
+    )
+    assert family_problem(unpaired, ChartFamily.SURVIVAL) == NEEDS_SURVIVAL
     with pytest.raises(ValueError, match=NEEDS_X):
         default_spec(columns, ChartFamily.XY)
 
 
 ROLES = st.sampled_from(list(ColumnRole))
+
+
+def allowed(role: ColumnRole, values: list[float]) -> list[float]:
+    """``values`` made valid for ``role``: times 0 or more, events 0 or 1."""
+    if role is ColumnRole.TIME:
+        return [abs(v) for v in values]
+    if role is ColumnRole.EVENT:
+        return [v if v != v else float(abs(v) >= 1) for v in values]
+    return values
 
 
 @given(
@@ -136,7 +150,7 @@ def test_every_table_gives_a_spec_or_a_reason(
     table = Table(
         "T",
         [
-            Column.new(f"C{i}", role, values if role.is_numeric else ["x"] * 3)
+            Column.new(f"C{i}", role, allowed(role, values) if role.is_numeric else ["x"] * 3)
             for i, (role, values) in enumerate(columns)
         ],
     )
@@ -205,3 +219,25 @@ def test_graph_type_needs_what_the_family_needs() -> None:
     assert variant_problem(table, ChartVariant.VIOLIN) == "This chart type cannot be drawn yet"
     with pytest.raises(ValueError, match=NEEDS_X):
         with_variant(bar, ChartVariant.SCATTER, table)
+
+
+def test_a_survival_graph_draws_each_time_event_pair() -> None:
+    table = Table(
+        "Trial",
+        [
+            Column.new("Days", ColumnRole.TIME, [1, 2], unit="d"),
+            Column.new("Drug", ColumnRole.EVENT, [1, 0]),
+            Column.new("Placebo", ColumnRole.EVENT, [1, 1]),
+        ],
+    )
+    spec = default_spec(table, ChartFamily.SURVIVAL)
+    assert spec.variant is ChartVariant.KAPLAN_MEIER
+    assert [s.source for s in spec.series] == [table.columns[1].id, table.columns[2].id]
+    assert spec.x_axis.title == "Days (d)"
+    assert spec.y_axis.title == "Survival probability"
+    assert spec.show_legend and spec.show_bands
+    assert graph_series_names(table, spec) == {
+        table.columns[1].id: "Drug",
+        table.columns[2].id: "Placebo",
+    }
+    assert variant_problem(table, ChartVariant.LINE, spec) == "A survival graph keeps its type"

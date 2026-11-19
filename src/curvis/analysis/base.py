@@ -47,6 +47,7 @@ BUILTIN_MODULES = (
     "curvis.analysis.compare.mann_whitney_analysis",
     "curvis.analysis.compare.kruskal_analysis",
     "curvis.analysis.fit.analyses",
+    "curvis.analysis.survival.kaplan_meier",
 )
 """Modules that register the built-in analysis types when imported."""
 
@@ -268,6 +269,8 @@ class AnalysisInputs:
     x_name: str = ""
     category_factor: str = ""
     """The name of the factor whose levels are the category groups (two-way ANOVA)."""
+    time_unit: str = ""
+    """The unit of the Time columns (survival)."""
 
 
 def series_choices(table: Table) -> list[InputChoice]:

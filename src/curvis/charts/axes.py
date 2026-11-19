@@ -17,6 +17,8 @@ compare the two renderers.
   third decade), so the labels do not run into each other: both renderers then show
   every label, where pyqtgraph would hide some and Matplotlib would overlap them. Labels
   read like the table (0.01, 1, 100); very large or small values use exponents (1e+08).
+- **Survival.** Like XY: the steps of the shown curves (from time 0 and survival 1)
+  and, when drawn, their bands, padded by 5 %.
 - **Categories.** The shown bars or boxes are numbered 0, 1, 2 … from the left, so a
   hidden series leaves no gap. Interaction graphs put the levels of the first factor at
   0, 1, 2 … (from −0.5 to n − 0.5); their Y range is that of XY graphs.
@@ -411,6 +413,13 @@ def _xy_bounds(spec: ChartSpec, data: ChartData | None) -> tuple[float, float, f
             ys.append(curve.py)
             if curve.show_band:
                 ys += [curve.low, curve.high]
+        for km in data.survival:
+            if km.source not in visible or len(km.px) == 0:
+                continue
+            xs.append(km.px)
+            ys.append(km.py)
+            if spec.show_bands:
+                ys += [km.low, km.high]
     x_low, x_high = _bounds(xs)
     y_low, y_high = _bounds(ys)
     return x_low, x_high, y_low, y_high

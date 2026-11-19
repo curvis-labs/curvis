@@ -23,7 +23,7 @@ from curvis.compute.calc_engine import CalcEngine
 from curvis.compute.jobs import Job, JobError
 from curvis.compute.recalc import UPSTREAM_ERROR, NodeJob
 from curvis.core import CycleError, Document, UndoEvent
-from curvis.data import ColumnRole, Table, series
+from curvis.data import ColumnRole, Table, series, survival_pairs
 
 type _Signature = tuple[ChartSpec, tuple[str, ...]]
 
@@ -32,6 +32,13 @@ def graph_reads(table: Table, spec: ChartSpec) -> list[str]:
     """What a graph reads: its table, the columns it draws, the fits it overlays and the
     analysis it draws (interaction graphs)."""
     reads = [table.id]
+    if spec.family is ChartFamily.SURVIVAL:
+        pairs = {p.source: p for p in survival_pairs(table)}
+        for style in spec.series:
+            pair = pairs.get(style.source)
+            if pair is not None:
+                reads += [pair.time_id, pair.event_id]
+        return list(dict.fromkeys(reads))
     by_source = {s.group_id or s.column_ids[0]: s for s in series(table)}
     for style in spec.series:
         found = by_source.get(style.source)

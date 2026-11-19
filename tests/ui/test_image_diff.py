@@ -33,6 +33,7 @@ from tests.unit.charts_tables import (
     column_table,
     replicate_table,
     sigmoid_table,
+    survival_table,
     two_way_analysis,
     two_way_result,
     two_way_table,
@@ -148,12 +149,20 @@ LAYOUTS = {
 turned category labels (both renderers now lay out a title and turned labels as
 Matplotlib does)."""
 
+
+def _survival() -> tuple[ChartSpec, ChartData]:
+    table = survival_table()
+    spec = replace(default_spec(table, ChartFamily.SURVIVAL), aspect_ratio="square")
+    return spec, compute(gather(table, spec, {}))
+
+
 GRAPHS = {
     "scatter": _scatter,
     "line": _line_with_fit,
     "bar": lambda: _bars(ChartVariant.BAR),
     "box": lambda: _bars(ChartVariant.BOX),
     "interaction": _interaction,
+    "survival": _survival,
 }
 
 

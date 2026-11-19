@@ -51,8 +51,12 @@ CELLS: st.SearchStrategy[CellValue] = (
 def columns(draw: st.DrawFn, name: str, n_rows: int) -> Column:
     role = draw(ROLES)
     if role.is_numeric:
+        allowed = {  # the values a Time or Event column accepts
+            ColumnRole.TIME: st.floats(0, allow_infinity=True) | st.integers(0, 1000),
+            ColumnRole.EVENT: st.sampled_from([0, 1, 0.0, 1.0]),
+        }.get(role, NUMBERS)
         values: list[CellValue] = draw(
-            st.lists(st.none() | NUMBERS, min_size=n_rows, max_size=n_rows)
+            st.lists(st.none() | allowed, min_size=n_rows, max_size=n_rows)
         )
     else:
         values = draw(st.lists(st.none() | st.text(max_size=3), min_size=n_rows, max_size=n_rows))

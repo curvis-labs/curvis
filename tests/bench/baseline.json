@@ -988,6 +988,48 @@
           "median": 0.007377399000006335
         }
       ]
+    },
+    {
+      "name": "test_kaplan_meier_10k_subjects",
+      "fullname": "tests/bench/test_survival.py::test_kaplan_meier_10k_subjects",
+      "stats": {
+        "min": 0.00492263136351922
+      },
+      "runs": [
+        {
+          "min": 0.00492263136351922,
+          "median": 0.005436486170604135
+        },
+        {
+          "min": 0.007313935483463955,
+          "median": 0.008912883152053484
+        },
+        {
+          "min": 0.008689825768188218,
+          "median": 0.009757770564229976
+        }
+      ]
+    },
+    {
+      "name": "test_survival_graph_data_4_curves_of_500",
+      "fullname": "tests/bench/test_survival.py::test_survival_graph_data_4_curves_of_500",
+      "stats": {
+        "min": 0.004752972424418827
+      },
+      "runs": [
+        {
+          "min": 0.008387445027032873,
+          "median": 0.008565564342556923
+        },
+        {
+          "min": 0.004752972424418827,
+          "median": 0.006010871263326038
+        },
+        {
+          "min": 0.004778278853302427,
+          "median": 0.008046379329743546
+        }
+      ]
     }
   ]
 }
