@@ -34,6 +34,11 @@ class ChartFont:
     """Width of the digit 0, in ems."""
     note: str = ""
     """Shown in the Format dialog's list after the name."""
+    generic: str = "sans-serif"
+    """The generic family: "sans-serif" or "serif"."""
+    fallbacks: tuple[str, ...] = ()
+    """Fonts an exported SVG names after this one, for computers without it: fonts with
+    the same letter widths, so the layout holds."""
 
     @property
     def ascent_em(self) -> float:
@@ -78,6 +83,7 @@ FONTS: dict[str, ChartFont] = {
             307,
             0.5562,
             note="the letter widths of Arial",
+            fallbacks=("Arial", "Helvetica"),
         ),
         ChartFont(
             "liberation_serif",
@@ -89,6 +95,8 @@ FONTS: dict[str, ChartFont] = {
             307,
             0.5,
             note="the letter widths of Times New Roman",
+            generic="serif",
+            fallbacks=("Times New Roman", "Times"),
         ),
         ChartFont("inter", "Inter", "Inter-Regular.ttf", 2048, 1984, 494, 0, 0.6309),
     )

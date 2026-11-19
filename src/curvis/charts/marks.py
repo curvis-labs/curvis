@@ -148,11 +148,13 @@ class Hit:
 
 @dataclass
 class Marks:
-    """Drawn in this order: polygons and rectangles (layer 0), lines, points."""
+    """Drawn in this order: polygons and rectangles, lines, points, then the lines
+    that go over the points (a column scatter's mean and error bars)."""
 
     shapes: list[Rect | Polygon] = field(default_factory=list)
     lines: list[Lines] = field(default_factory=list)
     points: list[Points] = field(default_factory=list)
+    over: list[Lines] = field(default_factory=list)
     legend: list[LegendEntry] = field(default_factory=list)
     hits: list[Hit] = field(default_factory=list)
 
@@ -288,7 +290,7 @@ def _mean_and_error(marks: Marks, c: CategoryData, at: float, ink: str) -> None:
             if math.isfinite(end) and end != c.plot_mean:
                 segments += [((at, c.plot_mean), (at, end)), ((at - cap, end), (at + cap, end))]
     if segments:
-        marks.lines.append(Lines(tuple(segments), ink, BOX_LINE_PT))
+        marks.over.append(Lines(tuple(segments), ink, BOX_LINE_PT))
     if len(c.values):
         low, high = float(c.values.min()), float(c.values.max())
         marks.hits.append(Hit(at - SCATTER_WIDTH / 2, low, at + SCATTER_WIDTH / 2, high, c.source))
@@ -414,18 +416,21 @@ def _swapped(marks: Marks) -> Marks:
             shapes.append(Rect(s.y0, s.x0, s.y1, s.x1, s.fill, s.fill_alpha, s.edge, s.edge_pt))
         else:
             shapes.append(Polygon(s.ys, s.xs, s.fill, s.fill_alpha, s.edge, s.edge_pt))
-    lines = [
-        Lines(
-            tuple(((a[1], a[0]), (b[1], b[0])) for a, b in ln.segments),
-            ln.color,
-            ln.width_pt,
-            ln.style,
-        )
-        for ln in marks.lines
-    ]
+
+    def swap(found: list[Lines]) -> list[Lines]:
+        return [
+            Lines(
+                tuple(((a[1], a[0]), (b[1], b[0])) for a, b in ln.segments),
+                ln.color,
+                ln.width_pt,
+                ln.style,
+            )
+            for ln in found
+        ]
+
     points = [Points(p.ys, p.xs, p.symbol, p.size_pt, p.color) for p in marks.points]
     hits = [Hit(h.y0, h.x0, h.y1, h.x1, h.source, h.bin) for h in marks.hits]
-    return Marks(shapes, lines, points, marks.legend, hits)
+    return Marks(shapes, swap(marks.lines), points, swap(marks.over), marks.legend, hits)
 
 
 __all__ = (

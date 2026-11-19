@@ -134,3 +134,21 @@ def survival_table() -> Table:
             Column.new("Placebo", ColumnRole.EVENT, placebo),
         ],
     )
+
+
+def spread_table() -> Table:
+    """Three Y columns of 30, 24 and 18 values with different spreads (seeded), for
+    violins, histograms and individual values."""
+    rng = np.random.default_rng(20261119)
+    n = 30
+    values = {
+        "Control": rng.normal(10.0, 2.0, 30),
+        "Low": rng.normal(14.0, 3.0, 24),
+        "High": rng.gamma(4.0, 1.5, 18) + 12.0,
+    }
+    columns = []
+    for name, v in values.items():
+        padded = np.full(n, np.nan)
+        padded[: len(v)] = np.round(v, 2)
+        columns.append(Column.new(name, ColumnRole.Y, padded, unit="mM"))
+    return Table("Spread", columns)

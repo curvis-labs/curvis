@@ -86,20 +86,31 @@ own font."""
 
 @functools.cache
 def _register_fonts() -> None:
-    """Make the bundled chart fonts known to Matplotlib (once per process)."""
+    """Make the bundled chart fonts known to Matplotlib (once per process). They go
+    first in its list, so where another version of a font with the same name is
+    installed, the bundled file still wins (Matplotlib takes the first of equal
+    matches)."""
     from matplotlib import font_manager
 
+    manager = font_manager.fontManager
     for font in FONTS.values():
         path = font.path()
         if font.file and path is not None and path.is_file():
-            font_manager.fontManager.addfont(str(path))
+            manager.addfont(str(path))
+            manager.ttflist.insert(0, manager.ttflist.pop())
 
 
 def chart_rc(spec: ChartSpec) -> dict[str, Any]:
     """The Matplotlib settings to draw and save ``spec`` with (``matplotlib.rc_context``):
     :data:`RC_PARAMS` with the graph's font."""
     _register_fonts()
-    return {**RC_PARAMS, "font.sans-serif": [chart_font_info(spec.font).family]}
+    font = chart_font_info(spec.font)
+    # An SVG names the fallbacks after the font, for computers without it.
+    return {
+        **RC_PARAMS,
+        "font.family": font.generic,
+        f"font.{font.generic}": [font.family, *font.fallbacks],
+    }
 
 
 # Symbols as pyqtgraph draws them (y up here, down there); a custom marker of Matplotlib
@@ -443,7 +454,7 @@ def _draw_marks(ax: Axes, marks: Marks) -> None:
         elif isinstance(shape, Polygon):
             xy = np.column_stack([shape.xs, shape.ys])
             ax.add_patch(PolygonPatch(xy, closed=True, joinstyle="miter", **common))
-    for lines in marks.lines:
+    for z, lines in [(3, ln) for ln in marks.lines] + [(5, ln) for ln in marks.over]:
         style: Any = "solid"
         if lines.style in _DASHES:
             style = (0, tuple(p * lines.width_pt for p in _DASHES[lines.style]))
@@ -454,7 +465,7 @@ def _draw_marks(ax: Axes, marks: Marks) -> None:
                 linewidths=lines.width_pt,
                 linestyles=style,
                 capstyle="butt",
-                zorder=3,
+                zorder=z,
             ),
             autolim=False,
         )

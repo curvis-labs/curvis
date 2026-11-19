@@ -1011,6 +1011,8 @@ class ChartView(QWidget):
                     pen=pg.mkPen(color),
                 )
             )
+        if marks.over:
+            plot.addItem(MarksItem(Marks(lines=list(marks.over)), self._px))
 
     def _legend_item(self, entry: LegendEntry) -> Any:
         """An item whose look a legend sample copies: a patch or a symbol."""

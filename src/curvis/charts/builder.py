@@ -379,7 +379,11 @@ def with_variant(spec: ChartSpec, variant: ChartVariant, table: Table) -> ChartS
     family = variant.family
     if spec.family is ChartFamily.BAR and family is ChartFamily.BAR:
         category, value = _bar_axes(spec)
-        return _with_bar_axes(replace(spec, variant=variant), category, value, table)
+        changed = replace(spec, variant=variant)
+        if variant is ChartVariant.HISTOGRAM and spec.variant is not ChartVariant.HISTOGRAM:
+            # Overlaid series need their names: a legend when there are several.
+            changed = replace(changed, show_legend=len(spec.series) > 1)
+        return _with_bar_axes(changed, category, value, table)
     if spec.family is ChartFamily.BAR:
         # Back to the upright layout first, so the X axis is the categories' again.
         category, value = _bar_axes(spec)
