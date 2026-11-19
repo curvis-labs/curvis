@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "analysis": "kaplan_meier",
+  "case": "near_ties",
+  "description": "Times that differ only by rounding (0.1 + 0.2 and 0.3, 1 and 1 + 1e-10) are one time. Kaplan-Meier, 95% CI log-log.",
+  "generated_by": {
+    "script": "validation/r/scripts/kaplan_meier.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1",
+      "survival": "3.8.6"
+    }
+  },
+  "inputs": {
+    "time": [0.30000000000000004, 0.29999999999999999, 1, 1.0000000001, 2, 2.5, 3.0000000030000002, 3, 5, 6],
+    "event": [1, 0, 1, 1, 0, 1, 1, 1, 0, 1],
+    "risk_times": [0, 1, 2, 3, 4, 5, 6]
+  },
+  "expected": {
+    "n": 10,
+    "n_events": 7,
+    "time": [0.29999999999999999, 1, 2, 2.5, 3, 5, 6],
+    "n_risk": [10, 8, 6, 5, 4, 2, 1],
+    "n_event": [1, 2, 0, 1, 2, 0, 1],
+    "n_censor": [1, 0, 1, 0, 0, 1, 0],
+    "survival": [0.90000000000000002, 0.67500000000000004, 0.67500000000000004, 0.54000000000000004, 0.27000000000000002, 0.27000000000000002, 0],
+    "std_err": [0.094868329805051374, 0.15507054846101501, 0.15507054846101501, 0.17311845655504213, 0.16036676713084916, 0.16036676713084916, "NaN"],
+    "lower": [0.47300927136205051, 0.29058535740313279, 0.29058535740313279, 0.18116533840412338, 0.041356972913025737, 0.041356972913025737, "NaN"],
+    "upper": [0.98528139336734311, 0.88249673370874016, 0.88249673370874016, 0.80071251733386928, 0.58381464196519139, 0.58381464196519139, "NaN"],
+    "median": 3,
+    "median_lower": 0.29999999999999999,
+    "median_upper": "NaN",
+    "risk_n": [10, 8, 6, 4, 2, 2, 1]
+  },
+  "kinds": {
+    "n": "exact",
+    "n_events": "exact",
+    "time": "exact",
+    "n_risk": "exact",
+    "n_event": "exact",
+    "n_censor": "exact",
+    "survival": "statistic",
+    "std_err": "statistic",
+    "lower": "ci",
+    "upper": "ci",
+    "median": "statistic",
+    "median_lower": "ci",
+    "median_upper": "ci",
+    "risk_n": "exact"
+  }
+}
