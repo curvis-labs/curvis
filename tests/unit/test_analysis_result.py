@@ -142,3 +142,37 @@ def test_results_pickle_for_worker_processes() -> None:
         (ResultTable("T", (ResultColumn("a"),), ((1.0,),)),),
     )
     assert pickle.loads(pickle.dumps(result)) == result
+
+
+def test_p_value_display_modes() -> None:
+    from curvis.analysis.result import PDisplay, format_p, p_marker, render_p
+
+    cases = [0.0312, 0.000312, 2.34e-7, 0.0, 1.0]
+    assert [format_p(p) for p in cases] == ["0.0312", "< 0.001", "< 0.001", "< 0.001", "1.00"]
+    assert [format_p(p, PDisplay.BELOW_00001) for p in cases] == [
+        "0.0312",
+        "0.000312",
+        "< 0.0001",
+        "< 0.0001",
+        "1.00",
+    ]
+    assert [format_p(p, PDisplay.EXACT) for p in cases] == [
+        "0.0312",
+        "3.1 × 10⁻⁴",
+        "2.3 × 10⁻⁷",
+        "< 2.2 × 10⁻³⁰⁸",  # an underflow, not a measured value
+        "1.00",
+    ]
+    text = f"differ ({p_marker(2.34e-7)}); not ({p_marker(0.2)})"
+    assert render_p(text) == "differ (P < 0.001); not (P = 0.200)"
+    assert render_p(text, PDisplay.EXACT) == "differ (P = 2.3 × 10⁻⁷); not (P = 0.200)"
+
+
+def test_stars_do_not_follow_the_display() -> None:
+    from curvis.analysis.result import Kind, PDisplay, ResultColumn, ResultTable, table_grid
+
+    table = ResultTable("Pairs", (ResultColumn("P", Kind.P_VALUE),), ((0.00004,),))
+    for display in PDisplay:
+        grid = table_grid(table, display)
+        assert grid.shown[0][1] == "***"
+    assert table_grid(table, PDisplay.EXACT).shown[0][0] == "4.0 × 10⁻⁵"
