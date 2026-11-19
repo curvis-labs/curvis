@@ -40,6 +40,7 @@ from PySide6.QtGui import (
     QFontMetricsF,
     QImage,
     QPainter,
+    QPainterPath,
     QPen,
     QResizeEvent,
     QTransform,
@@ -654,6 +655,8 @@ class ChartView(QWidget):
                 self._draw_xy(spec, data, colors)
             elif spec.variant in (ChartVariant.BAR, ChartVariant.BOX):
                 self._draw_categories(spec, data, colors)
+            elif spec.variant is ChartVariant.KAPLAN_MEIER:
+                self._draw_survival(spec, data)
             else:
                 self.message = UNSUPPORTED
         self._place_legend()
@@ -867,6 +870,49 @@ class ChartView(QWidget):
             has_bars = _set_error_bars(bars, series, cap)
             bars.setVisible(shown and has_bars)
             self._drawn.xy.append((series, item))
+
+    def _draw_survival(self, spec: ChartSpec, data: ChartData) -> None:
+        """Kaplan-Meier steps, their confidence bands and a tick at each censored time.
+        Clicking a legend entry toggles the curve (with its band and ticks)."""
+        plot = self.plot_item
+        legend = self._legend_wanted(spec)
+        self._show_legend(legend)
+        styles = {s.source: s for s in spec.series}
+        for curve in data.survival:
+            style = styles.get(curve.source)
+            if style is None:
+                continue
+            color = QColor(style.color)
+            shown = style.visible and len(curve.px) > 0
+            if spec.show_bands:
+                upper = pg.PlotCurveItem(curve.px, _nan_to_edge(curve.high, curve.py))
+                lower = pg.PlotCurveItem(curve.px, _nan_to_edge(curve.low, curve.py))
+                fill = QColor(color)
+                fill.setAlphaF(BAND_ALPHA)
+                band = pg.FillBetweenItem(upper, lower, brush=fill)
+                band.setZValue(-1)
+                band.setVisible(shown)
+                plot.addItem(band)
+            line_style = style.line_style
+            if line_style is LineStyle.NONE:
+                line_style = LineStyle.SOLID  # a survival curve is always drawn
+            pen = pg.mkPen(color, width=self._px(style.line_width), style=_PEN_STYLES[line_style])
+            item = pg.PlotDataItem(curve.px, curve.py, name=curve.name, pen=pen)
+            item.setVisible(shown)
+            plot.addItem(item)
+            ticks = pg.ScatterPlotItem(
+                curve.censor_px,
+                curve.censor_py,
+                symbol=_censor_tick(),
+                size=self._px(style.size),
+                pen=pg.mkPen(color, width=self._px(style.line_width)),
+                brush=pg.mkBrush(None),
+            )
+            ticks.setVisible(shown)
+            plot.addItem(ticks)
+            self._drawn.legend_sources[id(item)] = curve.source
+            if legend and style.in_legend:
+                self._add_legend_entry(item, curve.name)
 
     def _show_legend(self, shown: bool) -> None:
         if shown == self._legend_shown:
@@ -1121,6 +1167,16 @@ def _set_error_bars(bars: Any, series: XYSeriesData, cap: float) -> bool:
         beam=cap,
     )
     return True
+
+
+@functools.cache
+def _censor_tick() -> QPainterPath:
+    """A vertical stroke one symbol size long, as Matplotlib's "|" marker (pyqtgraph's
+    own "|" is a filled bar)."""
+    path = QPainterPath()
+    path.moveTo(0.0, -0.5)
+    path.lineTo(0.0, 0.5)
+    return path
 
 
 def _nan_to_edge(limit: Any, fit: Any) -> Any:

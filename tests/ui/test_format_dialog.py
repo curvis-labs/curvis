@@ -209,6 +209,36 @@ def test_bar_graphs_disable_what_they_do_not_use(qtbot: QtBot, context: Context)
     assert not dialog.log.isEnabled() and dialog.axis_from.isEnabled()
 
 
+def test_survival_graphs_toggle_their_bands(qtbot: QtBot, context: Context) -> None:
+    from curvis.charts.builder import default_spec
+    from curvis.core import Document, add_graph
+    from tests.unit.charts_tables import survival_table
+
+    doc = Document()
+    table = survival_table()
+    doc.execute(AddTable(table))
+    spec = default_spec(table, ChartFamily.SURVIVAL)
+    doc.execute(add_graph(doc, spec))
+    doc.undo_stack.clear()
+    dialog = FormatDialog(doc, spec.id, scheduler=context.scheduler)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    qtbot.waitUntil(dialog.preview_ready, timeout=5000)
+    assert dialog.show_bands.isVisible() and dialog.show_bands.isChecked()
+    dialog.show_bands.setChecked(False)
+    assert dialog.spec.show_bands is False
+    dialog.set_section(SERIES)
+    assert not dialog.symbol.isEnabled() and not dialog.error_bars.isEnabled()
+    assert dialog.symbol_size.isEnabled() and dialog.line_width.isEnabled()
+    assert "censored times" in dialog.series_note.text()
+    assert dialog.spec.show_bands is False  # applied as one step, like every Format change
+
+
+def test_only_survival_graphs_offer_bands(qtbot: QtBot, context: Context) -> None:
+    dialog, _doc = open_dialog(qtbot, context)
+    assert not dialog.show_bands.isVisible()
+
+
 def test_colors_and_text(qtbot: QtBot, context: Context) -> None:
     dialog, _doc = open_dialog(qtbot, context)
     dialog.set_section(COLORS)

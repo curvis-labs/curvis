@@ -128,6 +128,7 @@ LINE_LABELS = {
 }
 CATEGORY_NOTE = "Bar and box graphs use only the color, error bars and legend of a series."
 BOX_NOTE = "Box plots use only the color and legend of a series."
+SURVIVAL_NOTE = "Survival curves are steps; Size sets the length of the ticks at censored times."
 CATEGORY_AXIS_NOTE = "The X axis of a bar or box graph shows the series by name."
 LEVEL_AXIS_NOTE = "The X axis of an interaction graph shows the levels of the first factor."
 BAR_LOG_NOTE = "Bars start at 0, which a log axis cannot show."
@@ -356,6 +357,10 @@ class FormatDialog(QDialog):
         form.addRow(buddy_label("Si&ze", self.width_spin), size_row)
         self.show_legend = QCheckBox("Show le&gend")
         form.addRow("", self.show_legend)
+        self.show_bands = QCheckBox("Show confidence band&s")
+        self.show_bands.setToolTip("The 95% confidence band of each survival curve")
+        form.addRow("", self.show_bands)
+        self.show_bands.setVisible(self.original.family is ChartFamily.SURVIVAL)
         # Interaction graphs: which two-way ANOVA of the table the graph draws.
         self.anova_combo = QComboBox()
         self.anova_combo.setAccessibleName("Two-way ANOVA drawn")
@@ -373,6 +378,7 @@ class FormatDialog(QDialog):
         self.width_spin.valueChanged.connect(lambda _v: self._on_size_changed())
         self.height_spin.valueChanged.connect(lambda _v: self._on_size_changed())
         self.show_legend.toggled.connect(lambda on: self._edit(show_legend=on))
+        self.show_bands.toggled.connect(lambda on: self._edit(show_bands=on))
         self.anova_combo.currentIndexChanged.connect(lambda _i: self._on_anova_chosen())
         return box
 
@@ -576,6 +582,7 @@ class FormatDialog(QDialog):
                 self.width_spin,
                 self.height_spin,
                 self.show_legend,
+                self.show_bands,
             ]
         elif section == AXES:
             widgets += [
@@ -624,6 +631,8 @@ class FormatDialog(QDialog):
             spin.setEnabled(spec.aspect_ratio == CUSTOM_ASPECT)
         with QSignalBlocker(self.show_legend):
             self.show_legend.setChecked(spec.show_legend)
+        with QSignalBlocker(self.show_bands):
+            self.show_bands.setChecked(spec.show_bands)
         with QSignalBlocker(self.anova_combo):
             self.anova_combo.setCurrentIndex(self.anova_combo.findData(spec.analysis_id))
         with QSignalBlocker(self.scheme_combo):
@@ -779,10 +788,12 @@ class FormatDialog(QDialog):
         self._fill_error_bars(styles)
         category = self.spec.family is ChartFamily.BAR
         box = self.spec.variant is ChartVariant.BOX
+        survival = self.spec.family is ChartFamily.SURVIVAL
         for widget in (self.symbol, self.symbol_size, self.line_style, self.line_width):
             widget.setEnabled(not category)
-        self.error_bars.setEnabled(not box)
-        note = BOX_NOTE if box else CATEGORY_NOTE if category else ""
+        self.symbol.setEnabled(not category and not survival)
+        self.error_bars.setEnabled(not box and not survival)
+        note = BOX_NOTE if box else CATEGORY_NOTE if category else SURVIVAL_NOTE if survival else ""
         self.series_note.setText(note)
         self.series_note.setVisible(bool(note))
 

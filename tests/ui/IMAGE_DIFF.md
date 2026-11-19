@@ -3,7 +3,7 @@
 `tests/ui/test_image_diff.py` checks that an exported graph (Matplotlib,
 `curvis.charts.render_mpl`) matches the Graph panel (pyqtgraph,
 `curvis.charts.render_qt`). It draws every graph type (scatter, line with a fitted curve and
-its band, bar, box), with and without a legend, in the light and the dark app theme,
+its band, bar, box, interaction, and survival with its bands and censor ticks), with and without a legend, in the light and the dark app theme,
 plus layouts that once differed: titles wider than the plot and turned category labels.
 The helpers are in `tests/ui/image_diff.py`.
 
@@ -29,7 +29,7 @@ are**:
 
 Two measures:
 
-| Measure | What is compared | Radius | Threshold | Measured (all 27 cases) |
+| Measure | What is compared | Radius | Threshold | Measured (all 31 cases) |
 | --- | --- | --- | --- | --- |
 | **plot** | The plot area inside the axes, cut out of each image (3 px inset, because Matplotlib's axes box holds the axis lines and pyqtgraph's view box does not). The export's colour masks are scaled to the size of the screen's plot area. | 3 px (0.4 mm) | 0.01 | 0.0000 |
 | **page** | The whole page. | 8 px (1 mm) | 0.12 | 0 – 0.037 |

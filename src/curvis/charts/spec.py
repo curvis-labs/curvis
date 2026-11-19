@@ -242,6 +242,8 @@ class ChartSpec:
     analysis_id: str | None = None
     """The two-way ANOVA an interaction graph draws (Interaction family only). Its series
     are the category groups of the table: one line per level of the second factor."""
+    show_bands: bool = True
+    """Survival graphs: draw the 95% confidence band of each curve."""
     id: str = field(default_factory=new_id)
 
     def __post_init__(self) -> None:
@@ -347,6 +349,7 @@ def spec_to_json(spec: ChartSpec) -> dict[str, Any]:
         ],
         "show_legend": spec.show_legend,
         "analysis_id": spec.analysis_id,
+        "show_bands": spec.show_bands,
     }
 
 
@@ -415,6 +418,7 @@ def spec_from_json(data: Any) -> ChartSpec:
             ),
             show_legend=_bool(obj.get("show_legend", family is ChartFamily.XY), "show_legend"),
             analysis_id=_optional_str(obj.get("analysis_id"), "analysis_id"),
+            show_bands=_bool(obj.get("show_bands", True), "show_bands"),
         )
     except TypeError as exc:  # pragma: no cover - guarded by the checks above
         raise ValueError(str(exc)) from None

@@ -12,6 +12,9 @@ Statistics shown on graphs:
 - Bar: the mean of all of a series' values with their SD or SEM (also ``row_stats``).
 - Box: :func:`box_stats` — the quartiles by R's ``quantile(type = 6)`` (as GraphPad
   Prism) and whiskers from the minimum to the maximum (validated in ``box_stats``).
+- Survival: Kaplan-Meier step curves of each Time + Event pair, their 95% confidence
+  bands (log-log) and ticks at censored times, from
+  :func:`curvis.analysis.survival.km.kaplan_meier` (validated in ``kaplan_meier``).
 - Interaction: the cell means of the graph's two-way ANOVA with their SD or SEM, as the
   analysis reports them (validated in ``two_way_anova``). The levels of the first factor
   are at X = 0, 1, 2 …; each line is one level of the second factor (a category group).
@@ -32,7 +35,7 @@ import numpy.typing as npt
 from curvis.analysis.base import x_column_id
 from curvis.analysis.result import CellMeans, FittedCurve, Result
 from curvis.charts.spec import ChartFamily, ChartSpec, ChartVariant, ErrorBars, Scale
-from curvis.data import Table, name_key, row_stats, series
+from curvis.data import Table, name_key, row_stats, series, survival_pairs
 
 type FloatArray = npt.NDArray[np.float64]
 type IntArray = npt.NDArray[np.int64]
@@ -84,6 +87,8 @@ def gather(table: Table, spec: ChartSpec, results: Mapping[str, Result]) -> Char
     counted, not drawn."""
     if spec.family is ChartFamily.INTERACTION:
         return _gather_interaction(table, spec, results)
+    if spec.family is ChartFamily.SURVIVAL:
+        return _gather_survival(table, spec)
     by_source = {s.group_id or s.column_ids[0]: s for s in series(table)}
     inputs: list[SeriesInput] = []
     missing = 0
@@ -128,6 +133,24 @@ def _gather_interaction(
     notes = () if cells is not None else (NO_TWO_WAY_RESULT,)
     missing = len(spec.series) - len(names)
     return ChartInputs(spec, None, (), missing=missing, notes=notes, cells=cells, line_names=names)
+
+
+def _gather_survival(table: Table, spec: ChartSpec) -> ChartInputs:
+    """Survival graphs: each series is a Time + Event pair, as (time, event) columns."""
+    pairs = {p.source: p for p in survival_pairs(table)}
+    inputs: list[SeriesInput] = []
+    missing = 0
+    for style in spec.series:
+        pair = pairs.get(style.source)
+        if pair is None:
+            missing += 1
+            continue
+        columns = tuple(
+            np.array(table.column(c).values, dtype=np.float64)
+            for c in (pair.time_id, pair.event_id)
+        )
+        inputs.append(SeriesInput(style.source, pair.name, columns))
+    return ChartInputs(spec, None, tuple(inputs), missing=missing)
 
 
 NO_TWO_WAY_RESULT = (
@@ -209,6 +232,30 @@ class CurveData:
 
 
 @dataclass(frozen=True)
+class SurvivalCurveData:
+    """One Kaplan-Meier curve, in plot coordinates (log10 on a log axis).
+
+    ``px``/``py`` trace the steps: from (0, 1), at each time a vertical drop to the new
+    survival, then flat to the next time. ``low``/``high`` are the confidence band at
+    the same ``px`` (NaN where there is none: after the curve reaches 0). The censor
+    ticks are at ``censor_px``/``censor_py``.
+    """
+
+    source: str
+    name: str
+    px: FloatArray
+    py: FloatArray
+    low: FloatArray
+    high: FloatArray
+    censor_px: FloatArray
+    censor_py: FloatArray
+    n: int
+    n_events: int
+    median: float
+    """Median survival in the units of the Time column (NaN: not reached)."""
+
+
+@dataclass(frozen=True)
 class ChartData:
     family: ChartFamily
     variant: ChartVariant
@@ -219,6 +266,8 @@ class ChartData:
     """Secondary sentences for the Graph panel (left-out points, missing series)."""
     levels: tuple[str, ...] = ()
     """Interaction graphs: the levels of the first factor, at X = 0, 1, 2 …"""
+    survival: tuple[SurvivalCurveData, ...] = ()
+    """Survival graphs: one Kaplan-Meier curve per Time + Event pair."""
 
 
 # --- statistics ------------------------------------------------------------------------
@@ -295,6 +344,9 @@ def compute(inputs: ChartInputs) -> ChartData:
             s = "s" if dropped != 1 else ""
             notes.append(f"{dropped} mean{s} at or below 0 cannot be shown on a log axis.")
         return ChartData(spec.family, spec.variant, xy=xy, notes=tuple(notes), levels=levels)
+    if spec.family is ChartFamily.SURVIVAL:
+        drawn, problems = _survival(inputs)
+        return ChartData(spec.family, spec.variant, notes=(*notes, *problems), survival=drawn)
     if spec.family is ChartFamily.XY:
         xy, dropped = _xy(inputs)
         curves = _curves(inputs)
@@ -425,6 +477,57 @@ def _interaction(inputs: ChartInputs) -> tuple[tuple[XYSeriesData, ...], int, tu
             )
         )
     return tuple(out), dropped, cells.levels_a
+
+
+def _steps(times: FloatArray, values: FloatArray) -> tuple[FloatArray, FloatArray]:
+    """The corners of a step function that is 1 from 0 to the first time and drops to
+    ``values[j]`` at ``times[j]``."""
+    before = np.concatenate(([1.0], values[:-1]))
+    x = np.concatenate(([0.0], np.repeat(times, 2)))
+    y = np.concatenate(([1.0], np.column_stack((before, values)).ravel()))
+    return x, y
+
+
+def _survival(inputs: ChartInputs) -> tuple[tuple[SurvivalCurveData, ...], list[str]]:
+    from curvis.analysis.survival.km import kaplan_meier
+
+    spec = inputs.spec
+    x_scale, y_scale = spec.x_axis.scale, spec.y_axis.scale
+    out: list[SurvivalCurveData] = []
+    problems: list[str] = []
+    for s in inputs.series:
+        time, event = s.columns
+        try:
+            km = kaplan_meier(time, event)
+        except ValueError as exc:
+            problems.append(f"{s.name} is not drawn: {exc}")
+            continue
+        x, y = _steps(km.time, km.survival)
+        _, low = _steps(km.time, km.lower)
+        _, high = _steps(km.time, km.upper)
+        keep = _log_mask(x, x_scale) & _log_mask(y, y_scale)
+        if y_scale is Scale.LOG:
+            low = np.where(low > 0, low, np.nan)
+            high = np.where(high > 0, high, np.nan)
+        censored = km.n_censor > 0
+        cx, cy = km.time[censored], km.survival[censored]
+        ckeep = _log_mask(cx, x_scale) & _log_mask(cy, y_scale)
+        out.append(
+            SurvivalCurveData(
+                source=s.source,
+                name=s.name,
+                px=_to_plot(x[keep], x_scale),
+                py=_to_plot(y[keep], y_scale),
+                low=_to_plot(low[keep], y_scale),
+                high=_to_plot(high[keep], y_scale),
+                censor_px=_to_plot(cx[ckeep], x_scale),
+                censor_py=_to_plot(cy[ckeep], y_scale),
+                n=km.n,
+                n_events=km.n_events,
+                median=km.median,
+            )
+        )
+    return tuple(out), problems
 
 
 def _curves(inputs: ChartInputs) -> tuple[CurveData, ...]:

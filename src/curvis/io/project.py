@@ -48,7 +48,7 @@ from curvis.data import (
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -189,6 +189,18 @@ def _interaction_graphs(data: dict[str, Any]) -> dict[str, Any]:
     for graph in graphs if isinstance(graphs, list) else []:
         if isinstance(graph, dict):
             graph.setdefault("analysis_id", None)
+    return data
+
+
+@register_migration(8)
+def _survival_bands(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 9 stores whether a survival graph draws its confidence bands
+    (``show_bands``). Format 8 had no survival graphs; its graphs get the default."""
+    document = data.get("document")
+    graphs = document.get("graphs") if isinstance(document, dict) else None
+    for graph in graphs if isinstance(graphs, list) else []:
+        if isinstance(graph, dict):
+            graph.setdefault("show_bands", True)
     return data
 
 

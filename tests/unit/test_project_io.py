@@ -221,7 +221,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 8
+    assert data["schema_version"] == SCHEMA_VERSION == 9
     assert set(data["document"]) == {
         "id",
         "name",
@@ -391,7 +391,7 @@ def test_newer_version(tmp_path: Path) -> None:
 
 
 def test_migrations_cover_every_older_version() -> None:
-    assert SCHEMA_VERSION == 8
+    assert SCHEMA_VERSION == 9
     assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
@@ -449,9 +449,9 @@ def test_version_1_files_get_the_default_category_factor(tmp_path: Path) -> None
 def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "old.cvp"
     save(Document(), path)
-    monkeypatch.setattr(project, "SCHEMA_VERSION", 9)
-    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 8)})
-    with pytest.raises(ProjectFileError, match="from format 8"):
+    monkeypatch.setattr(project, "SCHEMA_VERSION", 10)
+    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 9)})
+    with pytest.raises(ProjectFileError, match="from format 9"):
         load(path)
 
 
@@ -757,3 +757,35 @@ def test_interaction_graphs_round_trip(tmp_path: Path) -> None:
     loaded = load(path)
     assert loaded.graphs == [graph]
     assert loaded.graphs[0].analysis_id == analysis.id
+
+
+def test_format_8_graphs_draw_survival_bands(tmp_path: Path) -> None:
+    path = tmp_path / "v8.cvp"
+    save(_graph_document(), path)
+
+    def to_v8(data: dict[str, Any]) -> None:
+        data["schema_version"] = 8
+        for graph in data["document"]["graphs"]:
+            del graph["show_bands"]
+
+    _rewrite(path, to_v8)
+    assert [g.show_bands for g in load(path).graphs] == [True, True]
+
+
+def test_survival_graphs_round_trip(tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily
+
+    table = Table(
+        "S",
+        [
+            Column.new("Days", ColumnRole.TIME, [1, 2, 3], unit="d"),
+            Column.new("A", ColumnRole.EVENT, [1, 0, 1]),
+        ],
+    )
+    graph = replace(default_spec(table, ChartFamily.SURVIVAL), show_bands=False)
+    path = tmp_path / "survival.cvp"
+    save(Document(tables=[table], graphs=[graph]), path)
+    assert load(path).graphs == [graph]

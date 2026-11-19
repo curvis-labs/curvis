@@ -38,8 +38,9 @@ from curvis.charts.spec import (
     LineStyle,
     Scale,
     SeriesSpec,
+    Symbol,
 )
-from curvis.data import Column, ColumnRole, Series, Table, series
+from curvis.data import Column, ColumnRole, Series, Table, series, survival_pairs
 
 DEFAULT_ERROR_BARS = ErrorBars.SD
 """Error bars of replicate groups in a new graph (confirmed for step 2.5)."""
@@ -47,7 +48,6 @@ DEFAULT_ERROR_BARS = ErrorBars.SD
 NEEDS_X = "Needs an X column with values"
 NEEDS_Y = "Needs a Y column"
 NEEDS_SURVIVAL = "Needs a Time + Event pair"
-SURVIVAL_LATER = "Survival graphs are not available yet"
 NEEDS_TWO_WAY = "Needs a two-way ANOVA"
 
 DOSE_RESPONSE_TYPES = ("hill_4pl", "hill_3pl", "biphasic", "bell_shaped")
@@ -55,6 +55,8 @@ DOSE_RESPONSE_TYPES = ("hill_4pl", "hill_3pl", "biphasic", "bell_shaped")
 
 TWO_WAY = "two_way_anova"
 INTERACTION_ONLY = "An interaction graph keeps its type"
+SURVIVAL_ONLY = "A survival graph keeps its type"
+SURVIVAL_Y_TITLE = "Survival probability"
 
 
 def two_way_analyses(table: Table, analyses: Sequence[Analysis]) -> list[Analysis]:
@@ -82,10 +84,7 @@ def family_problem(
     if family is ChartFamily.BAR:
         return None if series(table) else NEEDS_Y
     if family is ChartFamily.SURVIVAL:
-        roles = {c.role for c in table.columns}
-        if not {ColumnRole.TIME, ColumnRole.EVENT} <= roles:
-            return NEEDS_SURVIVAL
-        return SURVIVAL_LATER
+        return None if survival_pairs(table) else NEEDS_SURVIVAL
     return None if two_way_analyses(table, analyses) else NEEDS_TWO_WAY
 
 
@@ -159,11 +158,30 @@ def interaction_series(
     )
 
 
+def survival_series(table: Table, *, color_scheme: str = DEFAULT_SCHEME) -> tuple[SeriesSpec, ...]:
+    """A styled step curve for each Time + Event pair of ``table``, left to right. The
+    symbol is unused: censored subjects are marked with ticks."""
+    colors = scheme(color_scheme)
+    return tuple(
+        SeriesSpec(
+            source=pair.source,
+            color=colors.series_color(i),
+            symbol=Symbol.NONE,
+            line_style=LineStyle.SOLID,
+            error_bars=ErrorBars.NONE,
+        )
+        for i, pair in enumerate(survival_pairs(table))
+    )
+
+
 def graph_series_names(table: Table, spec: ChartSpec) -> dict[str, str]:
     """What ``spec`` can draw from ``table``, by source: its category groups for an
-    interaction graph, its series otherwise."""
+    interaction graph, its Time + Event pairs for a survival graph, its series
+    otherwise."""
     if spec.family is ChartFamily.INTERACTION:
         return {c.id: c.name for c in table.category_groups}
+    if spec.family is ChartFamily.SURVIVAL:
+        return {p.source: p.name for p in survival_pairs(table)}
     return {series_source(s): s.name for s in series(table)}
 
 
@@ -171,6 +189,8 @@ def default_series_of(table: Table, spec: ChartSpec) -> tuple[SeriesSpec, ...]:
     """The default style of everything ``spec`` can draw from ``table``."""
     if spec.family is ChartFamily.INTERACTION:
         return interaction_series(table)
+    if spec.family is ChartFamily.SURVIVAL:
+        return survival_series(table)
     return default_series(table)
 
 
@@ -222,6 +242,20 @@ def default_spec(
             show_legend=True,
             analysis_id=analysis.id,
         )
+    if family is ChartFamily.SURVIVAL:
+        pairs = survival_pairs(table)
+        return ChartSpec(
+            table_id=table.id,
+            family=family,
+            variant=ChartVariant.KAPLAN_MEIER,
+            series=survival_series(table),
+            x_axis=AxisSpec(title=column_title(table.column(pairs[0].time_id))),
+            y_axis=AxisSpec(title=SURVIVAL_Y_TITLE),
+            title=table.name,
+            aspect_ratio=aspect_ratio,
+            text_size=text_size,
+            show_legend=True,
+        )
     if family is ChartFamily.XY:
         x_id = x_column_id(table)
         assert x_id is not None
@@ -271,6 +305,8 @@ def variant_problem(
     ``variant`` (no full stop), or None."""
     if current is not None and current.family is ChartFamily.INTERACTION:
         return INTERACTION_ONLY
+    if current is not None and current.family is ChartFamily.SURVIVAL:
+        return SURVIVAL_ONLY
     if variant not in GRAPH_TYPES:
         return "This chart type cannot be drawn yet"
     return family_problem(table, variant.family)

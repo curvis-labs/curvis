@@ -193,3 +193,39 @@ def test_kaplan_meier_properties(subjects: list[tuple[int, bool]]) -> None:
     assert np.all(r.lower[ok] <= r.survival[ok] + 1e-12)
     assert np.all(r.upper[ok] >= r.survival[ok] - 1e-12)
     assert np.all(np.isnan(r.lower) == (r.survival == 0))
+
+
+# --- chart data ------------------------------------------------------------------------------
+
+
+def test_survival_chart_data_steps_bands_and_ticks() -> None:
+    from dataclasses import replace
+
+    from curvis.charts.builder import default_spec
+    from curvis.charts.data import compute, gather
+    from curvis.charts.spec import ChartFamily, Scale
+    from curvis.compute.graph_engine import graph_reads
+
+    table = make(
+        ("Days", T, [2, 3, 3, 5, 8]),
+        ("A", E, [1, 0, 1, 1, 0]),
+        ("B", E, [math.nan] * 5),  # nobody in group B
+    )
+    spec = default_spec(table, ChartFamily.SURVIVAL)
+    data = compute(gather(table, spec, {}))
+    (a,) = data.survival
+    assert a.px.tolist() == [0, 2, 2, 3, 3, 5, 5, 8, 8]
+    np.testing.assert_allclose(a.py, [1, 1, 0.8, 0.8, 0.6, 0.6, 0.3, 0.3, 0.3])
+    assert a.censor_px.tolist() == [3, 8]
+    np.testing.assert_allclose(a.censor_py, [0.6, 0.3])
+    assert np.all(a.low <= a.py + 1e-12) and np.all(a.high >= a.py - 1e-12)
+    assert data.notes == ("B is not drawn: No subject has both a time and an event.",)
+    assert graph_reads(table, spec) == [
+        table.id,
+        *(c.id for c in table.columns[:2]),
+        table.columns[2].id,
+    ]
+
+    log_x = replace(spec, x_axis=replace(spec.x_axis, scale=Scale.LOG))
+    (a_log,) = compute(gather(table, log_x, {})).survival
+    assert a_log.px[0] == pytest.approx(math.log10(2))  # time 0 cannot be on a log axis

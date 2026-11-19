@@ -1,5 +1,7 @@
 """Tables shared by the chart tests."""
 
+import math
+
 import numpy as np
 
 from curvis.analysis.base import Analysis
@@ -116,3 +118,19 @@ def two_way_result(table: Table, analysis: Analysis):  # type: ignore[no-untyped
     """The analysis' result, computed as the scheduler would."""
     kind = analysis.analysis_type
     return kind.run(kind.gather(table, analysis), analysis.params)
+
+
+def survival_table() -> Table:
+    """Two Kaplan-Meier curves on one Time column (Prism's layout): ties, censored
+    subjects and a curve that drops to 0."""
+    times = [2, 3, 3, 5, 6, 8, 8, 9, 11, 12, 14, 15, 17, 20, 22, 25]
+    drug = [1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0]
+    placebo = [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, math.nan, math.nan, math.nan]
+    return Table(
+        "Survival",
+        [
+            Column.new("Days", ColumnRole.TIME, times, unit="d"),
+            Column.new("Drug", ColumnRole.EVENT, drug),
+            Column.new("Placebo", ColumnRole.EVENT, placebo),
+        ],
+    )
