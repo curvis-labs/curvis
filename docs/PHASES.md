@@ -668,11 +668,9 @@ Build autosave and recovery in src/curvis/io and the launcher:
 - Saving, closing or discarding a document deletes its copy. A clean exit leaves the folder empty; a lock file marks a running session, so copies left by a session that is still running (a second Curvis window) are not offered.
 - Launcher: when recovery copies are found at start-up, a "Recovered projects" section above the recent projects lists each with its name and the time of the copy (relative, as for recent projects), with Open and Discard. Opening one opens it with unsaved changes and its original path; Save writes there, and warns first if that file's modification time is newer than the one in the sidecar. Never-saved projects open as untitled.
 - A copy that cannot be read is listed as "Cannot be recovered" with Discard only; it never stops the app from starting.
-- Settings: autosave interval (1–30 minutes, default 3) in the Settings dialog; a change applies to open documents at once.
+- Unclaimed recovery copies are kept until the user opens or discards them; nothing removes them automatically.
+- Settings: autosave interval (1–30 minutes, default 3) in the Settings dialog; a change applies to open documents at once. Autosave cannot be turned off.
 - Tests: copies are written only when there are changes, not while nothing changed, and deleted on save, close and discard; a subprocess test that kills the app mid-session and checks recovery on the next start; a damaged copy; the "file changed since" warning; a benchmark that writing a copy of a 10 MB project does not block the UI thread for more than 16 ms.
-
-Decisions to confirm with me before coding:
-- How long unclaimed recovery copies are kept (e.g. until discarded, or removed after 30 days).
 
 Make a plan first. When done, report what you built, test and benchmark results.
 ```
