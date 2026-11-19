@@ -1,13 +1,13 @@
 # Curvis — build phases and Claude Code prompts
 
-Curvis is built in 5 phases and 28 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
+Curvis is built in 5 phases and 29 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
 
 | Phase | Steps | Ends with (gate) |
 | --- | --- | --- |
 | 0 Foundations | 0.1–0.5 | App starts on Windows, macOS and Linux from CI-built installers |
 | 1 Data tables | 1.1–1.6 | You can type, paste, import and calculate data comfortably; dialogs follow one design |
 | 2 Core analyses + MVP | 2.1–2.9 | MVP beta: core tests match R, speed targets met |
-| 3 Full outline | 3.1–3.6 | Every feature in SPEC.md works |
+| 3 Full outline | 3.1–3.7 | Every feature in SPEC.md works |
 | 4 Release 1.0 | 4.1–4.2 | Validation report published, 1.0 installers released |
 
 ## How to use this file
@@ -593,8 +593,6 @@ Make a plan first. When done, report what you built and image-diff results.
 
 ### Step 3.6 — Excel and Prism import
 
-**Gate for phase 3:** every item in SPEC.md works; check it line by line.
-
 **Done when**
 - [ ] .xlsx and .xls import through the same preview dialog (sheet picker added).
 - [ ] Data tables from Prism .pzfx and .prism files import with sensible column roles and groups.
@@ -610,6 +608,38 @@ Extend import:
 - Tests with real Prism files I will put in tests/data/prism (ask me for them before you start). Never include Prism files you did not receive from me.
 
 Make a plan first. When done, report which Prism table types import and any that do not.
+```
+
+### Step 3.7 — Analyze dialog redesign
+
+**Gate for phase 3:** every item in SPEC.md works; check it line by line.
+
+**Done when**
+- [ ] The analyses are a grouped list with a filter field; options sit under the data; *About this analysis* replaces *What will run*, as in `docs/mockups/analyze-dialog.html`.
+- [ ] The X range is two number fields and fixed parameters are a table; nothing has to be typed in a syntax.
+- [ ] Every fit shows its equation and a sketch computed from its own model function; every test shows its null hypothesis and assumptions.
+- [ ] Projects saved before this step open unchanged, and the dialog fits 900 × 640 in light and dark themes with Advanced open.
+
+```text
+Read CLAUDE.md, docs/SPEC.md, docs/DESIGN.md (section 11) and step 3.7 in docs/PHASES.md, and open docs/mockups/analyze-dialog.html.
+
+Rebuild the Analyze dialog (src/curvis/ui/analyze_dialog.py) to the approved mockup. Change no statistics and no stored format:
+- Analysis list: replace the radio buttons with one list grouped by section, with a "Recent" section on top (up to 3 recently used, replacing the "recent" badge). Each row shows the name and the short text of what it reports. A filter field above it matches names and that text; arrow keys move, Enter runs. The list scrolls after about six rows.
+- Sections come from the analysis types, not from the dialog: add a `section` attribute to AnalysisType (fits: Linear, Dose-response, Kinetics, Shape-based; tests: Describe, Two groups, Three or more groups; survival: Survival) and group by it.
+- Options move to the left column, under the data. The X range of every fit becomes two number fields ("Fit only X from … to …") directly under the log checkbox, out of Advanced; empty means no limit, with a live count of the points used. Fixed parameters become a table in Advanced: one row per model parameter (from the model's parameters and display names) with a Fix check box and a value; the last free parameter cannot be unticked. Build the table so more columns (initial value, bounds) can be added later.
+- Both widgets read and write the existing strings (`x_range`, `fixed`), so parameters, `.cvp` files and `schema_version` stay as they are, and the existing parsers and error messages still apply.
+- "About this analysis" replaces "What will run". For a fit: the equation, a sketch of the curve, the sentence from describe(), and a "use when" line. For a test: the null hypothesis, the assumptions, the sentence from describe(), and a "use when" line that names the alternative where there is one. Descriptive statistics and Kaplan-Meier have no hypothesis.
+- The sketch is computed, never drawn by hand: evaluate the model's own function at example parameter values over a nominal X range (about 100 points, well under 5 ms) and draw it in the panel. A fixed parameter's value replaces its example value. Built-in models may add markers (a horizontal line at Top, a vertical one at EC50, a label); a model without markers gets the plain curve. Write each model's example values, X range and markers into docs/models.md.
+- Store the text of each analysis (equation, use when, hypothesis, assumptions) as data on its analysis type, next to the existing description, not in the dialog.
+- These choices keep the door open for user-defined fits after 1.0 (SPEC.md, "Planned after 1.0"). Build nothing for them now: no editor, no Custom section, no new project fields.
+- tests/ui/test_dialog_design.py must pass for the new dialog; extend it where the dialog needs it, never weaken its checks. pytest-qt tests for filtering, choosing, keyboard use, the X range and Fix table round-tripping to the stored strings, the sketch following a fixed value, and editing an analysis saved before this step.
+- Take offscreen screenshots in light and dark theme, Fit a curve and Compare groups, with Advanced open.
+
+Decisions to confirm with me before coding:
+- The "use when", hypothesis and assumption text of every analysis: write them all into a table in your plan for me to review.
+- The equations: render them from the Lark formula grammar if it can parse them, or store a display string per model? Tell me which, and why.
+
+Make a plan first. When done, report what changed, the screenshots, test and benchmark results.
 ```
 
 ---

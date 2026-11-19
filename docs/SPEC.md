@@ -53,6 +53,8 @@ One calculation can be applied to many columns at once: it makes one calculated 
 
 Curvis has 19 built-in analyses in three families. The Analyze dialog shows only the analyses your table can support. It opens on the family that best fits the data: survival when there are time/event pairs, curve fits when there are XY pairs, and group comparisons otherwise.
 
+In the dialog the analyses of a family are one list, grouped in sections (for curve fits: linear, dose-response, kinetics and shape-based), with recently used ones on top and a filter field to find one by name or by what it reports. The options sit under the data: a fit's X range is two number fields, and parameters are fixed in a table (a *Fix* check box and a value per parameter), so nothing has to be typed in a syntax. A panel, *About this analysis*, explains the chosen analysis before it runs: for a fit, its equation and a sketch of its curve with the parameters marked (a fixed parameter shown at its value); for a test, its null hypothesis and assumptions; for every analysis, one sentence on what will run and when to use it.
+
 | Family | Analysis | Details |
 | --- | --- | --- |
 | Compare groups | Descriptive statistics | n, mean, SD, SEM and 95% confidence interval of each replicate group, row by row |
@@ -106,3 +108,9 @@ Clicking a legend entry on XY and survival charts toggles that series on or off.
 - **Launcher.** On start-up, and whenever no project is open, a launcher screen shows a row of tiles to start from (a blank project and the sample projects, each sample with a small picture of its graph), an Open button, and a list of recent projects with their folder and a relative timestamp (e.g. "2 days ago"). A recent project opens with one click; right-clicking it offers to remove it from the list (the file is kept). A missing file is shown as "File not found".
 - **Undo and redo.** Each document keeps up to 50 undo steps.
 - **Settings.** Theme (light, dark or follow the system), default color palette for new columns and series (with a palette editor), default graph size, chart text size, and the number of decimal places shown in calculated columns.
+
+## Planned after 1.0
+
+Not part of 1.0; do not build. Listed so that 1.0 does not make it harder.
+
+- **User-defined curve fits.** The user types a model as a formula (in the same formula language, never evaluated as Python), names its parameters and gives starting values; it appears in the Analyze dialog under its own section, with a sketch drawn from the formula and the same parameter table as the built-in fits (later with bounds). Validation comes from the fit engine (NIST StRD and fixtures for general formulas), as a user's model has no R reference of its own.

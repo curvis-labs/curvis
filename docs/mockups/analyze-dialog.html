@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analyze dialog redesign</title>
+<!--
+  Proposal for the Analyze dialog: a grouped analysis list, options under the data, and an
+  "About this analysis" panel. Drawn in the style of index.html (palette of curvis.ui.theme, 1:1,
+  docs/DESIGN.md). Numbered markers refer to the list of changes. A picture, not code to copy.
+-->
+<style>
+  :root, :root[data-theme="light"] {
+    --window: #f4f6f8; --text: #1d3557; --base: #ffffff; --altbase: #e0f2f1;
+    --secondary: #667085; --error: #b3261e; --link: #007a7a; --highlight: #007a7a;
+    --hl-text: #ffffff; --button: #e9edf2; --border: #b9c1cc; --frame: #c3cad4;
+    --disabled: #9aa3b0; --canvas: #d5dbe3; --note: #1d3557; --mark: #e8590c;
+    --s1: #0072b2; --s2: #e69f00; --s3: #009e73;
+  }
+  :root[data-theme="dark"] {
+    --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+    --secondary: #9aa8bc; --error: #ff8080; --link: #00a6a6; --highlight: #00a6a6;
+    --hl-text: #0f1f33; --button: #1d3557; --border: #2e4a70; --frame: #0a1626;
+    --disabled: #5e7491; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+    --s1: #0072b2; --s2: #e69f00; --s3: #009e73;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --window: #152840; --text: #f4f6f8; --base: #0f1f33; --altbase: #1c3a4a;
+      --secondary: #9aa8bc; --error: #ff8080; --link: #00a6a6; --highlight: #00a6a6;
+      --hl-text: #0f1f33; --button: #1d3557; --border: #2e4a70; --frame: #0a1626;
+      --disabled: #5e7491; --canvas: #08111d; --note: #c8d2de; --mark: #ff922b;
+      --s1: #0072b2; --s2: #e69f00; --s3: #009e73;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--note);
+         font: 13px/1.4 system-ui, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+  header.page { padding: 20px 24px 8px; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  header.page h1 { font-size: 20px; margin: 0; color: var(--note); }
+  header.page p { margin: 0; flex: 1 1 320px; }
+  .switch button { font: inherit; padding: 4px 12px; border: 1px solid var(--border);
+                   background: var(--button); color: var(--text); border-radius: 3px; cursor: pointer; }
+  .switch button[aria-pressed="true"] { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  section.board { padding: 16px 24px 32px 40px; overflow-x: auto; }
+  section.board > h2 { font-size: 16px; margin: 8px 0 12px; color: var(--note); }
+  .row { display: flex; gap: 24px; align-items: flex-start; }
+  .notes { width: 300px; flex: none; }
+  .notes ol { margin: 0; padding-left: 22px; }
+  .notes li { margin-bottom: 6px; }
+  .notes li::marker { color: var(--mark); font-weight: 700; }
+
+  /* --- the drawn widgets (Fusion-like) --- */
+  .win { flex: none; background: var(--window); color: var(--text); border: 1px solid var(--frame);
+         box-shadow: 0 8px 28px rgba(0,0,0,.28); font-size: 13px; position: relative; }
+  .titlebar { height: 30px; display: flex; align-items: center; justify-content: center;
+              border-bottom: 1px solid var(--frame); font-weight: 600; }
+  .body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+  .tab { padding: 5px 14px; border: 1px solid var(--border); border-bottom: none; margin-right: -1px;
+         background: var(--button); border-radius: 3px 3px 0 0; }
+  .tab.on { background: var(--window); position: relative; top: 1px; font-weight: 600; }
+  .tab.hidden { display: none; }
+  u { text-decoration: underline; text-underline-offset: 2px; }
+  .secondary { color: var(--secondary); }
+  .cols { display: flex; gap: 16px; flex: 1; min-height: 0; }
+  .col { flex: 1 1 0; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .group { border: 1px solid var(--border); border-radius: 3px; padding: 14px 8px 8px; position: relative;
+           display: flex; flex-direction: column; gap: 8px; }
+  .group > .legend { position: absolute; top: -9px; left: 8px; background: var(--window); padding: 0 4px; }
+  .grow { flex: 1; }
+  .list { background: var(--base); border: 1px solid var(--border); overflow: hidden; }
+  .list .h { display: flex; background: var(--button); border-bottom: 1px solid var(--border); }
+  .list .h div, .list .r div { padding: 3px 6px; }
+  .list .r { display: flex; align-items: center; }
+  .list .r.sel { background: var(--highlight); color: var(--hl-text); }
+  .list .r.dim { color: var(--disabled); }
+  .c1 { flex: 1; } .c2 { width: 64px; } .c3 { width: 90px; text-align: right; }
+  .cb { display: inline-block; width: 13px; height: 13px; border: 1px solid var(--border); background: var(--base);
+        vertical-align: -2px; margin-right: 6px; border-radius: 2px; position: relative; }
+  .cb.on::after { content: ""; position: absolute; left: 3px; top: 0px; width: 4px; height: 8px;
+                  border: solid var(--text); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .cb.part::after { content: ""; position: absolute; left: 2px; top: 5px; width: 7px; height: 2px; background: var(--text); }
+  .rb { display: inline-block; width: 13px; height: 13px; border: 1px solid var(--border); background: var(--base);
+        border-radius: 50%; vertical-align: -2px; margin-right: 6px; position: relative; }
+  .rb.on::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--text); }
+  .btn { display: inline-block; text-align: center; padding: 4px 12px; min-width: 76px;
+         border: 1px solid var(--border); background: var(--button); border-radius: 3px; white-space: nowrap; }
+  .btn.def { border-color: var(--highlight); box-shadow: inset 0 0 0 1px var(--highlight); }
+  .btn.seg { min-width: 0; border-radius: 0; margin-right: -1px; }
+  .btn.seg.on { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  .btn.dis { color: var(--disabled); }
+  .field { display: inline-block; background: var(--base); border: 1px solid var(--border); border-radius: 2px;
+           padding: 3px 6px; min-width: 120px; }
+  .field.combo::after { content: "▾"; float: right; margin-left: 10px; color: var(--secondary); }
+  .field.w60 { min-width: 64px; }
+  .form { display: grid; grid-template-columns: max-content 1fr; gap: 8px 12px; align-items: center; }
+  .indent { padding-left: 20px; }
+  .line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .buttonrow { display: flex; align-items: center; gap: 8px; }
+  .buttonrow .spacer { flex: 1; }
+  .feedback { min-height: 19px; display: flex; gap: 6px; align-items: center; }
+  .warn::before { content: "⚠"; color: var(--text); }
+  .err { color: var(--error); }
+  .err::before { content: "⛔"; }
+  .advanced { display: flex; align-items: center; gap: 4px; }
+  .advanced::before { content: "▸"; color: var(--secondary); }
+  .summary { background: var(--base); border: 1px solid var(--border); padding: 8px; }
+  .m { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--mark); color: #fff;
+       font: 700 11px/18px system-ui, sans-serif; text-align: center; z-index: 2; box-shadow: 0 0 0 2px var(--window); }
+  .ref { color: var(--link); }
+
+  /* main-window frame for the Results panel */
+  .mw { display: flex; flex-direction: column; }
+  .mw .menubar { display: flex; gap: 16px; padding: 4px 10px; border-bottom: 1px solid var(--border); }
+  .mw .main { display: flex; flex: 1; min-height: 0; }
+  .grid { flex: 1; background: var(--base); border-right: 1px solid var(--border); overflow: hidden; }
+  .grid table, .res table { border-collapse: collapse; width: 100%; }
+  .grid th { background: var(--button); border: 1px solid var(--border); font-weight: 400; padding: 2px 6px;
+             text-align: left; white-space: nowrap; }
+  .grid th small { display: block; color: var(--text); }
+  .grid td { border: 1px solid var(--border); padding: 2px 6px; text-align: right; }
+  .grid td.calc { background: var(--altbase); }
+  .dock { width: 460px; flex: none; display: flex; flex-direction: column; }
+  .dock .dt { display: flex; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--border); gap: 8px; }
+  .res { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+  .res h3 { margin: 0; font-size: 13px; }
+  .res .reading { font-size: 14px; }
+  .res table { background: var(--base); border: 1px solid var(--border); }
+  .res th { text-align: left; font-weight: 600; background: var(--button); padding: 3px 6px; border-bottom: 1px solid var(--border); }
+  .res td { padding: 3px 6px; border-bottom: 1px solid var(--altbase); }
+  .res td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .res tr.sel td { background: var(--highlight); color: var(--hl-text); }
+  .badge { border: 1px solid var(--border); border-radius: 9px; padding: 0 8px; font-size: 12px; color: var(--secondary); }
+  .empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--secondary); padding: 24px; }
+  .preview { background: var(--base); border: 1px solid var(--border); flex: 1; display: flex; }
+  .preview svg { width: 100%; height: 100%; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+
+  /* --- additions for the analysis-chooser versions --- */
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+         color: var(--mark); border: 1px solid var(--mark); border-radius: 3px; padding: 0 6px; margin-right: 8px; }
+  .lede { max-width: 1240px; margin: 0 0 14px; }
+  .glist { background: var(--base); border: 1px solid var(--border); overflow: hidden; }
+  .glist .gh { padding: 6px 8px 2px; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+               text-transform: uppercase; color: var(--secondary); }
+  .glist .gi { padding: 3px 8px 3px 18px; display: flex; gap: 8px; align-items: baseline; }
+  .glist .gi .sub { color: var(--secondary); font-size: 12px; margin-left: auto; white-space: nowrap; }
+  .glist .gi.sel { background: var(--highlight); color: var(--hl-text); }
+  .glist .gi.sel .sub { color: var(--hl-text); opacity: .85; }
+  .glist .more { padding: 2px 8px 4px 18px; color: var(--disabled); }
+  .ptable { display: grid; grid-template-columns: 22px 1fr 110px; gap: 4px 8px; align-items: center;
+            background: var(--base); border: 1px solid var(--border); padding: 6px 8px; }
+  .ptable .hd { color: var(--secondary); font-size: 12px; }
+  .field.off { color: var(--disabled); }
+  .field.num { min-width: 0; text-align: right; }
+  .field.search::before { content: "⌕"; color: var(--secondary); margin-right: 6px; }
+  .open { display: flex; align-items: center; gap: 4px; }
+  .open::before { content: "▾"; color: var(--secondary); }
+  .gallery { display: flex; gap: 14px; }
+  .gallery .fam { display: flex; flex-direction: column; gap: 4px; }
+  .gallery .fam > .gh { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--secondary); }
+  .gallery .cards { display: flex; gap: 6px; }
+  .card { width: 76px; background: var(--base); border: 1px solid var(--border); border-radius: 4px;
+          padding: 4px 4px 3px; text-align: center; font-size: 12px; line-height: 1.2; }
+  .card svg { width: 60px; height: 32px; display: block; margin: 0 auto 2px; }
+  .card svg path { fill: none; stroke: var(--s1); stroke-width: 2; }
+  .card svg line { stroke: var(--border); stroke-width: 1; }
+  .card.sel { border-color: var(--highlight); box-shadow: inset 0 0 0 1px var(--highlight); background: var(--altbase); }
+  .card .badge { font-size: 10px; padding: 0 5px; }
+  .plot { background: var(--base); border: 1px solid var(--border); }
+  .plot svg { display: block; width: 100%; height: 130px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--border); border-radius: 12px; padding: 1px 10px; background: var(--button); }
+  .chip.on { background: var(--highlight); color: var(--hl-text); border-color: var(--highlight); }
+  .popup { position: absolute; z-index: 3; background: var(--base); border: 1px solid var(--border);
+           box-shadow: 0 6px 18px rgba(0,0,0,.25); width: 410px; }
+  .eq { font-family: "Cambria Math", "STIX Two Math", Georgia, serif; font-size: 13px; }
+  .compare-mini { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
+
+
+  .mi { display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: var(--mark); color: #fff;
+        font: 700 11px/18px system-ui, sans-serif; text-align: center; vertical-align: 1px; margin: 0 4px;
+        flex: none; }
+  .scroll { position: relative; }
+  .scroll .bar { position: absolute; right: 1px; top: 1px; bottom: 1px; width: 10px; background: var(--window);
+                 border-left: 1px solid var(--border); }
+  .scroll .bar::after { content: ""; position: absolute; left: 2px; right: 2px; top: 2px; height: 46%;
+                        border-radius: 3px; background: var(--border); }
+  .scroll .glist .gi { padding-right: 18px; }
+  .about .k { color: var(--secondary); }
+  .changes { columns: 2; column-gap: 32px; max-width: 1240px; padding-left: 22px; margin: 0; }
+  .changes li { break-inside: avoid; margin-bottom: 8px; }
+  .changes li::marker { color: var(--mark); font-weight: 700; }
+
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Analyze dialog — redesign</h1>
+  <p>The current dialog, then the new one for a curve fit and for a group comparison, both at the default size of 900 × 640. Orange numbers are the changes, listed at the bottom.</p>
+  <div class="switch" role="group" aria-label="Theme">
+    <button type="button" data-set="light">Light</button>
+    <button type="button" data-set="dark">Dark</button>
+  </div>
+</header>
+<section class="board"><h2><span class="tag">Now</span>Current dialog</h2><div class="row"><div class="win" style="width:900px;min-height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+<div class="tabs">
+  <div class="tab">C<u>o</u>mpare groups</div>
+  <div class="tab on">Fit a c<u>u</u>rve</div>
+</div>
+<div class="secondary">Fit a line or curve to each Y series against X.</div>
+<div class="cols"><div class="col">
+<div class="group grow">
+  <div class="legend">Data</div>
+  <div class="list grow">
+    <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
+    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;log[Agonist] (X)</div><div class="c2" style="text-align:right">–</div></div>
+  </div>
+  <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
+</div>
+</div><div class="col">
+<div class="group">
+  <div class="legend">Analysis</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px 8px;font-size:12.5px">
+    <div><span class="rb"></span>Li<u>n</u>ear regression</div><div><span class="rb"></span>Exponential ass<u>o</u>ciation</div><div><span class="rb"></span>Ga<u>u</u>ssian</div>
+    <div><span class="rb"></span><u>P</u>olynomial regression</div><div><span class="rb"></span>Exponential deca<u>y</u></div><div></div>
+    <div><span class="rb on"></span>Hill <u>4</u>PL <span class="badge">recent</span></div><div><span class="rb"></span><u>M</u>ichaelis-Menten</div><div></div>
+    <div><span class="rb"></span><u>3</u>PL (bottom 0)</div><div><span class="rb"></span><u>B</u>iphasic</div><div></div>
+    <div></div><div><span class="rb"></span>B<u>e</u>ll-shaped</div><div></div>
+  </div>
+</div>
+<div class="group">
+  <div class="legend">Options</div>
+  <div><span class="cb on"></span>X values are lo<u>g</u>10(concentration)</div>
+  <div class="open"><span><u>A</u>dvanced</span></div>
+  <div class="form indent">
+    <span>Fit only <u>X</u> from … to … (empty: all)</span><span class="field">−9 to −5</span>
+    <span><u>F</u>ix parameters (e.g. bottom = 0)</span><span class="field">top = 100</span>
+  </div>
+</div>
+
+<div class="group grow">
+  <div class="legend">What will run</div>
+  <div class="summary grow">Hill 4PL fit (variable slope) of Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5. Reports bottom, EC50 and Hill slope.</div>
+</div>
+</div></div>
+<div class="feedback"></div>
+<div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
+</div></div><div class=notes><p>For comparison. The radio grid fills top to bottom in columns of four, so related models (4PL, 3PL, Biphasic) are split across columns, and the advanced options need the exact syntax <code>top = 100</code> and <code>-9 to -5</code>.</p></div></div></section>
+<section class="board"><h2><span class="tag">New</span>Fit a curve — Hill 4PL, top fixed at 100, X from −9 to −5</h2><div class="row"><div class="win" style="width:900px;height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+<div class="tabs">
+  <div class="tab">C<u>o</u>mpare groups</div>
+  <div class="tab on">Fit a c<u>u</u>rve</div>
+</div>
+<div class="secondary">Fit a line or curve to each Y series against X.</div>
+<div class="cols"><div class="col">
+<div class="group grow">
+  <div class="legend">Data</div>
+  <div class="list grow">
+    <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">12</div></div><div class="r sel"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">12</div></div><div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">11</div></div>
+    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;log[Agonist] (X)</div><div class="c2" style="text-align:right">–</div></div>
+  </div>
+  <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
+</div>
+<div class="group">
+  <div class="legend">Options<span class="mi">4</span></div>
+  <div><span class="cb on"></span>X values are lo<u>g</u>10(concentration)</div>
+  <div class="line"><span>Fit only <u>X</u> from</span><span class="field w60 num">−9</span><span>to</span><span class="field w60 num">−5</span>
+    <span class="secondary">30 of 35 points</span><span class="mi">5</span></div>
+  <div class="open"><span><u>A</u>dvanced</span></div>
+  <div class="indent" style="display:flex;gap:4px;align-items:flex-start">
+    <div class="ptable" style="flex:1;padding:4px 8px;gap:3px 8px">
+      <span class="hd">Fix</span><span class="hd">Parameter</span><span class="hd">Value</span>
+      <span class="cb"></span><span>Bottom</span><span class="field num off">fitted</span>
+      <span class="cb on"></span><span>Top</span><span class="field num">100</span>
+      <span class="cb"></span><span>EC50</span><span class="field num off">fitted</span>
+      <span class="cb"></span><span>Hill slope</span><span class="field num off">fitted</span>
+    </div><span class="mi">6</span>
+  </div>
+</div></div><div class="col">
+<div class="group">
+  <div class="legend">Analysis<span class="mi">1</span></div>
+  <div class="line" style="flex-wrap:nowrap"><div class="field search" style="flex:1">Type to filter…</div><span class="mi">2</span></div>
+  <div style="display:flex;gap:4px;align-items:flex-start"><div class="scroll" style="flex:1"><div class="glist" style="height:150px"><div class="gh">Recent</div><div class="gi sel">Hill 4PL (variable slope)<span class="sub">EC50, Hill slope, top, bottom</span></div><div class="gh">Linear</div><div class="gi">Linear regression<span class="sub">slope, intercept, R²</span></div><div class="gi">Polynomial regression<span class="sub">degree 2–6</span></div><div class="gh">Dose-response</div><div class="gi">3PL (bottom fixed at 0)<span class="sub">EC50, Hill slope, top</span></div></div><div class="bar"></div></div><span class="mi">3</span></div>
+</div>
+<div class="group grow about">
+  <div class="legend">About this analysis<span class="mi">7</span></div>
+  <div class="eq" style="font-size:14px">Y = Bottom + (Top − Bottom) / (1 + 10<sup>(logEC50 − X) · HillSlope</sup>)</div>
+  <div style="display:flex;gap:4px;align-items:flex-start"><div class="plot" style="flex:1"><svg viewBox="0 0 400 122" style="display:block;width:100%;height:auto"><line x1="40" y1="102" x2="385" y2="102" stroke="var(--border)"/><line x1="40" y1="6" x2="40" y2="102" stroke="var(--border)"/><line x1="40" y1="20" x2="385" y2="20" stroke="var(--highlight)" stroke-width="1.5" stroke-dasharray="5 3"/><line x1="40" y1="90" x2="385" y2="90" stroke="var(--secondary)" stroke-dasharray="3 3"/><line x1="210" y1="55.0" x2="210" y2="102" stroke="var(--secondary)" stroke-dasharray="3 3"/><polyline points="40.0,90.0 43.4,90.0 46.8,90.0 50.2,90.0 53.6,89.9 57.0,89.9 60.4,89.9 63.8,89.9 67.2,89.9 70.6,89.9 74.0,89.9 77.4,89.8 80.8,89.8 84.2,89.8 87.6,89.8 91.0,89.7 94.4,89.7 97.8,89.6 101.2,89.5 104.6,89.5 108.0,89.4 111.4,89.3 114.8,89.1 118.2,89.0 121.6,88.8 125.0,88.6 128.4,88.4 131.8,88.1 135.2,87.8 138.6,87.5 142.0,87.1 145.4,86.6 148.8,86.1 152.2,85.4 155.6,84.7 159.0,83.9 162.4,83.0 165.8,81.9 169.2,80.7 172.6,79.4 176.0,77.9 179.4,76.3 182.8,74.4 186.2,72.5 189.6,70.3 193.0,68.0 196.4,65.6 199.8,63.1 203.2,60.4 206.6,57.7 210.0,55.0 213.4,52.3 216.8,49.6 220.2,46.9 223.6,44.4 227.0,42.0 230.4,39.7 233.8,37.5 237.2,35.6 240.6,33.7 244.0,32.1 247.4,30.6 250.8,29.3 254.2,28.1 257.6,27.0 261.0,26.1 264.4,25.3 267.8,24.6 271.2,23.9 274.6,23.4 278.0,22.9 281.4,22.5 284.8,22.2 288.2,21.9 291.6,21.6 295.0,21.4 298.4,21.2 301.8,21.0 305.2,20.9 308.6,20.7 312.0,20.6 315.4,20.5 318.8,20.5 322.2,20.4 325.6,20.3 329.0,20.3 332.4,20.2 335.8,20.2 339.2,20.2 342.6,20.2 346.0,20.1 349.4,20.1 352.8,20.1 356.2,20.1 359.6,20.1 363.0,20.1 366.4,20.1 369.8,20.0 373.2,20.0 376.6,20.0 380.0,20.0" fill="none" stroke="var(--s1)" stroke-width="2.5"/><circle cx="210" cy="55.0" r="3.5" fill="var(--s1)"/><text x="46" y="15" font-size="11" font-weight="700" fill="var(--highlight)">Top = 100 (fixed)</text><text x="380" y="85" font-size="11" fill="var(--secondary)" text-anchor="end">Bottom</text><text x="222" y="67.0" font-size="11" fill="var(--secondary)">Hill slope: steepness at EC50</text><text x="210" y="115" font-size="11" fill="var(--secondary)" text-anchor="middle">EC50</text><text x="34" y="115" font-size="10" fill="var(--secondary)" text-anchor="end">X</text><text x="32" y="12" font-size="10" fill="var(--secondary)" text-anchor="end">Y</text></svg></div><span class="mi">8</span></div>
+  <div>Fits Drug A, Drug B and Drug C against log[Agonist], with top fixed at 100 and X from −9 to −5.</div>
+  <div class="secondary">Use when the response rises or falls between two plateaus as log dose increases.<span class="mi">9</span></div>
+</div></div></div>
+<div class="feedback"></div>
+<div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
+</div></div></div></section>
+<section class="board"><h2><span class="tag">New</span>Compare groups — one-way ANOVA with Dunnett's test</h2><div class="row"><div class="win" style="width:900px;height:640px;display:flex;flex-direction:column"><div class="titlebar">Analyze</div><div class="body" style="flex:1;min-height:0">
+<div class="tabs">
+  <div class="tab on">C<u>o</u>mpare groups</div>
+  <div class="tab">Fit a c<u>u</u>rve</div>
+</div>
+<div class="secondary">Test whether the means or medians of two or more groups differ.</div>
+<div class="cols"><div class="col">
+<div class="group grow">
+  <div class="legend">Data</div>
+  <div class="list grow">
+    <div class="h"><div class="c1">Series</div><div class="c2" style="text-align:right">n</div></div>
+    <div class="r"><div class="c1"><span class="cb on"></span>Control</div><div class="c2" style="text-align:right">6</div></div><div class="r sel"><div class="c1"><span class="cb on"></span>Drug A</div><div class="c2" style="text-align:right">6</div></div><div class="r"><div class="c1"><span class="cb on"></span>Drug B</div><div class="c2" style="text-align:right">6</div></div><div class="r"><div class="c1"><span class="cb on"></span>Drug C</div><div class="c2" style="text-align:right">5</div></div>
+    <div class="r dim"><div class="c1">&nbsp;&nbsp;&nbsp;&nbsp;Dose (X)</div><div class="c2" style="text-align:right">–</div></div>
+  </div>
+  <div class="line"><span class="btn">Select a<u>l</u>l</span><span class="btn"><u>D</u>eselect all</span></div>
+</div>
+<div class="group">
+  <div class="legend">Options<span class="mi">4</span></div>
+  <div class="form">
+    <span>De<u>s</u>ign</span><span class="field combo">Ordinary</span>
+    <span><u>P</u>ost-hoc test</span><span class="field combo">Dunnett (vs. control)</span>
+    <span><u>C</u>ontrol group</span><span class="field combo">Control</span>
+  </div>
+</div></div><div class="col">
+<div class="group">
+  <div class="legend">Analysis<span class="mi">1</span></div>
+  <div class="line" style="flex-wrap:nowrap"><div class="field search" style="flex:1">Type to filter…</div><span class="mi">2</span></div>
+  <div style="display:flex;gap:4px;align-items:flex-start"><div class="scroll" style="flex:1"><div class="glist" style="height:150px"><div class="gh">Recent</div><div class="gi">t test<span class="sub">two groups, means</span></div><div class="gh">Three or more groups</div><div class="gi sel">One-way ANOVA<span class="sub">means, post-hoc tests</span></div><div class="gi">Kruskal-Wallis test<span class="sub">medians, non-parametric</span></div><div class="gi">Two-way ANOVA<span class="sub">two factors</span></div><div class="gh">Two groups</div></div><div class="bar"></div></div><span class="mi">3</span></div>
+</div>
+<div class="group grow about">
+  <div class="legend">About this analysis<span class="mi">7</span></div>
+  <div><span class="k">Null hypothesis:</span> the four group means are equal.</div>
+  <div><span class="k">Assumes:</span> values are independent and roughly normal within each group, with similar SDs.<span class="mi">10</span></div>
+  <div>Runs an ordinary one-way ANOVA on Control, Drug A, Drug B and Drug C, then Dunnett's multiple comparisons test of each group against Control.</div>
+  <div class="secondary">Use when comparing the means of three or more groups. For skewed data or outliers, use the Kruskal-Wallis test.<span class="mi">9</span></div>
+</div></div></div>
+<div class="feedback"></div>
+<div class="buttonrow"><span class="spacer"></span><span class="btn def">Run</span><span class="btn">Cancel</span></div>
+</div></div></div></section>
+<section class="board"><h2>Changes</h2>
+<ol class="changes">
+  <li><b>A grouped list replaces the radio grid.</b> The sub-families from SPEC.md become section headers (Linear, Dose-response, Kinetics, Shape-based; for tests Describe, Two groups, Three or more groups), with recently used analyses in a <i>Recent</i> section on top instead of a “recent” badge. Each row says in a few words what the analysis reports. Only analyses the table supports are listed, as now.</li>
+  <li><b>Filter field</b> above the list. Typing “ec50” or “decay” narrows the list to matching names and descriptions; arrow keys move through it and Enter runs.</li>
+  <li><b>The list scrolls</b> after about six rows, so the dialog keeps its 900 × 640 size (DESIGN.md) with Advanced open. Sections can be collapsed.</li>
+  <li><b>Options move to the left column, under the data.</b> What to analyze and how (series, X range, fixed values) now sit in one column; the right column is about the chosen analysis.</li>
+  <li><b>The X range is two number fields</b> directly under the log checkbox, out of Advanced. Empty means no limit; the count of points used updates as you type. Replaces the text field “Fit only X from … to … (empty: all)”.</li>
+  <li><b>Fix parameters becomes a table</b> in Advanced: one row per model parameter with a <i>Fix</i> checkbox and a value. Names come from the model, so nothing has to be typed or spelled right. The last free parameter can't be unticked. Replaces the text field “Fix parameters (e.g. bottom = 0)”.</li>
+  <li><b>“About this analysis” replaces “What will run”.</b> One panel for the chosen analysis: the equation (fits) or the hypothesis (tests), then the sentence that says what will run, as now.</li>
+  <li><b>Sketch of the model</b> with its parameters marked. A fixed parameter is drawn in the accent colour with its value and updates as you tick <i>Fix</i>. It is a fixed drawing per model, not a fit of the data, so it costs no computation.</li>
+  <li><b>A “use when” line</b> in plain language, pointing to the alternative where there is one (e.g. Kruskal-Wallis for skewed data).</li>
+  <li><b>Tests show the null hypothesis and assumptions</b> in place of the equation and sketch.</li>
+</ol>
+<p class="lede" style="margin-top:12px"><b>Stays the same:</b> the family tabs, the data list, the Run/Cancel row and feedback line, the stored parameters (<code>"top = 100"</code>, <code>"-9 to -5"</code>) and so every saved project. Needs a small edit to DESIGN.md (the right column has no “What will run” box any more) and to SPEC.md (the equation, sketch and use-when text per analysis).</p>
+</section>
+<script>
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll(".switch button");
+    function show(theme) {
+      root.setAttribute("data-theme", theme);
+      buttons.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.set === theme)); });
+      try { localStorage.setItem("curvis-mockup-theme", theme); } catch (e) {}
+    }
+    var start = null;
+    try { start = localStorage.getItem("curvis-mockup-theme"); } catch (e) {}
+    if (!start) start = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    buttons.forEach(function (b) { b.addEventListener("click", function () { show(b.dataset.set); }); });
+    show(start);
+  })();
+</script>
+</body>
+</html>

@@ -35,6 +35,8 @@ Format, Import).
   (Import's preview, Bulk rename's list of names). Options sit at the top of the right column at the height of their
   current page. The result takes the rest of the height. When a kind has nothing to pick
   (Format › Graph), its options move into the left column and the result stays on the right.
+  Analyze also puts its options in the left column, under the data, and the list of analyses
+  and *About this analysis* on the right (section 11).
 - **Secondary settings** (naming, placement, “append at the end”) go at the left of the button
   row. They never go in the main columns.
 - **Advanced options** go in a collapsed `Advanced` section at the bottom of the options panel
@@ -326,3 +328,41 @@ Mockup: `docs/mockups/launcher.html`.
   (`EmptyState`).
 - **Keyboard.** Tab order: tiles → *Open project…* → list. Arrow keys move along the tiles
   and in the list.
+
+## 11. Analyze dialog
+
+Mockup: `docs/mockups/analyze-dialog.html` (it replaces board 1 of `docs/mockups/index.html`).
+A workbench dialog (section 1) with one change of layout:
+
+```
+┌ Analyze ─────────────────────────────────────────────────────────────┐
+│ [Compare groups] [Fit a curve] [Survival]                            │
+│ One sentence on the family.                                          │
+│ ┌ Data ────────────────┐ ┌ Analysis ──────────────────────────────┐ │
+│ │ series list (grows)  │ │ filter field                           │ │
+│ │ Select all / Desel.  │ │ grouped list, ~6 rows, scrolls         │ │
+│ ├ Options ─────────────┤ ├ About this analysis ───────────────────┤ │
+│ │ options of the kind  │ │ equation + sketch, or hypothesis       │ │
+│ │ ▸ Advanced           │ │ what will run · when to use it (grows) │ │
+│ └──────────────────────┘ └────────────────────────────────────────┘ │
+│ ⚠ Feedback line                                      [Run] [Cancel] │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+- **Analysis list.** One list per family, in sections taken from the analysis types, with a
+  *Recent* section on top (up to three). A row is the name, then what it reports in
+  `PlaceholderText` at the right. List rows have no mnemonics; the *Analysis* group box has
+  one, and the filter field has an accessible name. Typing in the filter narrows the list;
+  Up/Down move from the filter into the list, Enter runs. The list is about six rows high and
+  scrolls, so the dialog keeps its size.
+- **Options** sit under the data at the height of their page. Fields that belong together sit
+  on one line (*Fit only X from [ ] to [ ]*, with the count of points used after them).
+  Values the user would otherwise type as text (a range, fixed parameters) are number fields
+  or a table, never a syntax to learn.
+- **About this analysis** takes the rest of the right column's height. From the top: the
+  equation (fits) or the null hypothesis and assumptions (tests), the sketch (fits), the
+  sentence that says what will run, and a “use when” line in `PlaceholderText`. The sketch is
+  drawn from the model with `Link` for the curve, `PlaceholderText` for markers and labels,
+  and `Highlight` for a fixed parameter; it is an illustration, never a fit of the data.
+- **Height.** Extra height goes to the series list on the left and to *About this analysis*
+  on the right. At 900 × 640 with Advanced open nothing is cut off.
