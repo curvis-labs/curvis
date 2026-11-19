@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "analysis": "michaelis_menten",
+  "case": "n_two",
+  "description": "Two points: an exact fit, df = 0, no SE.",
+  "generated_by": {
+    "script": "validation/r/scripts/michaelis_menten.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [2, 20],
+    "y": [
+      [30, 90]
+    ],
+    "fixed": {},
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 1, 5, 20, 50]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [2],
+    "df": [0],
+    "vmax": [115.71428571428571],
+    "vmax_se": ["NaN"],
+    "vmax_ci_lower": ["NaN"],
+    "vmax_ci_upper": ["NaN"],
+    "km": [5.7142857142857135],
+    "km_se": ["NaN"],
+    "km_ci_lower": ["NaN"],
+    "km_ci_upper": ["NaN"],
+    "r_squared": [1],
+    "sy_x": ["NaN"],
+    "band_fit": [0, 17.23404255319149, 54, 90, 103.84615384615384],
+    "band_lower": ["NaN", "NaN", "NaN", "NaN", "NaN"],
+    "band_upper": ["NaN", "NaN", "NaN", "NaN", "NaN"]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "vmax": "parameter",
+    "vmax_se": "parameter",
+    "vmax_ci_lower": "ci",
+    "vmax_ci_upper": "ci",
+    "km": "parameter",
+    "km_se": "parameter",
+    "km_ci_lower": "ci",
+    "km_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

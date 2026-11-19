@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "analysis": "michaelis_menten",
+  "case": "n_small",
+  "description": "Three concentrations, one replicate: df = 1.",
+  "generated_by": {
+    "script": "validation/r/scripts/michaelis_menten.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [1, 6, 50],
+    "y": [
+      [18.642857142857142, 58, 108.14285714285714]
+    ],
+    "fixed": {},
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 1, 5, 20, 50]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [3],
+    "df": [1],
+    "vmax": [121.54201106081943],
+    "vmax_se": [3.5366781118910082],
+    "vmax_ci_lower": [76.604254885184531],
+    "vmax_ci_upper": [166.47976723645434],
+    "km": [6.3405691252705436],
+    "km_se": [0.64153897705131158],
+    "km_ci_lower": [-1.8109564633795001],
+    "km_ci_upper": [14.492094713920586],
+    "r_squared": [0.99860283242916115],
+    "sy_x": [2.3712696805558369],
+    "band_fit": [0, 16.557573259871713, 53.587262560740264, 92.285030352069953, 107.86366995208785],
+    "band_lower": [0, 2.2129993292863013, 26.660040715565025, 69.701950393760086, 77.943392129667998],
+    "band_upper": [0, 30.902147190457125, 80.51448440591551, 114.86811031037982, 137.78394777450768]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "vmax": "parameter",
+    "vmax_se": "parameter",
+    "vmax_ci_lower": "ci",
+    "vmax_ci_upper": "ci",
+    "km": "parameter",
+    "km_se": "parameter",
+    "km_ci_lower": "ci",
+    "km_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

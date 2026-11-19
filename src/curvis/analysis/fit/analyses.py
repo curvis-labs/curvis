@@ -1,5 +1,7 @@
 """The curve-fit analyses of the Analyze dialog: linear regression, polynomial
-regression, the Hill 4PL and the 3PL with the bottom fixed at 0.
+regression, the Hill 4PL and the 3PL with the bottom fixed at 0, and the nonlinear
+curves of docs/models.md (biphasic and bell-shaped dose-response, one-phase exponential
+association and decay, Michaelis-Menten, Gaussian).
 
 Each fits every ticked series to the table's X column in one run (every replicate is a
 point) and reports, per series, the parameters with their standard errors and 95%
@@ -36,7 +38,9 @@ from curvis.data import Table
 
 if TYPE_CHECKING:
     from curvis.analysis.fit.dose_response import DoseResponseFit
+    from curvis.analysis.fit.engine import NonlinearFit
     from curvis.analysis.fit.linear import PolynomialFit
+    from curvis.analysis.fit.nonlinear import CurveSpec, DerivedValue
     from curvis.analysis.fit.points import Points, XRange
 
 CURVE_POINTS = 200
@@ -47,6 +51,12 @@ CONFIDENCE = 0.95
 LINEAR_METHOD = "Linear regression (least squares)"
 HILL4_METHOD = "Hill four-parameter logistic fit (4PL, least squares)"
 HILL3_METHOD = "Three-parameter logistic fit (3PL, bottom fixed at 0, least squares)"
+BIPHASIC_METHOD = "Biphasic dose-response fit (least squares)"
+BELL_METHOD = "Bell-shaped dose-response fit (least squares)"
+ASSOCIATION_METHOD = "One-phase exponential association fit (least squares)"
+DECAY_METHOD = "One-phase exponential decay fit (least squares)"
+MICHAELIS_MENTEN_METHOD = "Michaelis-Menten fit (least squares)"
+GAUSSIAN_METHOD = "Gaussian fit (least squares)"
 
 
 def polynomial_method(degree: int) -> str:
@@ -526,7 +536,527 @@ class Hill3(CurveFit):
         return run_logistic(inputs, params, three=True)
 
 
+# --- nonlinear curves (docs/models.md) ---------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TwoPhaseParams(FitParams):
+    x_is_log: bool = param(False, "X values are lo&g10(concentration)")
+    fixed: str = param("", "&Fix parameters (e.g. hill slope 1 = 1)", advanced=True)
+
+
+@dataclass(frozen=True)
+class AssociationParams(FitParams):
+    fixed: str = param("", "&Fix parameters (e.g. Y0 = 0)", advanced=True)
+
+
+@dataclass(frozen=True)
+class DecayParams(FitParams):
+    fixed: str = param("", "&Fix parameters (e.g. plateau = 0)", advanced=True)
+
+
+@dataclass(frozen=True)
+class MichaelisMentenParams(FitParams):
+    fixed: str = param("", "&Fix parameters (e.g. Vmax = 100)", advanced=True)
+
+
+@dataclass(frozen=True)
+class GaussianParams(FitParams):
+    fixed: str = param("", "&Fix parameters (e.g. baseline = 0)", advanced=True)
+
+
+def curve_fixed(spec: CurveSpec, text: str, example: str) -> dict[str, float]:
+    """The values of a "Fix parameters" text: "name = value" pairs separated by commas
+    or semicolons, with names as the results show them in any case and spacing
+    ("hill slope 1", "HillSlope1"), or a few short forms (nH1). Fixing every
+    parameter is refused."""
+    from curvis.analysis.fit.nonlinear import name_key
+
+    names = spec.names()
+    labels = [spec.labels[p] for p in spec.model.parameters]
+    allowed = ", ".join(labels[:-1]) + " or " + labels[-1]
+    fixed: dict[str, float] = {}
+    for part in text.replace(";", ",").split(","):
+        if not part.strip():
+            continue
+        name, equals, value = part.partition("=")
+        key = names.get(name_key(name))
+        if not equals or key is None:
+            raise AnalysisError(
+                f'Fix parameters as "name = value", where the name is {allowed}; '
+                f'for example "{example}".'
+            )
+        found = parse_number(value, f"The value of {name.strip()}")
+        if found is None:
+            raise AnalysisError(f"Give a value for {name.strip()}, for example {example}.")
+        fixed[key] = found
+    if len(fixed) == len(spec.model.parameters):
+        raise AnalysisError("Leave at least one parameter free to fit.")
+    return fixed
+
+
+@dataclass(frozen=True)
+class _SeriesFit:
+    name: str
+    fit: NonlinearFit
+    derived: dict[str, DerivedValue | None]
+    points: Points
+
+
+def run_curve(inputs: AnalysisInputs, params: FitParams, kind: NonlinearCurve) -> Result:
+    """Fit ``kind``'s curve to every series and lay out the results."""
+    from curvis.analysis.fit.dose_response import log_x
+    from curvis.analysis.fit.nonlinear import curve_points, derived_value, fit_curve, uses_fixed
+
+    spec = kind.spec()
+    x = _no_x(inputs)
+    xr = x_range(params)
+    fixed = kind.fixed_values(params)
+    x_is_log = bool(getattr(params, "x_is_log", False))
+    on_log = spec.log_x and not x_is_log
+    fits: list[_SeriesFit] = []
+    curves: list[FittedCurve] = []
+    warnings: list[str] = []
+    for s in inputs.series:
+        points = curve_points(spec, x, s.columns, x_is_log, xr)
+        f = fit_curve(spec, points, fixed, CONFIDENCE)
+        derived = {d.name: derived_value(f, d) for d in spec.derived} if f.ok else {}
+        fits.append(_SeriesFit(s.name, f, derived, points))
+        if not f.ok:
+            warnings.append(f"{s.name}: {f.message}")
+            continue
+        grid = _grid(fit_points(x, s.columns, xr), log_spaced=on_log)
+        band = f.band(log_x(grid, False) if on_log else grid)
+        curves.append(_curve(s.id, s.name, grid, band, log_x=on_log))
+        warnings += [f"{s.name}: {w}" for w in kind.warnings(fits[-1], x_is_log)]
+        if f.df == 0:
+            warnings.append(
+                f"{s.name}: the curve goes through every point (no degrees of freedom "
+                "left), so there are no standard errors or confidence intervals."
+            )
+
+    names = [s.name for s in inputs.series]
+    parameters = spec.model.parameters
+    shown_derived = [d for d in spec.derived if not uses_fixed(d, fixed)]
+
+    def cells(get: Any) -> list[Cell]:
+        return [get(sf) if sf.fit.ok else None for sf in fits]
+
+    def value(name: str) -> Any:
+        return lambda sf: sf.fit.value(name)
+
+    def stat(name: str, attr: str) -> Any:
+        def get(sf: _SeriesFit) -> Cell:
+            if name in fixed:
+                return "(fixed)"
+            return float(getattr(sf.fit, attr)[sf.fit.names.index(name)])
+
+        return get
+
+    def derived_cell(name: str, attr: str) -> Any:
+        def get(sf: _SeriesFit) -> Cell:
+            dv = sf.derived.get(name)
+            return None if dv is None else float(getattr(dv, attr))
+
+        return get
+
+    labels = spec.labels
+    rows: list[tuple[str, Sequence[Cell]]] = [
+        ("Fit", [_status_text(sf.fit.ok, sf.fit.status.value) for sf in fits])
+    ]
+    rows += [(labels[n], cells(value(n))) for n in parameters]
+    rows += [(d.label, cells(derived_cell(d.name, "value"))) for d in shown_derived]
+    rows += [(f"SE of {labels[n]}", cells(stat(n, "se"))) for n in parameters]
+    rows += [
+        (f"SE of {d.label}", cells(derived_cell(d.name, "se")))
+        for d in shown_derived
+        if d.linear is not None
+    ]
+    for n in parameters:
+        rows.append((f"Lower 95% CI of {labels[n]}", cells(stat(n, "ci_lower"))))
+        rows.append((f"Upper 95% CI of {labels[n]}", cells(stat(n, "ci_upper"))))
+    for d in shown_derived:
+        rows.append((f"Lower 95% CI of {d.label}", cells(derived_cell(d.name, "ci_lower"))))
+        rows.append((f"Upper 95% CI of {d.label}", cells(derived_cell(d.name, "ci_upper"))))
+    rows += [
+        ("R²", cells(lambda sf: sf.fit.r_squared)),
+        ("Sy.x", cells(lambda sf: sf.fit.sy_x)),
+        ("Degrees of freedom", cells(lambda sf: _int(sf.fit.df))),
+        ("Number of points", [_int(sf.fit.n) for sf in fits]),
+    ]
+    one = kind.reading(fits[0]) if fits[0].fit.ok else ""
+    notes = list(kind.notes(x_is_log))
+    if fixed:
+        from curvis.analysis.compare.common import number
+
+        notes.append(
+            "Fixed: " + ", ".join(f"{labels[n]} = {number(v)}" for n, v in fixed.items()) + "."
+        )
+    return Result(
+        kind.method,
+        _summary(names, [sf.fit.ok for sf in fits], one, kind.what),
+        tuple(warnings),
+        tables=(_table("Best-fit values", names, rows),),
+        notes=tuple(notes),
+        curves=tuple(curves),
+    )
+
+
+def _ci(dv: DerivedValue | None, df: int) -> str:
+    from curvis.analysis.compare.common import number
+
+    if dv is None or df <= 0 or math.isnan(dv.ci_lower):
+        return ""
+    return f" (95% CI {number(dv.ci_lower)} to {number(dv.ci_upper)})"
+
+
+def _param_ci(f: NonlinearFit, name: str) -> str:
+    from curvis.analysis.compare.common import number
+
+    i = f.names.index(name)
+    if f.df <= 0 or not f.free[i] or math.isnan(float(f.ci_lower[i])):
+        return ""
+    return f" (95% CI {number(float(f.ci_lower[i]))} to {number(float(f.ci_upper[i]))})"
+
+
+def _outside(value: float, points: Points) -> bool:
+    finite = points.x[np.isfinite(points.x)]
+    return bool(len(finite)) and not float(finite.min()) <= value <= float(finite.max())
+
+
+class NonlinearCurve(CurveFit):
+    """A curve of docs/models.md. Subclasses name their :meth:`spec` and may add a
+    one-line reading, warnings and notes."""
+
+    example: ClassVar[str] = ""
+    """A "Fix parameters" example, as in the field's label."""
+
+    @staticmethod
+    def spec() -> CurveSpec:
+        raise NotImplementedError
+
+    def fixed_values(self, params: Params) -> dict[str, float]:
+        return curve_fixed(self.spec(), str(getattr(params, "fixed", "")), self.example)
+
+    def reading(self, sf: _SeriesFit) -> str:
+        from curvis.analysis.compare.common import number
+
+        return f"Fitted {self.what} to {sf.name}; R² = {number(sf.fit.r_squared)}."
+
+    def warnings(self, sf: _SeriesFit, x_is_log: bool) -> list[str]:
+        return []
+
+    def notes(self, x_is_log: bool) -> list[str]:
+        return []
+
+
+def _ec50_warnings(sf: _SeriesFit) -> list[str]:
+    out = []
+    for i in (1, 2):
+        name = f"log_ec50_{i}"
+        if sf.fit.free[sf.fit.names.index(name)] and _outside(sf.fit.value(name), sf.points):
+            out.append(
+                f"EC50 {i} is outside the range of the X values, so it is an extrapolation. "
+                "Measure concentrations on both sides of it."
+            )
+    return out
+
+
+def _log_notes(x_is_log: bool) -> list[str]:
+    if x_is_log:
+        return ["X values are log10(concentration); EC50 = 10^LogEC50."]
+    return [
+        "X values are concentrations; the fit uses log10 of them (LogEC50 = log10 EC50), "
+        "and the CI of each EC50 is 10^(CI of its LogEC50)."
+    ]
+
+
+class Biphasic(NonlinearCurve):
+    id = "biphasic"
+    label = "&Biphasic dose-response"
+    method = BIPHASIC_METHOD
+    params_type = TwoPhaseParams
+    what = "a biphasic dose-response curve"
+    reports = "bottom, top, the fraction in phase 1, both EC50s and Hill slopes"
+    example = "hill slope 1 = 1"
+
+    @staticmethod
+    def spec() -> CurveSpec:
+        from curvis.analysis.fit.multiphase import BIPHASIC
+
+        return BIPHASIC
+
+    @staticmethod
+    def run(inputs: AnalysisInputs, params: TwoPhaseParams) -> Result:
+        return run_curve(inputs, params, BIPHASIC_TYPE)
+
+    def reading(self, sf: _SeriesFit) -> str:
+        from curvis.analysis.compare.common import number
+
+        f = sf.fit
+        e1, e2 = sf.derived.get("ec50_1"), sf.derived.get("ec50_2")
+        first = f"{number(e1.value)}{_ci(e1, f.df)}" if e1 else number(10 ** f.value("log_ec50_1"))
+        second = f"{number(e2.value)}{_ci(e2, f.df)}" if e2 else number(10 ** f.value("log_ec50_2"))
+        return (
+            f"The curve of {sf.name} has two phases, with EC50s of {first} and {second}; "
+            f"{number(100 * f.value('frac'))}% of the span is in the first phase; "
+            f"R² = {number(f.r_squared)}."
+        )
+
+    def warnings(self, sf: _SeriesFit, x_is_log: bool) -> list[str]:
+        out = _ec50_warnings(sf)
+        frac = sf.fit.value("frac")
+        if not 0 <= frac <= 1:
+            out.append(
+                "Frac is outside 0 to 1, so the two phases go in opposite directions. "
+                "A bell-shaped curve may describe the data better."
+            )
+        return out
+
+    def notes(self, x_is_log: bool) -> list[str]:
+        return [*_log_notes(x_is_log), "Frac is the fraction of the span in phase 1."]
+
+
+class BellShaped(NonlinearCurve):
+    id = "bell_shaped"
+    label = "B&ell-shaped dose-response"
+    method = BELL_METHOD
+    params_type = TwoPhaseParams
+    what = "a bell-shaped dose-response curve"
+    reports = "both plateaus, the dip, both EC50s and Hill slopes, and the peak center, width and amplitude"  # noqa: E501
+    example = "hill slope 1 = 1"
+
+    @staticmethod
+    def spec() -> CurveSpec:
+        from curvis.analysis.fit.multiphase import BELL_SHAPED
+
+        return BELL_SHAPED
+
+    @staticmethod
+    def run(inputs: AnalysisInputs, params: TwoPhaseParams) -> Result:
+        return run_curve(inputs, params, BELL_TYPE)
+
+    def reading(self, sf: _SeriesFit) -> str:
+        from curvis.analysis.compare.common import number
+
+        f = sf.fit
+        amplitude = sf.derived.get("amplitude")
+        center = sf.derived.get("center")
+        shape = (
+            "peaks"
+            if f.value("dip") >= (f.value("plateau_1") + f.value("plateau_2")) / 2
+            else "dips"
+        )
+        where = (
+            f" at a log concentration of {number(center.value)}{_ci(center, f.df)}"
+            if center
+            else ""
+        )
+        size = f" with an amplitude of {number(amplitude.value)}" if amplitude else ""
+        return f"The curve of {sf.name} {shape}{where}{size}; R² = {number(f.r_squared)}."
+
+    def warnings(self, sf: _SeriesFit, x_is_log: bool) -> list[str]:
+        out = _ec50_warnings(sf)
+        f = sf.fit
+        if f.value("log_ec50_1") > f.value("log_ec50_2"):
+            out.append(
+                "LogEC50 1 is above LogEC50 2, so the curve does not have the usual bell "
+                "shape; read the peak center, width and amplitude with care."
+            )
+        return out
+
+    def notes(self, x_is_log: bool) -> list[str]:
+        unit = "X" if x_is_log else "log10(concentration)"
+        return [
+            *_log_notes(x_is_log),
+            f"Peak center = (LogEC50 1 + LogEC50 2) / 2 and peak width = LogEC50 2 − LogEC50 1, "
+            f"in units of {unit}; peak amplitude = Dip − (Plateau 1 + Plateau 2) / 2.",
+        ]
+
+
+class _Exponential(NonlinearCurve):
+    half: ClassVar[str] = "half_life"
+    half_label: ClassVar[str] = "half-life"
+    moves: ClassVar[str] = "decays"
+
+    def reading(self, sf: _SeriesFit) -> str:
+        from curvis.analysis.compare.common import number
+
+        f = sf.fit
+        k = f.value("k")
+        half = sf.derived.get(self.half)
+        if k > 0 and half is not None:
+            return (
+                f"{sf.name} {self.moves} to a plateau of {number(f.value('plateau'))} with a "
+                f"{self.half_label} of {number(half.value)}{_ci(half, f.df)} "
+                f"(K = {number(k)}); R² = {number(f.r_squared)}."
+            )
+        return f"Fitted {self.what} to {sf.name} with K = {number(k)}; R² = {number(f.r_squared)}."
+
+    def warnings(self, sf: _SeriesFit, x_is_log: bool) -> list[str]:
+        f = sf.fit
+        k = f.value("k")
+        finite = sf.points.x[np.isfinite(sf.points.x)]
+        out = []
+        if k < 0:
+            out.append(
+                f"K is negative, so the curve grows away from the plateau instead of "
+                f"approaching it, and the {self.half_label} is not defined. Check the "
+                "data, or choose another model."
+            )
+        elif len(finite) and k > 0 and math.log(2) / k > float(np.ptp(finite)):
+            out.append(
+                f"The {self.half_label} is longer than the X range of the data, so the "
+                "plateau is an extrapolation. Measure for longer."
+            )
+        return out
+
+    def notes(self, x_is_log: bool) -> list[str]:
+        return [
+            f"The {self.half_label} is ln 2 / K and tau is 1 / K (X units); their CIs "
+            "come from the CI of K."
+        ]
+
+
+class ExpAssociation(_Exponential):
+    id = "exp_association"
+    label = "Exponential ass&ociation"
+    method = ASSOCIATION_METHOD
+    params_type = AssociationParams
+    what = "a one-phase exponential association"
+    reports = "Y0, plateau, the rate constant K and the half-time"
+    example = "Y0 = 0"
+    half = "half_time"
+    half_label = "half-time"
+    moves = "rises"
+
+    @staticmethod
+    def spec() -> CurveSpec:
+        from curvis.analysis.fit.kinetics import EXP_ASSOCIATION
+
+        return EXP_ASSOCIATION
+
+    @staticmethod
+    def run(inputs: AnalysisInputs, params: AssociationParams) -> Result:
+        return run_curve(inputs, params, ASSOCIATION_TYPE)
+
+
+class ExpDecay(_Exponential):
+    id = "exp_decay"
+    label = "Exponential deca&y"
+    method = DECAY_METHOD
+    params_type = DecayParams
+    what = "a one-phase exponential decay"
+    reports = "Y0, plateau, the rate constant K and the half-life"
+    example = "plateau = 0"
+
+    @staticmethod
+    def spec() -> CurveSpec:
+        from curvis.analysis.fit.kinetics import EXP_DECAY
+
+        return EXP_DECAY
+
+    @staticmethod
+    def run(inputs: AnalysisInputs, params: DecayParams) -> Result:
+        return run_curve(inputs, params, DECAY_TYPE)
+
+
+class MichaelisMenten(NonlinearCurve):
+    id = "michaelis_menten"
+    label = "&Michaelis-Menten"
+    method = MICHAELIS_MENTEN_METHOD
+    params_type = MichaelisMentenParams
+    what = "a Michaelis-Menten curve"
+    reports = "Vmax and Km"
+    example = "Vmax = 100"
+
+    @staticmethod
+    def spec() -> CurveSpec:
+        from curvis.analysis.fit.kinetics import MICHAELIS_MENTEN
+
+        return MICHAELIS_MENTEN
+
+    @staticmethod
+    def run(inputs: AnalysisInputs, params: MichaelisMentenParams) -> Result:
+        return run_curve(inputs, params, MICHAELIS_MENTEN_TYPE)
+
+    def reading(self, sf: _SeriesFit) -> str:
+        from curvis.analysis.compare.common import number
+
+        f = sf.fit
+        return (
+            f"{sf.name} has Vmax = {number(f.value('vmax'))}{_param_ci(f, 'vmax')} and "
+            f"Km = {number(f.value('km'))}{_param_ci(f, 'km')}; R² = {number(f.r_squared)}."
+        )
+
+    def warnings(self, sf: _SeriesFit, x_is_log: bool) -> list[str]:
+        km = sf.fit.value("km")
+        finite = sf.points.x[np.isfinite(sf.points.x)]
+        if km < 0:
+            return ["Km is negative, which has no meaning for an enzyme. Check the data."]
+        if len(finite) and km > float(finite.max()):
+            return [
+                "Km is above the highest substrate concentration, so Vmax and Km are "
+                "extrapolations. Measure at higher concentrations."
+            ]
+        return []
+
+
+class Gaussian(NonlinearCurve):
+    id = "gaussian"
+    label = "Ga&ussian"
+    method = GAUSSIAN_METHOD
+    params_type = GaussianParams
+    what = "a Gaussian peak"
+    reports = "the peak center, width (SD and FWHM), amplitude and baseline"
+    example = "baseline = 0"
+
+    @staticmethod
+    def spec() -> CurveSpec:
+        from curvis.analysis.fit.shape import GAUSSIAN
+
+        return GAUSSIAN
+
+    @staticmethod
+    def run(inputs: AnalysisInputs, params: GaussianParams) -> Result:
+        return run_curve(inputs, params, GAUSSIAN_TYPE)
+
+    def reading(self, sf: _SeriesFit) -> str:
+        from curvis.analysis.compare.common import number
+
+        f = sf.fit
+        return (
+            f"The peak of {sf.name} is at {number(f.value('center'))}{_param_ci(f, 'center')}, "
+            f"with SD {number(f.value('sd'))} and amplitude {number(f.value('amplitude'))}; "
+            f"R² = {number(f.r_squared)}."
+        )
+
+    def warnings(self, sf: _SeriesFit, x_is_log: bool) -> list[str]:
+        if _outside(sf.fit.value("center"), sf.points):
+            return [
+                "The center of the peak is outside the range of the X values, so it is "
+                "an extrapolation."
+            ]
+        return []
+
+    def notes(self, x_is_log: bool) -> list[str]:
+        return ["FWHM (full width at half maximum) = 2.3548 × SD."]
+
+
+BIPHASIC_TYPE = Biphasic()
+BELL_TYPE = BellShaped()
+ASSOCIATION_TYPE = ExpAssociation()
+DECAY_TYPE = ExpDecay()
+MICHAELIS_MENTEN_TYPE = MichaelisMenten()
+GAUSSIAN_TYPE = Gaussian()
+
 register(LinearRegression())
 register(PolynomialRegression())
 register(Hill4())
 register(Hill3())
+register(BIPHASIC_TYPE)
+register(ASSOCIATION_TYPE)
+register(DECAY_TYPE)
+register(MICHAELIS_MENTEN_TYPE)
+register(BELL_TYPE)
+register(GAUSSIAN_TYPE)

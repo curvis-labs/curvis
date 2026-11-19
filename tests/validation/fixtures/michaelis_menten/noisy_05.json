@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "analysis": "michaelis_menten",
+  "case": "noisy_05",
+  "description": "Noise SD 10% of Vmax, 2 replicate(s), 8 concentrations.",
+  "generated_by": {
+    "script": "validation/r/scripts/michaelis_menten.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [25, 50, 100, 200, 400, 800, 1600, 3200],
+    "y": [
+      [563.56431071745396, 136.42601731325209, 211.73135784382498, 1853.1712911909301, 2381.7546635283898, 2712.9054618006007, 2491.3109006065633, 3561.1457453145713],
+      [270.57715041307239, 686.8393718845407, 1369.4836724923259, 1016.8833578565896, 1914.4830124014679, 2990.1701647267018, 2708.5309030110598, 3291.1143219568262]
+    ],
+    "fixed": {},
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 125, 250, 500]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [16],
+    "df": [14],
+    "vmax": [3554.0339350890613],
+    "vmax_se": [273.12104738149134],
+    "vmax_ci_lower": [2968.2475484750707],
+    "vmax_ci_upper": [4139.8203217030514],
+    "km": [290.7926457170862],
+    "km_se": [75.43905506546254],
+    "km_ci_lower": [128.99196466358399],
+    "km_ci_upper": [452.59332677058842],
+    "r_squared": [0.90018662798388283],
+    "sy_x": [381.39522588479565],
+    "band_fit": [0, 1068.4514179416544, 1642.9744206194059, 2247.1339069335199],
+    "band_lower": [0, 773.54770604914154, 1322.9479559735337, 1970.2523086507217],
+    "band_upper": [0, 1363.3551298341672, 1963.0008852652782, 2524.0155052163182]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "vmax": "parameter",
+    "vmax_se": "parameter",
+    "vmax_ci_lower": "ci",
+    "vmax_ci_upper": "ci",
+    "km": "parameter",
+    "km_se": "parameter",
+    "km_ci_lower": "ci",
+    "km_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

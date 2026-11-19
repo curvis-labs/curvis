@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "analysis": "exp_association",
+  "case": "fixed_y0",
+  "description": "Y0 fixed at 0 (as Misra1a and BoxBOD): 2 free parameters.",
+  "generated_by": {
+    "script": "validation/r/scripts/exp_association.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [0, 0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30],
+    "y": [
+      [4.2295290176408571, 10.431946896069899, 14.888234007724321, 24.021280313259421, 39.073561252072267, 51.352481125167579, 56.810574874895948, 70.691198973135201, 72.989240611618115, 80.427095087603476, 74.94408723180355],
+      [4.6012175343010817, 10.233626281720451, 14.835853507996738, 27.784493742205228, 32.061242250694043, 54.319946126487928, 58.064064309267977, 66.741543484441422, 73.383867552943613, 78.185200021858449, 80.597303116646998]
+    ],
+    "fixed": {
+      "y0": 0
+    },
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 2, 5, 10, 20]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [22],
+    "df": [20],
+    "plateau": [78.373513058107761],
+    "plateau_se": [1.289554609956296],
+    "plateau_ci_lower": [75.683549278485742],
+    "plateau_ci_upper": [81.06347683772978],
+    "k": [0.20615068674305997],
+    "k_se": [0.010078818594572646],
+    "k_ci_lower": [0.18512663956315792],
+    "k_ci_upper": [0.22717473392296203],
+    "half_time": [3.3623326291600626],
+    "half_time_ci_lower": [3.0511631667410719],
+    "half_time_ci_upper": [3.7441784834184859],
+    "tau": [4.8508206099083724],
+    "tau_ci_lower": [4.4018979696004106],
+    "tau_ci_upper": [5.4017077302310099],
+    "r_squared": [0.99026676680307624],
+    "sy_x": [2.8015574885404488],
+    "band_fit": [0, 26.480474303084709, 50.414696424775094, 68.399538471097031, 77.104204522855824],
+    "band_lower": [0, 24.836165880451002, 48.356092800650835, 66.740949770493344, 74.81626745199739],
+    "band_upper": [0, 28.124782725718415, 52.473300048899354, 70.058127171700718, 79.392141593714257]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "plateau": "parameter",
+    "plateau_se": "parameter",
+    "plateau_ci_lower": "ci",
+    "plateau_ci_upper": "ci",
+    "k": "parameter",
+    "k_se": "parameter",
+    "k_ci_lower": "ci",
+    "k_ci_upper": "ci",
+    "half_time": "parameter",
+    "half_time_ci_lower": "ci",
+    "half_time_ci_upper": "ci",
+    "tau": "parameter",
+    "tau_ci_lower": "ci",
+    "tau_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

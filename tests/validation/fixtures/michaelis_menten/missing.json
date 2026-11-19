@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "analysis": "michaelis_menten",
+  "case": "missing",
+  "description": "Missing X and Y values: unbalanced replicates per row.",
+  "generated_by": {
+    "script": "validation/r/scripts/michaelis_menten.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [0.25, 0.5, 1, 2, 4, "NaN", 16, 32, 64],
+    "y": [
+      [0.36246986616207888, "NaN", 18.454396927989716, 32.499250866940443, 47.965942049100804, 48.005925718939423, "NaN", 112.36588609906455, 114.96943653084323],
+      [-3.5332318150855331, -0.36108335127269164, 9.7963136468487253, "NaN", 54.367938769248163, 64.950644153058121, 87.116315857146859, 108.41383461711513, 125.06764051114801]
+    ],
+    "fixed": {},
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 1, 5, 20, 50]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [13],
+    "df": [11],
+    "vmax": [133.63231546237213],
+    "vmax_se": [4.6877462097368472],
+    "vmax_ci_lower": [123.3146556204655],
+    "vmax_ci_upper": [143.94997530427875],
+    "km": [7.1897006941378603],
+    "km_se": [0.94110892460788176],
+    "km_ci_lower": [5.1183339170461117],
+    "km_ci_upper": [9.2610674712296088],
+    "r_squared": [0.98784442780460668],
+    "sy_x": [5.6695624656747965],
+    "band_fit": [0, 16.317118348174233, 54.813616353450399, 98.296275465204701, 116.83250116753094],
+    "band_lower": [0, 13.07867005087332, 48.254898963984886, 93.317278155261434, 110.54141304874943],
+    "band_upper": [0, 19.555566645475146, 61.372333742915913, 103.27527277514797, 123.12358928631244]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "vmax": "parameter",
+    "vmax_se": "parameter",
+    "vmax_ci_lower": "ci",
+    "vmax_ci_upper": "ci",
+    "km": "parameter",
+    "km_se": "parameter",
+    "km_ci_lower": "ci",
+    "km_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

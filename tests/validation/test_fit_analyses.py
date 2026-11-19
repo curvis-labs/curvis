@@ -18,12 +18,20 @@ import pytest
 
 from curvis.analysis import base
 from curvis.analysis.base import AnalysisInputs, SeriesData
-from curvis.analysis.fit.analyses import Hill3Params, Hill4Params, LinearParams, PolynomialParams
+from curvis.analysis.fit.analyses import (
+    Hill3Params,
+    Hill4Params,
+    LinearParams,
+    NonlinearCurve,
+    PolynomialParams,
+)
 from curvis.analysis.result import Result
 from tests.validation.harness import Fixture, compare, fixture_paths, format_report, load_fixture
 
 LINEAR = [p for p in fixture_paths() if p.parent.name == "linear_fit"]
 DOSE = [p for p in fixture_paths() if p.parent.name == "dose_response"]
+CURVES = ("biphasic", "bell_shaped", "exp_association", "exp_decay", "michaelis_menten", "gaussian")
+NONLINEAR = [p for p in fixture_paths() if p.parent.name in CURVES]
 
 
 def inputs_of(fixture: Fixture) -> AnalysisInputs:
@@ -126,6 +134,68 @@ def test_dose_response_analyses_match_r(path: Path) -> None:
         pytest.fail(format_report(fixture, mismatches), pytrace=False)
     if ok:
         assert result.curves and result.curves[0].series_id == "s"
+    else:
+        assert not result.curves and result.warnings
+
+
+def fixed_text(fixed: Mapping[str, Any], labels: Mapping[str, str]) -> str:
+    return ", ".join(f"{labels[k]} = {float(v)!r}" for k, v in fixed.items())
+
+
+def ids_nonlinear(path: Path) -> str:
+    return f"{path.parent.name}/{path.stem}"
+
+
+@pytest.mark.parametrize("path", NONLINEAR, ids=ids_nonlinear)
+def test_nonlinear_curve_analyses_match_r(path: Path) -> None:
+    """Biphasic, bell-shaped, exponential, Michaelis-Menten and Gaussian fits, read back
+    from the Results table (the user writes the fixed values as text)."""
+    fixture = load_fixture(path)
+    kind = base.get(fixture.analysis)
+    assert isinstance(kind, NonlinearCurve)
+    spec = kind.spec()
+    values: dict[str, Any] = {
+        "x_range": range_text(fixture.inputs),
+        "fixed": fixed_text(fixture.inputs["fixed"], spec.labels),
+    }
+    if spec.log_x:
+        values["x_is_log"] = fixture.inputs["x_is_log"]
+    result = kind.run(inputs_of(fixture), kind.params_type(**values))
+    r = rows(result)
+    ok = r["Fit"] == "OK"
+    got: dict[str, npt.ArrayLike] = {
+        "fit_ok": [ok],
+        "n": [number(r["Number of points"])],
+        "df": [number(r["Degrees of freedom"]) if ok else math.nan],
+        "r_squared": [number(r["R²"])],
+        "sy_x": [number(r["Sy.x"])],
+    }
+    for key, label in spec.labels.items():
+        if key in fixture.inputs["fixed"]:
+            assert r[label] == float(fixture.inputs["fixed"][key]) or not ok
+            assert r[f"SE of {label}"] == "(fixed)" or not ok
+            continue
+        got[key] = [number(r[label])]
+        got[f"{key}_se"] = [number(r[f"SE of {label}"])]
+        got[f"{key}_ci_lower"] = [number(r[f"Lower 95% CI of {label}"])]
+        got[f"{key}_ci_upper"] = [number(r[f"Upper 95% CI of {label}"])]
+    for d in spec.derived:
+        if d.name not in fixture.expected:
+            assert d.label not in r
+            continue
+        got[d.name] = [number(r[d.label])]
+        if d.linear is not None:
+            got[f"{d.name}_se"] = [number(r[f"SE of {d.label}"])]
+        got[f"{d.name}_ci_lower"] = [number(r[f"Lower 95% CI of {d.label}"])]
+        got[f"{d.name}_ci_upper"] = [number(r[f"Upper 95% CI of {d.label}"])]
+    expected = {k: v for k, v in fixture.expected.items() if not k.startswith("band_")}
+    mismatches = compare(_only(fixture, expected), got)
+    if mismatches:
+        pytest.fail(format_report(fixture, mismatches), pytrace=False)
+    assert result.method == kind.method
+    if ok:
+        assert result.curves and result.curves[0].series_id == "s"
+        assert result.curves[0].log_x == (spec.log_x and not fixture.inputs.get("x_is_log"))
     else:
         assert not result.curves and result.warnings
 

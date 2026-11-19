@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "analysis": "michaelis_menten",
+  "case": "ties",
+  "description": "Velocities rounded to multiples of 10: many tied values.",
+  "generated_by": {
+    "script": "validation/r/scripts/michaelis_menten.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [0.25, 0.5, 1, 2, 4, 8, 16, 32, 64],
+    "y": [
+      [0, -0, 20, 30, 50, 50, 80, 110, 110],
+      [-0, -0, 10, 20, 50, 60, 90, 110, 130]
+    ],
+    "fixed": {},
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 1, 5, 20, 50]
+  },
+  "expected": {
+    "fit_ok": [true],
+    "n": [18],
+    "df": [16],
+    "vmax": [138.8467449666781],
+    "vmax_se": [6.7919589595051315],
+    "vmax_ci_lower": [124.44843517632989],
+    "vmax_ci_upper": [153.24505475702631],
+    "km": [9.6415521688140426],
+    "km_se": [1.4011866204202719],
+    "km_ci_lower": [6.6711692269871889],
+    "km_ci_upper": [12.611935110640896],
+    "r_squared": [0.97450700064985529],
+    "sy_x": [7.3143620153614286],
+    "band_fit": [0, 13.047602714722396, 47.415309307990057, 93.683855808846019, 116.40101566578581],
+    "band_lower": [0, 10.452547257409787, 41.376963979571343, 88.413484436211135, 108.61729876384172],
+    "band_upper": [0, 15.642658172035006, 53.453654636408771, 98.954227181480903, 124.1847325677299]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "vmax": "parameter",
+    "vmax_se": "parameter",
+    "vmax_ci_lower": "ci",
+    "vmax_ci_upper": "ci",
+    "km": "parameter",
+    "km_se": "parameter",
+    "km_ci_lower": "ci",
+    "km_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}

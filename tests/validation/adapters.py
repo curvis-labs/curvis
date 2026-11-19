@@ -493,6 +493,68 @@ def dose_response(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
     return out
 
 
+def _curve_spec(key: str) -> Any:
+    from curvis.analysis.fit.kinetics import EXP_ASSOCIATION, EXP_DECAY, MICHAELIS_MENTEN
+    from curvis.analysis.fit.multiphase import BELL_SHAPED, BIPHASIC
+    from curvis.analysis.fit.shape import GAUSSIAN
+
+    specs = (BIPHASIC, BELL_SHAPED, EXP_ASSOCIATION, EXP_DECAY, MICHAELIS_MENTEN, GAUSSIAN)
+    return next(s for s in specs if s.key == key)
+
+
+def _nonlinear_curve(key: str, inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/<key>.R with validation/r/R/nonlinear.R: the free
+    parameters with SE and CI, the derived values that use only free parameters, R²,
+    Sy.x and the band. A fit that is not OK reports no numbers, as R does."""
+    import math
+
+    import numpy as np
+
+    from curvis.analysis.fit.nonlinear import curve_points, derived_value, fit_curve, uses_fixed
+
+    spec = _curve_spec(key)
+    fixed = {k: float(v) for k, v in inputs["fixed"].items()}
+    x_is_log = bool(inputs.get("x_is_log", False))
+    points = curve_points(spec, inputs["x"], inputs["y"], x_is_log, _x_range(inputs))
+    f = fit_curve(spec, points, fixed)
+    nan = math.nan
+    ok = f.ok
+    out: dict[str, npt.ArrayLike] = {"fit_ok": [ok], "n": [f.n], "df": [f.df if ok else nan]}
+    for i, name in enumerate(f.names):
+        if name in fixed:
+            continue
+        out[name] = [float(f.values[i]) if ok else nan]
+        out[f"{name}_se"] = [float(f.se[i]) if ok else nan]
+        out[f"{name}_ci_lower"] = [float(f.ci_lower[i]) if ok else nan]
+        out[f"{name}_ci_upper"] = [float(f.ci_upper[i]) if ok else nan]
+    for d in spec.derived:
+        if uses_fixed(d, fixed):
+            continue
+        v = derived_value(f, d) if ok else None
+        out[d.name] = [v.value if v else nan]
+        if d.linear is not None:
+            out[f"{d.name}_se"] = [v.se if v else nan]
+        out[f"{d.name}_ci_lower"] = [v.ci_lower if v else nan]
+        out[f"{d.name}_ci_upper"] = [v.ci_upper if v else nan]
+    out["r_squared"] = [f.r_squared if ok else nan]
+    out["sy_x"] = [f.sy_x if ok else nan]
+    at = np.asarray(inputs["at"], dtype=np.float64)
+    if spec.log_x and not x_is_log:
+        from curvis.analysis.fit.dose_response import log_x
+
+        at = log_x(at, False)
+    fit, lower, upper = f.band(at)
+    if not ok:
+        fit = lower = upper = np.full(len(at), nan)
+    out["band_fit"], out["band_lower"], out["band_upper"] = fit, lower, upper
+    return out
+
+
+for _key in ("biphasic", "bell_shaped", "exp_association", "exp_decay", "michaelis_menten",
+             "gaussian"):  # fmt: skip
+    adapter(_key)(lambda inputs, key=_key: _nonlinear_curve(key, inputs))
+
+
 @adapter("nist_nls")
 def nist_nls(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
     """validation/r/scripts/nist_strd.R: NIST StRD nonlinear datasets from NIST's

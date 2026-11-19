@@ -69,6 +69,10 @@ class FitModel(ABC):
         """Initial values from the data."""
         raise NotImplementedError(f"{type(self).__name__} has no automatic initial values")
 
+    def starts(self, x: FloatArray, y: FloatArray) -> list[FloatArray]:
+        """Initial values to try, best first (default: :meth:`guess` alone)."""
+        return [np.asarray(self.guess(x, y), dtype=np.float64)]
+
     def canonical(self, p: FloatArray, free: tuple[bool, ...]) -> FloatArray:
         """The same curve in its reported form (default: ``p`` itself). ``free`` marks
         the parameters that are free and unbounded, which alone may change."""
@@ -327,11 +331,19 @@ def fit_model(
     max_corr = math.nan
 
     norms = np.sqrt(np.sum(jac_free**2, axis=0))
-    if k and (not np.all(np.isfinite(norms)) or np.any(norms <= 1e-300)):
-        flat = [names[i] for i, z in zip(var_index, norms <= 1e-300, strict=True) if z]
+    no_effect = _no_effect(norms, p[var_index], y)
+    if k > 1 and tss == 0:
         status = FitStatus.AMBIGUOUS
         message = (
-            f"The fit is ambiguous: {', '.join(flat) or 'a parameter'} does not change the curve."
+            "The fit is ambiguous: every Y value is the same, so the data cannot "
+            "determine the shape of the curve."
+        )
+    elif k and (not np.all(np.isfinite(norms)) or np.any(no_effect)):
+        flat = [names[i] for i, z in zip(var_index, no_effect, strict=True) if z]
+        status = FitStatus.AMBIGUOUS
+        verb = "do" if len(flat) > 1 else "does"
+        message = (
+            f"The fit is ambiguous: {', '.join(flat) or 'a parameter'} {verb} not change the curve."
         )
     elif k:
         sv = np.linalg.svd(jac_free / norms, compute_uv=False)
@@ -370,6 +382,23 @@ def fit_model(
         model, status, message, names, free_t, p, se, ci_low, ci_high, n, df, rss,
         r_squared, sy_x, confidence, cov, max_corr,
     )  # fmt: skip
+
+
+NO_EFFECT = 1e-12
+"""A parameter whose change by max(|value|, 1) moves the curve (RMS over the points) by
+less than this times the RMS of Y does not change the curve beyond rounding."""
+
+
+def _no_effect(norms: FloatArray, values: FloatArray, y: FloatArray) -> npt.NDArray[np.bool_]:
+    """Free parameters that have no effect on the curve: their Jacobian column is 0, or
+    so small that the curve depends on them only at rounding level (e.g. the LogEC50 of
+    a phase whose span is ~1e-16)."""
+    n = max(len(y), 1)
+    y_scale = math.sqrt(float(np.dot(y, y)) / n)
+    effect = norms * np.maximum(np.abs(values), 1.0) / math.sqrt(n)
+    with np.errstate(invalid="ignore"):
+        tiny = effect <= NO_EFFECT * y_scale if y_scale > 0 else np.zeros(len(norms), bool)
+    return np.asarray((norms <= 1e-300) | tiny, dtype=np.bool_)
 
 
 def _near(value: float, limit: float) -> bool:

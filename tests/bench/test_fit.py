@@ -1,6 +1,7 @@
-"""Benchmarks for the curve fits. Target: a 4PL fit of 12 points × 20 series in < 200 ms
-(CLAUDE.md), run as the app runs it (``AnalysisType.run``: the fits, the Result table
-and the fitted curves with their confidence bands for graphs)."""
+"""Benchmarks for the curve fits. Target: 12 points × 20 series in < 200 ms for the 4PL
+(CLAUDE.md) and for every other nonlinear curve, run as the app runs it
+(``AnalysisType.run``: the fits, the Result table and the fitted curves with their
+confidence bands for graphs)."""
 
 from typing import Any
 
@@ -69,3 +70,62 @@ def test_linear_regression_12_points_by_20_series(benchmark: Any) -> None:
     result = benchmark(kind.run, AnalysisInputs("T", 12, series, x, "X"), kind.default_params())
     assert len(result.curves) == N_SERIES
     assert benchmark.stats.stats.mean < TARGET_S
+
+
+def curve_series(type_id: str) -> AnalysisInputs:
+    """20 series of 12 points of the curve of ``type_id``, parameters varied per series,
+    with realistic noise (3% of the span for the 7-parameter models, 5% otherwise)."""
+    from curvis.analysis.fit.analyses import NonlinearCurve
+
+    kind = base.get(type_id)
+    assert isinstance(kind, NonlinearCurve)
+    model = kind.spec().model
+    rng = np.random.default_rng(2)
+    designs: dict[str, tuple[Any, Any, float]] = {
+        "biphasic": (np.linspace(-10, -3, 12), [0, 100, 0.4, -8, -5, 1, 1], 3),
+        "bell_shaped": (np.linspace(-10, -3, 12), [0, 100, 10, -8, -5, 1, 1], 3),
+        "exp_association": (np.linspace(0, 30, 12), [5, 80, 0.2], 4),
+        "exp_decay": (np.linspace(0, 30, 12), [100, 10, 0.15], 4.5),
+        "michaelis_menten": (2.0 ** np.arange(-2, 10), [120, 6], 6),
+        "gaussian": (np.linspace(0, 20, 12), [5, 50, 10, 2.5], 2.5),
+    }
+    x, truth, sd = designs[type_id]
+    series = []
+    for i in range(N_SERIES):
+        p = np.asarray(truth, dtype=np.float64) * rng.uniform(0.95, 1.05, len(truth))
+        y = model.f(x, p) + rng.normal(0, sd, len(x))
+        series.append(SeriesData(f"s{i}", f"Series {i}", (y,)))
+    shown_x = 10.0**x if kind.spec().log_x else x
+    return AnalysisInputs("T", len(x), tuple(series), shown_x, "X")
+
+
+def fit_curves(benchmark: Any, type_id: str) -> None:
+    kind = base.get(type_id)
+    result = benchmark(kind.run, curve_series(type_id), kind.default_params())
+    fit_row = next(r for r in result.tables[0].rows if r[0] == "Fit")
+    assert fit_row[1:].count("OK") >= N_SERIES - 1
+    assert benchmark.stats.stats.mean < TARGET_S
+
+
+def test_biphasic_12_points_by_20_series(benchmark: Any) -> None:
+    fit_curves(benchmark, "biphasic")
+
+
+def test_bell_shaped_12_points_by_20_series(benchmark: Any) -> None:
+    fit_curves(benchmark, "bell_shaped")
+
+
+def test_exp_association_12_points_by_20_series(benchmark: Any) -> None:
+    fit_curves(benchmark, "exp_association")
+
+
+def test_exp_decay_12_points_by_20_series(benchmark: Any) -> None:
+    fit_curves(benchmark, "exp_decay")
+
+
+def test_michaelis_menten_12_points_by_20_series(benchmark: Any) -> None:
+    fit_curves(benchmark, "michaelis_menten")
+
+
+def test_gaussian_12_points_by_20_series(benchmark: Any) -> None:
+    fit_curves(benchmark, "gaussian")

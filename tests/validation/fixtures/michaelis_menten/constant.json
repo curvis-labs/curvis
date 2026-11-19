@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "analysis": "michaelis_menten",
+  "case": "constant",
+  "description": "Every velocity is 42: the fit has no minimum (Km -> 0).",
+  "generated_by": {
+    "script": "validation/r/scripts/michaelis_menten.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "jsonlite": "2.0.0",
+      "minpack.lm": "1.2.4",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "x": [0.25, 0.5, 1, 2, 4, 8, 16, 32, 64],
+    "y": [
+      [42, 42, 42, 42, 42, 42, 42, 42, 42],
+      [42, 42, 42, 42, 42, 42, 42, 42, 42]
+    ],
+    "fixed": {},
+    "x_min": "-Inf",
+    "x_max": "Inf",
+    "at": [0, 1, 5, 20, 50]
+  },
+  "expected": {
+    "fit_ok": [false],
+    "n": [18],
+    "df": ["NaN"],
+    "vmax": ["NaN"],
+    "vmax_se": ["NaN"],
+    "vmax_ci_lower": ["NaN"],
+    "vmax_ci_upper": ["NaN"],
+    "km": ["NaN"],
+    "km_se": ["NaN"],
+    "km_ci_lower": ["NaN"],
+    "km_ci_upper": ["NaN"],
+    "r_squared": ["NaN"],
+    "sy_x": ["NaN"],
+    "band_fit": ["NaN", "NaN", "NaN", "NaN", "NaN"],
+    "band_lower": ["NaN", "NaN", "NaN", "NaN", "NaN"],
+    "band_upper": ["NaN", "NaN", "NaN", "NaN", "NaN"]
+  },
+  "kinds": {
+    "fit_ok": "exact",
+    "n": "exact",
+    "df": "exact",
+    "vmax": "parameter",
+    "vmax_se": "parameter",
+    "vmax_ci_lower": "ci",
+    "vmax_ci_upper": "ci",
+    "km": "parameter",
+    "km_se": "parameter",
+    "km_ci_lower": "ci",
+    "km_ci_upper": "ci",
+    "r_squared": "statistic",
+    "sy_x": "parameter",
+    "band_fit": "parameter",
+    "band_lower": "ci",
+    "band_upper": "ci"
+  }
+}
