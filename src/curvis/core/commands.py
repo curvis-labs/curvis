@@ -27,7 +27,7 @@ from curvis.data import (
     name_error,
     normalized_order,
 )
-from curvis.data.column import coerce_cell, convert_values, writable
+from curvis.data.column import coerce_cell, convert_values, role_problem, writable
 from curvis.data.layout import column_category
 from curvis.data.names import name_key, unique_name
 
@@ -571,6 +571,16 @@ class SetColumnRole(Command):
                 f"Column '{column.name}' is calculated, so it holds numbers. "
                 "It cannot become a Text column."
             )
+        if self.role.is_numeric:
+            values = column.values
+            if not column.role.is_numeric:
+                values = convert_values(values, self.role)
+            bad = role_problem(values, self.role)
+            if bad is not None:
+                raise CommandError(
+                    f"Column '{column.name}' cannot have the role {self.role.value}. "
+                    f"Row {bad[0] + 1}: {bad[1]}."
+                )
         self._name = column.name
         self._old_role = column.role
         # Keep the old array only when it is replaced: an array still in the table can

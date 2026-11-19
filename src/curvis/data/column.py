@@ -57,31 +57,71 @@ def parse_number(text: str | None) -> float:
         return math.nan
 
 
+def value_problem(value: float, role: ColumnRole) -> str | None:
+    """Why the number ``value`` cannot be in a column with ``role`` (no full stop), or
+    None. Time values are 0 or more; Event values are 1 (event) or 0 (censored).
+    Missing values (NaN) are always allowed."""
+    if math.isnan(value):
+        return None
+    if role is ColumnRole.TIME and not value >= 0:
+        return f"A time cannot be negative ({format_number(value)})"
+    if role is ColumnRole.EVENT and value not in (0.0, 1.0):
+        return f"An event is 1 (event) or 0 (censored), not {format_number(value)}"
+    return None
+
+
+def role_problem(values: npt.NDArray[Any], role: ColumnRole) -> tuple[int, str] | None:
+    """The first row (0-based) of a numeric column whose value ``role`` does not allow,
+    with the reason, or None."""
+    if role not in (ColumnRole.TIME, ColumnRole.EVENT) or values.dtype != np.float64:
+        return None
+    if role is ColumnRole.TIME:
+        bad = ~np.isnan(values) & ~(values >= 0)
+    else:
+        bad = ~np.isnan(values) & (values != 0) & (values != 1)
+    if not bad.any():
+        return None
+    row = int(np.argmax(bad))
+    problem = value_problem(float(values[row]), role)
+    assert problem is not None
+    return row, problem
+
+
 def coerce_cell(value: CellValue, role: ColumnRole) -> CellValue:
     """Validate one cell value for a column with ``role``.
 
     Numeric columns accept numbers, numeric strings and ``None`` or ``""`` (missing,
-    stored as NaN). Text columns accept strings, numbers (stored as text) and ``None``.
+    stored as NaN); Time and Event columns only the values :func:`value_problem`
+    allows. Text columns accept strings, numbers (stored as text) and ``None``.
     Raises ``ValueError`` for anything else.
     """
     if role.is_numeric:
-        if value is None:
-            return math.nan
-        if isinstance(value, str):
-            if not value.strip():
-                return math.nan
-            try:
-                return float(value.strip())
-            except ValueError:
-                raise ValueError(f"'{value}' is not a number") from None
-        if isinstance(value, int | float):
-            return float(value)
-        raise ValueError(f"{value!r} is not a number")
+        number = _coerce_number(value)
+        problem = value_problem(number, role)
+        if problem is not None:
+            raise ValueError(problem)
+        return number
     if value is None or isinstance(value, str):
         return value
     if isinstance(value, int | float):
         return format_number(float(value))
     raise ValueError(f"{value!r} is not text")
+
+
+def _coerce_number(value: CellValue) -> float:
+    """``value`` as a number (NaN for missing); raises ``ValueError`` if it is none."""
+    if value is None:
+        return math.nan
+    if isinstance(value, str):
+        if not value.strip():
+            return math.nan
+        try:
+            return float(value.strip())
+        except ValueError:
+            raise ValueError(f"'{value}' is not a number") from None
+    if isinstance(value, int | float):
+        return float(value)
+    raise ValueError(f"{value!r} is not a number")
 
 
 def missing_value(role: ColumnRole) -> float | None:
@@ -208,3 +248,6 @@ class Column:
         expected = np.dtype(np.float64) if self.role.is_numeric else np.dtype(object)
         if self.values.dtype != expected:
             raise ValueError(f"column '{self.name}' holds {self.values.dtype}, expected {expected}")
+        bad = role_problem(self.values, self.role)
+        if bad is not None:
+            raise ValueError(f"column '{self.name}', row {bad[0] + 1}: {bad[1]}")

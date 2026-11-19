@@ -215,6 +215,30 @@ def test_text_in_a_number_column_is_refused(qtbot: QtBot, view: TableView, doc: 
     assert doc.undo_stack.count == 0
 
 
+def test_a_bad_event_value_is_refused(qtbot: QtBot, view: TableView, doc: Document) -> None:
+    messages: list[str] = []
+    view.error.connect(messages.append)
+    assert view.model().set_role([1], ColumnRole.EVENT) is False  # holds 10.5 and 20
+    assert messages == [
+        "Column 'Resp' cannot have the role Event. Row 1: An event is 1 (event) or 0 "
+        "(censored), not 10.5."
+    ]
+    assert view.model().set_role([0], ColumnRole.EVENT) is False  # holds 2 and 3
+    assert doc.tables[0].columns[0].role is ColumnRole.X
+    go(view, 0, 1)
+    type_text(qtbot, view, "1")
+    key(qtbot, view, Qt.Key.Key_Return)
+    go(view, 1, 1)
+    type_text(qtbot, view, "0")
+    key(qtbot, view, Qt.Key.Key_Return)
+    assert view.model().set_role([1], ColumnRole.EVENT) is True
+    go(view, 2, 1)
+    type_text(qtbot, view, "2")
+    key(qtbot, view, Qt.Key.Key_Return)
+    assert messages[-1] == "An event is 1 (event) or 0 (censored), not 2."
+    assert values(doc, "Resp") == [1.0, 0.0, None]
+
+
 def test_typing_below_the_data_adds_rows(qtbot: QtBot, view: TableView, doc: Document) -> None:
     go(view, 5, 1)
     type_text(qtbot, view, "1")
