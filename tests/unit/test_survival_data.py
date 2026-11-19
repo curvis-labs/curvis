@@ -229,3 +229,42 @@ def test_survival_chart_data_steps_bands_and_ticks() -> None:
     log_x = replace(spec, x_axis=replace(spec.x_axis, scale=Scale.LOG))
     (a_log,) = compute(gather(table, log_x, {})).survival
     assert a_log.px[0] == pytest.approx(math.log10(2))  # time 0 cannot be on a log axis
+
+
+# --- cross-checks ------------------------------------------------------------------------
+
+
+def test_z_is_qnorm_0_975() -> None:
+    from scipy.stats import norm
+
+    from curvis.analysis.survival.km import Z
+
+    assert norm.ppf(0.975) == Z
+
+
+@settings(max_examples=60, deadline=None)
+@given(
+    st.lists(st.tuples(st.integers(0, 15), st.booleans()), min_size=1, max_size=40),
+)
+def test_estimate_and_interval_match_lifelines(subjects: list[tuple[int, bool]]) -> None:
+    """Curvis computes the estimate with NumPy (validated against R); lifelines'
+    KaplanMeierFitter is the cross-check. Small integer times give many ties. Where S
+    is 0, lifelines gives the interval [0, 0] and R none (NaN), which Curvis follows."""
+    import warnings
+
+    from lifelines import KaplanMeierFitter
+
+    time = np.array([t for t, _ in subjects], dtype=np.float64)
+    event = np.array([e for _, e in subjects], dtype=np.float64)
+    r = kaplan_meier(time, event)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fitter = KaplanMeierFitter(alpha=0.05).fit(time, event)
+    index = np.searchsorted(np.asarray(fitter.timeline), r.time)
+    survival = fitter.survival_function_.to_numpy()[index, 0]
+    ci = fitter.confidence_interval_.to_numpy()[index]
+    np.testing.assert_allclose(r.survival, survival, rtol=1e-12, atol=1e-15)
+    defined = r.survival > 0
+    np.testing.assert_allclose(r.lower[defined], ci[defined, 0], rtol=1e-10, atol=1e-15)
+    np.testing.assert_allclose(r.upper[defined], ci[defined, 1], rtol=1e-10, atol=1e-15)
+    assert np.all(np.isnan(r.lower[~defined]) & (ci[~defined, 0] == 0))

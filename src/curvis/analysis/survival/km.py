@@ -2,14 +2,16 @@
 median survival with its interval, and numbers at risk.
 
 Validated against R's ``survival::survfit(conf.type = "log-log")`` and
-``quantile.survfit`` in ``validation/r/scripts/kaplan_meier.R``. lifelines
-(``KaplanMeierFitter``) computes the estimate and its interval; the rest follows R:
+``quantile.survfit`` in ``validation/r/scripts/kaplan_meier.R``, and cross-checked in
+the tests against lifelines' ``KaplanMeierFitter`` (a test-only dependency: it spends
+~11 ms per curve on pandas, too slow for a graph redraw). The definitions are R's:
 
 - Missing times or events (NaN) are left out. Times that differ only by rounding are
   one time, as with survfit's ``timefix = TRUE`` (:func:`merge_near_ties`, R's
   ``aeqSurv``).
 - At each distinct time t (events and censorings), n at risk is the number with time
   ≥ t; a censoring at the time of an event counts as at risk for it.
+- S(t) = product of (1 − d / n) over the times up to t, as survfit computes it.
 - The standard error of S is S·sigma, with Greenwood's sigma² = sum of d / (n (n − d)).
 - The interval is log-log: S^exp(∓z sigma / log S). Where S is 1 it is [1, 1]; where S is
   0 (every subject left had an event) there is no interval and no SE (NaN), as in R.
@@ -32,6 +34,10 @@ type IntArray = npt.NDArray[np.int64]
 METHOD = "Kaplan-Meier survival estimate"
 CI_METHOD = "log-log"
 CONFIDENCE = 0.95
+
+Z = 1.959963984540054
+"""qnorm(0.975): the 97.5% quantile of the standard normal distribution (checked against
+SciPy in the tests; a constant, so the estimate needs no SciPy import)."""
 
 TOLERANCE = math.sqrt(np.finfo(np.float64).eps)
 """R's ``sqrt(.Machine$double.eps)``: the tolerance of ``aeqSurv`` and ``quantile.survfit``."""
@@ -131,12 +137,16 @@ def kaplan_meier(time: npt.ArrayLike, event: npt.ArrayLike) -> KaplanMeier:
     n_censor = n_at - n_event
     n_risk = (len(t) - np.concatenate(([0], np.cumsum(n_at)[:-1]))).astype(np.int64)
 
-    survival, lower, upper = _lifelines_estimate(t, e, times)
+    survival = np.cumprod(1.0 - n_event / n_risk)
     with np.errstate(divide="ignore", invalid="ignore"):
         terms = n_event / (n_risk * (n_risk - n_event))
     terms[n_event == 0] = 0.0
     sigma = np.sqrt(np.cumsum(terms))
-    std_err = survival * sigma
+    with np.errstate(divide="ignore", invalid="ignore"):  # S = 0: 0 * inf, set to NaN below
+        std_err = survival * sigma
+        log_s = np.log(survival)
+        lower = survival ** np.exp(-Z * sigma / log_s)
+        upper = survival ** np.exp(Z * sigma / log_s)
     zero = survival == 0
     one = survival == 1
     std_err[zero] = np.nan
@@ -165,31 +175,6 @@ def kaplan_meier(time: npt.ArrayLike, event: npt.ArrayLike) -> KaplanMeier:
         median_lower=median_lower,
         median_upper=median_upper,
         subject_times=np.sort(t),
-    )
-
-
-def _lifelines_estimate(
-    t: FloatArray, e: IntArray, times: FloatArray
-) -> tuple[FloatArray, FloatArray, FloatArray]:
-    """S and its log-log interval at ``times``, from lifelines."""
-    import warnings
-
-    from lifelines import KaplanMeierFitter  # imported here: lifelines is slow to import
-
-    fitter = KaplanMeierFitter(alpha=1 - CONFIDENCE)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # lifelines warns about S = 0 in its CI
-        fitter.fit(t, e)
-    timeline = np.asarray(fitter.timeline, dtype=np.float64)
-    index = np.searchsorted(timeline, times)
-    if not np.array_equal(timeline[index], times):  # pragma: no cover - lifelines changed
-        raise RuntimeError("lifelines' timeline does not hold every time")
-    survival = np.array(fitter.survival_function_.to_numpy()[index, 0], dtype=np.float64)
-    ci = fitter.confidence_interval_.to_numpy()
-    return (
-        survival,
-        np.array(ci[index, 0], dtype=np.float64),
-        np.array(ci[index, 1], dtype=np.float64),
     )
 
 

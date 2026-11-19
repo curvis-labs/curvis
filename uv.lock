@@ -137,7 +137,6 @@ version = "0.1.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "lark" },
-    { name = "lifelines" },
     { name = "lmfit" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -154,6 +153,7 @@ build = [
 ]
 dev = [
     { name = "hypothesis" },
+    { name = "lifelines" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -166,7 +166,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "lark", specifier = ">=1.2" },
-    { name = "lifelines", specifier = ">=0.30" },
     { name = "lmfit", specifier = ">=1.3" },
     { name = "matplotlib", specifier = ">=3.9" },
     { name = "numpy", specifier = ">=2.5.4" },
@@ -181,6 +180,7 @@ requires-dist = [
 build = [{ name = "pyinstaller", specifier = ">=6.22.3" }]
 dev = [
     { name = "hypothesis", specifier = ">=6.100" },
+    { name = "lifelines", specifier = ">=0.30" },
     { name = "mypy", specifier = ">=1.13" },
     { name = "pre-commit", specifier = ">=4.0" },
     { name = "pytest", specifier = ">=8.3,<9.2" },

@@ -41,7 +41,6 @@ class KaplanMeierAnalysis(_AnalysisType):
     method = METHOD
     family = Family.SURVIVAL
     params_type = KaplanMeierParams
-    imports = ("lifelines",)
 
     def candidates(self, table: Table) -> list[InputChoice]:
         choices: list[InputChoice] = []

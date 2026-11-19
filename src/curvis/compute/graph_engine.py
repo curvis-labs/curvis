@@ -27,9 +27,6 @@ from curvis.data import ColumnRole, Table, series, survival_pairs
 
 type _Signature = tuple[ChartSpec, tuple[str, ...]]
 
-SURVIVAL_IMPORTS = ("lifelines",)
-"""Survival graphs compute Kaplan-Meier curves with lifelines (imported lazily)."""
-
 
 def graph_reads(table: Table, spec: ChartSpec) -> list[str]:
     """What a graph reads: its table, the columns it draws, the fits it overlays and the
@@ -152,8 +149,7 @@ class GraphEngine(QObject):
             raise ValueError("The table of this graph was deleted.") from None
         results = self.analysis_engine.results if self.analysis_engine is not None else {}
         inputs = gather(table, spec, results)
-        imports = SURVIVAL_IMPORTS if spec.family is ChartFamily.SURVIVAL else ()
-        return NodeJob(Job(compute, (inputs,), imports=imports))
+        return NodeJob(Job(compute, (inputs,)))
 
     # --- following the recalculator ----------------------------------------------------
 
