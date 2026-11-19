@@ -577,8 +577,8 @@ Make a plan first. When done, report validation results.
 ### Step 3.5 — Remaining charts and settings
 
 **Done when**
-- [ ] Horizontal bar, violin, histogram and grouped bar/horizontal bar/box/violin charts work and export.
-- [ ] Color schemes, palette editor, custom size, chart font, and all settings in SPEC.md work (the import decimal mark comes in step 3.6, the autosave interval in step 4.1).
+- [x] Horizontal bar, violin, histogram and grouped bar/horizontal bar/box/violin charts work and export.
+- [x] Color schemes, palette editor, custom size, chart font, and all settings in SPEC.md work (the import decimal mark comes in step 3.6, the autosave interval in step 4.1).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.5 in docs/PHASES.md.
