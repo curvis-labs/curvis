@@ -1,6 +1,6 @@
 # Curvis — build phases and Claude Code prompts
 
-Curvis is built in 5 phases and 29 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
+Curvis is built in 5 phases and 30 steps. Each step is one Claude Code session that ends in a working, tested state. Each phase ends with a gate you check yourself before moving on.
 
 | Phase | Steps | Ends with (gate) |
 | --- | --- | --- |
@@ -8,7 +8,7 @@ Curvis is built in 5 phases and 29 steps. Each step is one Claude Code session t
 | 1 Data tables | 1.1–1.6 | You can type, paste, import and calculate data comfortably; dialogs follow one design |
 | 2 Core analyses + MVP | 2.1–2.9 | MVP beta: core tests match R, speed targets met |
 | 3 Full outline | 3.1–3.7 | Every feature in SPEC.md works |
-| 4 Release 1.0 | 4.1–4.2 | Validation report published, 1.0 installers released |
+| 4 Release 1.0 | 4.1–4.3 | Validation report published, 1.0 installers released |
 
 ## How to use this file
 
@@ -578,7 +578,7 @@ Make a plan first. When done, report validation results.
 
 **Done when**
 - [ ] Horizontal bar, violin, histogram and grouped bar/horizontal bar/box/violin charts work and export.
-- [ ] Color schemes, palette editor, custom size, and all settings in SPEC.md work.
+- [ ] Color schemes, palette editor, custom size, chart font, and all settings in SPEC.md work (the import decimal mark comes in step 3.6, the autosave interval in step 4.1).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.5 in docs/PHASES.md.
@@ -586,7 +586,11 @@ Read CLAUDE.md, docs/SPEC.md and step 3.5 in docs/PHASES.md.
 Complete graphs and settings from SPEC.md:
 - Chart variants: horizontal bar, violin, histogram (with bin control), and grouped bar, horizontal bar, box and violin for category groups, in both renderers, with image-diff tests.
 - Color schemes for charts and a palette editor; default palette for new columns and series.
-- Settings: default chart aspect ratio, chart text size, default palette (theme and decimal places exist already).
+- Chart font in the chart spec and the Format dialog, drawn the same by both renderers.
+- Settings: default graph size, chart font, chart text size, default palette, P-value display, default export format and PNG resolution, Clear recent projects, and Reset to defaults (theme, decimal places and crash log exist already). New graphs copy the graph settings into their chart spec; existing graphs never change when a setting changes. Tests for both.
+
+Decisions to confirm with me before coding:
+- Which fonts the chart font offers, and which are bundled so that screen, export and image-diff tests match on every platform (licences must allow bundling).
 
 Make a plan first. When done, report what you built and image-diff results.
 ```
@@ -596,6 +600,7 @@ Make a plan first. When done, report what you built and image-diff results.
 **Done when**
 - [ ] .xlsx and .xls import through the same preview dialog (sheet picker added).
 - [ ] Data tables from Prism .pzfx and .prism files import with sensible column roles and groups.
+- [ ] The preview dialog has a decimal mark choice (auto-detect, point, comma) with its default in Settings.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.6 in docs/PHASES.md.
@@ -604,6 +609,7 @@ Extend import:
 - Excel: .xlsx via fastexcel, .xls via xlrd, through the existing preview dialog with an added sheet picker.
 - Prism .pzfx: data tables are XML at the start of the file. Map Prism table types (XY, column, grouped, survival) and subcolumns (replicates, mean/SD/N) to Curvis roles, replicate groups and category groups. Use the open-source R package pzfx as a reference for the structure; do not copy its code.
 - Prism .prism: data is stored as CSV inside the file with JSON metadata. Import data tables the same way.
+- Decimal mark: add auto-detect, point or comma to the preview dialog for CSV/TSV and for text cells in Excel, and a default decimal mark in Settings. Auto-detect must not mistake a thousands separator for a decimal mark (e.g. "1,234"); when unsure, use the Settings default and say so in the preview. Tests with semicolon-delimited, comma-decimal files.
 - Analyses and graph styling are not imported; show a short note saying so.
 - Tests with real Prism files I will put in tests/data/prism (ask me for them before you start). Never include Prism files you did not receive from me.
 
@@ -646,18 +652,40 @@ Make a plan first. When done, report what changed, the screenshots, test and ben
 
 ## Phase 4 — Release 1.0
 
-### Step 4.1 — Robustness, accessibility and documentation
+### Step 4.1 — Autosave and crash recovery
 
 **Done when**
-- [ ] Autosave and crash recovery work; old-version project files open.
+- [ ] Open projects with unsaved changes, including never-saved ones, are written as recovery copies at the interval set in Settings, without blocking the UI.
+- [ ] After a crash or a killed process, the launcher offers each recovered project; opening it restores the work, discarding it deletes the copy.
+- [ ] A normal save, close or discard leaves no recovery copy behind, and a recovery copy never overwrites a project file.
+
+```text
+Read CLAUDE.md, docs/SPEC.md (Autosave and recovery, Settings) and step 4.1 in docs/PHASES.md.
+
+Build autosave and recovery in src/curvis/io and the launcher:
+- Recovery copies are ordinary .cvp files (same writer, temp file then rename) in the app data folder (QStandardPaths.AppDataLocation), one per open document, with a small sidecar holding the original path, the project name, the time of the copy and the original file's modification time when the document was last saved or opened.
+- A timer per document writes a copy only when there are unsaved changes since the last copy. Snapshot the document on the UI thread (plain data, cheap) and write it through compute.scheduler so the UI never waits; a newer copy of the same document cancels an older one still being written.
+- Saving, closing or discarding a document deletes its copy. A clean exit leaves the folder empty; a lock file marks a running session, so copies left by a session that is still running (a second Curvis window) are not offered.
+- Launcher: when recovery copies are found at start-up, a "Recovered projects" section above the recent projects lists each with its name and the time of the copy (relative, as for recent projects), with Open and Discard. Opening one opens it with unsaved changes and its original path; Save writes there, and warns first if that file's modification time is newer than the one in the sidecar. Never-saved projects open as untitled.
+- A copy that cannot be read is listed as "Cannot be recovered" with Discard only; it never stops the app from starting.
+- Unclaimed recovery copies are kept until the user opens or discards them; nothing removes them automatically.
+- Settings: autosave interval (1–30 minutes, default 3) in the Settings dialog; a change applies to open documents at once. Autosave cannot be turned off.
+- Tests: copies are written only when there are changes, not while nothing changed, and deleted on save, close and discard; a subprocess test that kills the app mid-session and checks recovery on the next start; a damaged copy; the "file changed since" warning; a benchmark that writing a copy of a 10 MB project does not block the UI thread for more than 16 ms.
+
+Make a plan first. When done, report what you built, test and benchmark results.
+```
+
+### Step 4.2 — Robustness, accessibility and documentation
+
+**Done when**
+- [ ] Old-version project files open.
 - [ ] Screen-reader labels and full keyboard access are in place.
 - [ ] User guide covers every feature.
 
 ```text
-Read CLAUDE.md, docs/SPEC.md and step 4.1 in docs/PHASES.md.
+Read CLAUDE.md, docs/SPEC.md and step 4.2 in docs/PHASES.md.
 
 Prepare for 1.0:
-- Autosave a recovery copy every 3 minutes; offer recovery on next start after a crash.
 - Migration tests: projects saved by every previous schema version open correctly.
 - Accessibility: accessible names for all controls, full keyboard operation, sufficient contrast in both themes.
 - Final performance pass against every target in CLAUDE.md.
@@ -666,7 +694,7 @@ Prepare for 1.0:
 Make a plan first. When done, report results for each item.
 ```
 
-### Step 4.2 — Validation report and 1.0 release
+### Step 4.3 — Validation report and 1.0 release
 
 **Gate for phase 4:** you read the validation report and approve the release.
 
@@ -675,7 +703,7 @@ Make a plan first. When done, report results for each item.
 - [ ] Signed installers for Windows and macOS and an AppImage for Linux are attached to the v1.0.0 release.
 
 ```text
-Read CLAUDE.md, docs/SPEC.md and step 4.2 in docs/PHASES.md.
+Read CLAUDE.md, docs/SPEC.md and step 4.3 in docs/PHASES.md.
 
 Release 1.0:
 - A script that runs tests/validation and writes docs/validation-report.md (and a PDF): each analysis, the R function and package versions used, number of fixtures, the largest difference found per output, and the approved exceptions from TOLERANCES.md.

@@ -34,7 +34,7 @@ Columns can be organized further:
 
 Columns and column groups are movable by drag and drop.
 
-**Import.** CSV, TSV and Excel (.xlsx and .xls) files load through a preview dialog where you pick the header row and the delimiter (auto-detect, comma, semicolon, tab or space), and optionally the range of rows and columns to import.
+**Import.** CSV, TSV and Excel (.xlsx and .xls) files load through a preview dialog where you pick the header row, the delimiter (auto-detect, comma, semicolon, tab or space) and the decimal mark (auto-detect, point or comma; the default comes from Settings), and optionally the range of rows and columns to import.
 
 **Calculated columns.** The Calculate dialog adds derived columns from four ready-made calculations or a custom formula:
 
@@ -90,7 +90,7 @@ The Format dialog controls:
 - Each axis: title, range, label, linear or log scale, and the angle of the X tick labels (Auto, horizontal, 45° or 90°; Auto turns them when they do not fit side by side)
 - Each series: symbol, symbol size, line style, line width, color, error-bar type and whether it is listed in the legend; series can be added, removed and reordered
 - Fitted curves laid over the graph, listed with the series; they can be removed
-- Color scheme and chart text size
+- Color scheme, chart font and chart text size
 
 The graph's page leaves room for everything it shows: tick labels that reach past the plot get a margin, turned labels too long for the page are shortened with "…", and a legend too wide for the right of the plot goes under it.
 
@@ -107,7 +107,18 @@ Clicking a legend entry on XY and survival charts toggles that series on or off.
 - **Toolbars.** A main toolbar with New project, Open project, Save project, Undo and Redo, and a table toolbar with Import data, Add column, Group as replicates, Set category, Calculate, Plot and Analyze. Plot opens the chart families to pick from. Every toolbar button is also in the menus and the command palette.
 - **Launcher.** On start-up, and whenever no project is open, a launcher screen shows a row of tiles to start from (a blank project and the sample projects, each sample with a small picture of its graph), an Open button, and a list of recent projects with their folder and a relative timestamp (e.g. "2 days ago"). A recent project opens with one click; right-clicking it offers to remove it from the list (the file is kept). A missing file is shown as "File not found".
 - **Undo and redo.** Each document keeps up to 50 undo steps.
-- **Settings.** Theme (light, dark or follow the system), default color palette for new columns and series (with a palette editor), default graph size, chart text size, and the number of decimal places shown in calculated columns.
+- **Autosave and recovery.** Every few minutes (3 by default, set in Settings), each open project with unsaved changes, including one never saved, is written as a recovery copy to the app's own data folder. A recovery copy never replaces the project file and is deleted when the project is saved, closed or its changes discarded. If Curvis did not close normally, the launcher shows the recovered projects with their name and the time of the copy; each can be opened or discarded, and copies are kept until then. A recovered project opens with unsaved changes, and Save writes to its original file, after a warning if that file was changed since the copy was made. Its undo history starts empty; its change log is kept.
+- **Settings.**
+  - Appearance: theme (light, dark or follow the system).
+  - New graphs: default color palette for new columns and series (with a palette editor), default graph size (one of the Format dialog's sizes or a custom width and height), chart font and chart text size.
+  - Tables: the number of decimal places shown in calculated columns, and the default decimal mark for import (point or comma).
+  - Results: how P values are shown: "P < 0.001" (the default), "P < 0.0001", or exact (e.g. 2.3 × 10⁻⁷). This changes only the display; stored results keep full precision, and the significance stars do not change.
+  - Export: default file format and PNG resolution, filled in by the Export dialog.
+  - Projects: how often to autosave a recovery copy (1–30 minutes, default 3; autosave is always on), and *Clear recent projects*, which asks first and keeps the files.
+  - Privacy: keep a local crash log (off by default; nothing is sent).
+  - *Reset to defaults* asks first and restores every setting above; recent projects, global constants and recovery copies are kept.
+
+  Settings only give starting values. A new graph copies the palette, size, font and text size into its own definition, so changing a setting later does not change existing graphs, and a project looks the same on every computer. Only the theme and the display of numbers and P values follow the current settings.
 
 ## Planned after 1.0
 
