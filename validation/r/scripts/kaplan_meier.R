@@ -17,7 +17,8 @@
 #   and sigma is infinite or undefined.
 # - 95% confidence interval, conf.type = "log-log" (lifelines' interval, chosen for
 #   Curvis by the project owner): with z = qnorm(0.975),
-#     lower = S^exp( z sigma / log S),  upper = S^exp(-z sigma / log S).
+#     lower = S^exp(-z sigma / log S),  upper = S^exp( z sigma / log S).
+#   (log S < 0, so the exponent of the lower limit is above 1 and the limit below S.)
 #   Where S is 0 or 1 survfit gives no interval from this formula; the fixtures record
 #   whatever survfit returns there (NA becomes "NaN").
 # - Median survival (quantile.survfit, probs = 0.5): the first time S(t) <= 0.5. Where S
@@ -72,8 +73,8 @@ km_case <- function(case, description, time, event, risk_times = NULL) {
   inner <- finite & surv < 1 & is.finite(fit$lower) & is.finite(fit$upper)
   if (any(inner)) {
     s <- surv[inner]
-    lower <- s^exp(Z * sigma[inner] / log(s))
-    upper <- s^exp(-Z * sigma[inner] / log(s))
+    lower <- s^exp(-Z * sigma[inner] / log(s))
+    upper <- s^exp(Z * sigma[inner] / log(s))
     stopifnot(isTRUE(all.equal(fit$lower[inner], lower, tolerance = 1e-12)),
               isTRUE(all.equal(fit$upper[inner], upper, tolerance = 1e-12)))
   }
