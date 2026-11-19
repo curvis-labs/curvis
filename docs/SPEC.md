@@ -80,7 +80,7 @@ Graphs are drawn directly from a data table. You pick a chart family from the to
 | Chart family | Variants |
 | --- | --- |
 | XY | Scatter and line plots with SD or SEM error bars, and fitted curves overlaid |
-| Bar | Bar, horizontal bar, box, violin and histogram; grouped bar, horizontal bar, box and violin for category groups |
+| Bar | Bar, horizontal bar, box, violin, scatter and histogram; grouped bar, horizontal bar, box and violin for category groups; option to show individual values with symbols |
 | Survival | Kaplan-Meier step curves with confidence bands |
 | Interaction | Plot of two-way ANOVA results |
 
