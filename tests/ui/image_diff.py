@@ -28,7 +28,6 @@ import numpy.typing as npt
 from PIL import Image, ImageFilter
 from PySide6.QtGui import QImage
 
-from curvis.charts.colors import scheme
 from curvis.charts.data import ChartData
 from curvis.charts.render_mpl.export import render_image
 from curvis.charts.render_qt.chart_view import render_page
