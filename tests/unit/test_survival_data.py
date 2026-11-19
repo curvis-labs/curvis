@@ -268,3 +268,29 @@ def test_estimate_and_interval_match_lifelines(subjects: list[tuple[int, bool]])
     np.testing.assert_allclose(r.lower[defined], ci[defined, 0], rtol=1e-10, atol=1e-15)
     np.testing.assert_allclose(r.upper[defined], ci[defined, 1], rtol=1e-10, atol=1e-15)
     assert np.all(np.isnan(r.lower[~defined]) & (ci[~defined, 0] == 0))
+
+
+def test_survival_tooltips() -> None:
+    from curvis.charts.builder import default_spec
+    from curvis.charts.data import compute, gather
+    from curvis.charts.spec import ChartFamily
+    from curvis.charts.tooltips import describe_censored, describe_step, step_at
+
+    table = make(("Days", T, [2, 3, 3, 5]), ("A", E, [1, 0, 1, 1]))
+    (curve,) = compute(gather(table, default_spec(table, ChartFamily.SURVIVAL), {})).survival
+    assert [step_at(curve, x) for x in (0.0, 1.9, 2.0, 4.0, 5.0, 9.0)] == [-1, -1, 0, 1, 2, 2]
+    assert describe_step(curve, -1, "Days") == "A\nDays: 0 to 2\nSurvival: 1\nAt risk: 4"
+    assert describe_step(curve, 1, "Days").splitlines() == [
+        "A",
+        "Days: 3 to 5",
+        "Survival: 0.5000",
+        "95% CI: 0.05785 to 0.8449",  # sigma = 0.5: 0.5^exp(±1.96 · 0.5 / ln 0.5)
+        "At risk: 3, events: 1, censored: 1",
+    ]
+    # S = 0 has no interval, so no CI line; the last step has no end
+    assert describe_step(curve, 2, "Days") == (
+        "A\nDays: 5\nSurvival: 0\nAt risk: 1, events: 1, censored: 0"
+    )
+    assert describe_censored(curve, 1, "Days") == (
+        "A · 1 censored subject\nDays: 3\nSurvival: 0.5000\nAt risk: 3"
+    )

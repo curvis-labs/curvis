@@ -34,6 +34,7 @@ import numpy.typing as npt
 
 from curvis.analysis.base import x_column_id
 from curvis.analysis.result import CellMeans, FittedCurve, Result
+from curvis.analysis.survival.km import KaplanMeier, kaplan_meier
 from curvis.charts.spec import ChartFamily, ChartSpec, ChartVariant, ErrorBars, Scale
 from curvis.data import Table, name_key, row_stats, series, survival_pairs
 
@@ -253,6 +254,11 @@ class SurvivalCurveData:
     n_events: int
     median: float
     """Median survival in the units of the Time column (NaN: not reached)."""
+    km: KaplanMeier
+    """The estimate the curve draws, in the units of the Time column (for tooltips)."""
+    ptime: FloatArray
+    """``km.time`` in plot coordinates (−inf for time 0 on a log axis), to find the step
+    under the pointer."""
 
 
 @dataclass(frozen=True)
@@ -489,8 +495,6 @@ def _steps(times: FloatArray, values: FloatArray) -> tuple[FloatArray, FloatArra
 
 
 def _survival(inputs: ChartInputs) -> tuple[tuple[SurvivalCurveData, ...], list[str]]:
-    from curvis.analysis.survival.km import kaplan_meier
-
     spec = inputs.spec
     x_scale, y_scale = spec.x_axis.scale, spec.y_axis.scale
     out: list[SurvivalCurveData] = []
@@ -525,6 +529,8 @@ def _survival(inputs: ChartInputs) -> tuple[tuple[SurvivalCurveData, ...], list[
                 n=km.n,
                 n_events=km.n_events,
                 median=km.median,
+                km=km,
+                ptime=_to_plot(km.time, x_scale),
             )
         )
     return tuple(out), problems

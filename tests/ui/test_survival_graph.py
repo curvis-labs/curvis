@@ -3,6 +3,7 @@ redrawing after an edit, and export (step 3.4)."""
 
 from pathlib import Path
 
+import numpy as np
 import pyqtgraph as pg
 import pytest
 from pytestqt.qtbot import QtBot
@@ -91,3 +92,41 @@ def test_survival_graph_exports(
     path = tmp_path / f"survival.{fmt.value}"
     export_graph(graph, data, str(path), fmt.value, 300)
     assert path.stat().st_size > 1000
+
+
+def test_hovering_a_step_or_a_censor_tick_shows_its_numbers(
+    window: MainWindow, tab: DocumentTab, qtbot: QtBot
+) -> None:
+    from PySide6.QtCore import QPointF
+
+    window.registry.action("graph.new.survival").trigger()
+    settle(qtbot, tab)
+    chart = chart_of(tab)
+    vb = chart.plot_item.vb
+    drug = tab.graph_engine.data[tab.document.graphs[0].id].survival[0]  # type: ignore[union-attr]
+    km = drug.km
+    j = int(np.flatnonzero(km.time == 20)[0])  # Drug is flat from 20 to 22; Placebo ended at 17
+    flat = vb.mapViewToScene(QPointF(21.0, float(km.survival[j])))
+    text = chart.tooltip_at(flat)
+    assert text is not None
+    lines = text.splitlines()
+    assert lines[:2] == ["Drug", "Days (d): 20 to 22"]
+    assert lines[2] == f"Survival: {float(km.survival[j]):.4f}"
+    assert lines[3].startswith("95% CI: ")
+    assert lines[4] == f"At risk: {km.n_risk[j]}, events: 0, censored: 1"
+
+    last = len(km.time) - 1
+    tick = vb.mapViewToScene(QPointF(25.0, float(km.survival[last])))
+    assert chart.tooltip_at(tick) == "\n".join(
+        [
+            "Drug · 1 censored subject",
+            "Days (d): 25",
+            f"Survival: {float(km.survival[last]):.4f}",
+            "At risk: 1",
+        ]
+    )
+    assert chart.tooltip_at(vb.mapViewToScene(QPointF(21.0, 0.95))) is None  # far from both
+
+    click_legend(qtbot, chart, 0)  # a hidden curve has no tooltip
+    settle(qtbot, tab)
+    assert chart_of(tab).tooltip_at(flat) is None
