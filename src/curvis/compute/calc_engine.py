@@ -22,6 +22,7 @@ errors leave the column empty (NaN) and are kept in :attr:`CalcEngine.errors`.
 
 from __future__ import annotations
 
+import contextlib
 import math
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
@@ -43,7 +44,7 @@ from curvis.core import (
     UndoEvent,
     constant_node,
 )
-from curvis.data import Table, role_values
+from curvis.data import AmbiguousColumnError, Table, resolve_reference, role_values
 
 type _Signature = tuple[object, ...]
 
@@ -220,9 +221,13 @@ class CalcEngine(QObject):
         formula = parse(calculation.formula)
         columns: dict[str, npt.NDArray[Any]] = {}
         for name in formula.columns:
-            column = table.column_by_name(name)
-            if column is not None:
-                columns[name] = column.values.copy()
+            try:
+                column = resolve_reference(table, name)
+            except AmbiguousColumnError as exc:
+                raise ValueError(str(exc)) from None
+            except LookupError:
+                continue  # evaluating reports the unknown column, with its place
+            columns[name] = column.values.copy()
         try:
             roles = role_values(table, calculation.pairing, index, set(formula.roles))
         except KeyError:
@@ -279,9 +284,8 @@ def _reads(calculation: Calculation, output: CalculatedColumn, table: Table) -> 
         return []
     reads: list[str] = []
     for name in formula.columns:
-        column = table.column_by_name(name)
-        if column is not None:
-            reads.append(column.id)
+        with contextlib.suppress(LookupError):
+            reads.append(resolve_reference(table, name).id)
     index = calculation.target_index(output)
     if index >= 0:
         sources = calculation.pairing.role_sources(index)
@@ -294,6 +298,8 @@ def _reads(calculation: Calculation, output: CalculatedColumn, table: Table) -> 
 def _cycle_message(error: CycleError, document: Document) -> str:
     names: list[str] = []
     for node in error.path:
-        name = next((c.name for t in document.tables for c in t.columns if c.id == node), node)
+        name = next(
+            (t.full_name(c) for t in document.tables for c in t.columns if c.id == node), node
+        )
         names.append(name)
     return "The formula depends on its own result: " + " → ".join(names)

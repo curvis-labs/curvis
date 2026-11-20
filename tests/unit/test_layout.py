@@ -112,7 +112,7 @@ def test_group_names_are_unique_per_category() -> None:
 
 def test_name_rules() -> None:
     table = make_table("a.A.K b.B.L c")
-    assert name_error(table, column_names={"a": "C"}) == "There is already a column called 'C'."
+    assert name_error(table, column_names={"a": "C"}) == "There is already a column called 'c'."
     assert name_error(table, column_names={"a": "c", "c": "a"}) is None  # a swap is fine
     assert name_error(table, column_names={"a": " "}) == "A column name cannot be blank."
     k = table.category_groups[0]

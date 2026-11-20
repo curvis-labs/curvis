@@ -122,7 +122,7 @@ def test_table_check_detects_problems() -> None:
         Table(
             "T", [Column.new("A", ColumnRole.Y, [1]), Column.new("B", ColumnRole.Y, [1, 2])]
         ).check()
-    with pytest.raises(ValueError, match="duplicate column names"):
+    with pytest.raises(ValueError, match="already a column called"):
         Table("T", [Column.new("A", ColumnRole.Y), Column.new("A", ColumnRole.Y)]).check()
     with pytest.raises(ValueError, match="duplicate column ids"):
         Table(
@@ -131,7 +131,7 @@ def test_table_check_detects_problems() -> None:
 
 
 def test_table_check_detects_names_differing_only_in_case() -> None:
-    with pytest.raises(ValueError, match="duplicate column names"):
+    with pytest.raises(ValueError, match="already a column called"):
         Table("T", [Column.new("Dose", ColumnRole.Y), Column.new("dose", ColumnRole.Y)]).check()
 
 

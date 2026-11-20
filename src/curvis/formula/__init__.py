@@ -18,7 +18,7 @@ from curvis.formula.constants import (
 )
 from curvis.formula.errors import FormulaError
 from curvis.formula.parser import Formula, parse, warm_up
-from curvis.formula.rewrite import rename_columns
+from curvis.formula.rewrite import column_refs, rename_columns
 
 __all__ = [
     "BUILTIN_CONSTANTS",
@@ -32,6 +32,7 @@ __all__ = [
     "RoleRef",
     "RoleStat",
     "check",
+    "column_refs",
     "compile_formula",
     "constant_name_problem",
     "evaluate",

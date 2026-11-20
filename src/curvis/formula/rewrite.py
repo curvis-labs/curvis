@@ -21,22 +21,23 @@ def rename_columns(text: str, renames: Mapping[str, str]) -> str:
         root = parse(text).root
     except FormulaError:
         return text
-    refs = [n for n in _column_refs(root) if name_key(n.name) in by_key]
+    refs = [n for n in column_refs(root) if name_key(n.name) in by_key]
     for ref in sorted(refs, key=lambda n: n.span.start, reverse=True):
         new = "[" + by_key[name_key(ref.name)].replace("]", "]]") + "]"
         text = text[: ref.span.start] + new + text[ref.span.end :]
     return text
 
 
-def _column_refs(node: Node) -> Iterator[ColumnRef]:
+def column_refs(node: Node) -> Iterator[ColumnRef]:
+    """Every column reference in the tree under ``node``, in the order written."""
     match node:
         case ColumnRef():
             yield node
         case Unary(_, operand):
-            yield from _column_refs(operand)
+            yield from column_refs(operand)
         case Binary(_, left, right):
-            yield from _column_refs(left)
-            yield from _column_refs(right)
+            yield from column_refs(left)
+            yield from column_refs(right)
         case Call(_, args):
             for arg in args:
-                yield from _column_refs(arg)
+                yield from column_refs(arg)
