@@ -611,7 +611,6 @@ Columns in a category:
 - SetCategory: leaving a category sets the name to the full name; entering one drops a leading "category: " that matches it; moving into a category that has a series of that name is refused. Undo restores names exactly.
 - Formulas: [Male: Control] always resolves; [Control] resolves when one column has that short name, otherwise an error that lists the full names. Renaming a category or moving a column rewrites formulas (curvis.formula.rewrite), in the same command.
 - Lookups by name (column_by_name, the Calculate dialog's lists, bulk rename, copy with headers, CSV export) use full names; the header, graphs, legends and results show short names (series are matched across categories by short name, as now).
-- Fix SetCategory's redo with names that need trimming (e.g. "0\r"): it can give the category a new id; tests/unit/test_model_hypothesis.py finds it.
 
 Empty columns:
 - Their headers show the names they would get (next_column_names), dimmed, with no role.
