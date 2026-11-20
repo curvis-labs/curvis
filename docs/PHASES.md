@@ -578,7 +578,7 @@ Make a plan first. When done, report validation results.
 
 **Done when**
 - [x] Horizontal bar, violin, histogram and grouped bar/horizontal bar/box/violin charts work and export.
-- [x] Color schemes, palette editor, custom size, chart font, and all settings in SPEC.md work (the import decimal mark comes in step 3.6, the autosave interval in step 4.1).
+- [x] Color schemes, palette editor, custom size, chart font, and all settings in SPEC.md work (the import decimal mark comes in step 3.7, the autosave interval in step 4.1).
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.5 in docs/PHASES.md.
@@ -595,7 +595,35 @@ Decisions to confirm with me before coding:
 Make a plan first. When done, report what you built and image-diff results.
 ```
 
-### Step 3.6 — Excel and Prism import
+### Step 3.6 — Columns in categories, empty columns
+
+**Done when**
+- [ ] Y columns can be put in a category directly, with the same name in every category; full names ("Male: Control") are unique and used by formulas, copy and export.
+- [ ] Renaming a category, taking a column out of one or moving it into one keeps names unique, rewrites formulas, and undoes exactly.
+- [ ] The empty columns right of the table show their names and take typing, pasting and naming where the user does it.
+
+```text
+Read CLAUDE.md, docs/SPEC.md (Data tables and formulas: Columns in a category, Empty columns) and step 3.6 in docs/PHASES.md.
+
+Columns in a category:
+- A column keeps its short name and its category (as now); its full name is derived: "category: name", or the name for a column outside every category. Do not store the full name, and change neither the .cvp format nor schema_version.
+- Uniqueness: full names unique in the table, ignoring case (curvis.data.layout), checked in every command that names, moves or categorises a column, with a plain message ("There is already a column called 'Male: Control'.").
+- SetCategory: leaving a category sets the name to the full name; entering one drops a leading "category: " that matches it; moving into a category that has a series of that name is refused. Undo restores names exactly.
+- Formulas: [Male: Control] always resolves; [Control] resolves when one column has that short name, otherwise an error that lists the full names. Renaming a category or moving a column rewrites formulas (curvis.formula.rewrite), in the same command.
+- Lookups by name (column_by_name, the Calculate dialog's lists, bulk rename, copy with headers, CSV export) use full names; the header, graphs, legends and results show short names (series are matched across categories by short name, as now).
+- Fix SetCategory's redo with names that need trimming (e.g. "0\r"): it can give the category a new id; tests/unit/test_model_hypothesis.py finds it.
+
+Empty columns:
+- Their headers show the names they would get (next_column_names), dimmed, with no role.
+- Typing or pasting into one adds it and any empty columns before it as Y columns, in the same command, with the value where it was typed (no longer moved left).
+- Double-clicking a spare header names it and adds the column.
+
+Tests: unit tests of the rules and commands (undo and redo of every case), formula resolution and rewriting, and pytest-qt tests of the header and of typing into a spare column. Extend the Hypothesis model test to put columns in categories.
+
+Make a plan first. When done, report what changed and any formulas the rules make ambiguous.
+```
+
+### Step 3.7 — Excel and Prism import
 
 **Done when**
 - [ ] .xlsx and .xls import through the same preview dialog (sheet picker added).
@@ -603,7 +631,7 @@ Make a plan first. When done, report what you built and image-diff results.
 - [ ] The preview dialog has a decimal mark choice (auto-detect, point, comma) with its default in Settings.
 
 ```text
-Read CLAUDE.md, docs/SPEC.md and step 3.6 in docs/PHASES.md.
+Read CLAUDE.md, docs/SPEC.md and step 3.7 in docs/PHASES.md.
 
 Extend import:
 - Excel: .xlsx via fastexcel, .xls via xlrd, through the existing preview dialog with an added sheet picker.
@@ -616,7 +644,7 @@ Extend import:
 Make a plan first. When done, report which Prism table types import and any that do not.
 ```
 
-### Step 3.7 — Analyze dialog redesign
+### Step 3.8 — Analyze dialog redesign
 
 **Gate for phase 3:** every item in SPEC.md works; check it line by line.
 
@@ -627,7 +655,7 @@ Make a plan first. When done, report which Prism table types import and any that
 - [ ] Projects saved before this step open unchanged, and the dialog fits 900 × 640 in light and dark themes with Advanced open.
 
 ```text
-Read CLAUDE.md, docs/SPEC.md, docs/DESIGN.md (section 11) and step 3.7 in docs/PHASES.md, and open docs/mockups/analyze-dialog.html.
+Read CLAUDE.md, docs/SPEC.md, docs/DESIGN.md (section 11) and step 3.8 in docs/PHASES.md, and open docs/mockups/analyze-dialog.html.
 
 Rebuild the Analyze dialog (src/curvis/ui/analyze_dialog.py) to the approved mockup. Change no statistics and no stored format:
 - Analysis list: replace the radio buttons with one list grouped by section, with a "Recent" section on top (up to 3 recently used, replacing the "recent" badge). Each row shows the name and the short text of what it reports. A filter field above it matches names and that text; arrow keys move, Enter runs. The list scrolls after about six rows.
