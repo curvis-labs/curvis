@@ -404,7 +404,14 @@ class DocumentTab(QWidget):
         if problem is not None:
             self.message.emit(f"{problem}.")
             return False
-        spec = default_spec(table, family, self.document.analyses, defaults=self._graph_defaults())
+        calculated = {c.column_id for calc in self.document.calculations for c in calc.columns}
+        spec = default_spec(
+            table,
+            family,
+            self.document.analyses,
+            defaults=self._graph_defaults(),
+            calculated=calculated,
+        )
         try:
             self.document.execute(add_graph(self.document, spec))
         except CommandError as exc:

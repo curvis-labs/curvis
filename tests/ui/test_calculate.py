@@ -511,7 +511,7 @@ def test_formulas_use_full_names_and_flag_ambiguous_short_names(
     tab: DocumentTab, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     model = model_of(tab)
-    model.insert_column(2)  # B
+    model.remove_columns([3])  # the new table's C; B is used below
     model.rename_column(1, "Control")
     model.rename_column(2, "Control 2")
     model.set_category([1], "Male")

@@ -320,7 +320,9 @@ def graph_document(family_name: str = "xy") -> tuple[Document, str]:
     from curvis.core import add_graph
 
     doc = grouped_document()
-    spec = default_spec(doc.table("t"), ChartFamily(family_name))
+    # As the app does: calculated columns count as filled before their values arrive.
+    calculated = {c.column_id for calc in doc.calculations for c in calc.columns}
+    spec = default_spec(doc.table("t"), ChartFamily(family_name), calculated=calculated)
     doc.execute(add_graph(doc, spec))
     doc.undo_stack.clear()
     return doc, spec.id

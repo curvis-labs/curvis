@@ -247,6 +247,7 @@ def test_import_without_a_project_makes_one(
         ("Dose", ColumnRole.X),
         ("Response", ColumnRole.Y),
         ("Label", ColumnRole.TEXT),
+        ("C", ColumnRole.Y),  # the new table's unused empty column stays
     ]
     assert tab.table_view.model().rowCount() >= 3
     assert (
@@ -256,7 +257,7 @@ def test_import_without_a_project_makes_one(
     assert tab.document.undo_stack.undo_text == "Import 'basic.csv'"
 
     window.undo()
-    assert [c.name for c in table.columns] == ["X", "A"]
+    assert [c.name for c in table.columns] == ["X", "A", "B", "C"]
     assert table.n_rows == 0
 
 
@@ -268,7 +269,7 @@ def test_import_fills_empty_columns_of_the_current_table(
     importing.extend([DATA / "tab.tsv", DATA / "bom.csv"])
     window.import_data()
     wait_import(qtbot, window)
-    assert [c.name for c in table.columns] == ["Dose", "Resp A", "Resp B"]
+    assert [c.name for c in table.columns] == ["Dose", "Resp A", "Resp B", "C"]
 
     window.import_data()  # nothing is empty now: appended
     wait_import(qtbot, window)
@@ -306,7 +307,7 @@ def test_import_with_ranges(qtbot: QtBot, window: MainWindow) -> None:
     tab = window.current_tab
     assert tab is not None
     table = tab.document.tables[0]
-    assert [c.name for c in table.columns] == ["Dose", "Resp"]
+    assert [c.name for c in table.columns] == ["Dose", "Resp", "B", "C"]
     assert table.columns[0].values.tolist() == [2.0, 3.0, 4.0]
 
 

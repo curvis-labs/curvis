@@ -26,8 +26,10 @@ shows it next to the disabled family.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import replace
+
+import numpy as np
 
 from curvis.analysis.base import Analysis, Family, rows_match_x, x_column_id
 from curvis.charts.colors import CURVIS, ColorScheme, recolored
@@ -124,11 +126,19 @@ def default_series(
     palette: ColorScheme = CURVIS,
     error_bars: ErrorBars = DEFAULT_ERROR_BARS,
     line: bool = False,
+    skip_empty: bool = False,
+    calculated: Collection[str] = (),
 ) -> tuple[SeriesSpec, ...]:
-    """A styled :class:`SeriesSpec` for each series of ``table``, left to right."""
+    """A styled :class:`SeriesSpec` for each series of ``table``, left to right.
+
+    With ``skip_empty``, series without values (e.g. the empty columns of a new table)
+    are left out, unless every series is empty. ``calculated`` are the ids of calculated
+    columns, which count as filled before their values arrive.
+    """
     colors = palette
     specs: list[SeriesSpec] = []
-    for i, s in enumerate(series(table)):
+    found = series(table)
+    for i, s in enumerate(_with_values(table, found, calculated) if skip_empty else found):
         if s.group_id is not None:
             bars, error_column = error_bars, None
         else:
@@ -146,6 +156,21 @@ def default_series(
             )
         )
     return tuple(specs)
+
+
+def _with_values(
+    table: Table, found: Sequence[Series], calculated: Collection[str] = ()
+) -> list[Series]:
+    """The series of ``found`` that hold at least one value or read a calculated column;
+    all of them if none does."""
+    filled = [
+        s
+        for s in found
+        if any(
+            c in calculated or bool(np.any(~np.isnan(table.column(c).values))) for c in s.column_ids
+        )
+    ]
+    return filled or list(found)
 
 
 def interaction_series(
@@ -226,6 +251,7 @@ def default_spec(
     *,
     error_bars: ErrorBars = DEFAULT_ERROR_BARS,
     defaults: GraphDefaults | None = None,
+    calculated: Collection[str] = (),
 ) -> ChartSpec:
     """A new graph of ``table`` in ``family``. ``analyses`` are the document's analyses;
     the curve fits of this table among them are overlaid on an XY graph. ``defaults``
@@ -239,7 +265,8 @@ def default_spec(
         raise ValueError(f"{problem}.")
     d = defaults if defaults is not None else GraphDefaults()
     palette = d.palette
-    found = series(table)
+    # Series without values (e.g. a new table's empty columns) are left out.
+    found = _with_values(table, series(table), calculated)
     if family is ChartFamily.INTERACTION:
         analysis = two_way_analyses(table, analyses)[-1]
         factor = first_factor_name(analysis)
@@ -286,7 +313,13 @@ def default_spec(
             table_id=table.id,
             family=family,
             variant=ChartVariant.SCATTER,
-            series=default_series(table, palette=palette, error_bars=error_bars),
+            series=default_series(
+                table,
+                palette=palette,
+                error_bars=error_bars,
+                skip_empty=True,
+                calculated=calculated,
+            ),
             x_axis=AxisSpec(
                 title=column_title(table.column(x_id)),
                 scale=Scale.LOG if log_x else Scale.LINEAR,
@@ -307,7 +340,13 @@ def default_spec(
         variant=ChartVariant.BAR,
         series=tuple(
             replace(s, error_bars=error_bars, error_column=None)
-            for s in default_series(table, palette=palette, error_bars=error_bars)
+            for s in default_series(
+                table,
+                palette=palette,
+                error_bars=error_bars,
+                skip_empty=True,
+                calculated=calculated,
+            )
         ),
         y_axis=AxisSpec(title=_shared_unit(table, found)),
         title=table.name,

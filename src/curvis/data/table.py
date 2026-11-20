@@ -14,6 +14,9 @@ from curvis.data.roles import ColumnRole
 
 DEFAULT_CATEGORY_FACTOR = "Category"
 
+BLANK_Y_COLUMNS = ("A", "B", "C")
+"""The empty Y columns of a new table: real columns, ready to type or paste into."""
+
 
 @dataclass
 class Table:
@@ -29,8 +32,10 @@ class Table:
 
     @classmethod
     def blank(cls, name: str = "Data 1") -> "Table":
-        """An empty table for a new project: an X column and one Y column."""
-        return cls(name, [Column.new("X", ColumnRole.X), Column.new("A", ColumnRole.Y)])
+        """An empty table: an X column and the Y columns A, B and C, all without values."""
+        columns = [Column.new("X", ColumnRole.X)]
+        columns += [Column.new(n, ColumnRole.Y) for n in BLANK_Y_COLUMNS]
+        return cls(name, columns)
 
     @property
     def n_rows(self) -> int:

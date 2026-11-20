@@ -600,7 +600,7 @@ Make a plan first. When done, report what you built and image-diff results.
 **Done when**
 - [x] Y columns can be put in a category directly, with the same name in every category; full names ("Male: Control") are unique and used by formulas, copy and export.
 - [x] Renaming a category, taking a column out of one or moving it into one keeps names unique, rewrites formulas, and undoes exactly.
-- [x] The empty columns right of the table show their names and take typing, pasting and naming where the user does it.
+- [x] A new table has real, empty Y columns A, B and C (no dummy columns right of the table); analyses and new graphs skip columns without values.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md (Data tables and formulas: Columns in a category, Empty columns) and step 3.6 in docs/PHASES.md.
@@ -612,10 +612,10 @@ Columns in a category:
 - Formulas: [Male: Control] always resolves; [Control] resolves when one column has that short name, otherwise an error that lists the full names. Renaming a category or moving a column rewrites formulas (curvis.formula.rewrite), in the same command.
 - Lookups by name (column_by_name, the Calculate dialog's lists, bulk rename, copy with headers, CSV export) use full names; the header, graphs, legends and results show short names (series are matched across categories by short name, as now).
 
-Empty columns:
-- Their headers show the names they would get (next_column_names), dimmed, with no role.
-- Typing or pasting into one adds it and any empty columns before it as Y columns, in the same command, with the value where it was typed (no longer moved left).
-- Double-clicking a spare header names it and adds the column.
+Empty columns (changed during the step: the dummy columns right of the table could never be used up):
+- A new table has an X column and real, empty Y columns A, B and C; the table shows no dummy columns right of the data.
+- A column without values is not ticked by analyses and is left out of new graphs.
+- A paste that runs past the last column still adds Y columns, in the same command.
 
 Tests: unit tests of the rules and commands (undo and redo of every case), formula resolution and rewriting, and pytest-qt tests of the header and of typing into a spare column. Extend the Hypothesis model test to put columns in categories.
 

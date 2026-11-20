@@ -371,7 +371,7 @@ def test_import_goes_into_the_selected_table(
     wait_import(qtbot, window)
     table = project.document.tables[2]
     assert table.name == "Table 2"
-    assert [c.name for c in table.columns] == ["Dose", "Response", "Label"]
+    assert [c.name for c in table.columns] == ["Dose", "Response", "Label", "C"]
     assert [c.name for c in project.document.table("tS").columns] == ["Dose", "Response"]
     assert window.statusBar().currentMessage() == (
         "Imported 3 rows and 3 columns from basic.csv into Table 2."

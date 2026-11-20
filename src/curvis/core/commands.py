@@ -1218,7 +1218,8 @@ class ImportColumns(Command):
     and values; the remaining columns are added on the right. A name already used by
     another column gets " (2)", " (3)", …. The table grows to the longer of its own and
     the imported row count; a table whose columns were all empty takes the imported
-    row count. ``source`` names the file in the undo text.
+    row count. Empty columns left unfilled stay. ``source`` names the file in the undo
+    text.
     """
 
     def __init__(self, table_id: str, columns: Sequence[Column], source: str) -> None:

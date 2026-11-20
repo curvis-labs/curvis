@@ -56,7 +56,8 @@ def tab(window: MainWindow) -> DocumentTab:
     tab = window.new_document()
     doc = tab.document
     table = doc.tables[0]
-    doc.execute(RemoveColumn(table.id, table.columns[1].id))
+    for column in table.columns[1:]:  # the blank table's empty A, B and C
+        doc.execute(RemoveColumn(table.id, column.id))
     for name, values in (("A1", [1, 2, 3]), ("A2", [3, 4, 5]), ("A3", [5, 6, 7])):
         from curvis.core import AddColumn
 
