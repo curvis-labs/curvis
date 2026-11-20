@@ -178,6 +178,17 @@ GROUPING_NEEDS_CATEGORIES = "Put series in category groups to cluster them."
 type Problem = str | None
 
 
+COMBO_CHARACTERS = 14
+"""Combo boxes whose items can be long (font notes, palette names) are this many
+characters wide at least, not as wide as their longest item: the list shows every item
+in full when it opens. Otherwise the widest section sets the dialog's minimum width."""
+
+
+def _compact(combo: QComboBox) -> None:
+    combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+    combo.setMinimumContentsLength(COMBO_CHARACTERS)
+
+
 def _swatch(color: str, size: int = 12) -> QIcon:
     pixmap = QPixmap(size, size)
     pixmap.fill(QColor(color))
@@ -363,9 +374,9 @@ class FormatDialog(QDialog):
         self.title_edit = QLineEdit()
         form.addRow(buddy_label("&Title", self.title_edit), self.title_edit)
         self.type_combo = QComboBox()
-        self.type_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        _compact(self.type_combo)
         self._fill_types()
-        form.addRow(buddy_label("Graph t&ype", self.type_combo), self.type_combo)
+        form.addRow(buddy_label("T&ype", self.type_combo), self.type_combo)
         row = QHBoxLayout()
         row.setSpacing(0)
         self.aspect_group = QButtonGroup(self)
@@ -469,6 +480,7 @@ class FormatDialog(QDialog):
         (:meth:`_show_variant_options`)."""
         factor = self.table.category_factor or "category"
         self.grouping = QComboBox()
+        _compact(self.grouping)
         for choice, text in GROUPING_LABELS.items():
             self.grouping.addItem(text.format(factor=factor), choice)
         self.grouping_label = buddy_label("Cl&usters", self.grouping)
@@ -681,7 +693,7 @@ class FormatDialog(QDialog):
         outer = QVBoxLayout(box)
         form = form_layout()
         self.scheme_combo = QComboBox()
-        self.scheme_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        _compact(self.scheme_combo)
         self.edit_colors = QPushButton("Edit c&olors…")
         self.edit_colors.setToolTip("Change the colors of this graph's palette")
         scheme_row = QHBoxLayout()
@@ -690,6 +702,7 @@ class FormatDialog(QDialog):
         scheme_row.addStretch(1)
         form.addRow(buddy_label("Color sc&heme", self.scheme_combo), scheme_row)
         self.font_combo = QComboBox()
+        _compact(self.font_combo)
         for font in FONTS.values():
             text = f"{font.family} ({font.note})" if font.note else font.family
             self.font_combo.addItem(text, font.id)
