@@ -7,11 +7,19 @@ stored as numbers; they are turned into text only for display and the clipboard
 
 A P value gets significance stars next to it: * P < 0.05, ** P < 0.01, *** P < 0.001.
 Results are frozen dataclasses of plain values, so they pickle across processes.
+
+How P values are shown follows the Settings (:class:`PDisplay`): "P < 0.001" (the
+default), "P < 0.0001", or exact (2.3 × 10⁻⁷). It changes only the text: results keep
+full precision and the stars do not change. A reading names its P values with a marker
+(:func:`p_marker`) that :func:`render_p` turns into text when it is shown, so a change of
+the setting needs no new run.
 """
 
 from __future__ import annotations
 
 import math
+import re
+import sys
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -28,7 +36,32 @@ SIGNIFICANT_DIGITS = 4
 
 P_SIGNIFICANT_DIGITS = 3
 P_FLOOR = 0.001
-"""P values below this are shown as "< 0.001"."""
+"""P values below this are shown as "< 0.001" (the default display)."""
+P_EXACT_DIGITS = 2
+"""Significant digits of an exact P value below :data:`P_FLOOR` (2.3 × 10⁻⁷)."""
+
+
+class PDisplay(StrEnum):
+    """How P values are shown (Settings, Results)."""
+
+    BELOW_0001 = "0.001"
+    """ "P < 0.001" for smaller values (the default)."""
+    BELOW_00001 = "0.0001"
+    """ "P < 0.0001" for smaller values."""
+    EXACT = "exact"
+    """Every value, e.g. 2.3 × 10⁻⁷."""
+
+    @property
+    def label(self) -> str:
+        return {
+            "0.001": "P < 0.001",
+            "0.0001": "P < 0.0001",
+            "exact": "Exact (e.g. 2.3 × 10⁻⁷)",
+        }[self.value]
+
+
+DEFAULT_P_DISPLAY = PDisplay.BELOW_0001
+_SUPERSCRIPT = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
 
 
 class Kind(StrEnum):
@@ -87,16 +120,52 @@ def format_number(value: float) -> str:
     return f"{value:.{SIGNIFICANT_DIGITS - 1}e}"
 
 
-def format_p(p: float) -> str:
-    """A P value for display: "< 0.001", or 3 significant digits (0.0312, 0.452, 1.00)."""
+def format_p(p: float, display: PDisplay = DEFAULT_P_DISPLAY) -> str:
+    """A P value for display: 3 significant digits (0.0312, 0.452, 1.00); below the
+    floor of ``display`` "< 0.001" or "< 0.0001", or exactly, with 2 significant digits
+    and a power of ten (2.3 × 10⁻⁷)."""
     if math.isnan(p):
         return ""
-    if p < P_FLOOR:
-        return f"< {P_FLOOR:g}"
+    if display is PDisplay.EXACT:
+        if p >= P_FLOOR:
+            return _fixed(p, P_SIGNIFICANT_DIGITS)
+        if p < sys.float_info.min:
+            # Below the smallest normal double: an underflow, not a measured value.
+            return f"< {_power_of_ten(sys.float_info.min)}"
+        return _power_of_ten(p)
+    floor = 0.0001 if display is PDisplay.BELOW_00001 else P_FLOOR
+    if p < floor:
+        return f"< {floor:g}"
     return _fixed(p, P_SIGNIFICANT_DIGITS)
 
 
-def shown(value: Cell, kind: Kind) -> str:
+def _power_of_ten(p: float) -> str:
+    """``p`` as m × 10ⁿ with :data:`P_EXACT_DIGITS` significant digits."""
+    mantissa, exponent = f"{p:.{P_EXACT_DIGITS - 1}e}".split("e")
+    return f"{mantissa} × 10{str(int(exponent)).translate(_SUPERSCRIPT)}"
+
+
+_P_MARKER = re.compile(r"\u27e6P:([^\u27e7]+)\u27e7")
+
+
+def p_marker(p: float) -> str:
+    """A P value in a reading, turned into "P = 0.0312" or "P < 0.001" by
+    :func:`render_p` when the reading is shown."""
+    return f"\u27e6P:{p!r}\u27e7"
+
+
+def p_phrase(p: float, display: PDisplay = DEFAULT_P_DISPLAY) -> str:
+    """ "P = 0.0312", "P < 0.001" or "P = 2.3 × 10⁻⁷"."""
+    text = format_p(p, display)
+    return f"P {text}" if text.startswith("<") else f"P = {text}"
+
+
+def render_p(text: str, display: PDisplay = DEFAULT_P_DISPLAY) -> str:
+    """``text`` with its P-value markers written out as ``display`` shows them."""
+    return _P_MARKER.sub(lambda m: p_phrase(float(m.group(1)), display), text)
+
+
+def shown(value: Cell, kind: Kind, display: PDisplay = DEFAULT_P_DISPLAY) -> str:
     """The text shown for ``value`` in the Results panel."""
     if _is_missing(value):
         return ""
@@ -106,7 +175,7 @@ def shown(value: Cell, kind: Kind) -> str:
     if kind is Kind.INTEGER:
         return str(int(value))
     if kind is Kind.P_VALUE:
-        return format_p(float(value))
+        return format_p(float(value), display)
     if kind is Kind.LABEL and math.isfinite(float(value)):
         return f"{float(value):.6g}"
     return format_number(float(value))
@@ -243,7 +312,7 @@ class Grid:
     """Per column: right-align it (numbers)."""
 
 
-def table_grid(table: ResultTable) -> Grid:
+def table_grid(table: ResultTable, display: PDisplay = DEFAULT_P_DISPLAY) -> Grid:
     """The text of ``table``, with a stars column after each P-value column."""
     header: list[str] = []
     numeric: list[bool] = []
@@ -259,7 +328,7 @@ def table_grid(table: ResultTable) -> Grid:
         shown_row: list[str] = []
         full_row: list[str] = []
         for column, cell in zip(table.columns, row, strict=True):
-            shown_row.append(shown(cell, column.kind))
+            shown_row.append(shown(cell, column.kind, display))
             full_row.append(full_text(cell, column.kind))
             if column.kind is Kind.P_VALUE:
                 mark = stars(_p_of(cell))
@@ -270,7 +339,9 @@ def table_grid(table: ResultTable) -> Grid:
     return Grid(table.title, tuple(header), tuple(shown_rows), tuple(full_rows), tuple(numeric))
 
 
-def values_grid(values: tuple[Value, ...], title: str = "") -> Grid:
+def values_grid(
+    values: tuple[Value, ...], title: str = "", display: PDisplay = DEFAULT_P_DISPLAY
+) -> Grid:
     """Named values as a two-column table (name, value), plus stars for P values."""
     with_stars = any(v.kind is Kind.P_VALUE for v in values)
     header = ("", "Value", "") if with_stars else ("", "Value")
@@ -278,7 +349,7 @@ def values_grid(values: tuple[Value, ...], title: str = "") -> Grid:
     full_rows: list[tuple[str, ...]] = []
     for v in values:
         label = f"{v.label} ({v.unit})" if v.unit else v.label
-        shown_row = [label, shown(v.value, v.kind)]
+        shown_row = [label, shown(v.value, v.kind, display)]
         full_row = [label, full_text(v.value, v.kind)]
         if with_stars:
             mark = stars(_p_of(v.value)) if v.kind is Kind.P_VALUE else ""
@@ -290,10 +361,10 @@ def values_grid(values: tuple[Value, ...], title: str = "") -> Grid:
     return Grid(title, header, tuple(shown_rows), tuple(full_rows), numeric)
 
 
-def grids(result: Result) -> list[Grid]:
+def grids(result: Result, display: PDisplay = DEFAULT_P_DISPLAY) -> list[Grid]:
     """The sections of ``result`` in display order: its values, then its tables."""
     sections: list[Grid] = []
     if result.values:
-        sections.append(values_grid(result.values, result.method))
-    sections += [table_grid(t) for t in result.tables]
+        sections.append(values_grid(result.values, result.method, display))
+    sections += [table_grid(t, display) for t in result.tables]
     return sections

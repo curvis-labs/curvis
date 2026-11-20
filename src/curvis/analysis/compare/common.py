@@ -15,7 +15,7 @@ import numpy.typing as npt
 
 from curvis.analysis.base import AnalysisType, Family, Params, SeriesData, series_choices
 from curvis.analysis.compare.samples import Sample
-from curvis.analysis.result import format_number, format_p
+from curvis.analysis.result import format_number, p_marker
 from curvis.data import Table
 
 type FloatArray = npt.NDArray[np.float64]
@@ -44,9 +44,9 @@ def name_list(names: Sequence[str]) -> str:
 
 
 def p_text(p: float) -> str:
-    """ "P = 0.0312" or "P < 0.001"."""
-    shown = format_p(p)
-    return f"P {shown}" if shown.startswith("<") else f"P = {shown}"
+    """ "P = 0.0312" or "P < 0.001" in a reading, as the Settings show P values
+    (a marker that :func:`curvis.analysis.result.render_p` writes out)."""
+    return p_marker(p)
 
 
 def number(value: float) -> str:

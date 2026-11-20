@@ -2,15 +2,16 @@
 :class:`~curvis.charts.data.ChartData` using pyqtgraph.
 
 It draws XY graphs (scatter or line, SD / SEM / Error-column error bars, fitted curves
-and their confidence bands), bar graphs (mean with error bars) and box plots. It
-computes nothing: every number comes from :mod:`curvis.charts.data`, and the ranges and
-ticks come from :mod:`curvis.charts.axes`, as in the export renderer.
+and their confidence bands), bar-family graphs (bars, horizontal bars, boxes, violins,
+columns of values and histograms, from the shapes of :mod:`curvis.charts.marks`) and
+survival curves. It computes nothing: every number comes from :mod:`curvis.charts.data`,
+and the ranges and ticks come from :mod:`curvis.charts.axes`, as in the export renderer.
 
 - **The page.** The widget shows the graph's page (its size in cm) zoomed to fit,
   letterboxed: text, symbols, lines and ticks are drawn at their size in points times
   the zoom, so the graph keeps the proportions of its export.
-- **Font.** DejaVu Sans, the font Matplotlib exports with, loaded from Matplotlib's
-  files (:func:`curvis.charts.axes.chart_font_path`).
+- **Font.** The graph's chart font, loaded from the same file Matplotlib exports with
+  (:mod:`curvis.charts.fonts`), with the same line metrics.
 - Colours come from the spec's colour scheme, not the app theme (docs/DESIGN.md §3).
 - **Legend** to the right of the plot when the spec shows one, listing the series that
   are in the legend. Clicking an XY entry sends :attr:`ChartView.series_toggled`; the
@@ -27,7 +28,7 @@ from __future__ import annotations
 import functools
 import html
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -51,16 +52,10 @@ from PySide6.QtWidgets import QApplication, QGraphicsWidget, QSizePolicy, QToolT
 from curvis.charts.axes import (
     AXIS_WIDTH_PT,
     BAND_ALPHA,
-    BAR_WIDTH,
-    BOX_FILL_ALPHA,
-    BOX_LINE_PT,
-    BOX_WIDTH,
     CAP_SHARE,
     ERROR_BAR_WIDTH_PT,
     FONT_ASCENT_EM,
     FONT_DESCENT_EM,
-    FONT_FAMILY,
-    FONT_LINE_GAP_EM,
     LEGEND_BORDER_EM,
     LEGEND_COLUMN_GAP_EM,
     LEGEND_GAP_EM,
@@ -74,14 +69,15 @@ from curvis.charts.axes import (
     AxesLayout,
     AxisLayout,
     axes_layout,
-    chart_font_path,
     legend_columns,
     page_px,
     points_to_px,
     wrap_to_fit,
 )
-from curvis.charts.colors import ColorScheme, scheme
+from curvis.charts.colors import ColorScheme
 from curvis.charts.data import CategoryData, ChartData, SurvivalCurveData, XYSeriesData
+from curvis.charts.fonts import ChartFont, chart_font_info
+from curvis.charts.marks import Hit, LegendEntry, Marks, Polygon, Rect, bar_marks
 from curvis.charts.spec import (
     LINE_VARIANTS,
     XY_VARIANTS,
@@ -93,6 +89,7 @@ from curvis.charts.spec import (
     Symbol,
 )
 from curvis.charts.tooltips import (
+    describe_bin,
     describe_category,
     describe_cell,
     describe_censored,
@@ -122,15 +119,17 @@ _PEN_STYLES = {
 
 
 @functools.cache
-def chart_font_family() -> str:
-    """The chart font, loaded once from Matplotlib's copy of DejaVu Sans."""
-    path = chart_font_path()
+def chart_font_family(font_id: str = "dejavu_sans") -> str:
+    """The family of the chart font ``font_id``, loaded once from its file (the one
+    Matplotlib exports with)."""
+    info = chart_font_info(font_id)
+    path = info.path()
     if path is not None:
-        font_id = QFontDatabase.addApplicationFont(str(path))
-        families = QFontDatabase.applicationFontFamilies(font_id) if font_id >= 0 else []
+        loaded = QFontDatabase.addApplicationFont(str(path))
+        families = QFontDatabase.applicationFontFamilies(loaded) if loaded >= 0 else []
         if families:
             return str(families[0])
-    return FONT_FAMILY
+    return info.family
 
 
 def chart_font(family: str) -> QFont:
@@ -241,6 +240,9 @@ class ChartAxis(pg.AxisItem):  # type: ignore[misc]
     """Pixels between the tick labels and the axis title."""
     em = 0.0
     """Pixels per em of the chart text (tick labels and axis title)."""
+    ascent_em = FONT_ASCENT_EM
+    descent_em = FONT_DESCENT_EM
+    """The chart font's line metrics (Matplotlib's, from :mod:`curvis.charts.fonts`)."""
     overflow = (0.0, 0.0)
     on_overflow: Callable[[], None] | None = None
 
@@ -273,14 +275,14 @@ class ChartAxis(pg.AxisItem):  # type: ignore[misc]
         chart has set :attr:`em`: the label's own height)."""
         if not self.em:
             return float(self.label.boundingRect().height())
-        return (FONT_ASCENT_EM + FONT_DESCENT_EM) * self.em
+        return (self.ascent_em + self.descent_em) * self.em
 
     def _baseline_shift(self, font: QFont) -> float:
         """How much lower Qt puts the baseline under the top of a line of ``font`` than
         Matplotlib does, in pixels (0 before the chart has set :attr:`em`)."""
         if not self.em:
             return 0.0
-        return QFontMetricsF(font).ascent() - FONT_ASCENT_EM * self.em
+        return QFontMetricsF(font).ascent() - self.ascent_em * self.em
 
     def _title_room(self) -> float:
         if not self.label.isVisible():
@@ -378,7 +380,7 @@ class ChartAxis(pg.AxisItem):  # type: ignore[misc]
             p.setFont(self.style["tickFont"])
         p.setPen(self.textPen())
         # The baseline as Matplotlib puts it in a line of height h centred on the anchor.
-        baseline = FONT_ASCENT_EM * self.em - self._line() / 2
+        baseline = self.ascent_em * self.em - self._line() / 2
         for anchor, w, _h, text in self._turned:
             p.save()
             p.translate(anchor)
@@ -411,6 +413,7 @@ class ChartTitle(QGraphicsWidget):
         self.title_color = QColor()
         self.em = 0.0
         self.pad = 0.0
+        self.metrics = chart_font_info("dejavu_sans")
         self.lines: tuple[str, ...] = ()
         self.baselines: tuple[float, ...] = ()
         self.on_height = on_height
@@ -419,11 +422,22 @@ class ChartTitle(QGraphicsWidget):
         self.setPreferredWidth(0)
         self.setVisible(False)
 
-    def set_title(self, text: str, font: QFont, color: QColor, em: float, pad: float) -> None:
-        """Show ``text`` in ``font`` (``em`` pixels high) with ``pad`` pixels between its
-        last baseline and the plot; an empty text hides the title and its row."""
+    def set_title(
+        self,
+        text: str,
+        font: QFont,
+        color: QColor,
+        em: float,
+        pad: float,
+        metrics: ChartFont | None = None,
+    ) -> None:
+        """Show ``text`` in ``font`` (``em`` pixels high, with the line ``metrics`` of its
+        chart font) with ``pad`` pixels between its last baseline and the plot; an empty
+        text hides the title and its row."""
         self.text, self.title_font, self.title_color = text, font, color
         self.em, self.pad = em, pad
+        if metrics is not None:
+            self.metrics = metrics
         self.lines = ()
         self.setVisible(bool(text))
         self._lay_out()
@@ -442,16 +456,17 @@ class ChartTitle(QGraphicsWidget):
         if lines == self.lines and self.baselines:
             return
         self.lines = lines
-        gap = FONT_LINE_GAP_EM * self.em / 2 if len(lines) > 1 else 0.0
+        m = self.metrics
+        gap = m.line_gap_em * self.em / 2 if len(lines) > 1 else 0.0
         baselines: list[float] = []
         y = 0.0
         descent = 0.0
         for line in lines:
             ink = metrics.tightBoundingRect(line)
-            ascent = max(FONT_ASCENT_EM * self.em, -ink.top()) + gap
+            ascent = max(m.ascent_em * self.em, -ink.top()) + gap
             y += descent + ascent
             baselines.append(y)
-            descent = max(FONT_DESCENT_EM * self.em, ink.bottom()) + gap
+            descent = max(m.descent_em * self.em, ink.bottom()) + gap
         self.baselines = tuple(baselines)
         height = y + self.pad if lines else 0.0
         if height != self.maximumHeight() or not lines:
@@ -489,44 +504,71 @@ class _XYParts:
     without a band."""
 
 
-class BoxItem(pg.GraphicsObject):  # type: ignore[misc]
-    """Box plots: a box from Q1 to Q3 with the median, whiskers from min to max."""
+_QT_DASHES = {LineStyle.DASH: [4.0, 2.0], LineStyle.DOT: [1.0, 2.0]}
+"""Dash patterns in line widths (as the export's)."""
 
-    def __init__(self, boxes: Sequence[tuple[float, Any, QColor]], width_px: float) -> None:
+
+class MarksItem(pg.GraphicsObject):  # type: ignore[misc]
+    """The shapes and lines of a bar-family graph (curvis.charts.marks), in plot
+    coordinates, with cosmetic pens ``px`` pixels per point wide."""
+
+    def __init__(self, marks: Marks, px: Callable[[float], float]) -> None:
         super().__init__()
-        self._boxes = boxes  # (position, plot BoxStats, colour)
-        self._width_px = width_px
-        finite = [b for _, b, _ in boxes if b.n > 0]
-        low = min((b.min for b in finite), default=0.0)
-        high = max((b.max for b in finite), default=1.0)
-        if low == high:
-            low, high = low - 0.5, high + 0.5
-        left = min((p for p, _, _ in boxes), default=0) - BOX_WIDTH
-        right = max((p for p, _, _ in boxes), default=0) + BOX_WIDTH
-        self._bounds = QRectF(left, low, right - left, high - low)
+        self._marks = marks
+        self._px = px
+        xs: list[float] = []
+        ys: list[float] = []
+        for shape in marks.shapes:
+            if isinstance(shape, Rect):
+                xs += [shape.x0, shape.x1]
+                ys += [shape.y0, shape.y1]
+            else:
+                xs += [float(np.min(shape.xs)), float(np.max(shape.xs))]
+                ys += [float(np.min(shape.ys)), float(np.max(shape.ys))]
+        for lines in marks.lines:
+            for a, b in lines.segments:
+                xs += [a[0], b[0]]
+                ys += [a[1], b[1]]
+        finite_x = [v for v in xs if math.isfinite(v)] or [0.0, 1.0]
+        finite_y = [v for v in ys if math.isfinite(v)] or [0.0, 1.0]
+        left, right = min(finite_x), max(finite_x)
+        low, high = min(finite_y), max(finite_y)
+        self._bounds = QRectF(left, low, (right - left) or 1.0, (high - low) or 1.0)
 
     def boundingRect(self) -> QRectF:  # noqa: N802 (Qt API)
         return self._bounds
 
+    def _pen(self, color: str, width_pt: float, style: LineStyle = LineStyle.SOLID) -> QPen:
+        pen = QPen(QColor(color), self._px(width_pt))
+        pen.setCosmetic(True)
+        pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
+        if style in _QT_DASHES:
+            pen.setDashPattern(_QT_DASHES[style])
+        return pen
+
     def paint(self, painter: QPainter, *_args: Any) -> None:
-        half = BOX_WIDTH / 2
-        for position, b, color in self._boxes:
-            if b.n == 0:
-                continue
-            pen = QPen(color, self._width_px)
-            pen.setCosmetic(True)
-            pen.setCapStyle(Qt.PenCapStyle.FlatCap)
-            painter.setPen(pen)
-            fill = QColor(color)
-            fill.setAlphaF(BOX_FILL_ALPHA)
+        for shape in self._marks.shapes:
+            fill = QColor(shape.fill)
+            fill.setAlphaF(shape.fill_alpha)
             painter.setBrush(fill)
-            painter.drawRect(QRectF(position - half, b.q1, BOX_WIDTH, b.q3 - b.q1))
-            painter.drawLine(QPointF(position - half, b.median), QPointF(position + half, b.median))
-            painter.drawLine(QPointF(position, b.q3), QPointF(position, b.max))
-            painter.drawLine(QPointF(position, b.q1), QPointF(position, b.min))
-            cap = half / 2
-            painter.drawLine(QPointF(position - cap, b.max), QPointF(position + cap, b.max))
-            painter.drawLine(QPointF(position - cap, b.min), QPointF(position + cap, b.min))
+            painter.setPen(self._pen(shape.edge, shape.edge_pt))
+            if isinstance(shape, Rect):
+                painter.drawRect(
+                    QRectF(shape.x0, shape.y0, shape.x1 - shape.x0, shape.y1 - shape.y0)
+                )
+            elif isinstance(shape, Polygon):
+                path = QPainterPath()
+                path.moveTo(float(shape.xs[0]), float(shape.ys[0]))
+                for x, y in zip(shape.xs[1:].tolist(), shape.ys[1:].tolist(), strict=True):
+                    path.lineTo(x, y)
+                path.closeSubpath()
+                painter.drawPath(path)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        for lines in self._marks.lines:
+            painter.setPen(self._pen(lines.color, lines.width_pt, lines.style))
+            for a, b in lines.segments:
+                painter.drawLine(QPointF(*a), QPointF(*b))
 
 
 @dataclass
@@ -536,8 +578,8 @@ class _Drawn:
     xy: list[tuple[XYSeriesData, Any]] = field(default_factory=list)
     """(series data, its main PlotDataItem)."""
     categories: list[CategoryData] = field(default_factory=list)
-    positions: dict[str, int] = field(default_factory=dict)
-    """Position of each bar or box drawn, by source."""
+    hits: list[Hit] = field(default_factory=list)
+    """Where each bar, box, violin, column or bin answers a hover."""
     legend_sources: dict[int, str] = field(default_factory=dict)
     """id(item) -> series source, for legend clicks."""
     survival: list[tuple[SurvivalCurveData, Any]] = field(default_factory=list)
@@ -555,6 +597,7 @@ class ChartView(QWidget):
         super().__init__(parent)
         self.setAccessibleName("Graph")
         self.family = chart_font_family()
+        self.font_info = chart_font_info("dejavu_sans")
         # The plot and, to its right, the legend (outside the data, like Prism).
         self.plot_widget = pg.GraphicsLayoutWidget(self)
         self.plot_widget.setAccessibleName("Graph")
@@ -657,13 +700,15 @@ class ChartView(QWidget):
         self._show_legend(False)
         self._drawn = _Drawn()
         self.message = ""
-        colors = scheme(spec.color_scheme)
+        colors = spec.palette
+        self.font_info = chart_font_info(spec.font)
+        self.family = chart_font_family(spec.font)
         self.layout_ = axes_layout(spec, data)
         self._style(spec, colors)
         if data is not None:
             if spec.variant in XY_VARIANTS:
                 self._draw_xy(spec, data, colors)
-            elif spec.variant in (ChartVariant.BAR, ChartVariant.BOX):
+            elif spec.family is ChartFamily.BAR:
                 self._draw_categories(spec, data, colors)
             elif spec.variant is ChartVariant.KAPLAN_MEIER:
                 self._draw_survival(spec, data)
@@ -689,6 +734,7 @@ class ChartView(QWidget):
             ink,
             self._px(spec.text_size * TITLE_SCALE),
             self._px(TITLE_PAD_PT),
+            self.font_info,
         )
         tick = max(1, round(self._px(TICK_LENGTH_PT)))
         for name, axis_spec in (("bottom", spec.x_axis), ("left", spec.y_axis)):
@@ -699,6 +745,8 @@ class ChartView(QWidget):
             axis.setTickFont(font)
             axis.label.setFont(font)
             axis.em = self._px(spec.text_size)
+            axis.ascent_em = self.font_info.ascent_em
+            axis.descent_em = self.font_info.descent_em
             axis.setLabel(
                 axis_spec.title or None,
                 color=colors.ink,
@@ -937,62 +985,57 @@ class ChartView(QWidget):
         self._legend_shown = shown
 
     def _draw_categories(self, spec: ChartSpec, data: ChartData, colors: ColorScheme) -> None:
+        """Bar-family graphs: the shapes, lines and symbols of curvis.charts.marks."""
         plot = self.plot_item
         assert self.layout_ is not None
-        styles = {s.source: s for s in spec.series}
-        positions = self.layout_.positions
-        shown = [c for c in data.categories if c.source in positions]
-        self._drawn.categories = shown
-        self._drawn.positions = dict(positions)
-        ink = QColor(colors.ink)
-        legend = self._legend_wanted(spec)
+        marks = bar_marks(spec, data, self.layout_)
+        self._drawn.categories = [c for c in data.categories if c.source in self.layout_.positions]
+        self._drawn.hits = list(marks.hits)
+        legend = self._legend_wanted(spec) and bool(marks.legend)
         self._show_legend(legend)
         if legend:
-            for c in shown:
-                if styles[c.source].in_legend:
-                    sample = pg.BarGraphItem(
-                        x=[0],
-                        height=[1],
-                        width=1,
-                        brush=QColor(styles[c.source].color),
-                        pen=pg.mkPen(ink, width=self._px(AXIS_WIDTH_PT)),
-                    )
-                    self._add_legend_entry(sample, c.name, patch=True)
-                    self.legend.items[-1][0].setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-        if not shown:
-            return
-        if spec.variant is ChartVariant.BOX:
-            boxes = [
-                (float(positions[c.source]), c.plot_box, QColor(styles[c.source].color))
-                for c in shown
-            ]
-            plot.addItem(BoxItem(boxes, self._px(BOX_LINE_PT)))
-            return
-        x = np.array([positions[c.source] for c in shown], dtype=np.float64)
-        heights = np.array([c.mean for c in shown], dtype=np.float64)
-        brushes = [QColor(styles[c.source].color) for c in shown]
-        bar = pg.BarGraphItem(
-            x=x,
-            height=np.nan_to_num(heights),
-            width=BAR_WIDTH,
-            brushes=brushes,
-            pen=pg.mkPen(ink, width=self._px(AXIS_WIDTH_PT)),
-        )
-        plot.addItem(bar)
-        top = np.array([c.err_high for c in shown], dtype=np.float64)
-        bottom = np.array([c.err_low for c in shown], dtype=np.float64)
-        keep = ((top > 0) | (bottom > 0)) & np.isfinite(heights)
-        if np.any(keep):
+            for entry in marks.legend:
+                self._add_legend_entry(self._legend_item(entry), entry.name, entry.symbol is None)
+                self.legend.items[-1][0].setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        if marks.shapes or marks.lines:
+            plot.addItem(MarksItem(marks, self._px))
+        for points in marks.points:
+            color = QColor(points.color)
             plot.addItem(
-                pg.ErrorBarItem(
-                    x=x[keep],
-                    y=heights[keep],
-                    top=top[keep],
-                    bottom=bottom[keep],
-                    beam=BAR_WIDTH / 3,
-                    pen=pg.mkPen(ink, width=self._px(BOX_LINE_PT)),
+                pg.ScatterPlotItem(
+                    points.xs,
+                    points.ys,
+                    symbol=_SYMBOLS[points.symbol],
+                    size=self._px(points.size_pt),
+                    brush=color,
+                    pen=pg.mkPen(color),
                 )
             )
+        if marks.over:
+            plot.addItem(MarksItem(Marks(lines=list(marks.over)), self._px))
+
+    def _legend_item(self, entry: LegendEntry) -> Any:
+        """An item whose look a legend sample copies: a patch or a symbol."""
+        if entry.symbol is not None:
+            color = QColor(entry.color)
+            return pg.PlotDataItem(
+                [],
+                [],
+                pen=None,
+                symbol=_SYMBOLS[entry.symbol],
+                symbolSize=self._px(entry.size_pt),
+                symbolBrush=color,
+                symbolPen=pg.mkPen(color),
+            )
+        fill = QColor(entry.color)
+        fill.setAlphaF(entry.fill_alpha)
+        return pg.BarGraphItem(
+            x=[0],
+            height=[1],
+            width=1,
+            brush=fill,
+            pen=pg.mkPen(QColor(entry.edge or entry.color), width=self._px(AXIS_WIDTH_PT)),
+        )
 
     def _apply_layout(self, spec: ChartSpec, layout: AxesLayout) -> None:
         """Set the ticks and ranges, only where they changed: new ticks make pyqtgraph
@@ -1060,7 +1103,7 @@ class ChartView(QWidget):
             return self._xy_tooltip(scene_pos)
         if self._drawn.survival:
             return self._survival_tooltip(scene_pos)
-        if self._drawn.categories:
+        if self._drawn.hits:
             point = vb.mapSceneToView(scene_pos)
             return self._category_tooltip(point.x(), point.y())
         return None
@@ -1134,19 +1177,14 @@ class ChartView(QWidget):
 
     def _category_tooltip(self, x: float, y: float) -> str | None:
         assert self.spec is not None
-        box = self.spec.variant is ChartVariant.BOX
-        half = (BOX_WIDTH if box else BAR_WIDTH) / 2
-        for c in self._drawn.categories:
-            if abs(x - self._drawn.positions[c.source]) > half:
+        for hit in self._drawn.hits:
+            if not hit.contains(x, y):
                 continue
-            if box:
-                b = c.plot_box
-                if b.n and b.min <= y <= b.max:
-                    return describe_category(c, self.spec.variant)
-            else:
-                low, high = c.mean - c.err_low, c.mean + c.err_high
-                if min(0.0, low) <= y <= max(0.0, high):
-                    return describe_category(c, self.spec.variant)
+            if hit.bin >= 0 and self.data is not None and self.data.histogram is not None:
+                return describe_bin(self.data.histogram, hit.source, hit.bin)
+            found = next((c for c in self._drawn.categories if c.source == hit.source), None)
+            if found is not None:
+                return describe_category(found, self.spec.variant)
         return None
 
     def _on_mouse_moved(self, scene_pos: QPointF) -> None:
@@ -1188,7 +1226,7 @@ def render_page(
     if app is not None:
         app.processEvents()
     image = QImage(view.plot_widget.size(), QImage.Format.Format_ARGB32)
-    image.fill(QColor(scheme(spec.color_scheme).page))
+    image.fill(QColor(spec.palette.page))
     painter = QPainter(image)
     view.plot_widget.render(painter)
     painter.end()
@@ -1244,10 +1282,10 @@ def _nan_to_edge(limit: Any, fit: Any) -> Any:
 
 
 __all__ = (
-    "BoxItem",
     "ChartAxis",
     "ChartView",
     "LegendSample",
+    "MarksItem",
     "chart_font",
     "chart_font_family",
     "render_page",

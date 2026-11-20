@@ -12,7 +12,9 @@ from weakref import WeakKeyDictionary
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QDialog, QLabel, QSplitter, QTabWidget, QVBoxLayout, QWidget
 
-from curvis.charts.spec import ChartFamily, ChartSpec, ChartVariant
+from curvis.analysis.result import DEFAULT_P_DISPLAY, PDisplay
+from curvis.charts.colors import ColorScheme
+from curvis.charts.spec import ChartFamily, ChartSpec, ChartVariant, GraphDefaults
 from curvis.core import (
     LAST_TABLE,
     AddTable,
@@ -80,9 +82,17 @@ class DocumentTab(QWidget):
         scheduler: Scheduler | None = None,
         global_constants: Callable[[], Sequence[ProjectConstant]] = list,
         recent_analyses: Callable[[], Sequence[str]] = list,
+        graph_defaults: Callable[[], GraphDefaults] = GraphDefaults,
+        palettes: Callable[[], Sequence[ColorScheme]] = list,
+        export_defaults: Callable[[], tuple[str, int]] = lambda: ("png", 300),
+        p_display: PDisplay = DEFAULT_P_DISPLAY,
     ) -> None:
         super().__init__(parent)
         self.document = document
+        self._graph_defaults = graph_defaults
+        """What a new graph copies from the Settings, read when the graph is made."""
+        self._palettes = palettes
+        self._export_defaults = export_defaults
         self.path = path
         self._decimal_places = decimal_places
         self._global_constants = global_constants
@@ -92,7 +102,9 @@ class DocumentTab(QWidget):
         self.graph_engine: GraphEngine | None = None
         self.scheduler = scheduler
         self._pending_exports: dict[str, Path] = {}
-        self._export_settings: tuple[str, int] = ("png", 300)
+        self._export_settings: tuple[str, int] | None = None
+        """The format and resolution of this tab's last export; the first one starts
+        from the Settings."""
         self._export_folder: Path | None = path.parent if path is not None else None
         if scheduler is not None:
             scheduler.finished.connect(self._on_job_finished)
@@ -116,6 +128,7 @@ class DocumentTab(QWidget):
         self.side_tabs.setDocumentMode(True)
         self.side_tabs.setMinimumWidth(260)
         self.results_panel = ResultsPanel(document, self.analysis_engine, self.side_tabs)
+        self.results_panel.set_p_display(p_display)
         self.results_panel.edit_requested.connect(self.edit_analysis)
         self.results_panel.delete_requested.connect(self.delete_analysis)
         self.results_panel.current_changed.connect(self.state_changed)
@@ -158,6 +171,10 @@ class DocumentTab(QWidget):
     def is_modified(self) -> bool:
         """True when there are changes since the last save (or since it was created)."""
         return not self.document.undo_stack.is_clean
+
+    def set_p_display(self, display: PDisplay) -> None:
+        """Show P values as ``display`` (Settings, Results)."""
+        self.results_panel.set_p_display(display)
 
     def set_decimal_places(self, places: int) -> None:
         self._decimal_places = places
@@ -387,7 +404,7 @@ class DocumentTab(QWidget):
         if problem is not None:
             self.message.emit(f"{problem}.")
             return False
-        spec = default_spec(table, family, self.document.analyses)
+        spec = default_spec(table, family, self.document.analyses, defaults=self._graph_defaults())
         try:
             self.document.execute(add_graph(self.document, spec))
         except CommandError as exc:
@@ -459,6 +476,7 @@ class DocumentTab(QWidget):
             scheduler=self.scheduler,
             results=self.analysis_engine.results if self.analysis_engine is not None else {},
             data=engine.data.get(graph_id) if engine is not None else None,
+            palettes=self._palettes(),
             parent=self,
         )
         try:
@@ -483,7 +501,7 @@ class DocumentTab(QWidget):
         if graph_id is None:
             return False
         spec = self.document.graph(graph_id)
-        fmt, dpi = self._export_settings
+        fmt, dpi = self._export_settings or self._export_defaults()
         dialog = ExportDialog(spec, fmt=ExportFormat(fmt), dpi=dpi, parent=self)
         try:
             if not self._exec_dialog(dialog):

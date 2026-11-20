@@ -31,6 +31,8 @@ Columns can be organized further:
 - **Category groups** define a second factor for two-way ANOVA and grouped charts.
 - **Renaming in place.** Double-clicking a column name in the header edits it in place; Tab keeps the name and moves to the next column header on the right (Shift+Tab to the left), so a row of names can be typed in one go. Replicate group and category names in the header edit the same way.
 - **Bulk rename** relabels many columns and groups in one step.
+- **Columns in a category.** A Y column put in a category directly (not through a replicate group) is a series of one column, with its values down the rows. The header shows its name, e.g. "Control", under the category's name. Its *full name* is "category: name" ("Male: Control"), so "Control" can be a column in every category. Full names are unique in the table (a column outside every category has its plain name as its full name). Formulas, copied and exported headers use the full name; a formula may use the short name where only one column has it. Renaming a category renames its columns' full names, and formulas follow. Taking a column out of its category makes its full name its name ("Male: Control"); putting a column into a category whose name begins its name drops that beginning ("Male: Control" put in Male is "Control"). A column cannot move into a category that already has a series of its name; Curvis says so. Undo restores the names exactly.
+- **Empty columns.** Right of the last column the table shows three empty columns, their headers showing the names they would get, dimmed. Typing or pasting into one adds it, and any empty ones before it, as Y columns, with the value where it was typed; naming one in its header adds it with that name.
 
 Columns and column groups are movable by drag and drop.
 
@@ -80,17 +82,17 @@ Graphs are drawn directly from a data table. You pick a chart family from the to
 | Chart family | Variants |
 | --- | --- |
 | XY | Scatter and line plots with SD or SEM error bars, and fitted curves overlaid |
-| Bar | Bar, horizontal bar, box, violin, scatter and histogram; grouped bar, horizontal bar, box and violin for category groups; option to show individual values with symbols |
+| Bar | Bar, horizontal bar, box, violin (trimmed at the data range or not), scatter and histogram (automatic bins, a number of bins, or a bin width and start); grouped bar, horizontal bar, box and violin for category groups, clustered by replicate group (colored by category) or by category (colored by replicate group); option to show individual values with symbols |
 | Survival | Kaplan-Meier step curves with confidence bands |
 | Interaction | Plot of two-way ANOVA results |
 
 The Format dialog controls:
 
-- Graph title, size (Tall 4 × 6 cm, Wide 9 × 6 cm, Square 6 × 6 cm, or a custom width and height) and whether the graph shows a legend
+- Graph title, graph type (the types of its family: XY and Bar graphs can change between theirs; survival and interaction graphs keep theirs), size (Tall 4 × 6 cm, Wide 9 × 6 cm, Square 6 × 6 cm, or a custom width and height) and whether the graph shows a legend
 - Each axis: title, range, label, linear or log scale, and the angle of the X tick labels (Auto, horizontal, 45° or 90°; Auto turns them when they do not fit side by side)
 - Each series: symbol, symbol size, line style, line width, color, error-bar type and whether it is listed in the legend; series can be added, removed and reordered
 - Fitted curves laid over the graph, listed with the series; they can be removed
-- Color scheme, chart font and chart text size
+- Color scheme, chart font (DejaVu Sans, Liberation Sans, Liberation Serif or Inter, bundled with Curvis so a graph looks the same on screen, in exports and on every computer) and chart text size
 
 The graph's page leaves room for everything it shows: tick labels that reach past the plot get a margin, turned labels too long for the page are shortened with "…", and a legend too wide for the right of the plot goes under it.
 

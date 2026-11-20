@@ -2,9 +2,14 @@
 :class:`~curvis.charts.data.ChartData` as a Matplotlib figure.
 
 It mirrors :mod:`curvis.charts.render_qt.chart_view`: the same page size, view ranges
-and ticks (:mod:`curvis.charts.axes`), the same font (DejaVu Sans), colours, symbol
-shapes, line widths, error-bar caps, bands, bars and boxes, and the legend to the right
-of the plot. The image-diff tests compare the two.
+and ticks (:mod:`curvis.charts.axes`), the same font (the graph's, from the bundled
+files of :mod:`curvis.charts.fonts`), colours, symbol shapes, line widths, error-bar
+caps, bands, and the legend to the right of the plot. Bar-family graphs are drawn from
+the shapes of :mod:`curvis.charts.marks`, as on screen. The image-diff tests compare the
+two.
+
+Draw and save a figure inside ``matplotlib.rc_context(chart_rc(spec))``, which sets
+the graph's font.
 
 One difference is on purpose: a series hidden with a legend click is left out of an
 exported legend (the screen lists it dimmed, so it can be clicked back on).
@@ -16,7 +21,6 @@ No pyplot: figures are made directly, so this runs in worker processes and threa
 from __future__ import annotations
 
 import functools
-import math
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -24,10 +28,6 @@ import numpy as np
 from curvis.charts.axes import (
     AXIS_WIDTH_PT,
     BAND_ALPHA,
-    BAR_WIDTH,
-    BOX_FILL_ALPHA,
-    BOX_LINE_PT,
-    BOX_WIDTH,
     CAP_SHARE,
     CM_PER_INCH,
     ERROR_BAR_WIDTH_PT,
@@ -49,11 +49,14 @@ from curvis.charts.axes import (
     legend_columns,
     wrap_to_fit,
 )
-from curvis.charts.colors import ColorScheme, scheme
+from curvis.charts.colors import ColorScheme
 from curvis.charts.data import ChartData, XYSeriesData
+from curvis.charts.fonts import FONTS, chart_font_info
+from curvis.charts.marks import LegendEntry, Marks, Polygon, Rect, bar_marks
 from curvis.charts.spec import (
     LINE_VARIANTS,
     XY_VARIANTS,
+    ChartFamily,
     ChartSpec,
     ChartVariant,
     LineStyle,
@@ -77,7 +80,38 @@ RC_PARAMS: dict[str, Any] = {
     "axes.unicode_minus": True,
     "path.simplify": False,
 }
-"""Matplotlib settings for every graph (use with ``matplotlib.rc_context``)."""
+"""Matplotlib settings for every graph in DejaVu Sans; :func:`chart_rc` gives a graph's
+own font."""
+
+
+@functools.cache
+def _register_fonts() -> None:
+    """Make the bundled chart fonts known to Matplotlib (once per process). They go
+    first in its list, so where another version of a font with the same name is
+    installed, the bundled file still wins (Matplotlib takes the first of equal
+    matches)."""
+    from matplotlib import font_manager
+
+    manager = font_manager.fontManager
+    for font in FONTS.values():
+        path = font.path()
+        if font.file and path is not None and path.is_file():
+            manager.addfont(str(path))
+            manager.ttflist.insert(0, manager.ttflist.pop())
+
+
+def chart_rc(spec: ChartSpec) -> dict[str, Any]:
+    """The Matplotlib settings to draw and save ``spec`` with (``matplotlib.rc_context``):
+    :data:`RC_PARAMS` with the graph's font."""
+    _register_fonts()
+    font = chart_font_info(spec.font)
+    # An SVG names the fallbacks after the font, for computers without it.
+    return {
+        **RC_PARAMS,
+        "font.family": font.generic,
+        f"font.{font.generic}": [font.family, *font.fallbacks],
+    }
+
 
 # Symbols as pyqtgraph draws them (y up here, down there); a custom marker of Matplotlib
 # is scaled so its largest coordinate is 0.5, like pyqtgraph's, so sizes match.
@@ -103,24 +137,27 @@ def make_figure(spec: ChartSpec, data: ChartData | None) -> Figure:
     """
     from matplotlib.figure import Figure
 
+    _register_fonts()
     width, height = spec.page_size_cm
-    colors = scheme(spec.color_scheme)
+    colors = spec.palette
     fig = Figure(figsize=(width / CM_PER_INCH, height / CM_PER_INCH), facecolor=colors.page)
     pad = PAGE_PAD_PT / 72
     fig.set_layout_engine(_title_layout()(w_pad=pad, h_pad=pad, wspace=0, hspace=0))
     ax = fig.add_subplot(axes_class=_chart_axes())
     layout = axes_layout(spec, data)
     _style(ax, spec, colors, layout)
+    marks: Marks | None = None
     if data is not None:
         if spec.variant in XY_VARIANTS:
             _draw_xy(ax, spec, data, layout)
-        elif spec.variant in (ChartVariant.BAR, ChartVariant.BOX):
-            _draw_categories(ax, spec, data, colors, layout)
+        elif spec.family is ChartFamily.BAR:
+            marks = bar_marks(spec, data, layout)
+            _draw_marks(ax, marks)
         elif spec.variant is ChartVariant.KAPLAN_MEIER:
             _draw_survival(ax, spec, data)
         else:
             raise ValueError(UNSUPPORTED)
-    _legend(ax, spec, data, colors, layout)
+    _legend(ax, spec, data, colors, layout, marks)
     return fig
 
 
@@ -390,78 +427,61 @@ def _error_lines(series: XYSeriesData, cap: float) -> tuple[np.ndarray, np.ndarr
     return xs.ravel(), ys.ravel()
 
 
-# --- bars and boxes --------------------------------------------------------------------
+# --- bar-family marks -----------------------------------------------------------------
 
 
-def _draw_categories(
-    ax: Axes, spec: ChartSpec, data: ChartData, colors: ColorScheme, layout: AxesLayout
-) -> None:
+_DASHES = {LineStyle.DASH: (4.0, 2.0), LineStyle.DOT: (1.0, 2.0)}
+"""Dash patterns in line widths, as Qt's dash and dot lines."""
+
+
+def _draw_marks(ax: Axes, marks: Marks) -> None:
+    """The shapes, lines and symbols of a bar-family graph (curvis.charts.marks)."""
     from matplotlib.collections import LineCollection
+    from matplotlib.patches import Polygon as PolygonPatch
     from matplotlib.patches import Rectangle
 
-    styles = {s.source: s for s in spec.series}
-    positions = layout.positions
-    shown = [c for c in data.categories if c.source in positions]
-    if spec.variant is ChartVariant.BOX:
-        half, cap = BOX_WIDTH / 2, BOX_WIDTH / 4
-        for c in shown:
-            b, color, at = c.plot_box, styles[c.source].color, float(positions[c.source])
-            if b.n == 0:
-                continue
+    for shape in marks.shapes:
+        common: dict[str, Any] = {
+            "facecolor": _with_alpha(shape.fill, shape.fill_alpha),
+            "edgecolor": shape.edge,
+            "linewidth": shape.edge_pt,
+            "zorder": 2,
+        }
+        if isinstance(shape, Rect):
             ax.add_patch(
-                Rectangle(
-                    (at - half, b.q1),
-                    BOX_WIDTH,
-                    b.q3 - b.q1,
-                    facecolor=_with_alpha(color, BOX_FILL_ALPHA),
-                    edgecolor=color,
-                    linewidth=BOX_LINE_PT,
-                    zorder=2,
-                )
+                Rectangle((shape.x0, shape.y0), shape.x1 - shape.x0, shape.y1 - shape.y0, **common)
             )
-            lines = [
-                [(at - half, b.median), (at + half, b.median)],
-                [(at, b.q3), (at, b.max)],
-                [(at, b.q1), (at, b.min)],
-                [(at - cap, b.max), (at + cap, b.max)],
-                [(at - cap, b.min), (at + cap, b.min)],
-            ]
-            ax.add_collection(
-                LineCollection(
-                    lines, colors=color, linewidths=BOX_LINE_PT, capstyle="butt", zorder=3
-                ),
-                autolim=False,
-            )
-        return
-    x = np.array([positions[c.source] for c in shown], dtype=np.float64)
-    heights = np.nan_to_num(np.array([c.mean for c in shown], dtype=np.float64))
-    if len(shown):
-        ax.bar(
-            x,
-            heights,
-            width=BAR_WIDTH,
-            color=[styles[c.source].color for c in shown],
-            edgecolor=colors.ink,
-            linewidth=AXIS_WIDTH_PT,
-            zorder=2,
-        )
-    half = BAR_WIDTH / 6
-    segments: list[list[tuple[float, float]]] = []
-    for c, position, height in zip(shown, x.tolist(), heights.tolist(), strict=True):
-        if not math.isfinite(c.mean) or (c.err_high <= 0 and c.err_low <= 0):
-            continue
-        top, bottom = height + c.err_high, height - c.err_low
-        segments += [
-            [(position, bottom), (position, top)],
-            [(position - half, top), (position + half, top)],
-            [(position - half, bottom), (position + half, bottom)],
-        ]
-    if segments:
+        elif isinstance(shape, Polygon):
+            xy = np.column_stack([shape.xs, shape.ys])
+            ax.add_patch(PolygonPatch(xy, closed=True, joinstyle="miter", **common))
+    for z, lines in [(3, ln) for ln in marks.lines] + [(5, ln) for ln in marks.over]:
+        style: Any = "solid"
+        if lines.style in _DASHES:
+            style = (0, tuple(p * lines.width_pt for p in _DASHES[lines.style]))
         ax.add_collection(
             LineCollection(
-                segments, colors=colors.ink, linewidths=BOX_LINE_PT, capstyle="butt", zorder=3
+                [list(seg) for seg in lines.segments],
+                colors=lines.color,
+                linewidths=lines.width_pt,
+                linestyles=style,
+                capstyle="butt",
+                zorder=z,
             ),
             autolim=False,
+        )
+    for points in marks.points:
+        ax.plot(
+            points.xs,
+            points.ys,
+            linestyle="None",
+            marker=_MARKERS[points.symbol],
+            markersize=points.size_pt,
+            markerfacecolor=points.color,
+            markeredgecolor=points.color,
+            markeredgewidth=AXIS_WIDTH_PT,
+            zorder=4,
+            scalex=False,
+            scaley=False,
         )
 
 
@@ -471,16 +491,42 @@ def _with_alpha(color: str, alpha: float) -> tuple[float, float, float, float]:
     return to_rgba(color, alpha)
 
 
+def _legend_handle(entry: LegendEntry) -> Any:
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+
+    if entry.symbol is not None:
+        return Line2D(
+            [],
+            [],
+            linestyle="None",
+            marker=_MARKERS[entry.symbol],
+            markersize=entry.size_pt,
+            markerfacecolor=entry.color,
+            markeredgecolor=entry.color,
+            markeredgewidth=AXIS_WIDTH_PT,
+        )
+    return Patch(
+        facecolor=_with_alpha(entry.color, entry.fill_alpha),
+        edgecolor=entry.edge or entry.color,
+        linewidth=AXIS_WIDTH_PT,
+    )
+
+
 # --- legend ------------------------------------------------------------------------------
 
 
 def _legend(
-    ax: Axes, spec: ChartSpec, data: ChartData | None, colors: ColorScheme, layout: AxesLayout
+    ax: Axes,
+    spec: ChartSpec,
+    data: ChartData | None,
+    colors: ColorScheme,
+    layout: AxesLayout,
+    marks: Marks | None = None,
 ) -> None:
     if not spec.show_legend or data is None:
         return
     from matplotlib.lines import Line2D
-    from matplotlib.patches import Patch
 
     styles = {s.source: s for s in spec.series}
     handles: list[Any] = []
@@ -516,17 +562,10 @@ def _legend(
             _dashes(handle, line, style.line_width)
             handles.append(handle)
             names.append(curve.name)
-    else:
-        for c in data.categories:
-            if c.source in layout.positions and styles[c.source].in_legend:
-                handles.append(
-                    Patch(
-                        facecolor=styles[c.source].color,
-                        edgecolor=colors.ink,
-                        linewidth=AXIS_WIDTH_PT,
-                    )
-                )
-                names.append(c.name)
+    elif marks is not None:
+        for entry in marks.legend:
+            handles.append(_legend_handle(entry))
+            names.append(entry.name)
     if handles:
         figure = ax.get_figure()
         assert figure is not None
@@ -555,4 +594,4 @@ def _legend(
         )
 
 
-__all__ = ("RC_PARAMS", "make_figure")
+__all__ = ("RC_PARAMS", "chart_rc", "make_figure")

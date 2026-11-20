@@ -216,7 +216,16 @@ def test_graph_type_needs_what_the_family_needs() -> None:
     bar = default_spec(table, ChartFamily.BAR)
     assert variant_problem(table, ChartVariant.SCATTER) == NEEDS_X
     assert variant_problem(table, ChartVariant.BOX) is None
-    assert variant_problem(table, ChartVariant.VIOLIN) == "This chart type cannot be drawn yet"
+    for variant in (
+        ChartVariant.HORIZONTAL_BAR,
+        ChartVariant.VIOLIN,
+        ChartVariant.COLUMN_SCATTER,
+        ChartVariant.HISTOGRAM,
+    ):
+        assert variant_problem(table, variant) is None
+    assert (
+        variant_problem(table, ChartVariant.KAPLAN_MEIER) == "This chart type cannot be drawn yet"
+    )
     with pytest.raises(ValueError, match=NEEDS_X):
         with_variant(bar, ChartVariant.SCATTER, table)
 

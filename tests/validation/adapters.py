@@ -629,3 +629,40 @@ def kaplan_meier(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
         "median_upper": r.median_upper,
         "risk_n": r.at_risk(inputs["risk_times"]),
     }
+
+
+@adapter("violin_density")
+def violin_density(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/violin_density.R: bandwidth, range and density of violins."""
+    from curvis.charts.stats import CUT, GRID_POINTS
+    from curvis.charts.stats import violin_density as density
+
+    assert inputs["grid_points"] == GRID_POINTS and inputs["cut"] == CUT
+    trimmed = [density(g, trim=True) for g in inputs["groups"]]
+    full = [density(g, trim=False) for g in inputs["groups"]]
+    return {
+        "n": [d.n for d in trimmed],
+        "bw": [d.bw for d in trimmed],
+        "trimmed_low": [d.grid[0] for d in trimmed],
+        "trimmed_high": [d.grid[-1] for d in trimmed],
+        "full_low": [d.grid[0] for d in full],
+        "full_high": [d.grid[-1] for d in full],
+        "trimmed_density": [d.density for d in trimmed],
+        "full_density": [d.density for d in full],
+    }
+
+
+@adapter("histogram_bins")
+def histogram_bins(inputs: Mapping[str, Any]) -> Mapping[str, npt.ArrayLike]:
+    """validation/r/scripts/histogram_bins.R: shared bin edges and counts per group."""
+    from curvis.charts.spec import BinMode
+    from curvis.charts.stats import histogram_bins as bins
+
+    found = bins(
+        inputs["groups"],
+        BinMode(inputs["bins"]),
+        count=int(inputs.get("count", 10)),
+        width=float(inputs.get("width", 1.0)),
+        start=float(inputs.get("start", 0.0)),
+    )
+    return {"breaks": found.breaks, "counts": found.counts, "n_outside": found.n_outside}

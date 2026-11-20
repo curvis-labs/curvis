@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "analysis": "histogram_bins",
+  "case": "count_one",
+  "description": "A single bin.",
+  "generated_by": {
+    "script": "validation/r/scripts/histogram_bins.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "graphics": "4.6.1",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [2, 3, 5, 8]
+    ],
+    "bins": "count",
+    "count": 1
+  },
+  "expected": {
+    "breaks": [2, 8],
+    "counts": [
+      [4]
+    ],
+    "n_outside": [0]
+  },
+  "kinds": {
+    "breaks": "statistic",
+    "counts": "exact",
+    "n_outside": "exact"
+  }
+}

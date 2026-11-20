@@ -221,7 +221,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 9
+    assert data["schema_version"] == SCHEMA_VERSION == 10
     assert set(data["document"]) == {
         "id",
         "name",
@@ -391,7 +391,7 @@ def test_newer_version(tmp_path: Path) -> None:
 
 
 def test_migrations_cover_every_older_version() -> None:
-    assert SCHEMA_VERSION == 9
+    assert SCHEMA_VERSION == 10
     assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
@@ -449,9 +449,9 @@ def test_version_1_files_get_the_default_category_factor(tmp_path: Path) -> None
 def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "old.cvp"
     save(Document(), path)
-    monkeypatch.setattr(project, "SCHEMA_VERSION", 10)
-    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 9)})
-    with pytest.raises(ProjectFileError, match="from format 9"):
+    monkeypatch.setattr(project, "SCHEMA_VERSION", 11)
+    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 10)})
+    with pytest.raises(ProjectFileError, match="from format 10"):
         load(path)
 
 
@@ -789,3 +789,49 @@ def test_survival_graphs_round_trip(tmp_path: Path) -> None:
     path = tmp_path / "survival.cvp"
     save(Document(tables=[table], graphs=[graph]), path)
     assert load(path).graphs == [graph]
+
+
+def test_format_9_graphs_keep_their_colors_and_font(tmp_path: Path) -> None:
+    """Format 9 named a colour scheme; format 10 keeps a copy of its colours."""
+    from curvis.charts.colors import CURVIS
+    from curvis.charts.fonts import DEFAULT_FONT
+    from curvis.charts.spec import Grouping, HistogramBins
+
+    path = tmp_path / "v9.cvp"
+    save(_graph_document(), path)
+
+    def to_v9(data: dict[str, Any]) -> None:
+        data["schema_version"] = 9
+        for graph in data["document"]["graphs"]:
+            for key in ("palette", "font", "grouping", "show_points", "violin_trim", "bins"):
+                del graph[key]
+            graph["color_scheme"] = "curvis"
+
+    _rewrite(path, to_v9)
+    for graph in load(path).graphs:
+        assert graph.palette == CURVIS and graph.font == DEFAULT_FONT
+        assert graph.grouping is Grouping.NONE and not graph.show_points
+        assert graph.violin_trim and graph.bins == HistogramBins()
+
+
+def test_graph_style_round_trips(tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    from curvis.charts.colors import ColorScheme
+    from curvis.charts.spec import BinMode, Grouping, HistogramBins
+
+    document = _graph_document()
+    mine = ColorScheme("custom", "Lab", "#fafafa", "#101010", ("#123456", "#abcdef"))
+    styled = replace(
+        document.graphs[0],
+        palette=mine,
+        font="liberation_serif",
+        grouping=Grouping.BY_CATEGORY,
+        show_points=True,
+        violin_trim=False,
+        bins=HistogramBins(BinMode.WIDTH, 7, 0.25, -1.5),
+    )
+    document.graphs[0] = styled
+    path = tmp_path / "styled.cvp"
+    save(document, path)
+    assert load(path).graphs[0] == styled

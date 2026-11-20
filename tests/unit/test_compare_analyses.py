@@ -16,7 +16,7 @@ from curvis.analysis.base import (
 from curvis.analysis.compare.anova_analysis import AnovaParams
 from curvis.analysis.compare.kruskal_analysis import KruskalParams
 from curvis.analysis.compare.ttest_analysis import TTestParams
-from curvis.analysis.result import Result, Value, grids
+from curvis.analysis.result import Result, Value, grids, render_p
 from curvis.data import Column, Table
 
 
@@ -64,7 +64,7 @@ def test_t_test_reports_the_difference_b_minus_a_with_a_plain_reading() -> None:
     assert result.summary.startswith(
         "The mean of Drug is 1.417 higher than the mean of Control (95% CI 0.8605 to 1.973)"
     )
-    assert "statistically significant (P < 0.001)" in result.summary
+    assert "statistically significant (P < 0.001)" in render_p(result.summary)
     assert result.warnings == ()
 
 

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "analysis": "histogram_bins",
+  "case": "auto_n_two",
+  "description": "n = 2: the smallest histogram.",
+  "generated_by": {
+    "script": "validation/r/scripts/histogram_bins.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "graphics": "4.6.1",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [1.5, 4.25]
+    ],
+    "bins": "auto"
+  },
+  "expected": {
+    "breaks": [1, 2, 3, 4, 5],
+    "counts": [
+      [1, 0, 0, 1]
+    ],
+    "n_outside": [0]
+  },
+  "kinds": {
+    "breaks": "statistic",
+    "counts": "exact",
+    "n_outside": "exact"
+  }
+}

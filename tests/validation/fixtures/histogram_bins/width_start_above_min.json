@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "analysis": "histogram_bins",
+  "case": "width_start_above_min",
+  "description": "A start above the smallest values: they are left out.",
+  "generated_by": {
+    "script": "validation/r/scripts/histogram_bins.R",
+    "r_version": "R version 4.6.1 (2026-06-24 ucrt)",
+    "platform": "x86_64-w64-mingw32",
+    "packages": {
+      "graphics": "4.6.1",
+      "jsonlite": "2.0.0",
+      "stats": "4.6.1"
+    }
+  },
+  "inputs": {
+    "groups": [
+      [-3, -1, 0.5, 2, 4, 6.5],
+      [-0.5, 1, 9]
+    ],
+    "bins": "width",
+    "width": 2,
+    "start": 0
+  },
+  "expected": {
+    "breaks": [0, 2, 4, 6, 8, 10],
+    "counts": [
+      [2, 1, 0, 1, 0],
+      [1, 0, 0, 0, 1]
+    ],
+    "n_outside": [2, 1]
+  },
+  "kinds": {
+    "breaks": "statistic",
+    "counts": "exact",
+    "n_outside": "exact"
+  }
+}

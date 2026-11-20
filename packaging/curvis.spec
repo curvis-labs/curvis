@@ -90,7 +90,11 @@ HIDDEN_IMPORTS = [
 a = Analysis(  # noqa: F821
     [str(ROOT / "packaging" / "entry.py")],
     pathex=[str(ROOT / "src")],
-    datas=[(str(ROOT / "src" / "curvis" / "ui" / "icons"), "curvis/ui/icons")],
+    datas=[
+        (str(ROOT / "src" / "curvis" / "ui" / "icons"), "curvis/ui/icons"),
+        # The bundled chart fonts with their licences (curvis.charts.fonts).
+        (str(ROOT / "src" / "curvis" / "charts" / "font_files"), "curvis/charts/font_files"),
+    ],
     hiddenimports=HIDDEN_IMPORTS,
     excludes=EXCLUDES,
     noarchive=False,

@@ -1,5 +1,12 @@
-"""App settings stored with QSettings: theme, decimal places, recent projects, recently
-used analyses and global constants.
+"""App settings stored with QSettings: theme, decimal places, what new graphs start
+with (palette, size, font, text size) and the palettes the user made, how P values are
+shown, export defaults, the crash log, recent projects, recently used analyses and
+global constants.
+
+Settings only give starting values: a new graph copies them into its chart spec
+(:meth:`Settings.graph_defaults`), so a later change never alters an existing graph.
+:meth:`Settings.reset_to_defaults` restores every setting the Settings dialog shows and
+keeps recent projects, recently used analyses and global constants.
 
 Values are validated on read, so a damaged or hand-edited settings file falls back to the
 defaults instead of breaking the app. Recent projects and global constants are each stored
@@ -17,6 +24,20 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QSettings, Signal
 
+from curvis.analysis.result import DEFAULT_P_DISPLAY, PDisplay
+from curvis.charts.colors import CURVIS, ColorScheme, normalized, palette_problem
+from curvis.charts.fonts import DEFAULT_FONT, FONTS
+from curvis.charts.spec import (
+    ASPECT_PRESETS,
+    CUSTOM_ASPECT,
+    DEFAULT_ASPECT,
+    DEFAULT_TEXT_SIZE,
+    MAX_TEXT_SIZE,
+    MIN_TEXT_SIZE,
+    GraphDefaults,
+    palette_from_json,
+    palette_to_json,
+)
 from curvis.core.constants import ProjectConstant
 
 ORGANIZATION = "Curvis"
@@ -32,6 +53,14 @@ MAX_RECENT_ANALYSES = 5
 DECIMAL_PLACES_DEFAULT = 4
 DECIMAL_PLACES_MIN = 0
 DECIMAL_PLACES_MAX = 15
+
+GRAPH_SIZE_RANGE = (1.0, 50.0)
+"""Smallest and largest custom page side, in cm (as the Format dialog's)."""
+EXPORT_FORMATS = ("png", "svg", "pdf")
+EXPORT_FORMAT_DEFAULT = "png"
+PNG_DPI_DEFAULT = 300
+PNG_DPI_MIN, PNG_DPI_MAX = 72, 1200
+MAX_PALETTES = 50
 
 
 class Theme(StrEnum):
@@ -60,6 +89,13 @@ class RecentProject:
         return self.path.stem
 
 
+def _checked(palette: ColorScheme) -> ColorScheme:
+    problem = palette_problem(palette)
+    if problem is not None:
+        raise ValueError(problem)
+    return normalized(palette)
+
+
 def _same_file_key(path: Path) -> str:
     """Key that treats two spellings of the same file as equal."""
     return os.path.normcase(str(path.expanduser().resolve(strict=False)))
@@ -76,6 +112,32 @@ class Settings(QObject):
     GLOBAL_CONSTANTS = "formulas/global_constants"
     RECENT_ANALYSES = "analyses/recent"
     CRASH_LOG = "privacy/crash_log"
+    GRAPH_PALETTE = "graphs/palette"
+    GRAPH_SIZE = "graphs/size"
+    GRAPH_CUSTOM_SIZE = "graphs/custom_size"
+    GRAPH_FONT = "graphs/font"
+    GRAPH_TEXT_SIZE = "graphs/text_size"
+    PALETTES = "graphs/palettes"
+    P_DISPLAY = "results/p_display"
+    EXPORT_FORMAT = "export/format"
+    PNG_DPI = "export/png_dpi"
+
+    RESET_KEYS = (
+        THEME,
+        DECIMAL_PLACES,
+        CRASH_LOG,
+        GRAPH_PALETTE,
+        GRAPH_SIZE,
+        GRAPH_CUSTOM_SIZE,
+        GRAPH_FONT,
+        GRAPH_TEXT_SIZE,
+        PALETTES,
+        P_DISPLAY,
+        EXPORT_FORMAT,
+        PNG_DPI,
+    )
+    """What Reset to defaults restores: every setting of the Settings dialog. Recent
+    projects, recently used analyses and global constants are kept."""
 
     def __init__(self, store: QSettings | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -132,6 +194,171 @@ class Settings(QObject):
     @crash_log.setter
     def crash_log(self, enabled: bool) -> None:
         self._set(self.CRASH_LOG, bool(enabled))
+
+    # --- new graphs ------------------------------------------------------------------
+
+    @property
+    def graph_palette(self) -> ColorScheme:
+        """The palette new graphs copy (default: Curvis)."""
+        return self._palette(self._store.value(self.GRAPH_PALETTE, "")) or CURVIS
+
+    @graph_palette.setter
+    def graph_palette(self, palette: ColorScheme) -> None:
+        self._set(self.GRAPH_PALETTE, json.dumps(palette_to_json(_checked(palette))))
+
+    @property
+    def palettes(self) -> list[ColorScheme]:
+        """The palettes the user made with the palette editor, in order."""
+        raw = self._store.value(self.PALETTES, "[]")
+        try:
+            items = json.loads(str(raw))
+        except ValueError:
+            return []
+        if not isinstance(items, list):
+            return []
+        found: list[ColorScheme] = []
+        for item in items[:MAX_PALETTES]:
+            try:
+                found.append(palette_from_json(item))
+            except (ValueError, KeyError, TypeError):
+                continue
+        return found
+
+    @palettes.setter
+    def palettes(self, palettes: list[ColorScheme]) -> None:
+        data = [palette_to_json(_checked(p)) for p in palettes[:MAX_PALETTES]]
+        self._set(self.PALETTES, json.dumps(data))
+
+    @property
+    def graph_size(self) -> tuple[str, tuple[float, float] | None]:
+        """(page preset, custom size in cm or None) new graphs start with."""
+        preset = str(self._store.value(self.GRAPH_SIZE, DEFAULT_ASPECT))
+        if preset in ASPECT_PRESETS:
+            return preset, None
+        if preset == CUSTOM_ASPECT:
+            size = self._custom_size()
+            if size is not None:
+                return CUSTOM_ASPECT, size
+        return DEFAULT_ASPECT, None
+
+    def set_graph_size(self, preset: str, custom: tuple[float, float] | None = None) -> None:
+        if preset == CUSTOM_ASPECT:
+            low, high = GRAPH_SIZE_RANGE
+            if custom is None or not all(low <= v <= high for v in custom):
+                raise ValueError(f"A custom size is {low:g} to {high:g} cm on each side.")
+            self._store.setValue(self.GRAPH_CUSTOM_SIZE, json.dumps(list(custom)))
+        elif preset not in ASPECT_PRESETS:
+            raise ValueError(f"Unknown graph size {preset!r}.")
+        self._set(self.GRAPH_SIZE, preset)
+
+    def _custom_size(self) -> tuple[float, float] | None:
+        try:
+            raw = json.loads(str(self._store.value(self.GRAPH_CUSTOM_SIZE, "null")))
+            width, height = float(raw[0]), float(raw[1])
+        except (ValueError, TypeError, IndexError, KeyError):
+            return None
+        low, high = GRAPH_SIZE_RANGE
+        return (width, height) if low <= width <= high and low <= height <= high else None
+
+    @property
+    def graph_font(self) -> str:
+        """Id of the chart font new graphs use."""
+        value = str(self._store.value(self.GRAPH_FONT, DEFAULT_FONT))
+        return value if value in FONTS else DEFAULT_FONT
+
+    @graph_font.setter
+    def graph_font(self, font_id: str) -> None:
+        if font_id not in FONTS:
+            raise ValueError(f"Unknown chart font {font_id!r}.")
+        self._set(self.GRAPH_FONT, font_id)
+
+    @property
+    def graph_text_size(self) -> float:
+        """Chart text size (points) of new graphs."""
+        try:
+            size = float(str(self._store.value(self.GRAPH_TEXT_SIZE, DEFAULT_TEXT_SIZE)))
+        except ValueError:
+            return DEFAULT_TEXT_SIZE
+        return size if MIN_TEXT_SIZE <= size <= MAX_TEXT_SIZE else DEFAULT_TEXT_SIZE
+
+    @graph_text_size.setter
+    def graph_text_size(self, size: float) -> None:
+        if not MIN_TEXT_SIZE <= size <= MAX_TEXT_SIZE:
+            raise ValueError(
+                f"Chart text size must be from {MIN_TEXT_SIZE:g} to {MAX_TEXT_SIZE:g} points."
+            )
+        self._set(self.GRAPH_TEXT_SIZE, float(size))
+
+    def graph_defaults(self) -> GraphDefaults:
+        """What a new graph copies into its chart spec."""
+        preset, custom = self.graph_size
+        return GraphDefaults(
+            aspect_ratio=preset,
+            custom_size=custom,
+            palette=self.graph_palette,
+            font=self.graph_font,
+            text_size=self.graph_text_size,
+        )
+
+    def _palette(self, raw: object) -> ColorScheme | None:
+        if not raw:
+            return None
+        try:
+            return palette_from_json(json.loads(str(raw)))
+        except (ValueError, KeyError, TypeError):
+            return None
+
+    # --- results and export ---------------------------------------------------------
+
+    @property
+    def p_display(self) -> PDisplay:
+        """How P values are shown (only the display; results keep full precision)."""
+        try:
+            return PDisplay(str(self._store.value(self.P_DISPLAY, DEFAULT_P_DISPLAY.value)))
+        except ValueError:
+            return DEFAULT_P_DISPLAY
+
+    @p_display.setter
+    def p_display(self, display: PDisplay) -> None:
+        self._set(self.P_DISPLAY, PDisplay(display).value)
+
+    @property
+    def export_format(self) -> str:
+        """The format the Export dialog starts with: "png", "svg" or "pdf"."""
+        value = str(self._store.value(self.EXPORT_FORMAT, EXPORT_FORMAT_DEFAULT))
+        return value if value in EXPORT_FORMATS else EXPORT_FORMAT_DEFAULT
+
+    @export_format.setter
+    def export_format(self, fmt: str) -> None:
+        if fmt not in EXPORT_FORMATS:
+            raise ValueError(f"Unknown export format {fmt!r}.")
+        self._set(self.EXPORT_FORMAT, fmt)
+
+    @property
+    def png_dpi(self) -> int:
+        """The PNG resolution the Export dialog starts with."""
+        try:
+            dpi = int(str(self._store.value(self.PNG_DPI, PNG_DPI_DEFAULT)))
+        except ValueError:
+            return PNG_DPI_DEFAULT
+        return dpi if PNG_DPI_MIN <= dpi <= PNG_DPI_MAX else PNG_DPI_DEFAULT
+
+    @png_dpi.setter
+    def png_dpi(self, dpi: int) -> None:
+        if not PNG_DPI_MIN <= dpi <= PNG_DPI_MAX:
+            raise ValueError(f"Choose a resolution from {PNG_DPI_MIN} to {PNG_DPI_MAX} dpi.")
+        self._set(self.PNG_DPI, int(dpi))
+
+    # --- reset -----------------------------------------------------------------------
+
+    def reset_to_defaults(self) -> None:
+        """Restore every setting of the Settings dialog; recent projects, recently used
+        analyses and global constants are kept."""
+        for key in self.RESET_KEYS:
+            self._store.remove(key)
+        self._store.sync()
+        for key in self.RESET_KEYS:
+            self.changed.emit(key)
 
     # --- recent projects ---------------------------------------------------------
 

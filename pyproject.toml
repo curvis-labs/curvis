@@ -79,6 +79,7 @@ module = [
     "curvis.charts.colors",
     "curvis.charts.builder",
     "curvis.charts.data",
+    "curvis.charts.stats",
     "curvis.charts.tooltips",
 ]
 strict = true

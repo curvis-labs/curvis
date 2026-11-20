@@ -91,9 +91,14 @@ TYPE_ACTIONS = {
     "graph.type.scatter": (ChartVariant.SCATTER, "&Scatter", "chart_xy"),
     "graph.type.line": (ChartVariant.LINE, "&Line", "plot"),
     "graph.type.bar": (ChartVariant.BAR, "&Bar", "chart_bar"),
+    "graph.type.horizontal_bar": (ChartVariant.HORIZONTAL_BAR, "&Horizontal bar", "chart_bar"),
     "graph.type.box": (ChartVariant.BOX, "B&ox", "chart_box"),
+    "graph.type.violin": (ChartVariant.VIOLIN, "&Violin", "chart_box"),
+    "graph.type.column_scatter": (ChartVariant.COLUMN_SCATTER, "Column s&catter", "chart_xy"),
+    "graph.type.histogram": (ChartVariant.HISTOGRAM, "H&istogram", "chart_bar"),
 }
-"""The graph types of the Change graph type menu."""
+"""The graph types of the Change graph type menu (and the command palette). The Graph
+panel's toolbar shows the first four of SPEC.md (scatter, line, bar, box)."""
 
 NO_PROJECT = "Open or create a project first"
 NO_TABLE = "Show a table first"
@@ -737,6 +742,10 @@ class MainWindow(QMainWindow):
             scheduler=self.scheduler,
             global_constants=lambda: self.settings.global_constants,
             recent_analyses=lambda: self.settings.recent_analyses,
+            graph_defaults=self.settings.graph_defaults,
+            palettes=lambda: self.settings.palettes,
+            export_defaults=lambda: (self.settings.export_format, self.settings.png_dpi),
+            p_display=self.settings.p_display,
         )
         tab.message.connect(self._show_status)
         tab.manage_constants_requested.connect(self.show_constants)
@@ -1018,6 +1027,9 @@ class MainWindow(QMainWindow):
         elif key == Settings.DECIMAL_PLACES:
             for tab in self.document_tabs():
                 tab.set_decimal_places(self.settings.decimal_places)
+        elif key == Settings.P_DISPLAY:
+            for tab in self.document_tabs():
+                tab.set_p_display(self.settings.p_display)
         elif key == Settings.GLOBAL_CONSTANTS:
             for tab in self.document_tabs():
                 if tab.engine is not None:
