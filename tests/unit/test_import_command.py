@@ -25,13 +25,13 @@ def snapshot(table: Table) -> list[tuple[str, str, str, list[object]]]:
 def test_blank_table_fills_its_columns_left_to_right_then_appends() -> None:
     table = Table.blank()
     doc = Document(tables=[table])
-    x_id, a_id = (c.id for c in table.columns)
-    cols = imported()
+    blank_ids = [c.id for c in table.columns]  # X, A, B and C
+    cols = imported(count=5)
     doc.execute(ImportColumns(table.id, cols, "'data.csv'"))
 
-    assert [c.name for c in table.columns] == ["In 0", "In 1", "In 2"]
-    assert [c.role for c in table.columns] == [ColumnRole.Y] * 3
-    assert [c.id for c in table.columns] == [x_id, a_id, cols[2].id]
+    assert [c.name for c in table.columns] == [f"In {i}" for i in range(5)]
+    assert [c.role for c in table.columns] == [ColumnRole.Y] * 5
+    assert [c.id for c in table.columns] == [*blank_ids, cols[4].id]
     assert table.n_rows == 3
     table.check()
     assert doc.undo_stack.undo_text == "Import 'data.csv'"
@@ -46,6 +46,8 @@ def test_imported_x_fills_the_empty_x_column() -> None:
     assert [(c.name, c.role) for c in table.columns] == [
         ("Dose", ColumnRole.X),
         ("Resp", ColumnRole.Y),
+        ("B", ColumnRole.Y),  # the blank table's unused empty columns stay
+        ("C", ColumnRole.Y),
     ]
 
 

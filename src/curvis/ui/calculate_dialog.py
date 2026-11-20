@@ -44,13 +44,15 @@ from PySide6.QtWidgets import (
 from curvis.core import Calculation, CalculationKind, Document
 from curvis.core import calculation_formulas as cf
 from curvis.core.constants import JsonValue, ProjectConstant
-from curvis.data import Column, ColumnRole, Pairing, Table
+from curvis.data import AmbiguousColumnError, ColumnRole, Pairing, Table, resolve_reference
 from curvis.data.pairing import DEFAULT_ROLE_A, DEFAULT_ROLE_B
 from curvis.formula import (
     BUILTIN_CONSTANTS,
+    Formula,
     FormulaError,
     Function,
     check,
+    column_refs,
     parse,
     resolve_constants,
 )
@@ -177,7 +179,10 @@ class _ReferenceOptions(QWidget):
 
     changed = Signal()
 
-    def __init__(self, verb: str, columns: Sequence[Column], parent: QWidget | None = None) -> None:
+    def __init__(
+        self, verb: str, columns: Sequence[tuple[str, str]], parent: QWidget | None = None
+    ) -> None:
+        """``columns`` are (full name, id) of the columns to choose from."""
         super().__init__(parent)
         self.stack = FittedStack(self)
         layout = QVBoxLayout(self)
@@ -195,8 +200,8 @@ class _ReferenceOptions(QWidget):
         self.column_mean_radio = QRadioButton(f"{verb} the mean of anot&her column:")
         self.column_combo = QComboBox()
         self.column_combo.setAccessibleName("Reference column")
-        for column in columns:
-            self.column_combo.addItem(column.name, column.id)
+        for name, column_id in columns:
+            self.column_combo.addItem(name, column_id)
         self.unpaired_group = QButtonGroup(self)
         for i, (radio, ref) in enumerate(
             (
@@ -501,7 +506,7 @@ class CalculateDialog(QDialog):
                     parent.setCheckState(0, Qt.CheckState.Unchecked)
                     self.tree.addTopLevelItem(parent)
                     groups[column.group_id] = parent
-            item = QTreeWidgetItem([column.name, ""])
+            item = QTreeWidgetItem([self.table.full_name(column), ""])
             item.setData(0, _ID, column.id)
             if column.id in source_ids and column.role is ColumnRole.Y:
                 item.setFlags(
@@ -525,7 +530,9 @@ class CalculateDialog(QDialog):
         self.options_box = QGroupBox("Options")
         layout = QVBoxLayout(self.options_box)
         self.options = FittedStack()
-        reference_columns = [c for c in self.table.columns if c.role.is_numeric]
+        reference_columns = [
+            (self.table.full_name(c), c.id) for c in self.table.columns if c.role.is_numeric
+        ]
         self.custom_options = secondary_label()
         self.baseline_options = _ReferenceOptions("Subtract", reference_columns)
         self.normalize_options = _NormalizeOptions()
@@ -885,13 +892,30 @@ class CalculateDialog(QDialog):
             keys |= {key, f"{key}:mean"}
         return keys
 
+    def _column_names(self) -> list[str]:
+        """Names a formula can use for the numeric columns: full names, and short names
+        that belong to one column only (others are reported by :meth:`_check_references`)."""
+        numeric = [c for c in self.table.columns if c.role.is_numeric]
+        names = [self.table.full_name(c) for c in numeric]
+        return names + [c.name for c in numeric]
+
+    def _check_references(self, formula: Formula) -> None:
+        """Raise :class:`FormulaError` at a short column name that several columns have."""
+        for node in column_refs(formula.root):
+            try:
+                resolve_reference(self.table, node.name)
+            except AmbiguousColumnError as exc:
+                raise FormulaError(str(exc), node.span.start, node.span.end) from None
+            except LookupError:
+                pass
+
     def _validate(self) -> None:
         self._formula_error = None
         text = self.formula
         try:
             formula = parse(text)
-            names = [c.name for c in self.table.columns if c.role.is_numeric]
-            check(formula, names, self._constants(), self._role_keys(self.pairing()))
+            check(formula, self._column_names(), self._constants(), self._role_keys(self.pairing()))
+            self._check_references(formula)
         except FormulaError as exc:
             self._formula_error = exc
         error = self._formula_error
@@ -951,7 +975,7 @@ class CalculateDialog(QDialog):
             ]
         for column in self.table.columns:
             if column.role.is_numeric:
-                ref = "[" + column.name.replace("]", "]]") + "]"
+                ref = "[" + self.table.full_name(column).replace("]", "]]") + "]"
                 entries.append(_PaletteEntry(ref, ref, f"{column.role.value} column"))
         return entries
 

@@ -12,7 +12,7 @@ from pytestqt.qtbot import QtBot
 from curvis.core import AddTable, Document
 from curvis.data import Column, ColumnRole, Table
 from curvis.ui.main_window import MainWindow
-from curvis.ui.table import SPARE_COLUMNS, SPARE_ROWS, TableModel, TableView
+from curvis.ui.table import SPARE_ROWS, TableModel, TableView
 
 
 @pytest.fixture
@@ -95,17 +95,16 @@ def select(view: TableView, *blocks: tuple[int, int, int, int]) -> None:
 def test_model_shows_values_spare_cells_and_headers(view: TableView) -> None:
     model = view.model()
     assert model.rowCount() == 3 + SPARE_ROWS
-    assert model.columnCount() == 3 + SPARE_COLUMNS
-    shown = [[model.index(r, c).data() for c in range(4)] for r in range(4)]
+    assert model.columnCount() == 3  # no dummy columns right of the data
+    shown = [[model.index(r, c).data() for c in range(3)] for r in range(4)]
     assert shown == [
-        ["1", "10.5", "a", None],
-        ["2", "20", "b", None],
-        ["3", "", None, None],
-        [None, None, None, None],
+        ["1", "10.5", "a"],
+        ["2", "20", "b"],
+        ["3", "", None],
+        [None, None, None],
     ]
     assert model.headerData(0, Qt.Orientation.Horizontal) == "Dose\nX"
     assert model.headerData(1, Qt.Orientation.Horizontal) == "Resp\nY"
-    assert model.headerData(3, Qt.Orientation.Horizontal) == ""
     assert model.headerData(0, Qt.Orientation.Vertical) == "1"
 
 
@@ -153,6 +152,38 @@ def test_typing_replaces_the_cell_and_enter_moves_down(
     assert values(doc, "Resp") == [42.0, 20.0, None]
     assert current(view) == (1, 1)
     assert doc.undo_stack.undo_text == "Set cell in column 'Resp', row 1"
+
+
+def test_tab_in_the_last_column_adds_a_column(qtbot: QtBot, view: TableView, doc: Document) -> None:
+    go(view, 1, 2)  # Label, the last column
+    key(qtbot, view, Qt.Key.Key_Tab)
+    table = doc.tables[0]
+    assert [c.name for c in table.columns] == ["Dose", "Resp", "Label", "A"]
+    assert table.columns[3].role == ColumnRole.Y
+    assert current(view) == (1, 3)
+    # Typing, then Tab, saves the cell and adds the next column.
+    type_text(qtbot, view, "5")
+    key(qtbot, view, Qt.Key.Key_Tab)
+    assert values(doc, "A") == [None, 5.0, None]
+    assert [c.name for c in table.columns][3:] == ["A", "B"]
+    assert current(view) == (1, 4)
+    # Arrow keys and Shift+Tab never add columns.
+    key(qtbot, view, Qt.Key.Key_Right)
+    assert current(view) == (1, 4) and len(table.columns) == 5
+    doc.undo()
+    doc.undo()
+    doc.undo()
+    assert [c.name for c in table.columns] == ["Dose", "Resp", "Label"]
+
+
+def test_typing_then_right_arrow_in_the_last_column_adds_nothing(
+    qtbot: QtBot, view: TableView, doc: Document
+) -> None:
+    go(view, 0, 2)
+    type_text(qtbot, view, "z")
+    key(qtbot, view, Qt.Key.Key_Right)
+    assert len(doc.tables[0].columns) == 3
+    assert values(doc, "Label")[0] == "z"
 
 
 def test_tab_moves_right_and_shift_tab_left(qtbot: QtBot, view: TableView, doc: Document) -> None:
@@ -252,20 +283,28 @@ def test_typing_below_the_data_adds_rows(qtbot: QtBot, view: TableView, doc: Doc
     assert view.model().rowCount() == 3 + SPARE_ROWS
 
 
-def test_typing_in_a_spare_column_adds_a_y_column(
-    qtbot: QtBot, view: TableView, doc: Document
-) -> None:
-    go(view, 0, 4)  # two columns past the last: the new column goes right after it
+def test_a_new_table_has_empty_y_columns_to_type_into(qtbot: QtBot, window: MainWindow) -> None:
+    tab = window.new_document()
+    view = tab.table_view
+    assert view is not None
+    model = view.model()
+    assert model.columnCount() == 4  # X, A, B and C; no dummy columns
+    assert [model.headerData(c, Qt.Orientation.Horizontal) for c in range(4)] == [
+        "X\nX",
+        "A\nY",
+        "B\nY",
+        "C\nY",
+    ]
+    view.setFocus()
+    go(view, 0, 3)  # C, the last column
     type_text(qtbot, view, "3")
     key(qtbot, view, Qt.Key.Key_Return)
-    table = doc.tables[0]
-    assert [c.name for c in table.columns] == ["Dose", "Resp", "Label", "A"]
-    assert table.columns[3].role == ColumnRole.Y
-    assert values(doc, "A") == [3.0, None, None]
-    assert view.model().headerData(3, Qt.Orientation.Horizontal) == "A\nY"
-    doc.undo()
-    assert len(table.columns) == 3
-    assert not doc.undo_stack.can_undo
+    table = tab.document.tables[0]
+    assert [c.name for c in table.columns] == ["X", "A", "B", "C"]  # nothing added
+    assert values(tab.document, "C") == [3.0]
+    assert model.columnCount() == 4
+    tab.document.undo()
+    assert table.n_rows == 0
 
 
 def test_delete_clears_the_selection_in_one_step(
@@ -345,12 +384,12 @@ def test_paste_past_the_edges_adds_rows_and_columns(view: TableView, doc: Docume
     assert table.n_rows == 4
     assert values(doc, "Label") == ["a", "b", "x", "y"]
     assert values(doc, "B") == [None, None, 2.0, 4.0]
-    assert view.model().columnCount() == 5 + SPARE_COLUMNS
+    assert view.model().columnCount() == 5
     assert doc.undo_stack.count == 1
     doc.undo()
     assert [c.name for c in table.columns] == ["Dose", "Resp", "Label"]
     assert table.n_rows == 3
-    assert view.model().columnCount() == 3 + SPARE_COLUMNS
+    assert view.model().columnCount() == 3
 
 
 def test_paste_with_text_in_a_number_column_changes_nothing(view: TableView, doc: Document) -> None:
@@ -366,6 +405,7 @@ def test_paste_with_text_in_a_number_column_changes_nothing(view: TableView, doc
 def test_copy_and_paste_round_trip(view: TableView, doc: Document) -> None:
     select(view, (0, 0, 2, 1))
     view.copy_selection()
+    view.model().insert_column(3)  # an empty Y column; the paste adds one more
     go(view, 0, 3)
     assert view.paste()
     table = doc.tables[0]
@@ -434,11 +474,6 @@ def test_header_menu_inserts_columns(view: TableView, doc: Document) -> None:
     doc.undo()
     doc.undo()
     assert header(view, 1) == "Resp\nY"
-
-
-def test_header_menu_on_a_spare_column_adds_a_column(view: TableView, doc: Document) -> None:
-    menu_action(view, 4, "Add column")
-    assert [c.name for c in doc.tables[0].columns] == ["Dose", "Resp", "Label", "A"]
 
 
 def test_header_menu_renames_a_column(qtbot: QtBot, view: TableView, doc: Document) -> None:
@@ -555,7 +590,7 @@ def test_empty_columns_can_be_deleted(window: MainWindow) -> None:
     assert tab.table_view is not None
     go(tab.table_view, 0, 1)
     window.registry.action("table.delete_columns").trigger()
-    assert [c.name for c in tab.document.tables[0].columns] == ["X"]
+    assert [c.name for c in tab.document.tables[0].columns] == ["X", "B", "C"]
 
 
 def test_view_paints_cells_selection_and_current_cell(view: TableView) -> None:
@@ -579,3 +614,14 @@ def test_long_numbers_are_rounded_to_fit_but_kept_in_full(view: TableView) -> No
     assert len(shown) <= width and shown.startswith("107.6")
     assert model.index(0, 1).data(Qt.ItemDataRole.EditRole) == "107.64052345967664"
     assert model.index(0, 1).data(Qt.ItemDataRole.ToolTipRole) == "107.64052345967664"
+
+
+def test_headers_still_answer_after_their_table_is_removed(doc: Document) -> None:
+    from curvis.core import RemoveTable
+
+    doc.execute(AddTable(Table("Other", [Column.new("Q", ColumnRole.Y)])))
+    model = TableModel(doc, doc.tables[0].id)
+    doc.execute(RemoveTable(doc.tables[0].id))
+    # The model keeps showing its last state until the tab replaces the view.
+    tip = model.headerData(0, Qt.Orientation.Horizontal, Qt.ItemDataRole.ToolTipRole)
+    assert tip.startswith("Dose (X column)")

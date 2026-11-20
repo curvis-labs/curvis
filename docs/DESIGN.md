@@ -293,7 +293,9 @@ Mockup: `docs/mockups/table-tabs.html`, board 6.
   no ellipsis.
 - **Keys.** Enter or a click elsewhere keeps the name. Esc cancels the header being edited.
   Tab keeps the name and edits the next column header to the right, Shift+Tab the one to the
-  left. Tab on the last column keeps the name and stops; it never adds a column.
+  left. Tab on the last column keeps the name, adds a Y column (named A, B, … as free) and
+  edits its name; Esc there keeps the added column. Tab in a cell of the last column adds a
+  Y column too and moves into it.
 - **Undo.** Each changed name is one undo step (“Rename column 'Drug' to 'Drug A'”). A name
   left unchanged adds none, and names kept with Tab stay when a later header is cancelled.
 - **Invalid names.** An empty name or one already used in the table keeps the field open and

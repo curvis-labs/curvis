@@ -12,6 +12,7 @@ from curvis.core import (
     AddColumn,
     AddTable,
     BulkRename,
+    Calculation,
     Command,
     CommandError,
     CycleError,
@@ -31,11 +32,17 @@ from curvis.core import (
     SetColumnRole,
     UndoStack,
     UngroupColumns,
+    add_calculation,
 )
-from curvis.data import CellValue, Column, ColumnRole, Table
+from curvis.data import CellValue, Column, ColumnRole, Pairing, Table, full_name, full_names
+from curvis.data.names import name_key
 
 NAMES = st.sampled_from(
-    ["A", "a", "B", "Dose", "dOSE", "Resp", "T0", "t0", "C1", "c1", "", " "]
+    [
+        *("A", "a", "B", "Dose", "dOSE", "Resp", "T0", "t0", "C1", "c1", "", " "),
+        # Names that look like full names ("category: name") of columns in a category.
+        *("Male", "male", "Male: A", "male:a", " Male : B", "Male:", "M: Male: A"),
+    ]
 ) | st.text(max_size=4)
 ROLES = st.sampled_from(list(ColumnRole))
 NUMBERS = st.floats(allow_nan=True, allow_infinity=True) | st.integers(-1000, 1000)
@@ -85,6 +92,9 @@ def draw_command(data: st.DataObject, doc: Document) -> Command:
     if tables_with_columns:
         kinds += ["remove_column", "move_column", "rename_column", "cell", "block", "role"] * 2
         kinds += ["group", "group", "ungroup", "category", "reorder", "bulk_rename", "factor"]
+        kinds += ["category", "category", "calculate"]
+    if any(t.category_groups for t in doc.tables):
+        kinds += ["rename_category"]
     kind = data.draw(st.sampled_from(kinds))
     if kind == "add_table":
         n = len(doc.tables)
@@ -111,9 +121,24 @@ def draw_command(data: st.DataObject, doc: Document) -> Command:
         some_groups = (
             data.draw(st.lists(st.sampled_from(group_ids), max_size=3)) if group_ids else []
         )
-        return SetCategory(
-            table.id, some_groups, data.draw(st.none() | NAMES), column_ids=some_columns
-        )
+        # Often an existing category, so columns move between categories.
+        existing = [c.name for c in table.category_groups]
+        category = data.draw(st.none() | NAMES | (st.sampled_from(existing) if existing else NAMES))
+        return SetCategory(table.id, some_groups, category, column_ids=some_columns)
+    if kind == "rename_category":
+        table = data.draw(st.sampled_from([t for t in doc.tables if t.category_groups]))
+        category = data.draw(st.sampled_from(table.category_groups))
+        return BulkRename(table.id, categories={category.id: data.draw(NAMES)})
+    if kind == "calculate":
+        numeric = [c for c in table.columns if c.role.is_numeric]
+        source = data.draw(st.sampled_from(numeric)) if numeric else column
+        # Refer to a column by its full name, its short name or a name it does not have.
+        ref = data.draw(st.sampled_from([full_name(table, column), column.name]) | NAMES)
+        text = "{A} + [" + ref.replace("]", "]]") + "]"
+        try:
+            return add_calculation(doc, Calculation(table.id, text, Pairing((source.id,))))
+        except CommandError:  # e.g. a Text column cannot be calculated from
+            return RenameColumn(table.id, column.id, column.name)
     if kind == "reorder":
         return ReorderColumns(table.id, data.draw(st.permutations([c.id for c in table.columns])))
     if kind == "factor":
@@ -152,40 +177,47 @@ def draw_command(data: st.DataObject, doc: Document) -> Command:
 
 def try_execute(doc: Document, command: Command) -> bool:
     """Execute ``command``; if it is rejected, check that nothing changed."""
-    before = copy.deepcopy(doc.tables)
+    before = snapshot(doc)
     log_length = len(doc.change_log)
     try:
         doc.execute(command)
     except CommandError:
-        assert doc.tables == before
+        assert snapshot(doc) == before
         assert len(doc.change_log) == log_length
         return False
     for table in doc.tables:
         table.check()
+        keys = [name_key(n) for n in full_names(table)]
+        assert len(set(keys)) == len(keys)  # full names stay unique
         assert all(not c.values.flags.writeable for c in table.columns)
     return True
+
+
+def snapshot(doc: Document) -> object:
+    """What undo and redo must restore exactly: the tables and the calculations."""
+    return copy.deepcopy((doc.tables, doc.calculations))
 
 
 @given(doc=documents(), data=st.data())
 def test_random_commands_then_full_undo_restores_document(
     doc: Document, data: st.DataObject
 ) -> None:
-    original = copy.deepcopy(doc.tables)
+    original = snapshot(doc)
     n_steps = data.draw(st.integers(1, UNDO_LIMIT))
     applied = 0
     for _ in range(n_steps):
         if try_execute(doc, draw_command(data, doc)):
             applied += 1
-    final = copy.deepcopy(doc.tables)
+    final = snapshot(doc)
 
     assert doc.undo_stack.index == applied
     while doc.undo_stack.can_undo:
         doc.undo()
-    assert doc.tables == original
+    assert snapshot(doc) == original
 
     while doc.undo_stack.can_redo:
         doc.redo()
-    assert doc.tables == final
+    assert snapshot(doc) == final
     assert len(doc.change_log) == 3 * applied
 
 
@@ -198,14 +230,14 @@ class UndoRedoMachine(RuleBasedStateMachine):
     def start(self, doc: Document) -> None:
         self.doc = doc
         self.doc.undo_stack = UndoStack(doc, limit=self.limit)
-        self.history = [copy.deepcopy(doc.tables)]
+        self.history = [snapshot(doc)]
         self.position = 0
         self.log_length = 0
 
     @rule(data=st.data())
     def execute(self, data: st.DataObject) -> None:
         if try_execute(self.doc, draw_command(data, self.doc)):
-            self.history = [*self.history[: self.position + 1], copy.deepcopy(self.doc.tables)]
+            self.history = [*self.history[: self.position + 1], snapshot(self.doc)]
             self.position += 1
             if len(self.history) > self.limit + 1:
                 del self.history[0]
@@ -228,7 +260,7 @@ class UndoRedoMachine(RuleBasedStateMachine):
 
     @invariant()
     def matches_expected_state(self) -> None:
-        assert self.doc.tables == self.history[self.position]
+        assert snapshot(self.doc) == self.history[self.position]
         assert len(self.doc.change_log) == self.log_length
         assert self.doc.undo_stack.index == self.position
         assert self.doc.undo_stack.count == len(self.history) - 1

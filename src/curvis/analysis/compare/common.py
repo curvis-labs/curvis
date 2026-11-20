@@ -7,7 +7,7 @@ leaving out missing values.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import ClassVar
 
 import numpy as np
@@ -94,8 +94,8 @@ class GroupComparison(AnalysisType):
             return f"Needs at least {self.min_groups} Y columns or replicate groups."
         return None
 
-    def default_inputs(self, table: Table) -> tuple[str, ...]:
-        ids = [c.id for c in self.candidates(table)]
+    def default_inputs(self, table: Table, calculated: Collection[str] = ()) -> tuple[str, ...]:
+        ids = list(super().default_inputs(table, calculated))  # empty columns are skipped
         return tuple(ids[: self.max_groups] if self.max_groups else ids)
 
     def check(self, table: Table, inputs: Sequence[str], params: Params) -> str | None:

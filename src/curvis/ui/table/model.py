@@ -4,8 +4,10 @@ The model reads the columns' NumPy arrays directly; Qt asks only for the cells i
 about to paint. Every change is sent to the document as a command. The model follows
 the undo stack, so edits, undo and redo all reach the view the same way.
 
-Below and to the right of the data the model shows spare empty rows and columns.
-Writing into them adds rows, and new Y columns, in the same command as the write.
+Below the data the model shows spare empty rows; writing into them adds rows in the same
+command as the write. There are no spare columns: a new table has real, empty Y columns
+to type into (see :meth:`curvis.data.Table.blank`), and a paste that runs past the last
+column adds Y columns in the same command.
 
 Above the column names the header shows *bands*: one row of category groups and one
 of replicate groups, each only when the table has any (see :meth:`TableModel.bands`).
@@ -45,6 +47,8 @@ from curvis.data import CellValue, Column, ColumnRole, NodeKind, Table
 from curvis.data.layout import (
     column_category,
     find_node,
+    full_name,
+    full_names,
     layout_tree,
     moved_order,
     name_error,
@@ -55,9 +59,6 @@ from curvis.ui.table.format import cell_text, fitted_number_text
 
 SPARE_ROWS = 20
 """Empty rows shown below the data, to type or paste into."""
-
-SPARE_COLUMNS = 3
-"""Empty columns shown right of the data."""
 
 type Index = QModelIndex | QPersistentModelIndex
 
@@ -104,6 +105,11 @@ def _bands(table: Table) -> list[list[Band | None]]:
                 groups[child.start : child.end] = [band] * (child.end - child.start)
     rows = [(categories, table.category_groups), (groups, table.replicate_groups)]
     return [row for row, used in rows if used]
+
+
+def _taken_names(table: Table) -> list[str]:
+    """Names a new column must avoid: every full name and every short name."""
+    return [*full_names(table), *(c.name for c in table.columns)]
 
 
 class TableModel(QAbstractTableModel):
@@ -156,6 +162,17 @@ class TableModel(QAbstractTableModel):
         found = (self.column_at(p) for p in sorted(set(positions)))
         # Not ``if c``: an empty column has length 0.
         return [c for c in found if c is not None]
+
+    def _taken_names(self) -> list[str]:
+        return _taken_names(self.table)
+
+    def _new_columns(self, count: int) -> list[Command]:
+        """AddColumn commands for ``count`` new Y columns at the right end, named A, B, …
+        as free."""
+        if count <= 0:
+            return []
+        names = next_column_names(self._taken_names(), count)
+        return [AddColumn(self.table_id, Column.new(n, ColumnRole.Y)) for n in names]
 
     def bands(self) -> list[list[Band | None]]:
         """Header bands above the columns, top row first (empty without groups).
@@ -211,7 +228,7 @@ class TableModel(QAbstractTableModel):
         return 0 if parent.isValid() else self._n_rows + SPARE_ROWS
 
     def columnCount(self, parent: Index = QModelIndex()) -> int:  # noqa: B008, N802 (Qt API)
-        return 0 if parent.isValid() else len(self._columns) + SPARE_COLUMNS
+        return 0 if parent.isValid() else len(self._columns)
 
     def value(self, row: int, col: int) -> CellValue:
         """The stored value of a cell; None for spare cells and missing text."""
@@ -281,7 +298,11 @@ class TableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.ToolTipRole and orientation == Qt.Orientation.Horizontal:
             column = self.column_at(section)
             if column is not None:
-                tip = f"{column.name} ({column.role.value} column)"
+                try:
+                    shown = full_name(self.table, column)
+                except KeyError:  # the table is gone; the tab replaces this view
+                    shown = column.name
+                tip = f"{shown} ({column.role.value} column)"
                 if column.group_id is not None:
                     tip += (
                         f" in replicate group '{self.table.replicate_group(column.group_id).name}'"
@@ -328,14 +349,9 @@ class TableModel(QAbstractTableModel):
             return False
         table = self.table
         width = len(values[0])
-        if left > len(table.columns):
-            # Leave no gap: the block starts in the first spare column.
-            left = len(table.columns)
+        # A block that runs past the last column adds Y columns for the rest of it.
         missing = left + width - len(table.columns)
-        commands: list[Command] = []
-        if missing > 0:
-            names = next_column_names([c.name for c in table.columns], missing)
-            commands += [AddColumn(self.table_id, Column.new(n, ColumnRole.Y)) for n in names]
+        commands: list[Command] = self._new_columns(missing)
         if missing <= 0 and len(values) == 1 and width == 1:
             column = table.columns[left]
             return self.execute(SetCellValue(self.table_id, column.id, top, values[0][0]))
@@ -386,7 +402,7 @@ class TableModel(QAbstractTableModel):
         """
         table = self.table
         position = max(0, min(position, len(table.columns)))
-        (name,) = next_column_names([c.name for c in table.columns])
+        (name,) = next_column_names(self._taken_names())
         neighbour = self.column_at(beside) if beside is not None else None
         group_id = category_id = None
         if neighbour is not None and role is ColumnRole.Y:
@@ -491,15 +507,28 @@ class TableModel(QAbstractTableModel):
                 return table.category_group(category_id).name
         return None
 
-    def column_name_problem(self, column_id: str, name: str) -> str | None:
-        """Why ``name`` cannot be the name of the column ``column_id``, or None."""
+    def column_name_problem(self, column_id: str | None, name: str) -> str | None:
+        """Why ``name`` cannot be the name of the column ``column_id``, or None.
+
+        ``column_id`` None checks the name of a new column outside every category.
+        Full names are compared: "Control" can be a column in every category.
+        """
         name = name.strip()
         if not name:
             return "Enter a column name."
+        table = self.table
         key = name_key(name)
-        for column in self.table.columns:
-            if column.id != column_id and name_key(column.name) == key:
-                return f"'{column.name}' is already used in this table. Enter another name."
+        if column_id is not None:
+            column = table.column(column_id)
+            key = name_key(full_name(table, column, {column_id: name}))
+        for other in table.columns:
+            if other.id != column_id and name_key(full_name(table, other)) == key:
+                shown = full_name(table, other)
+                return f"'{shown}' is already used in this table. Enter another name."
+        if column_id is not None:
+            error = name_error(table, column_names={column_id: name})
+            if error is not None:
+                return f"{error} Enter another name."
         return None
 
     def band_name_problem(self, kind: NodeKind, node_id: str, name: str) -> str | None:

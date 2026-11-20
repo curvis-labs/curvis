@@ -546,7 +546,10 @@ class AnalyzeDialog(QDialog):
             ticked = [c.id for c in kind.selected(self.table, sorted(self._checked))]
             params = self.forms[kind.id].params()
             if not ticked or kind.check(self.table, ticked, params) is not None:
-                self._checked = set(kind.default_inputs(self.table))
+                calculated = {
+                    c.column_id for calc in self.document.calculations for c in calc.columns
+                }
+                self._checked = set(kind.default_inputs(self.table, calculated))
         self._started.add(kind.id)
         self.set_checked(sorted(self._checked))
 

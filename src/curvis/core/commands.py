@@ -29,7 +29,13 @@ from curvis.data import (
     normalized_order,
 )
 from curvis.data.column import coerce_cell, convert_values, role_problem, writable
-from curvis.data.layout import column_category
+from curvis.data.layout import (
+    FULL_NAME_SEPARATOR,
+    column_by_full_name,
+    column_category,
+    full_name,
+    resolve_reference,
+)
 from curvis.data.names import name_key, unique_name
 
 if TYPE_CHECKING:
@@ -187,9 +193,68 @@ def _drop_calculated(doc: Document, column_ids: set[str], table_id: str | None =
     doc.calculations = kept
 
 
-def _rewrite_formulas(doc: Document, table_id: str, renames: Mapping[str, str]) -> None:
-    """Update ``[old]`` to ``[new]`` in the formulas of the table's calculations."""
-    renames = {old: new for old, new in renames.items() if old != new}
+type _References = dict[str, tuple[str, bool]]
+"""For each column reference of a table's formulas (as written): the id of the column it
+resolves to, and whether it named the column by its full name."""
+
+
+def _references(doc: Document, table_id: str) -> _References:
+    """Where the column references in the formulas of the table's calculations point."""
+    from curvis.formula import FormulaError, parse
+
+    try:
+        table = doc.table(table_id)
+    except KeyError:
+        return {}
+    found: _References = {}
+    for calculation in doc.calculations:
+        if calculation.table_id != table_id:
+            continue
+        try:
+            names = parse(calculation.formula).columns
+        except FormulaError:
+            continue
+        for name in names:
+            if name in found:
+                continue
+            try:
+                column = resolve_reference(table, name)
+            except LookupError:
+                continue
+            found[name] = (column.id, column_by_full_name(table, name) is column)
+    return found
+
+
+def _follow_references(doc: Document, table_id: str, before: _References) -> None:
+    """Rewrite formula references that no longer point at the column they pointed at
+    before a change (``before``, from :func:`_references`) to that column's new name.
+
+    A reference that named a column by its short name keeps a short name where that
+    still names only this column; otherwise it gets the full name ("Male: Control").
+    References that still resolve as before are left as written.
+    """
+    if not before:
+        return
+    table = doc.table(table_id)
+    by_id = {c.id: c for c in table.columns}
+    renames: dict[str, str] = {}
+    for name, (column_id, was_full) in before.items():
+        column = by_id.get(column_id)
+        if column is None:
+            continue  # the column is gone; the formula reports it
+        try:
+            if resolve_reference(table, name) is column:
+                continue
+        except LookupError:
+            pass
+        new = full_name(table, column)
+        if not was_full:
+            try:
+                if resolve_reference(table, column.name) is column:
+                    new = column.name
+            except LookupError:
+                pass
+        renames[name] = new
     if not renames:
         return
     from curvis.formula.rewrite import rename_columns
@@ -198,6 +263,13 @@ def _rewrite_formulas(doc: Document, table_id: str, renames: Mapping[str, str]) 
         replace(c, formula=rename_columns(c.formula, renames)) if c.table_id == table_id else c
         for c in doc.calculations
     ]
+
+
+def _check_column_names(table: Table, renames: Mapping[str, str]) -> None:
+    """Refuse column names (by id) that are blank or whose full names are taken."""
+    error = name_error(table, column_names=renames)
+    if error is not None:
+        raise CommandError(error)
 
 
 def _check_not_calculated(doc: Document, column: Column) -> None:
@@ -245,6 +317,27 @@ class AddTable(Command):
     @property
     def touched_nodes(self) -> tuple[str, ...]:
         return _table_nodes(self.table)
+
+
+def fix_name_clashes(doc: Document) -> list[str]:
+    """Rename columns whose full names clash, one undo step per table; return notes.
+
+    Projects saved before full names existed can hold, e.g., "Male: Control" outside
+    every category next to "Control" in category Male (see
+    :func:`curvis.data.layout.name_clashes`). Formulas follow the new names.
+    """
+    from curvis.data import name_clashes
+
+    notes: list[str] = []
+    for table in doc.tables:
+        renames = name_clashes(table)
+        if not renames:
+            continue
+        old = {i: full_name(table, table.column(i)) for i in renames}
+        doc.execute(BulkRename(table.id, columns=renames))
+        listed = ", ".join(f"'{old[i]}' to '{full_name(table, table.column(i))}'" for i in renames)
+        notes.append(f"Renamed {listed} in table '{table.name}', so every column name is unique.")
+    return notes
 
 
 LAST_TABLE = "A project needs at least one table."
@@ -396,10 +489,12 @@ class AddColumn(Command):
         self._at = 0
         self._old_rows = 0
         self._touched: tuple[str, ...] = (table_id, column.id)
+        self._calculations: list[Calculation] = []
 
     def do(self, doc: Document) -> None:
         table = _get_table(doc, self.table_id)
-        _check_name(self.column.name, [c.name for c in table.columns], "column")
+        if not self.column.name.strip():
+            raise CommandError("A column name cannot be blank.")
         if any(c.id == self.column.id for c in table.columns):
             raise CommandError("This column is already in the table.")
         try:
@@ -408,10 +503,14 @@ class AddColumn(Command):
             raise CommandError(str(exc)) from None
         self._at = _check_insert_index(self.index, len(table.columns))
         self._old_rows = table.n_rows
+        references = _references(doc, self.table_id)
         before = _Layout.capture(table)
         table.columns.insert(self._at, self.column)
         _check_layout(table, before)
         table.resize(max(self._old_rows, len(self.column)))
+        # A new "Control" can make a formula's [Control] name two columns: keep it on its own.
+        self._calculations = doc.calculations
+        _follow_references(doc, self.table_id, references)
         # A longer column pads the others, which changes them too.
         padded = len(self.column) > self._old_rows and len(table.columns) > 1
         self._touched = _table_nodes(table) if padded else (self.table_id, self.column.id)
@@ -420,6 +519,7 @@ class AddColumn(Command):
         table = doc.table(self.table_id)
         del table.columns[self._at]
         table.resize(self._old_rows)
+        doc.calculations = self._calculations
 
     @property
     def summary(self) -> str:
@@ -516,12 +616,12 @@ class RenameColumn(Command):
     def do(self, doc: Document) -> None:
         table = _get_table(doc, self.table_id)
         column = _get_column(table, self.column_id)
-        taken = [c.name for c in table.columns if c.id != self.column_id]
-        _check_name(self.name, taken, "column")
+        _check_column_names(table, {self.column_id: self.name})
+        references = _references(doc, self.table_id)
         self._old_name = column.name
         column.name = self.name
         self._calculations = doc.calculations
-        _rewrite_formulas(doc, self.table_id, {self._old_name: self.name})
+        _follow_references(doc, self.table_id, references)
 
     def undo(self, doc: Document) -> None:
         doc.table(self.table_id).column(self.column_id).name = self._old_name
@@ -621,9 +721,11 @@ class _LayoutCommand(Command):
         self.table_id = table_id
         self._before: _Layout | None = None
         self._touched: tuple[str, ...] = (table_id,)
+        self._calculations: list[Calculation] = []
 
     def do(self, doc: Document) -> None:
         table = _get_table(doc, self.table_id)
+        references = _references(doc, self.table_id)
         before = _Layout.capture(table)
         try:
             changed = self.apply(table)
@@ -633,10 +735,15 @@ class _LayoutCommand(Command):
         _check_layout(table, before)
         self._before = before
         self._touched = (self.table_id, *changed)
+        # Formulas follow renamed columns and categories, and columns that moved in or
+        # out of a category.
+        self._calculations = doc.calculations
+        _follow_references(doc, self.table_id, references)
 
     def undo(self, doc: Document) -> None:
         assert self._before is not None
         self._before.restore(doc.table(self.table_id))
+        doc.calculations = self._calculations
 
     @abstractmethod
     def apply(self, table: Table) -> Sequence[str]:
@@ -773,12 +880,51 @@ class SetCategory(_LayoutCommand):
                     "Only Y columns can be put in a category."
                 )
         category_id = None if self.category is None else self._resolve_category(table)
+        names = self._new_names(table, columns, category_id)
         for group in groups:
             group.category_id = category_id
         for column in columns:
             column.category_id = category_id
+            column.name = names[column.id]
         _normalize(table)
         return [c.id for g in groups for c in table.group_columns(g.id)] + [c.id for c in columns]
+
+    def _new_names(
+        self, table: Table, columns: Sequence[Column], category_id: str | None
+    ) -> dict[str, str]:
+        """The name of each column after the move (see SPEC.md, Columns in a category).
+
+        A column leaving its category takes its full name ("Male: Control"); one entering a
+        category from outside drops a leading "category: " that matches it; one moving
+        between categories keeps its name. Refuses a name that a series of the target
+        category already has.
+        """
+        names: dict[str, str] = {}
+        for column in columns:
+            name = column.name
+            if category_id is None and column.category_id is not None:
+                name = full_name(table, column)
+            elif category_id is not None and column.category_id is None:
+                name = _without_prefix(name, table.category_group(category_id).name)
+            names[column.id] = name
+        if category_id is None:
+            return names
+        moving = {c.id for c in columns}
+        category = table.category_group(category_id).name
+        taken: dict[str, str] = {}
+        for group in table.replicate_groups:  # groups are checked by name_error
+            if group.category_id == category_id or group.id in self.group_ids:
+                taken[name_key(group.name)] = group.name
+        for other in table.columns:
+            if (
+                other.category_id == category_id
+                and other.group_id is None
+                and other.id not in moving
+            ):
+                taken[name_key(other.name)] = other.name
+        for column in columns:
+            _check_series_name(taken, names[column.id], category)
+        return names
 
     def _resolve_category(self, table: Table) -> str:
         """Id of the category named ``self.category``, made if needed.
@@ -805,6 +951,29 @@ class SetCategory(_LayoutCommand):
         if self.category is None:
             return f"Remove {series} from their category"
         return f"Put {series} in category '{self.category}'"
+
+
+def _without_prefix(name: str, category: str) -> str:
+    """``name`` without a leading "category:" (ignoring case and spaces), if that leaves
+    a name: "Male: Control" in category Male is "Control"."""
+    category, start = category.strip(), name.lstrip()
+    if name_key(start[: len(category)]) != name_key(category):
+        return name
+    rest = start[len(category) :].lstrip()
+    mark = FULL_NAME_SEPARATOR.strip()
+    if rest.startswith(mark) and rest[len(mark) :].strip():
+        return rest[len(mark) :].strip()
+    return name
+
+
+def _check_series_name(taken: dict[str, str], name: str, category: str) -> None:
+    """Refuse a series name already used in a category; else take it."""
+    key = name_key(name)
+    if key in taken:
+        raise CommandError(
+            f"There is already a series called '{taken[key]}' in category '{category}'."
+        )
+    taken[key] = name
 
 
 class ReorderColumns(_LayoutCommand):
@@ -864,19 +1033,6 @@ class BulkRename(_LayoutCommand):
         self.groups = dict(groups or {})
         self.categories = dict(categories or {})
         self._single_old = ""
-        self._old_column_names: dict[str, str] = {}
-        self._calculations: list[Calculation] = []
-
-    def do(self, doc: Document) -> None:
-        self._calculations = doc.calculations
-        super().do(doc)
-        table = doc.table(self.table_id)
-        renames = {self._old_column_names[i]: table.column(i).name for i in self.columns}
-        _rewrite_formulas(doc, self.table_id, renames)
-
-    def undo(self, doc: Document) -> None:
-        super().undo(doc)
-        doc.calculations = self._calculations
 
     def apply(self, table: Table) -> Sequence[str]:
         if not (self.columns or self.groups or self.categories):
@@ -893,7 +1049,6 @@ class BulkRename(_LayoutCommand):
         if error is not None:
             raise CommandError(error)
         names = [*self.columns.values(), *self.groups.values(), *self.categories.values()]
-        self._old_column_names = {i: table.column(i).name for i in self.columns}
         if len(items) == 1:
             self._single_old = items[0].name
         for item, name in zip(items, names, strict=True):
@@ -1063,7 +1218,8 @@ class ImportColumns(Command):
     and values; the remaining columns are added on the right. A name already used by
     another column gets " (2)", " (3)", …. The table grows to the longer of its own and
     the imported row count; a table whose columns were all empty takes the imported
-    row count. ``source`` names the file in the undo text.
+    row count. Empty columns left unfilled stay. ``source`` names the file in the undo
+    text.
     """
 
     def __init__(self, table_id: str, columns: Sequence[Column], source: str) -> None:
@@ -1072,6 +1228,7 @@ class ImportColumns(Command):
         self.source = source
         self._before: list[tuple[Column, npt.NDArray[Any]]] = []
         self._touched: tuple[str, ...] = (table_id,)
+        self._calculations: list[Calculation] = []
 
     def do(self, doc: Document) -> None:
         table = _get_table(doc, self.table_id)
@@ -1094,7 +1251,7 @@ class ImportColumns(Command):
         if len(empty) < len(table.columns):
             n_rows = max(n_rows, table.n_rows)
         slots = empty[: len(self.columns)]
-        taken = [c.name for i, c in enumerate(table.columns) if i not in slots]
+        taken = [full_name(table, c) for i, c in enumerate(table.columns) if i not in slots]
         placed: list[Column] = []
         for i, column in enumerate(self.columns):
             column_id = table.columns[slots[i]].id if i < len(slots) else column.id
@@ -1105,6 +1262,8 @@ class ImportColumns(Command):
         if any(c.id in ids for c in placed[len(slots) :]):
             raise CommandError("These columns are already in the table.")
 
+        references = _references(doc, self.table_id)
+        self._calculations = doc.calculations
         self._before = [(c, c.values) for c in table.columns]
         columns = list(table.columns)
         for slot, column in zip(slots, placed, strict=False):
@@ -1113,12 +1272,15 @@ class ImportColumns(Command):
         table.columns = columns
         table.resize(n_rows)
         self._touched = _table_nodes(table)
+        # An imported "Control" would take over a formula's [Control]; keep it on its column.
+        _follow_references(doc, self.table_id, references)
 
     def undo(self, doc: Document) -> None:
         table = doc.table(self.table_id)
         table.columns = [column for column, _ in self._before]
         for column, values in self._before:
             column.values = values
+        doc.calculations = self._calculations
 
     @property
     def summary(self) -> str:

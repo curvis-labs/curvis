@@ -714,6 +714,10 @@ class MainWindow(QMainWindow):
         assert isinstance(result, Document)
         self._add_tab(result, path)
         self.settings.add_recent_project(path)
+        from curvis.core import fix_name_clashes
+
+        for note in fix_name_clashes(result):
+            self._show_status(note)
 
     def _on_job_failed(self, node: str, error: JobError) -> None:
         if node == FORMULA_WARM_UP:

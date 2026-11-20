@@ -505,3 +505,32 @@ def test_generated_params_reach_the_document(
     (calculation,) = tab.document.calculations
     assert calculation.params["reference"] == cf.FIRST
     assert calculation.suffix == "_bl"
+
+
+def test_formulas_use_full_names_and_flag_ambiguous_short_names(
+    tab: DocumentTab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = model_of(tab)
+    model.remove_columns([3])  # the new table's C; B is used below
+    model.rename_column(1, "Control")
+    model.rename_column(2, "Control 2")
+    model.set_category([1], "Male")
+    model.set_category([2], "Female")
+    model.rename_column(2, "Control")  # "Female: Control"
+
+    def setup(dialog: CalculateDialog) -> None:
+        dialog.set_formula("{A} + [Control]")
+        assert not dialog.ok_button.isEnabled()
+        assert dialog.formula_error.text().startswith(
+            "More than one column is called 'Control': write [Male: Control] or [Female: Control]"
+        )
+        assert dialog.highlighter.error_span == (6, 15)
+        dialog.set_formula("{A} + [female: control]")
+        assert dialog.ok_button.isEnabled()
+
+    shown = run_dialog(monkeypatch, setup)
+    select_column(tab, "Male: Control")
+    assert tab.calculate()
+    assert shown
+    full = [table_of(tab).full_name(c) for c in table_of(tab).columns]
+    assert full == ["X", "Male: Control", "Male: Control_bl", "Female: Control"]

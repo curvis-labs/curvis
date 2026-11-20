@@ -19,6 +19,7 @@ from curvis.core import (
     EditConstant,
     RemoveColumn,
     RenameColumn,
+    SetCategory,
     SetCellBlock,
     SetCellValue,
     add_calculation,
@@ -241,3 +242,30 @@ def test_the_column_of_a_deleted_source_stays_an_error_column_after_an_edit(lab:
     assert lab.values(lab.doc.calculations[0]) == [3, 6, 9]
     assert "deleted" in lab.engine.errors[orphan]
     assert nan_equal(list(lab.table.column(orphan).values), [NAN] * 3)
+
+
+def test_short_names_resolve_and_follow_categories(lab: Lab) -> None:
+    lab.doc.execute(SetCategory("T", [], "Male", column_ids=["a1"]))
+    lab.doc.execute(SetCategory("T", [], "Female", column_ids=["a2"]))
+    calc = lab.add("{A} + [a1]", Pairing(("b1",)))  # "a1" is the short name of Male: a1
+    assert lab.values(calc) == [11, 22, 33]
+    lab.doc.execute(RenameColumn("T", "a2", "a1"))  # Female gets an "a1" too
+    lab.settle()
+    assert lab.doc.calculations[0].formula == "{A} + [Male: a1]"
+    assert lab.values(lab.doc.calculations[0]) == [11, 22, 33]
+
+
+def test_an_ambiguous_short_name_is_an_error_listing_full_names(lab: Lab) -> None:
+    lab.doc.execute(SetCategory("T", [], "Male", column_ids=["a1"]))
+    lab.doc.execute(SetCategory("T", [], "Female", column_ids=["a2"]))
+    lab.doc.execute(RenameColumn("T", "a2", "a1"))
+    calc = lab.add("{A} + [a1]", Pairing(("b1",)))
+    output = calc.columns[0].column_id
+    assert nan_equal(lab.values(calc), [NAN] * 3)
+    assert lab.engine.errors[output] == (
+        "More than one column is called 'a1': write [Male: a1] or [Female: a1]"
+    )
+    lab.doc.execute(RenameColumn("T", "a2", "a2"))
+    lab.settle()
+    assert lab.values(lab.doc.calculations[0]) == [11, 22, 33]
+    assert output not in lab.engine.errors

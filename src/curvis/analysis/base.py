@@ -22,7 +22,7 @@ import dataclasses
 import importlib
 import math
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
@@ -282,6 +282,11 @@ def series_choices(table: Table) -> list[InputChoice]:
     return choices
 
 
+def _filled(choice: InputChoice, calculated: Collection[str]) -> bool:
+    """True for a choice with values, or one that reads a calculated column."""
+    return choice.n_values > 0 or any(c in calculated for c in choice.column_ids)
+
+
 def rows_match_x(table: Table) -> bool:
     """True when the rows are matched to numeric X values: the table has an X column
     with at least one value. A table without one (or with rows labelled by text) holds
@@ -361,9 +366,13 @@ class AnalysisType(ABC):
         """True if ``table`` has the data this analysis needs."""
         return self.problem(table) is None
 
-    def default_inputs(self, table: Table) -> tuple[str, ...]:
-        """Inputs ticked when the dialog opens (default: all candidates)."""
-        return tuple(c.id for c in self.candidates(table))
+    def default_inputs(self, table: Table, calculated: Collection[str] = ()) -> tuple[str, ...]:
+        """Inputs ticked when the dialog opens (default: every candidate with values).
+
+        Empty columns, e.g. those of a new table, stay unticked; ``calculated`` are the
+        ids of calculated columns, which count as filled before their values arrive.
+        """
+        return tuple(c.id for c in self.candidates(table) if _filled(c, calculated))
 
     def default_params(self) -> Params:
         return self.params_type()

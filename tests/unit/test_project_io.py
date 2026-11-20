@@ -328,7 +328,7 @@ def _delete(path: tuple[str | int, ...]) -> Any:
         (_set(("document", "tables", 0, "columns", 0, "role"), "Z"), "unknown role 'Z'"),
         (_set(("document", "tables", 0, "columns", 0, "role"), "Text"), "expected string"),
         (_set(("document", "tables", 0, "columns", 0, "id"), "zzz"), "do not match"),
-        (_set(("document", "tables", 0, "columns", 1, "name"), "X"), "duplicate column names"),
+        (_set(("document", "tables", 0, "columns", 1, "name"), "X"), "already a column called"),
         (_set(("document", "tables", 0, "file"), "tables/9.arrow"), "is missing"),
         (_set(("document", "constants"), [{"id": "a", "name": "k", "value": "1", "unit": ""}]),
          "not a number"),
@@ -835,3 +835,70 @@ def test_graph_style_round_trips(tmp_path: Path) -> None:
     path = tmp_path / "styled.cvp"
     save(document, path)
     assert load(path).graphs[0] == styled
+
+
+# --- full names (step 3.6): no format change -----------------------------------------------
+
+
+def _categorised(tmp_path: Path, outside_name: str) -> Path:
+    """A project with "Control" in category Male and a column ``outside_name`` outside it,
+    written as an older Curvis would (the name is set in project.json)."""
+    male = CategoryGroup("Male", id="male")
+    table = Table(
+        "T",
+        [
+            Column.new("Control", "Y", [1, 2], id="mc", category_id="male"),
+            Column.new("other", "Y", [3, 4], id="o"),
+        ],
+        category_groups=[male],
+    )
+    save(Document(tables=[table]), tmp_path / "good.cvp")
+    with zipfile.ZipFile(tmp_path / "good.cvp") as zf:
+        members: dict[str, bytes | str] = {name: zf.read(name) for name in zf.namelist()}
+    path = tmp_path / "old.cvp"
+    write_zip(path, edit_json(members, _set(("document", "tables", 0, "columns", 1, "name"),
+                                            outside_name)))  # fmt: skip
+    return path
+
+
+def test_same_short_name_in_two_categories_round_trips(tmp_path: Path) -> None:
+    table = Table(
+        "T",
+        [
+            Column.new("Control", "Y", [1, 2], category_id="m"),
+            Column.new("Control", "Y", [3, 4], category_id="f"),
+        ],
+        category_groups=[CategoryGroup("Male", id="m"), CategoryGroup("Female", id="f")],
+    )
+    path = tmp_path / "p.cvp"
+    save(Document(tables=[table]), path)
+    loaded = load(path)
+    assert loaded.tables == [table]
+    with zipfile.ZipFile(path) as zf:
+        assert json.loads(zf.read("project.json"))["schema_version"] == SCHEMA_VERSION
+
+
+def test_an_older_project_with_clashing_full_names_opens(tmp_path: Path) -> None:
+    from curvis.core import fix_name_clashes
+
+    doc = load(_categorised(tmp_path, "Male: Control"))
+    (table,) = doc.tables
+    assert [c.name for c in table.columns] == ["Control", "Male: Control"]
+    notes = fix_name_clashes(doc)
+    assert len(notes) == 1
+    assert table.column("o").name == "Male: Control (2)"
+    assert not doc.undo_stack.is_clean
+    table.check()
+    doc.undo()
+    assert table.column("o").name == "Male: Control"
+
+
+def test_equal_plain_names_are_still_damage(tmp_path: Path) -> None:
+    table = Table("T", [Column.new("A", "Y", [1]), Column.new("B", "Y", [2])])
+    save(Document(tables=[table]), tmp_path / "two.cvp")
+    with zipfile.ZipFile(tmp_path / "two.cvp") as zf:
+        members: dict[str, bytes | str] = {name: zf.read(name) for name in zf.namelist()}
+    path = tmp_path / "bad.cvp"
+    write_zip(path, edit_json(members, _set(("document", "tables", 0, "columns", 1, "name"), "a")))
+    with pytest.raises(CorruptProjectError, match="already a column called"):
+        load(path)

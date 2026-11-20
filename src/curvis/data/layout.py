@@ -55,7 +55,111 @@ def column_category(table: Table, column: Column) -> str | None:
     return table.replicate_group(column.group_id).category_id
 
 
-def layout_error(table: Table) -> str | None:
+FULL_NAME_SEPARATOR = ": "
+"""Between a category's name and a column's name in the column's full name."""
+
+
+def in_category_directly(column: Column) -> bool:
+    """True for a column that sits in a category itself, not through a replicate group."""
+    return column.group_id is None and column.category_id is not None
+
+
+def full_name(
+    table: Table,
+    column: Column,
+    column_names: Mapping[str, str] | None = None,
+    category_names: Mapping[str, str] | None = None,
+) -> str:
+    """The name a column is known by in the table: "category: name" for a column that
+    sits in a category directly ("Male: Control"), else its name.
+
+    ``column_names`` and ``category_names`` (by id) replace current names, to check a
+    rename before it is made. A column whose category is missing has its plain name.
+    """
+    name = (column_names or {}).get(column.id, column.name)
+    if not in_category_directly(column):
+        return name
+    assert column.category_id is not None
+    category = (category_names or {}).get(column.category_id)
+    if category is None:
+        category = next((c.name for c in table.category_groups if c.id == column.category_id), None)
+        if category is None:
+            return name
+    return f"{category}{FULL_NAME_SEPARATOR}{name}"
+
+
+def full_names(table: Table) -> list[str]:
+    """The full names of the table's columns, left to right."""
+    return [full_name(table, c) for c in table.columns]
+
+
+def column_by_full_name(table: Table, name: str) -> Column | None:
+    """The column whose full name is ``name`` (ignoring case), or None."""
+    key = name_key(name)
+    return next((c for c in table.columns if name_key(full_name(table, c)) == key), None)
+
+
+class AmbiguousColumnError(LookupError):
+    """A formula's short column name belongs to more than one column."""
+
+
+def resolve_reference(table: Table, name: str) -> Column:
+    """The column a formula's ``[name]`` refers to.
+
+    A full name always resolves ("Male: Control"). Otherwise the short name must belong
+    to exactly one column ("Control" where only one category has it). Raises
+    ``LookupError`` with a plain message for an unknown name, and its subclass
+    :class:`AmbiguousColumnError` for a short name of several columns.
+    """
+    found = column_by_full_name(table, name)
+    if found is not None:
+        return found
+    key = name_key(name)
+    matches = [c for c in table.columns if name_key(c.name) == key]
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise LookupError(f"Unknown column '{name}'")
+    options = [f"[{full_name(table, c)}]" for c in matches]
+    listed = ", ".join(options[:-1]) + " or " + options[-1]
+    raise AmbiguousColumnError(f"More than one column is called '{name}': write {listed}")
+
+
+def name_clashes(table: Table) -> dict[str, str]:
+    """New names (by column id) that make the full names of ``table`` unique again.
+
+    Projects saved before full names existed can hold, e.g., "Male: Control" outside
+    every category next to "Control" in category Male. Of two clashing columns the one
+    outside every category is renamed (else the later one), with " (2)", " (3)", ….
+    """
+    renames: dict[str, str] = {}
+    by_key: dict[str, list[Column]] = {}
+    for column in table.columns:
+        by_key.setdefault(name_key(full_name(table, column)), []).append(column)
+    taken = {name_key(n) for n in full_names(table)}
+    for clashing in by_key.values():
+        # Before full names, plain names were unique; a clash of equal plain names is
+        # not one an older project can hold, so it is left for name_error to report.
+        if len(clashing) < 2 or len({name_key(c.name) for c in clashing}) < len(clashing):
+            continue
+        # Keep one column: the first that sits in a category directly, else the first.
+        keep = next((c for c in clashing if in_category_directly(c)), clashing[0])
+        for column in clashing:
+            if column is keep:
+                continue
+            n = 2
+            while True:
+                candidate = f"{column.name} ({n})"
+                full = full_name(table, column, {column.id: candidate})
+                if name_key(full) not in taken:
+                    break
+                n += 1
+            taken.add(name_key(full))
+            renames[column.id] = candidate
+    return renames
+
+
+def layout_error(table: Table, *, check_names: bool = True) -> str | None:
     """Why the groups of ``table`` break the layout rules, or None if they are fine."""
     groups = {g.id: g for g in table.replicate_groups}
     categories = {c.id: c for c in table.category_groups}
@@ -106,7 +210,7 @@ def layout_error(table: Table) -> str | None:
             return f"category group '{name}' has no series"
         if cols[-1] - cols[0] + 1 != len(cols):
             return f"the series of category '{name}' are not next to each other"
-    return name_error(table)
+    return name_error(table) if check_names else None
 
 
 def name_error(
@@ -117,8 +221,9 @@ def name_error(
 ) -> str | None:
     """Why the names of ``table`` (with the given names replaced, by id) are not valid.
 
-    Column names are unique in the table. Series names (replicate groups, and columns
-    that sit in a category directly) are unique within one category, and replicate
+    Full names of columns (see :func:`full_name`) are unique in the table. Series names
+    (replicate groups, and columns that sit in a category directly) are unique within
+    one category, and replicate
     group names among the groups without a category, so the same series, e.g.
     "Control", can appear in every category. Category names are unique. Names are
     compared ignoring case and cannot be blank.
@@ -139,9 +244,18 @@ def name_error(
             seen[key] = name
         return None
 
-    error = check([column_names.get(c.id, c.name) for c in table.columns], "column")
-    if error:
-        return error
+    blank = next((c for c in table.columns if not column_names.get(c.id, c.name).strip()), None)
+    if blank is not None:
+        return "A column name cannot be blank."
+    seen: dict[str, Column] = {}
+    for column in table.columns:
+        key = name_key(full_name(table, column, column_names, categories))
+        other = seen.setdefault(key, column)
+        if other is not column:
+            # Name the column that keeps its name, not the one being renamed.
+            existing = column if other.id in column_names else other
+            shown = full_name(table, existing, column_names, categories)
+            return f"There is already a column called '{shown}'."
     by_category: dict[str | None, list[str]] = {}
     for group in table.replicate_groups:
         name = group_names.get(group.id, group.name)

@@ -109,7 +109,7 @@ def generate(
             column = None
         if column is None:
             return None
-        ref = "[" + column.name.replace("]", "]]") + "]"
+        ref = "[" + table.full_name(column).replace("]", "]]") + "]"
         return f"{a} {op} {ref}" if reference == COLUMN else f"{a} {op} MEAN({ref})"
     return None
 

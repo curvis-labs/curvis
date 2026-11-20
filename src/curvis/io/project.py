@@ -53,6 +53,8 @@ from curvis.data import (
     Pairing,
     ReplicateGroup,
     Table,
+    name_clashes,
+    name_error,
 )
 
 FORMAT_NAME = "curvis-project"
@@ -537,9 +539,14 @@ def _read_table(zf: zipfile.ZipFile, value: Any, where: str) -> Table:
     )
     _read_arrays(zf, file, table, n_rows)
     try:
-        table.check()
+        table.check(check_names=False)
     except ValueError as e:
         raise _ContentError(str(e)) from None
+    # Projects saved before full names ("Male: Control") can hold clashing full names;
+    # they open, and fix_name_clashes renames them (see curvis.core.commands).
+    error = name_error(table, column_names=name_clashes(table))
+    if error is not None:
+        raise _ContentError(f"table '{table.name}': {error}")
     return table
 
 

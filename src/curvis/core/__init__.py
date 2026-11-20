@@ -46,6 +46,7 @@ from curvis.core.commands import (
     SetCellValue,
     SetColumnRole,
     UngroupColumns,
+    fix_name_clashes,
     new_table_name,
 )
 from curvis.core.constants import JsonValue, ProjectConstant
@@ -110,6 +111,7 @@ __all__ = [
     "edit_analysis",
     "edit_calculation",
     "edit_graph",
+    "fix_name_clashes",
     "new_table_name",
     "overlaid_on",
     "remove_analysis",

@@ -9,11 +9,13 @@ from dataclasses import dataclass, field
 from curvis.data.column import Column, resized
 from curvis.data.groups import CategoryGroup, ReplicateGroup
 from curvis.data.ids import new_id
-from curvis.data.layout import layout_error
-from curvis.data.names import name_key
+from curvis.data.layout import column_by_full_name, full_name, layout_error
 from curvis.data.roles import ColumnRole
 
 DEFAULT_CATEGORY_FACTOR = "Category"
+
+BLANK_Y_COLUMNS = ("A", "B", "C")
+"""The empty Y columns of a new table: real columns, ready to type or paste into."""
 
 
 @dataclass
@@ -30,8 +32,10 @@ class Table:
 
     @classmethod
     def blank(cls, name: str = "Data 1") -> "Table":
-        """An empty table for a new project: an X column and one Y column."""
-        return cls(name, [Column.new("X", ColumnRole.X), Column.new("A", ColumnRole.Y)])
+        """An empty table: an X column and the Y columns A, B and C, all without values."""
+        columns = [Column.new("X", ColumnRole.X)]
+        columns += [Column.new(n, ColumnRole.Y) for n in BLANK_Y_COLUMNS]
+        return cls(name, columns)
 
     @property
     def n_rows(self) -> int:
@@ -68,9 +72,16 @@ class Table:
         return [c for c in self.columns if c.group_id == group_id]
 
     def column_by_name(self, name: str) -> Column | None:
-        """The column called ``name`` (ignoring case), or ``None``."""
-        key = name_key(name)
-        return next((c for c in self.columns if name_key(c.name) == key), None)
+        """The column whose full name is ``name`` (ignoring case), or ``None``.
+
+        The full name of a column in a category is "category: name" ("Male: Control");
+        see :func:`curvis.data.layout.full_name`.
+        """
+        return column_by_full_name(self, name)
+
+    def full_name(self, column: Column) -> str:
+        """The full name of ``column`` ("Male: Control", or its name outside categories)."""
+        return full_name(self, column)
 
     def resize(self, n_rows: int) -> None:
         """Truncate or pad every column to ``n_rows`` (for use inside commands)."""
@@ -78,11 +89,12 @@ class Table:
             if len(column) != n_rows:
                 column.values = resized(column.values, n_rows)
 
-    def check(self) -> None:
-        """Raise ``ValueError`` if the table is inconsistent."""
-        names = [name_key(c.name) for c in self.columns]
-        if len(set(names)) != len(names):
-            raise ValueError(f"table '{self.name}' has duplicate column names")
+    def check(self, *, check_names: bool = True) -> None:
+        """Raise ``ValueError`` if the table is inconsistent.
+
+        With ``check_names`` False, names (blank or not unique) are not checked: for
+        projects saved before full names existed, whose clashes are fixed after loading.
+        """
         ids = [c.id for c in self.columns]
         if len(set(ids)) != len(ids):
             raise ValueError(f"table '{self.name}' has duplicate column ids")
@@ -90,6 +102,6 @@ class Table:
             column.check()
             if len(column) != self.n_rows:
                 raise ValueError(f"columns in table '{self.name}' have different lengths")
-        error = layout_error(self)
+        error = layout_error(self, check_names=check_names)
         if error is not None:
             raise ValueError(f"table '{self.name}': {error}")

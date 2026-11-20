@@ -27,7 +27,7 @@ from curvis.core.commands import (
     ReorderColumns,
 )
 from curvis.core.constants import ProjectConstant
-from curvis.data import Column, ColumnRole, Table
+from curvis.data import Column, ColumnRole, Table, full_names
 from curvis.data.layout import layout_tree
 from curvis.data.names import unique_name
 
@@ -133,7 +133,7 @@ def add_calculation(doc: Document, calculation: Calculation) -> Command:
     if problem is not None:
         raise CommandError(problem)
     targets = _in_table_order(table, calculation.pairing.targets)
-    taken = [c.name for c in table.columns]
+    taken = full_names(table)
     outputs = _new_outputs(table, targets, calculation.suffix, taken)
     commands: list[Command] = [AddColumn(table.id, column) for _, column in outputs]
     pairs = [(source, column.id) for source, column in outputs]
@@ -188,13 +188,14 @@ def edit_calculation(doc: Document, calculation: Calculation) -> Command:
     commands: list[Command] = [RemoveColumn(table.id, c) for c in dropped]
 
     remaining = [c for c in table.columns if c.id not in dropped]
-    taken = [c.name for c in remaining]
+    taken = [table.full_name(c) for c in remaining]
     if calculation.suffix != old.suffix:
         for source_id, output in kept.items():
             column = table.column(output.column_id)
-            if column.name == table.column(source_id).name + old.suffix:
+            source_name = table.full_name(table.column(source_id))
+            if column.name == source_name + old.suffix:
                 others = [n for n in taken if n != column.name]
-                name = unique_name(table.column(source_id).name + calculation.suffix, others)
+                name = unique_name(source_name + calculation.suffix, others)
                 if name != column.name:
                     commands.append(RenameColumn(table.id, column.id, name))
                     taken = [*others, name]
@@ -235,10 +236,14 @@ def _in_table_order(table: Table, column_ids: Sequence[str]) -> list[str]:
 def _new_outputs(
     table: Table, sources: Sequence[str], suffix: str, taken: list[str]
 ) -> list[tuple[str, Column]]:
-    """A new, empty Y column for each source, named "<source><suffix>"."""
+    """A new, empty Y column for each source, named "<source><suffix>".
+
+    The new column goes outside every category, so a source in one gives its full name:
+    "Male: Control" with " norm" makes "Male: Control norm".
+    """
     outputs: list[tuple[str, Column]] = []
     for source in sources:
-        name = unique_name(table.column(source).name + suffix, taken)
+        name = unique_name(table.full_name(table.column(source)) + suffix, taken)
         taken.append(name)
         values = np.full(table.n_rows, math.nan)
         outputs.append((source, Column.new(name, ColumnRole.Y, values)))

@@ -56,7 +56,13 @@ def test_next_column_names_skip_taken_names_ignoring_case() -> None:
 def test_blank_table() -> None:
     table = Table.blank()
     assert table.name == "Data 1"
-    assert [(c.name, c.role.value) for c in table.columns] == [("X", "X"), ("A", "Y")]
+    # Real, empty Y columns to type into; there are no dummy columns.
+    assert [(c.name, c.role.value) for c in table.columns] == [
+        ("X", "X"),
+        ("A", "Y"),
+        ("B", "Y"),
+        ("C", "Y"),
+    ]
     assert table.n_rows == 0
 
 
