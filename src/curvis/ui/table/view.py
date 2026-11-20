@@ -454,7 +454,6 @@ class TableView(QTableView):
         top = min(r[0] for r in ranges)
         left = min(r[1] for r in ranges)
         model = self.model()
-        left = min(left, model.n_data_columns)
         if not model.write_block(top, left, rows):
             return False
         self.select_block(top, left, top + len(rows) - 1, left + len(rows[0]) - 1)

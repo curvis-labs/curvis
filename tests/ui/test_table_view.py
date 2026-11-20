@@ -105,7 +105,9 @@ def test_model_shows_values_spare_cells_and_headers(view: TableView) -> None:
     ]
     assert model.headerData(0, Qt.Orientation.Horizontal) == "Dose\nX"
     assert model.headerData(1, Qt.Orientation.Horizontal) == "Resp\nY"
-    assert model.headerData(3, Qt.Orientation.Horizontal) == ""
+    # A spare column shows the name it would get, with no role line.
+    assert model.headerData(3, Qt.Orientation.Horizontal) == "A\n"
+    assert model.headerData(5, Qt.Orientation.Horizontal) == "C\n"
     assert model.headerData(0, Qt.Orientation.Vertical) == "1"
 
 
@@ -252,20 +254,24 @@ def test_typing_below_the_data_adds_rows(qtbot: QtBot, view: TableView, doc: Doc
     assert view.model().rowCount() == 3 + SPARE_ROWS
 
 
-def test_typing_in_a_spare_column_adds_a_y_column(
+def test_typing_in_a_spare_column_adds_it_where_it_was_typed(
     qtbot: QtBot, view: TableView, doc: Document
 ) -> None:
-    go(view, 0, 4)  # two columns past the last: the new column goes right after it
+    go(view, 0, 4)  # the second spare column: it and the one before it are added
     type_text(qtbot, view, "3")
     key(qtbot, view, Qt.Key.Key_Return)
     table = doc.tables[0]
-    assert [c.name for c in table.columns] == ["Dose", "Resp", "Label", "A"]
-    assert table.columns[3].role == ColumnRole.Y
-    assert values(doc, "A") == [3.0, None, None]
-    assert view.model().headerData(3, Qt.Orientation.Horizontal) == "A\nY"
+    assert [c.name for c in table.columns] == ["Dose", "Resp", "Label", "A", "B"]
+    assert [c.role for c in table.columns[3:]] == [ColumnRole.Y, ColumnRole.Y]
+    assert values(doc, "A") == [None, None, None]
+    assert values(doc, "B") == [3.0, None, None]
+    assert view.model().headerData(4, Qt.Orientation.Horizontal) == "B\nY"
+    assert doc.undo_stack.count == 1
     doc.undo()
     assert len(table.columns) == 3
     assert not doc.undo_stack.can_undo
+    doc.redo()
+    assert [c.name for c in table.columns][3:] == ["A", "B"]
 
 
 def test_delete_clears_the_selection_in_one_step(
@@ -579,3 +585,29 @@ def test_long_numbers_are_rounded_to_fit_but_kept_in_full(view: TableView) -> No
     assert len(shown) <= width and shown.startswith("107.6")
     assert model.index(0, 1).data(Qt.ItemDataRole.EditRole) == "107.64052345967664"
     assert model.index(0, 1).data(Qt.ItemDataRole.ToolTipRole) == "107.64052345967664"
+
+
+def test_paste_into_a_spare_column_lands_where_it_was_put(view: TableView, doc: Document) -> None:
+    go(view, 1, 4)  # the second spare column, row 2
+    assert view.paste("5\t6\r\n")
+    table = doc.tables[0]
+    assert [c.name for c in table.columns] == ["Dose", "Resp", "Label", "A", "B", "C"]
+    assert values(doc, "A") == [None, None, None]
+    assert values(doc, "B") == [None, 5.0, None]
+    assert values(doc, "C") == [None, 6.0, None]
+    assert view.model().headerData(6, Qt.Orientation.Horizontal) == "D\n"
+    assert doc.undo_stack.count == 1
+    doc.undo()
+    assert [c.name for c in table.columns] == ["Dose", "Resp", "Label"]
+
+
+def test_spare_headers_still_answer_after_their_table_is_removed(doc: Document) -> None:
+    from curvis.core import RemoveTable
+
+    doc.execute(AddTable(Table("Other", [Column.new("Q", ColumnRole.Y)])))
+    model = TableModel(doc, doc.tables[0].id)
+    doc.execute(RemoveTable(doc.tables[0].id))
+    # The model keeps showing its last state until the tab replaces the view.
+    assert model.headerData(model.n_data_columns, Qt.Orientation.Horizontal) == "A\n"
+    tip = model.headerData(0, Qt.Orientation.Horizontal, Qt.ItemDataRole.ToolTipRole)
+    assert tip.startswith("Dose (X column)")

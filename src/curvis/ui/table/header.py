@@ -8,6 +8,8 @@ box spanning its columns. A column without a band above it has a taller box inst
 - Double-clicking a column name or a band edits the name in place
   (:class:`~curvis.ui.inline_edit.InlineEditor`). Tab and Shift+Tab keep the name and
   edit the next or previous name in the same row; they stop at the last one.
+- Double-clicking the dimmed name of an empty column right of the data names it, which
+  adds it (and the empty columns before it).
 - Dragging a band moves the whole group or category.
 - Dragging the header of a column that is already selected moves that column. A drag
   that starts on an unselected column selects a range of columns, as before.
@@ -257,6 +259,10 @@ class GroupedHeader(QHeaderView):
             self.edit_column(section)
             event.accept()
             return
+        if model.is_spare_column(section):
+            self.edit_spare_column(section)
+            event.accept()
+            return
         super().mouseDoubleClickEvent(event)
 
     # --- renaming in place --------------------------------------------------------------
@@ -297,6 +303,30 @@ class GroupedHeader(QHeaderView):
             return True
 
         return self._open_editor(self.name_rect(section), column.name, commit)
+
+    def edit_spare_column(self, section: int) -> InlineEditor | None:
+        """Name the empty column at ``section`` in place; committing adds it."""
+        model = self.table_model()
+        if model is None or not model.is_spare_column(section):
+            return None
+        self._scroll_to(section)
+        shown = model.spare_names()[section - model.n_data_columns]
+
+        def commit(text: str, step: int) -> bool:
+            problem = model.column_name_problem(None, text)
+            if problem is not None:
+                model.error.emit(problem)
+                return False
+            if not model.name_spare_column(section, text):
+                return False
+            target = section + step
+            if step < 0 and 0 <= target < model.n_data_columns:
+                self.edit_column(target)
+            elif step > 0 and model.is_spare_column(target):
+                self.edit_spare_column(target)
+            return True
+
+        return self._open_editor(self.name_rect(section), shown, commit)
 
     def edit_band(self, kind: NodeKind, node_id: str) -> InlineEditor | None:
         """Edit the name of a replicate group or category in place."""

@@ -598,9 +598,9 @@ Make a plan first. When done, report what you built and image-diff results.
 ### Step 3.6 — Columns in categories, empty columns
 
 **Done when**
-- [ ] Y columns can be put in a category directly, with the same name in every category; full names ("Male: Control") are unique and used by formulas, copy and export.
-- [ ] Renaming a category, taking a column out of one or moving it into one keeps names unique, rewrites formulas, and undoes exactly.
-- [ ] The empty columns right of the table show their names and take typing, pasting and naming where the user does it.
+- [x] Y columns can be put in a category directly, with the same name in every category; full names ("Male: Control") are unique and used by formulas, copy and export.
+- [x] Renaming a category, taking a column out of one or moving it into one keeps names unique, rewrites formulas, and undoes exactly.
+- [x] The empty columns right of the table show their names and take typing, pasting and naming where the user does it.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md (Data tables and formulas: Columns in a category, Empty columns) and step 3.6 in docs/PHASES.md.

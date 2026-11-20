@@ -316,3 +316,69 @@ def test_ctrl_shift_r_opens_bulk_rename(
     action.trigger()
     assert opened == ["Bulk rename"]
     assert view.grouped_header.editor is None  # no field opened in the header
+
+
+# --- empty columns and columns in categories (step 3.6) -----------------------------------
+
+
+def test_spare_headers_show_dimmed_names_without_a_role(view: TableView) -> None:
+    model = view.model()
+    spare = [model.headerData(5 + i, Qt.Orientation.Horizontal) for i in range(3)]
+    assert spare == ["A\n", "B\n", "C\n"]
+    dimmed = model.headerData(5, Qt.Orientation.Horizontal, Qt.ItemDataRole.ForegroundRole)
+    placeholder = QApplication.palette().color(QApplication.palette().ColorRole.PlaceholderText)
+    assert dimmed == placeholder
+    assert model.headerData(4, Qt.Orientation.Horizontal, Qt.ItemDataRole.ForegroundRole) is None
+
+
+def test_double_click_on_a_spare_header_names_and_adds_it(
+    qtbot: QtBot, tab: DocumentTab, view: TableView
+) -> None:
+    field = double_click(qtbot, view, 6)  # the second spare column
+    assert field.text() == "B"
+    type_name(qtbot, field, "Time", Qt.Key.Key_Return)
+    assert names(tab)[5:] == ["A", "Time"]
+    assert view.model().headerData(6, Qt.Orientation.Horizontal) == "Time\nY"
+    assert tab.document.undo_stack.count == 1
+    tab.document.undo()
+    assert len(names(tab)) == 5
+
+
+def test_naming_a_spare_column_refuses_a_taken_name(
+    qtbot: QtBot, tab: DocumentTab, view: TableView, status: list[str]
+) -> None:
+    field = double_click(qtbot, view, 5)
+    type_name(qtbot, field, "drug", Qt.Key.Key_Return)
+    assert len(names(tab)) == 5
+    assert any("'Drug' is already used" in m for m in status)
+    assert not field.is_closed
+
+
+def test_tab_from_a_named_spare_column_names_the_next(
+    qtbot: QtBot, tab: DocumentTab, view: TableView
+) -> None:
+    field = double_click(qtbot, view, 5)
+    type_name(qtbot, field, "P1", Qt.Key.Key_Tab)
+    type_name(qtbot, editor(view), "P2", Qt.Key.Key_Return)
+    assert names(tab)[5:] == ["P1", "P2"]
+
+
+def test_same_column_name_in_two_categories_in_the_header(
+    qtbot: QtBot, tab: DocumentTab, view: TableView
+) -> None:
+    model = view.model()
+    model.set_category([1], "Male")
+    model.set_category([3], "Female")
+    field = double_click(qtbot, view, 3)  # Drug, now in Female
+    type_name(qtbot, field, "Control", Qt.Key.Key_Return)
+    table = tab.document.tables[0]
+    assert [table.full_name(c) for c in table.columns][:4] == [
+        "Dose",
+        "Male: Control",
+        "Control 2",
+        "Female: Control",
+    ]
+    # The header shows short names; the tooltip the full name.
+    assert model.headerData(3, Qt.Orientation.Horizontal).startswith("Control\n")
+    tip = model.headerData(3, Qt.Orientation.Horizontal, Qt.ItemDataRole.ToolTipRole)
+    assert tip.startswith("Female: Control (Y column)")

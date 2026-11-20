@@ -4,8 +4,10 @@ The model reads the columns' NumPy arrays directly; Qt asks only for the cells i
 about to paint. Every change is sent to the document as a command. The model follows
 the undo stack, so edits, undo and redo all reach the view the same way.
 
-Below and to the right of the data the model shows spare empty rows and columns.
-Writing into them adds rows, and new Y columns, in the same command as the write.
+Below and to the right of the data the model shows spare empty rows and columns. A
+spare column's header shows the name it would get (dimmed, with no role). Writing into
+spare cells adds rows, and new Y columns (with the spare columns before them), in the
+same command as the write, so values land where they were typed.
 
 Above the column names the header shows *bands*: one row of category groups and one
 of replicate groups, each only when the table has any (see :meth:`TableModel.bands`).
@@ -21,6 +23,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, QPersistentModelIndex, Qt
 from PySide6.QtCore import Signal as QtSignal
+from PySide6.QtGui import QGuiApplication, QPalette
 
 from curvis.core import (
     AddColumn,
@@ -45,6 +48,8 @@ from curvis.data import CellValue, Column, ColumnRole, NodeKind, Table
 from curvis.data.layout import (
     column_category,
     find_node,
+    full_name,
+    full_names,
     layout_tree,
     moved_order,
     name_error,
@@ -106,6 +111,16 @@ def _bands(table: Table) -> list[list[Band | None]]:
     return [row for row, used in rows if used]
 
 
+def _taken_names(table: Table) -> list[str]:
+    """Names a new column must avoid: every full name and every short name."""
+    return [*full_names(table), *(c.name for c in table.columns)]
+
+
+def _spare_names(table: Table) -> list[str]:
+    """The names new columns at the right end would get: A, B, C, … as free."""
+    return next_column_names(_taken_names(table), SPARE_COLUMNS)
+
+
 class TableModel(QAbstractTableModel):
     """Table model for one table of ``document``. ``error`` sends why a change was refused."""
 
@@ -132,6 +147,7 @@ class TableModel(QAbstractTableModel):
         self._columns: list[Column] = list(self.table.columns)
         self._n_rows = self.table.n_rows
         self._bands = _bands(self.table)
+        self._spare_names = _spare_names(self.table)
         self._unsubscribe = document.undo_stack.subscribe(self._on_undo_event)
         self.destroyed.connect(lambda *_: self._unsubscribe())
 
@@ -156,6 +172,28 @@ class TableModel(QAbstractTableModel):
         found = (self.column_at(p) for p in sorted(set(positions)))
         # Not ``if c``: an empty column has length 0.
         return [c for c in found if c is not None]
+
+    def is_spare_column(self, col: int) -> bool:
+        """True for one of the empty columns right of the data."""
+        return len(self._columns) <= col < len(self._columns) + SPARE_COLUMNS
+
+    def _taken_names(self) -> list[str]:
+        return _taken_names(self.table)
+
+    def spare_names(self) -> list[str]:
+        """The names the spare columns' headers show: what new columns would get."""
+        return list(self._spare_names)
+
+    def _new_columns(self, count: int, last_name: str | None = None) -> list[Command]:
+        """AddColumn commands for ``count`` new Y columns at the right end, named as the
+        spare headers show; the last one gets ``last_name`` if it is given."""
+        if count <= 0:
+            return []
+        taken = self._taken_names() + ([last_name] if last_name is not None else [])
+        names = next_column_names(taken, count - (last_name is not None))
+        if last_name is not None:
+            names.append(last_name)
+        return [AddColumn(self.table_id, Column.new(n, ColumnRole.Y)) for n in names]
 
     def bands(self) -> list[list[Band | None]]:
         """Header bands above the columns, top row first (empty without groups).
@@ -271,17 +309,32 @@ class TableModel(QAbstractTableModel):
                 return str(section + 1)
             column = self.column_at(section)
             if column is None:
-                return ""
+                if not self.is_spare_column(section):
+                    return ""
+                # The name it would get, on the name line; no role line.
+                return self._spare_names[section - len(self._columns)] + "\n"
             role_text = column.role.value
             if self._is_calculated(column):
                 role_text = f"{CALCULATED_MARK} {role_text}"
                 if self._calculation_error(column.id):
                     role_text += f" {ERROR_MARK}"
             return f"{column.name}\n{role_text}"
+        if (
+            role == Qt.ItemDataRole.ForegroundRole
+            and orientation == Qt.Orientation.Horizontal
+            and self.is_spare_column(section)
+        ):
+            return QGuiApplication.palette().color(QPalette.ColorRole.PlaceholderText)
         if role == Qt.ItemDataRole.ToolTipRole and orientation == Qt.Orientation.Horizontal:
             column = self.column_at(section)
+            if column is None and self.is_spare_column(section):
+                return "Type, paste or name the column here to add it"
             if column is not None:
-                tip = f"{column.name} ({column.role.value} column)"
+                try:
+                    shown = full_name(self.table, column)
+                except KeyError:  # the table is gone; the tab replaces this view
+                    shown = column.name
+                tip = f"{shown} ({column.role.value} column)"
                 if column.group_id is not None:
                     tip += (
                         f" in replicate group '{self.table.replicate_group(column.group_id).name}'"
@@ -328,14 +381,10 @@ class TableModel(QAbstractTableModel):
             return False
         table = self.table
         width = len(values[0])
-        if left > len(table.columns):
-            # Leave no gap: the block starts in the first spare column.
-            left = len(table.columns)
+        # Spare columns up to the last one written are added, so the block stays where
+        # it was put (writing into the third spare column adds all three).
         missing = left + width - len(table.columns)
-        commands: list[Command] = []
-        if missing > 0:
-            names = next_column_names([c.name for c in table.columns], missing)
-            commands += [AddColumn(self.table_id, Column.new(n, ColumnRole.Y)) for n in names]
+        commands: list[Command] = self._new_columns(missing)
         if missing <= 0 and len(values) == 1 and width == 1:
             column = table.columns[left]
             return self.execute(SetCellValue(self.table_id, column.id, top, values[0][0]))
@@ -386,13 +435,27 @@ class TableModel(QAbstractTableModel):
         """
         table = self.table
         position = max(0, min(position, len(table.columns)))
-        (name,) = next_column_names([c.name for c in table.columns])
+        (name,) = next_column_names(self._taken_names())
         neighbour = self.column_at(beside) if beside is not None else None
         group_id = category_id = None
         if neighbour is not None and role is ColumnRole.Y:
             group_id, category_id = neighbour.group_id, neighbour.category_id
         column = Column.new(name, role, group_id=group_id, category_id=category_id)
         return self.execute(AddColumn(self.table_id, column, position))
+
+    def name_spare_column(self, position: int, name: str) -> bool:
+        """Add the spare column at ``position`` with ``name``, as one command.
+
+        The spare columns before it are added too, with the names their headers show.
+        """
+        name = name.strip()
+        count = position - len(self.table.columns) + 1
+        if not self.is_spare_column(position) or count < 1:
+            return False
+        commands = self._new_columns(count, last_name=name)
+        if len(commands) == 1:
+            return self.execute(commands[0])
+        return self.execute(CommandGroup(f"Add {count} columns", commands))
 
     def remove_columns(self, positions: Sequence[int]) -> bool:
         """Delete the columns at ``positions``, as one command."""
@@ -491,15 +554,28 @@ class TableModel(QAbstractTableModel):
                 return table.category_group(category_id).name
         return None
 
-    def column_name_problem(self, column_id: str, name: str) -> str | None:
-        """Why ``name`` cannot be the name of the column ``column_id``, or None."""
+    def column_name_problem(self, column_id: str | None, name: str) -> str | None:
+        """Why ``name`` cannot be the name of the column ``column_id``, or None.
+
+        ``column_id`` None checks the name of a new column outside every category.
+        Full names are compared: "Control" can be a column in every category.
+        """
         name = name.strip()
         if not name:
             return "Enter a column name."
+        table = self.table
         key = name_key(name)
-        for column in self.table.columns:
-            if column.id != column_id and name_key(column.name) == key:
-                return f"'{column.name}' is already used in this table. Enter another name."
+        if column_id is not None:
+            column = table.column(column_id)
+            key = name_key(full_name(table, column, {column_id: name}))
+        for other in table.columns:
+            if other.id != column_id and name_key(full_name(table, other)) == key:
+                shown = full_name(table, other)
+                return f"'{shown}' is already used in this table. Enter another name."
+        if column_id is not None:
+            error = name_error(table, column_names={column_id: name})
+            if error is not None:
+                return f"{error} Enter another name."
         return None
 
     def band_name_problem(self, kind: NodeKind, node_id: str, name: str) -> str | None:
@@ -622,6 +698,7 @@ class TableModel(QAbstractTableModel):
         table = table if table is not None else self.table
         self._sync_columns(list(table.columns))
         self._sync_rows(table.n_rows)
+        self._spare_names = _spare_names(table)
         bands = _bands(table)
         if bands != self._bands:
             self._bands = bands
