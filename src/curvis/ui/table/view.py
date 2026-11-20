@@ -3,13 +3,15 @@
 - Typing in a cell starts editing it. Enter, Tab and the arrow keys then save the cell
   and move on. F2 (on every platform) or a double-click edits the text in place: the
   arrow keys then move the text cursor.
-- Enter moves down, Shift+Enter up, Tab right and Shift+Tab left.
+- Enter moves down, Shift+Enter up, Tab right and Shift+Tab left. Tab in the last
+  column adds a Y column and moves into it.
 - Ctrl+C and Ctrl+V copy and paste tab-separated text, which Excel reads and writes.
 - Delete or Backspace clears the selected cells.
 - Right-clicking a column header adds, deletes and renames columns, sets their role,
   groups them as replicates or into categories, and opens bulk rename.
 - Column, group and category names are renamed in place in the header (double-click or
-  Rename column); Tab and Shift+Tab move to the next and previous name.
+  Rename column); Tab and Shift+Tab move to the next and previous name, and Tab on the
+  last column's name adds a column and edits its name.
 - Groups are shown above their columns; columns and groups move by drag and drop
   (see :mod:`curvis.ui.table.header`).
 
@@ -96,10 +98,18 @@ def _key_step(event: QKeyEvent) -> tuple[int, int] | None:
     return None
 
 
+def _is_tab(event: QKeyEvent) -> bool:
+    """True for Tab without Shift (Shift+Tab moves left)."""
+    shift = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+    return event.key() == Qt.Key.Key_Tab and not shift
+
+
 class CellDelegate(QStyledItemDelegate):
-    """Editor for one cell. Sends ``move_requested`` after saving with Enter, Tab or arrows."""
+    """Editor for one cell. Sends ``move_requested`` after saving with Enter, Shift+Tab or
+    arrows, and ``tab_pressed`` after saving with Tab."""
 
     move_requested = Signal(int, int)
+    tab_pressed = Signal()
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -133,7 +143,10 @@ class CellDelegate(QStyledItemDelegate):
             if step is not None:
                 self.commitData.emit(editor)
                 self.closeEditor.emit(editor, QAbstractItemDelegate.EndEditHint.NoHint)
-                self.move_requested.emit(*step)
+                if _is_tab(event):
+                    self.tab_pressed.emit()
+                else:
+                    self.move_requested.emit(*step)
                 return True
         return super().eventFilter(editor, event)
 
@@ -168,6 +181,7 @@ class TableView(QTableView):
 
         self.cell_delegate = CellDelegate(self)
         self.cell_delegate.move_requested.connect(self.move_cursor)
+        self.cell_delegate.tab_pressed.connect(self.tab_forward)
         self.setItemDelegate(self.cell_delegate)
 
         self.grouped_header = GroupedHeader(self)
@@ -354,6 +368,19 @@ class TableView(QTableView):
             model.index(row, col), QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
 
+    def tab_forward(self) -> None:
+        """Tab: move one cell right; in the last column, add a Y column and move into it."""
+        model = self.model()
+        current = self.currentIndex()
+        if current.isValid() and current.column() == model.n_data_columns - 1:
+            if model.insert_column(model.n_data_columns):
+                self.selectionModel().setCurrentIndex(
+                    model.index(current.row(), current.column() + 1),
+                    QItemSelectionModel.SelectionFlag.ClearAndSelect,
+                )
+            return
+        self.move_cursor(0, 1)
+
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 (Qt API)
         if self.state() != QAbstractItemView.State.EditingState:
             if event.matches(QKeySequence.StandardKey.Copy):
@@ -368,6 +395,9 @@ class TableView(QTableView):
                 self.clear_selected_cells()
                 return
             step = _key_step(event)
+            if step is not None and _is_tab(event):
+                self.tab_forward()
+                return
             if step is not None:
                 self.move_cursor(*step)
                 return

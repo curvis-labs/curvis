@@ -148,12 +148,28 @@ def test_shift_tab_moves_to_the_previous_header(
     assert names(tab)[:3] == ["Dose (µM)", "Vehicle", "Vehicle 2"]
 
 
-def test_tab_on_the_last_column_keeps_the_name_and_stops(
+def test_tab_on_the_last_column_keeps_the_name_and_adds_a_column(
     qtbot: QtBot, view: TableView, tab: DocumentTab
 ) -> None:
     type_name(qtbot, double_click(qtbot, view, 4), "Drug B", Qt.Key.Key_Tab)
-    assert view.grouped_header.editor is not None and view.grouped_header.editor.is_closed
-    assert names(tab) == ["Dose", "Control", "Control 2", "Drug", "Drug B"]  # no new column
+    assert names(tab) == ["Dose", "Control", "Control 2", "Drug", "Drug B", "A"]
+    assert tab.document.tables[0].columns[5].role is ColumnRole.Y
+    field = editor(view)  # the new column's name is being edited
+    assert field.text() == "A"
+    assert field.geometry() == view.grouped_header.name_rect(5)
+    type_name(qtbot, field, "Drug C", Qt.Key.Key_Return)
+    assert names(tab)[5] == "Drug C"
+    tab.document.undo()
+    tab.document.undo()
+    assert names(tab) == ["Dose", "Control", "Control 2", "Drug", "Drug B"]
+
+
+def test_escape_on_the_added_column_keeps_it(
+    qtbot: QtBot, view: TableView, tab: DocumentTab
+) -> None:
+    type_name(qtbot, double_click(qtbot, view, 4), "Drug 2", Qt.Key.Key_Tab)
+    qtbot.keyClick(editor(view), Qt.Key.Key_Escape)
+    assert names(tab)[-1] == "A"
 
 
 def test_esc_after_tab_keeps_the_names_already_kept(

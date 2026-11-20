@@ -154,6 +154,38 @@ def test_typing_replaces_the_cell_and_enter_moves_down(
     assert doc.undo_stack.undo_text == "Set cell in column 'Resp', row 1"
 
 
+def test_tab_in_the_last_column_adds_a_column(qtbot: QtBot, view: TableView, doc: Document) -> None:
+    go(view, 1, 2)  # Label, the last column
+    key(qtbot, view, Qt.Key.Key_Tab)
+    table = doc.tables[0]
+    assert [c.name for c in table.columns] == ["Dose", "Resp", "Label", "A"]
+    assert table.columns[3].role == ColumnRole.Y
+    assert current(view) == (1, 3)
+    # Typing, then Tab, saves the cell and adds the next column.
+    type_text(qtbot, view, "5")
+    key(qtbot, view, Qt.Key.Key_Tab)
+    assert values(doc, "A") == [None, 5.0, None]
+    assert [c.name for c in table.columns][3:] == ["A", "B"]
+    assert current(view) == (1, 4)
+    # Arrow keys and Shift+Tab never add columns.
+    key(qtbot, view, Qt.Key.Key_Right)
+    assert current(view) == (1, 4) and len(table.columns) == 5
+    doc.undo()
+    doc.undo()
+    doc.undo()
+    assert [c.name for c in table.columns] == ["Dose", "Resp", "Label"]
+
+
+def test_typing_then_right_arrow_in_the_last_column_adds_nothing(
+    qtbot: QtBot, view: TableView, doc: Document
+) -> None:
+    go(view, 0, 2)
+    type_text(qtbot, view, "z")
+    key(qtbot, view, Qt.Key.Key_Right)
+    assert len(doc.tables[0].columns) == 3
+    assert values(doc, "Label")[0] == "z"
+
+
 def test_tab_moves_right_and_shift_tab_left(qtbot: QtBot, view: TableView, doc: Document) -> None:
     go(view, 1, 0)
     type_text(qtbot, view, "7")

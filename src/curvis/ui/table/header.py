@@ -7,7 +7,8 @@ box spanning its columns. A column without a band above it has a taller box inst
 - Clicking a band selects its columns.
 - Double-clicking a column name or a band edits the name in place
   (:class:`~curvis.ui.inline_edit.InlineEditor`). Tab and Shift+Tab keep the name and
-  edit the next or previous name in the same row; they stop at the last one.
+  edit the next or previous name in the same row. Tab on the last column's name adds a
+  Y column and edits its name; band names stop at the last one.
 - Dragging a band moves the whole group or category.
 - Dragging the header of a column that is already selected moves that column. A drag
   that starts on an unselected column selects a range of columns, as before.
@@ -292,6 +293,9 @@ class GroupedHeader(QHeaderView):
             position = model.table.column_index(column_id)
             model.rename_column(position, text.strip())
             target = position + step
+            if step > 0 and target == model.n_data_columns:
+                # Tab on the last column's name adds a column, so names can be typed on.
+                model.insert_column(target)
             if step and 0 <= target < model.n_data_columns:
                 self.edit_column(target)
             return True
