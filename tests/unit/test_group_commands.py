@@ -139,6 +139,43 @@ def test_set_category(doc: Document) -> None:
     assert last_summary(doc) == "Remove 3 series from their category"
 
 
+@pytest.mark.parametrize("name", ["0\r", " Male ", "Male\t"])
+def test_set_category_strips_the_name(doc: Document, name: str) -> None:
+    run_with_undo(doc, SetCategory("t", [], name, column_ids=["a"]))
+    (category,) = table(doc).category_groups
+    assert category.name == name.strip()
+    assert last_summary(doc) == f"Put 1 series in category '{name.strip()}'"
+    # The same name with other whitespace finds that category.
+    run_with_undo(doc, SetCategory("t", [], f" {name.strip()} ", column_ids=["b"]))
+    assert [c.id for c in table(doc).category_groups] == [category.id]
+    assert table(doc).column("b").category_id == category.id
+
+
+@pytest.mark.parametrize("name", ["0\r", " Male "])
+def test_set_category_redo_keeps_the_category(doc: Document, name: str) -> None:
+    # The only series of the existing category moves to the "same" name with
+    # whitespace: it must stay in that category on the first run and on every redo.
+    doc.execute(SetCategory("t", [], name.strip(), column_ids=["a"]))
+    (existing,) = table(doc).category_groups
+    run_with_undo(doc, SetCategory("t", [], name, column_ids=["a"]))
+    assert [c.id for c in table(doc).category_groups] == [existing.id]
+    for _ in range(3):
+        doc.undo()
+        doc.redo()
+        assert [c.id for c in table(doc).category_groups] == [existing.id]
+        assert table(doc).column("a").category_id == existing.id
+
+
+def test_set_category_redo_reuses_the_new_id(doc: Document) -> None:
+    doc.execute(SetCategory("t", [], "Male", column_ids=["a"]))
+    (made,) = table(doc).category_groups
+    for _ in range(3):
+        doc.undo()
+        assert table(doc).category_groups == []
+        doc.redo()
+        assert [c.id for c in table(doc).category_groups] == [made.id]
+
+
 def test_same_series_name_in_two_categories(doc: Document) -> None:
     doc.execute(GroupColumns("t", ["a", "b"], "Control"))
     doc.execute(GroupColumns("t", ["c", "d"], "Treated"))
