@@ -74,6 +74,7 @@ RESET_QUESTION = (
     "Reset every setting to its default? Recent projects, global constants and recovery "
     "copies are kept."
 )
+DELETE_PALETTE_QUESTION = "Delete the palette “{name}”? Graphs that use its colors keep them."
 EXPORT_LABELS = {"png": "PNG image", "svg": "SVG drawing", "pdf": "PDF document"}
 
 
@@ -325,8 +326,12 @@ class SettingsDialog(QDialog):
         self._fill_palettes()
 
     def remove_palette(self) -> None:
+        """Delete the chosen palette of the user's, after asking. Graphs made with it keep
+        their colors (each has its own copy)."""
         current = self._current_palette()
         if not current.id.startswith(USER_PREFIX):
+            return
+        if not self._ask("Delete palette", DELETE_PALETTE_QUESTION.format(name=current.name)):
             return
         self._palettes = [p for p in self._palettes if p.id != current.id]
         self._palette = next(iter(SCHEMES.values()))

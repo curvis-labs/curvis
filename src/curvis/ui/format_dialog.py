@@ -2,7 +2,7 @@
 
 A workbench dialog (docs/DESIGN.md §1, mockup in docs/mockups/index.html, board 3):
 
-- the sections as tabs: **Graph** (title, size, legend, and for bar-family graphs the
+- the sections as tabs: **Graph** (title, graph type, size, legend, and for bar-family graphs the
   clusters of category groups, individual values, violin ends and histogram bins),
   **Axes**, **Series** and **Colors and text** (color scheme, palette editor, chart
   font and text size), each with one sentence on what it changes;
@@ -57,15 +57,20 @@ from PySide6.QtWidgets import (
 from curvis.analysis.base import Analysis, analysis_labels
 from curvis.analysis.result import Result
 from curvis.charts.builder import (
+    GRAPH_TYPES,
+    INTERACTION_ONLY,
+    SURVIVAL_ONLY,
     default_series_of,
     error_column_of,
     first_factor_name,
     graph_series_names,
     is_fit,
     two_way_analyses,
+    variant_problem,
     with_fit,
     with_grouping,
     with_palette,
+    with_variant,
 )
 from curvis.charts.colors import SCHEMES, ColorScheme
 from curvis.charts.data import ChartData, compute, gather
@@ -118,7 +123,7 @@ if TYPE_CHECKING:
 GRAPH, AXES, SERIES, COLORS = range(4)
 SECTIONS = ("Graph", "Axes", "Series", "Colors and text")
 DESCRIPTIONS = (
-    "The title, size and legend of the graph.",
+    "The title, type, size and legend of the graph.",
     "Titles, ranges, labels and scales of the axes.",
     "Symbols, lines, colors, error bars and fitted curves. Select several series to change "
     "them together.",
@@ -357,6 +362,10 @@ class FormatDialog(QDialog):
         form = form_layout()
         self.title_edit = QLineEdit()
         form.addRow(buddy_label("&Title", self.title_edit), self.title_edit)
+        self.type_combo = QComboBox()
+        self.type_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._fill_types()
+        form.addRow(buddy_label("Graph t&ype", self.type_combo), self.type_combo)
         row = QHBoxLayout()
         row.setSpacing(0)
         self.aspect_group = QButtonGroup(self)
@@ -415,11 +424,49 @@ class FormatDialog(QDialog):
         self.show_legend.toggled.connect(lambda on: self._edit(show_legend=on))
         self.show_bands.toggled.connect(lambda on: self._edit(show_bands=on))
         self.anova_combo.currentIndexChanged.connect(lambda _i: self._on_anova_chosen())
+        self.type_combo.activated.connect(lambda _i: self._on_type_chosen())
         return box
 
+    def _fill_types(self) -> None:
+        """The graph types this graph can be changed to; the others are listed disabled
+        with the reason (as in the Change graph type menu)."""
+        from PySide6.QtGui import QStandardItemModel
+
+        combo = self.type_combo
+        family = self.original.family
+        if family in (ChartFamily.SURVIVAL, ChartFamily.INTERACTION):
+            combo.addItem(self.original.variant.label, self.original.variant)
+            combo.setEnabled(False)
+            combo.setToolTip(SURVIVAL_ONLY if family is ChartFamily.SURVIVAL else INTERACTION_ONLY)
+            return
+        model = combo.model()
+        assert isinstance(model, QStandardItemModel)
+        for variant in GRAPH_TYPES:
+            combo.addItem(variant.label, variant)
+            problem = variant_problem(self.table, variant, self.original)
+            if problem:
+                item = model.item(combo.count() - 1)
+                item.setEnabled(False)
+                item.setToolTip(f"{problem}.")
+
+    def _on_type_chosen(self) -> None:
+        variant = ChartVariant(self.type_combo.currentData())
+        if variant is self.spec.variant:
+            return
+        try:
+            spec = with_variant(self.spec, variant, self.table)
+        except ValueError as exc:
+            self._problems["graph"] = str(exc)
+            self._show_problem()
+            return
+        self._problems.pop("graph", None)
+        self._apply(spec)
+        self._load()
+        self._on_section_changed(self.tabs.currentIndex())
+
     def _build_bar_options(self, form: Any) -> None:
-        """The options of bar-family graphs, shown for the variants they apply to."""
-        variant = self.original.variant
+        """The options of bar-family graphs, shown for the variants they apply to
+        (:meth:`_show_variant_options`)."""
         factor = self.table.category_factor or "category"
         self.grouping = QComboBox()
         for choice, text in GROUPING_LABELS.items():
@@ -431,18 +478,14 @@ class FormatDialog(QDialog):
         )
         self.grouping.setEnabled(has_categories)
         self.grouping.setToolTip("" if has_categories else GROUPING_NEEDS_CATEGORIES)
-        for widget in (self.grouping_label, self.grouping):
-            widget.setVisible(variant in GROUPABLE_VARIANTS)
         self.show_points = QCheckBox("Show individual &values")
         self.show_points.setToolTip("Draw each value as a symbol over the bar, box or violin")
         form.addRow("", self.show_points)
-        self.show_points.setVisible(variant in POINTS_VARIANTS)
         self.violin_trim = QCheckBox("Tri&m violins at the smallest and largest value")
         self.violin_trim.setToolTip(
             "Off: the outline reaches three bandwidths further, as R's density() does"
         )
         form.addRow("", self.violin_trim)
-        self.violin_trim.setVisible(variant is ChartVariant.VIOLIN)
         self.bin_mode = QComboBox()
         for mode, text in BIN_LABELS.items():
             self.bin_mode.addItem(text, mode)
@@ -470,8 +513,7 @@ class FormatDialog(QDialog):
         width_row.addStretch(1)
         self.bin_width_label = buddy_label("Wi&dth", self.bin_width)
         form.addRow(self.bin_width_label, width_row)
-        histogram = variant is ChartVariant.HISTOGRAM
-        bin_widgets: tuple[QWidget, ...] = (
+        self._bin_widgets: tuple[QWidget, ...] = (
             self.bins_label,
             self.bin_mode,
             self.bin_count,
@@ -480,8 +522,6 @@ class FormatDialog(QDialog):
             self.bin_start_label,
             self.bin_start,
         )
-        for bin_widget in bin_widgets:
-            bin_widget.setVisible(histogram)
         self.grouping.activated.connect(lambda _i: self._on_grouping_chosen())
         self.show_points.toggled.connect(lambda on: self._edit(show_points=on))
         self.violin_trim.toggled.connect(lambda on: self._edit(violin_trim=on))
@@ -489,6 +529,16 @@ class FormatDialog(QDialog):
         self.bin_count.valueChanged.connect(lambda _v: self._edit_bins())
         self.bin_width.textEdited.connect(lambda _t: self._edit_bins())
         self.bin_start.textEdited.connect(lambda _t: self._edit_bins())
+
+    def _show_variant_options(self) -> None:
+        """Show the Graph options that the graph's current type uses."""
+        variant = self.spec.variant
+        for widget in (self.grouping_label, self.grouping):
+            widget.setVisible(variant in GROUPABLE_VARIANTS)
+        self.show_points.setVisible(variant in POINTS_VARIANTS)
+        self.violin_trim.setVisible(variant is ChartVariant.VIOLIN)
+        for bin_widget in self._bin_widgets:
+            bin_widget.setVisible(variant is ChartVariant.HISTOGRAM)
 
     def _build_axes_list(self) -> QGroupBox:
         box = QGroupBox("Axes")
@@ -703,6 +753,7 @@ class FormatDialog(QDialog):
         if section == GRAPH:
             widgets += [
                 self.title_edit,
+                self.type_combo,
                 *self.aspect_buttons.values(),
                 self.width_spin,
                 self.height_spin,
@@ -767,6 +818,9 @@ class FormatDialog(QDialog):
             self.show_bands.setChecked(spec.show_bands)
         with QSignalBlocker(self.anova_combo):
             self.anova_combo.setCurrentIndex(self.anova_combo.findData(spec.analysis_id))
+        with QSignalBlocker(self.type_combo):
+            self.type_combo.setCurrentIndex(max(0, self.type_combo.findData(spec.variant)))
+        self._show_variant_options()
         self._fill_schemes()
         with QSignalBlocker(self.font_combo):
             self.font_combo.setCurrentIndex(max(0, self.font_combo.findData(spec.font)))

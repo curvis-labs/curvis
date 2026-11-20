@@ -73,10 +73,21 @@ def test_palettes_are_made_changed_and_deleted(
     assert mine.name == "Lab" and mine.series == ("#aa0000", "#00aa00")
     assert settings.graph_palette == mine
 
+    answers = [False, True]
+    questions: list[str] = []
+
+    def ask(self: SettingsDialog, title: str, question: str) -> bool:
+        questions.append(question)
+        return answers.pop(0)
+
+    monkeypatch.setattr(SettingsDialog, "_ask", ask)
     again = SettingsDialog(settings)
     qtbot.addWidget(again)
     assert again.palette_combo.currentText() == "Lab (yours)"
+    again.delete_palette.click()  # declined: kept
+    assert again.palette_combo.currentText() == "Lab (yours)"
     again.delete_palette.click()
+    assert questions[0].startswith("Delete the palette “Lab”?")
     again.accept()
     assert settings.palettes == [] and settings.graph_palette == CURVIS
 
@@ -255,3 +266,43 @@ def test_the_preview_recomputes_for_violin_ends_and_bins(qtbot: QtBot) -> None:
         return len(found.breaks) - 1 if found is not None else 0
 
     qtbot.waitUntil(lambda: bins() == 4, timeout=10_000)
+
+
+def test_the_graph_type_is_changed_in_the_format_dialog(qtbot: QtBot) -> None:
+    dialog = _format(qtbot, ChartVariant.BAR, "spread")
+    dialog.set_section(GRAPH)
+    combo = dialog.type_combo
+    model = combo.model()
+    scatter = combo.findData(ChartVariant.SCATTER)
+    assert not model.item(scatter).isEnabled()  # the table has no X column
+    assert "X column" in model.item(scatter).toolTip()
+    assert dialog.violin_trim.isHidden()
+    index = combo.findData(ChartVariant.VIOLIN)
+    combo.setCurrentIndex(index)
+    combo.activated.emit(index)
+    assert dialog.spec.variant is ChartVariant.VIOLIN
+    assert not dialog.violin_trim.isHidden() and dialog.bin_mode.isHidden()
+    index = combo.findData(ChartVariant.HISTOGRAM)
+    combo.setCurrentIndex(index)
+    combo.activated.emit(index)
+    assert dialog.spec.variant is ChartVariant.HISTOGRAM
+    assert not dialog.bin_mode.isHidden() and dialog.show_points.isHidden()
+    assert dialog.spec.y_axis.title == "Number of values"
+    assert dialog.changed  # Apply stores the new type as one undo step
+
+
+def test_survival_graphs_keep_their_type_in_the_format_dialog(qtbot: QtBot) -> None:
+    from curvis.charts.builder import SURVIVAL_ONLY
+    from tests.unit.charts_tables import survival_table
+
+    table = survival_table()
+    doc = Document()
+    doc.execute(AddTable(table))
+    spec = default_spec(table, ChartFamily.SURVIVAL)
+    doc.execute(add_graph(doc, spec))
+    scheduler = Scheduler()
+    dialog = FormatDialog(doc, spec.id, scheduler=scheduler)
+    qtbot.addWidget(dialog)
+    dialog.destroyed.connect(scheduler.shutdown)
+    assert not dialog.type_combo.isEnabled() and dialog.type_combo.count() == 1
+    assert dialog.type_combo.toolTip() == SURVIVAL_ONLY

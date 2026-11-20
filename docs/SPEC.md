@@ -86,7 +86,7 @@ Graphs are drawn directly from a data table. You pick a chart family from the to
 
 The Format dialog controls:
 
-- Graph title, size (Tall 4 × 6 cm, Wide 9 × 6 cm, Square 6 × 6 cm, or a custom width and height) and whether the graph shows a legend
+- Graph title, graph type (the types of its family: XY and Bar graphs can change between theirs; survival and interaction graphs keep theirs), size (Tall 4 × 6 cm, Wide 9 × 6 cm, Square 6 × 6 cm, or a custom width and height) and whether the graph shows a legend
 - Each axis: title, range, label, linear or log scale, and the angle of the X tick labels (Auto, horizontal, 45° or 90°; Auto turns them when they do not fit side by side)
 - Each series: symbol, symbol size, line style, line width, color, error-bar type and whether it is listed in the legend; series can be added, removed and reordered
 - Fitted curves laid over the graph, listed with the series; they can be removed
