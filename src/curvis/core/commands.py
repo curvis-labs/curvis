@@ -25,6 +25,7 @@ from curvis.data import (
     Table,
     layout_error,
     name_error,
+    new_id,
     normalized_order,
 )
 from curvis.data.column import coerce_cell, convert_values, role_problem, writable
@@ -744,14 +745,13 @@ class SetCategory(_LayoutCommand):
         super().__init__(table_id)
         self.group_ids = list(group_ids)
         self.column_ids = list(column_ids)
-        self.category = category
-        self._new = (
-            None
-            if category is None
-            else CategoryGroup(category)
-            if category_id is None
-            else CategoryGroup(category, id=category_id)
-        )
+        # Names are compared and stored without surrounding whitespace.
+        self.category = None if category is None else category.strip()
+        self._new_id = category_id
+        # Decided on the first apply and reused on redo: the id of the category the
+        # series go into, and whether this command made it.
+        self._category_id: str | None = None
+        self._creates = False
 
     def apply(self, table: Table) -> Sequence[str]:
         if not self.group_ids and not self.column_ids:
@@ -772,21 +772,31 @@ class SetCategory(_LayoutCommand):
                     f"Column '{column.name}' has the role {column.role.value}. "
                     "Only Y columns can be put in a category."
                 )
-        category_id: str | None = None
-        if self._new is not None:
-            key = name_key(self._new.name)
-            existing = next((c for c in table.category_groups if name_key(c.name) == key), None)
-            if existing is None:
-                self._new.name = self._new.name.strip()
-                table.category_groups.append(self._new)
-                existing = self._new
-            category_id = existing.id
+        category_id = None if self.category is None else self._resolve_category(table)
         for group in groups:
             group.category_id = category_id
         for column in columns:
             column.category_id = category_id
         _normalize(table)
         return [c.id for g in groups for c in table.group_columns(g.id)] + [c.id for c in columns]
+
+    def _resolve_category(self, table: Table) -> str:
+        """Id of the category named ``self.category``, made if needed.
+
+        The choice between an existing category and a new one is made on the first
+        run only; a redo uses the same category (same id) as that run did.
+        """
+        assert self.category is not None
+        if self._category_id is None:
+            key = name_key(self.category)
+            existing = next((c for c in table.category_groups if name_key(c.name) == key), None)
+            self._creates = existing is None
+            self._category_id = existing.id if existing is not None else self._new_id or new_id()
+        if self._creates:
+            table.category_groups.append(CategoryGroup(self.category, id=self._category_id))
+        elif not any(c.id == self._category_id for c in table.category_groups):
+            raise CommandError(f"Table '{table.name}' no longer has category '{self.category}'.")
+        return self._category_id
 
     @property
     def summary(self) -> str:
