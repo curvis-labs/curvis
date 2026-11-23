@@ -118,9 +118,9 @@ def test_prism_tables_are_added_after_a_table_in_use(
     tab = window.new_document()
     document = tab.document
     first = document.tables[0]
-    from curvis.core import SetCell
+    from curvis.core import SetCellValue
 
-    document.execute(SetCell(first.id, first.columns[1].id, 0, 1.5))
+    document.execute(SetCellValue(first.id, first.columns[1].id, 0, 1.5))
     importing.extend([PRISM / "XY data_Rep.prism", PRISM / "XY data_Rep.pzfx"])
     window.import_data()
     window.import_data()
