@@ -324,11 +324,20 @@ Mockup: `docs/mockups/launcher.html`.
   folder under it in `PlaceholderText` (elided in the middle), and the relative time at the
   right. The hovered row is shaded with `Text` at 7 %. One click or Enter opens. A missing file
   uses the disabled text colour, says *File not found* in place of the time, and does not open.
+- **Recovered projects.** Only after Curvis did not close normally: above *Recent projects*,
+  the heading *Recovered projects* with the sentence “Curvis did not close normally. These
+  projects had unsaved changes.” in `PlaceholderText`, then a framed list on `Base`. Each row
+  has the name (semibold) with the folder of its file under it (*Never saved* for a project
+  that had no file), the time of the copy (relative, as in the recent list), and the buttons
+  *Open* and *Discard*. *Discard* asks first. A copy that cannot be read says *Cannot be
+  recovered* in place of the time and has *Discard* only. The section goes away when the
+  last row is opened or discarded; copies are never removed otherwise.
 - **Context menu** (right-click, the menu key or Shift+F10): *Open*, *Remove from list*.
   Removing never touches the file and adds no undo step.
 - **Empty list**: the centred sentence “Projects you open or save will appear here.”
   (`EmptyState`).
-- **Keyboard.** Tab order: tiles → *Open project…* → list. Arrow keys move along the tiles
+- **Keyboard.** Tab order: tiles → the buttons of the recovered projects → *Open project…* →
+  list. Arrow keys move along the tiles
   and in the list.
 
 ## 11. Analyze dialog
