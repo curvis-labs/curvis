@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GraphPadPrismFile xmlns="http://graphpad.com/prism/Prism.htm" PrismXMLVersion="5.00">
+<Created>
+<OriginalVersion CreatedByProgram="GraphPad Prism" CreatedByVersion="10.6.1.892" Login="wichertm" DateTime="2026-11-23T11:53:51+01:00"/>
+</Created>
+<InfoSequence>
+<Ref ID="Info0" Selected="1"/>
+</InfoSequence>
+<Info ID="Info0">
+<Title>Project info 1</Title>
+<Notes/>
+<Constant><Name>Experiment Date</Name><Value>2026-11-23</Value></Constant>
+<Constant><Name>Experiment ID</Name><Value/></Constant>
+<Constant><Name>Notebook ID</Name><Value/></Constant>
+<Constant><Name>Project</Name><Value/></Constant>
+<Constant><Name>Experimenter</Name><Value/></Constant>
+<Constant><Name>Protocol</Name><Value/></Constant>
+</Info>
+
+<TableSequence Selected="1">
+<Ref ID="Table0" Selected="1"/>
+</TableSequence>
+<Table ID="Table0" XFormat="numbers" YFormat="replicates" Replicates="3" TableType="XY" EVFormat="AsteriskAfterNumber">
+<Title>XY: Compare slopes (simple lin. reg.)</Title>
+<FloatingNote ID="Sticky0" Auto="0" Color="Yellow" Left="2376" Top="1139" Width="647" Height="414" ScrWidth="4000" ScrHeight="2560" ScrDPI="96">
+<WebLink Flags="0" ToolTip="@help:stat_how_to_linear_regression" URL="@help:reg_finding_the_best-fit_slope_and">
+Learn more about linear regression
+</WebLink>
+
+<B><Font Size="11" Color="#000000" Face="Verdana">How the data are organized</Font></B>
+<Font Size="11" Color="#000000" Face="Verdana"><BR/>The X values are time, and the Y values are concentration for control and treated data sets.  Triplicate values are entered in side-by-side subcolumns, with some missing values.</Font>
+<B><Font Size="11" Color="#000000" Face="Verdana"><BR/><BR/>The goal</Font></B>
+<Font Size="11" Color="#000000" Face="Verdana"><BR/>To use linear regression to fit straight lines through both data sets and compare the slopes.</Font>
+<B><Font Size="11" Color="#000000" Face="Verdana"><BR/><BR/>How to perform linear regression</Font></B>
+<Font Size="11" Color="#000000" Face="Verdana"><BR/>Click Analyze, and choose Linear regression from the list of XY analyses. <BR/><BR/>Check the option on the dialog: "Test whether the slopes and intercepts are significantly different". <BR/><BR/>The numerical results are placed on two analysis tabs ("Tabular results" and "Are lines different?"). <BR/><BR/>The linear regression lines are automatically superimposed on the graph.</Font>
+</FloatingNote>
+
+<FloatingNote ID="Sticky1" Auto="0" Color="Blue" Left="2376" Top="1177" Width="274" Height="84" ScrWidth="4000" ScrHeight="2560" ScrDPI="96">
+<WebLink Flags="0" ToolTip="@help:reg_comparingslopesandintercepts" URL="@help:reg_comparingslopesandintercepts">
+How Prism compares regression lines
+</WebLink>
+
+<Font Size="11" Color="#000000" Face="Verdana">How does Prism compare slopes?</Font>
+</FloatingNote>
+
+<XColumn Width="81" Subcolumns="1" Decimals="1">
+<Title>Minutes</Title>
+<Subcolumn>
+<d>1</d>
+<d>2</d>
+<d>3</d>
+<d>4</d>
+<d>5</d>
+<d>6</d>
+<d>7</d>
+<d>8</d>
+<d>9</d>
+<d>10</d>
+</Subcolumn>
+</XColumn>
+<XAdvancedColumn Version="1" Width="81" Decimals="1" Subcolumns="1">
+<Title>Minutes</Title>
+<Subcolumn>
+<d>1</d>
+<d>2</d>
+<d>3</d>
+<d>4</d>
+<d>5</d>
+<d>6</d>
+<d>7</d>
+<d>8</d>
+<d>9</d>
+<d>10</d>
+</Subcolumn>
+</XAdvancedColumn>
+<YColumn Width="243" Decimals="0" Subcolumns="3">
+<Title>Control</Title>
+<Subcolumn>
+<d>34</d>
+<d>38</d>
+<d>57</d>
+<d>65</d>
+<d>76</d>
+<d>79</d>
+<d>100</d>
+<d>105</d>
+<d>121</d>
+<d>135</d>
+</Subcolumn>
+<Subcolumn>
+<d>29</d>
+<d>49</d>
+<d/>
+<d>65</d>
+<d>91</d>
+<d>93</d>
+<d>107</d>
+<d>123</d>
+<d>143</d>
+<d>156</d>
+</Subcolumn>
+<Subcolumn>
+<d>28</d>
+<d>53</d>
+<d>55</d>
+<d>50</d>
+<d>84</d>
+<d>98</d>
+<d>89</d>
+<d>119</d>
+<d>134</d>
+<d/>
+</Subcolumn>
+</YColumn>
+<YColumn Width="243" Decimals="0" Subcolumns="3">
+<Title>Treated</Title>
+<Subcolumn>
+<d>31</d>
+<d>61</d>
+<d>78</d>
+<d>93</d>
+<d/>
+<d>134</d>
+<d>156</d>
+<d>167</d>
+<d>178</d>
+<d>198</d>
+</Subcolumn>
+<Subcolumn>
+<d>29</d>
+<d/>
+<d>99</d>
+<d>111</d>
+<d>109</d>
+<d>145</d>
+<d>134</d>
+<d/>
+<d>192</d>
+<d>203</d>
+</Subcolumn>
+<Subcolumn>
+<d>44</d>
+<d>89</d>
+<d>77</d>
+<d>109</d>
+<d>141</d>
+<d>129</d>
+<d>167</d>
+<d>180</d>
+<d>175</d>
+<d>234</d>
+</Subcolumn>
+</YColumn>
+</Table>
+
+<!--Analyses, graphs and layouts as compressed binary. Don't edit this part of the file.-->
+
+<Template xmlns:dt="urn:schemas-microsoft-com:datatypes" dt:dt="bin.base64">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
+/wMAiYb9aA==</Template></GraphPadPrismFile>
