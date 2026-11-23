@@ -625,9 +625,9 @@ Make a plan first. When done, report what changed and any formulas the rules mak
 ### Step 3.7 — Excel and Prism import
 
 **Done when**
-- [ ] .xlsx and .xls import through the same preview dialog (sheet picker added).
-- [ ] Data tables from Prism .pzfx and .prism files import with sensible column roles and groups.
-- [ ] The preview dialog has a decimal mark choice (auto-detect, point, comma) with its default in Settings.
+- [x] .xlsx and .xls import through the same preview dialog (sheet picker added).
+- [x] Data tables from Prism .pzfx and .prism files import with sensible column roles and groups.
+- [x] The preview dialog has a decimal mark choice (auto-detect, point, comma) with its default in Settings.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 3.7 in docs/PHASES.md.
