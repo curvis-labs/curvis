@@ -1,8 +1,9 @@
 """The launcher: shown at start-up and whenever no project is open (docs/DESIGN.md §10).
 
 One centred column, 760 px wide (narrower windows: the full width with the 12 px margin):
-a row of tiles to start from, the *Recent projects* heading with *Open project…* at its
-right, and the list of recent projects. Every colour comes from the palette, so the
+a row of tiles to start from, the projects recovered after Curvis did not close normally
+(only then), the *Recent projects* heading with *Open project…* at its right, and the
+list of recent projects. Every colour comes from the palette, so the
 launcher follows the theme.
 """
 
@@ -48,6 +49,7 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QAbstractButton,
     QAbstractItemView,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLayout,
@@ -64,8 +66,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from curvis.io.recovery import RecoveredCopy
 from curvis.settings import RecentProject
-from curvis.ui.dialogs import MARGIN, SECTION_SPACING, SPACING, EmptyState, set_tab_order
+from curvis.ui.dialogs import (
+    MARGIN,
+    SECTION_SPACING,
+    SPACING,
+    EmptyState,
+    secondary_label,
+    set_tab_order,
+)
 from curvis.ui.relative_time import format_relative
 from curvis.ui.resources import ICONS_DIR
 from curvis.ui.theme import control_border, grid_line
@@ -88,6 +98,10 @@ HOVER_ALPHA = 0.07
 """The hovered row is shaded with ``Text`` at this opacity."""
 EMPTY_TEXT = "Projects you open or save will appear here."
 MISSING_TEXT = "File not found"
+RECOVERED_HEADING = "Recovered projects"
+RECOVERED_NOTE = "Curvis did not close normally. These projects had unsaved changes."
+UNRECOVERABLE_TEXT = "Cannot be recovered"
+NEVER_SAVED_TEXT = "Never saved"
 
 _R = QPalette.ColorRole
 _G = QPalette.ColorGroup
@@ -617,6 +631,108 @@ class RecentList(QListWidget):
         self.menu_requested.emit(row, self.viewport().mapToGlobal(point))
 
 
+# --- recovered projects ---------------------------------------------------------------
+
+
+class RecoveredRow(QWidget):
+    """One recovered project: its name with its folder (or *Never saved*) under it, the
+    time of the copy, and *Open* and *Discard*. A copy that cannot be read says *Cannot
+    be recovered* in place of the time and offers *Discard* only."""
+
+    def __init__(self, copy: RecoveredCopy, when: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.copy = copy
+        self.setObjectName("recoveredRow")
+        self.setMinimumHeight(ROW_HEIGHT)
+        self.name_label = QLabel(copy.name, self)
+        self.name_label.setFont(_semibold(self.name_label.font()))
+        info = copy.info
+        if info is None:
+            where = ""
+        elif info.original_path is None:
+            where = NEVER_SAVED_TEXT
+        else:
+            where = display_folder(info.original_path.parent)
+        self.folder_label = secondary_label(where, self)
+        self.when_label = secondary_label(when if copy.recoverable else UNRECOVERABLE_TEXT, self)
+        self.when_label.setWordWrap(False)
+        self.open_button = QPushButton("Open", self)
+        self.open_button.setAccessibleName(f"Open recovered {copy.name}")
+        self.open_button.setVisible(copy.recoverable)
+        self.discard_button = QPushButton("Discard", self)
+        self.discard_button.setAccessibleName(f"Discard recovered {copy.name}")
+        if info is not None and info.original_path is not None:
+            self.setToolTip(str(info.original_path))
+        text = QVBoxLayout()
+        text.setContentsMargins(0, 0, 0, 0)
+        text.setSpacing(0)
+        text.addWidget(self.name_label)
+        if where:
+            text.addWidget(self.folder_label)
+        else:
+            self.folder_label.hide()
+        row = QHBoxLayout(self)
+        row.setContentsMargins(ROW_PADDING, SPACING // 2, ROW_PADDING, SPACING // 2)
+        row.setSpacing(SPACING)
+        row.addLayout(text, 1)
+        row.addWidget(self.when_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        row.addWidget(self.open_button, 0, Qt.AlignmentFlag.AlignVCenter)
+        row.addWidget(self.discard_button, 0, Qt.AlignmentFlag.AlignVCenter)
+
+    def buttons(self) -> list[QWidget]:
+        shown: list[QWidget] = [self.open_button] if self.copy.recoverable else []
+        return [*shown, self.discard_button]
+
+
+class RecoveredSection(QWidget):
+    """*Recovered projects*: a heading, a sentence that says why, and a framed list of
+    :class:`RecoveredRow` on ``Base``. Hidden while there is nothing to recover."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("recoveredProjects")
+        self.heading = QLabel(RECOVERED_HEADING, self)
+        self.heading.setFont(_semibold(self.heading.font()))
+        self.note = secondary_label(RECOVERED_NOTE, self)
+        self.frame = QFrame(self)
+        self.frame.setObjectName("recoveredList")
+        self.frame.setAccessibleName(RECOVERED_HEADING)
+        self.frame.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame.setBackgroundRole(_R.Base)
+        self.frame.setAutoFillBackground(True)
+        self.rows_layout = QVBoxLayout(self.frame)
+        self.rows_layout.setContentsMargins(1, 1, 1, 1)
+        self.rows_layout.setSpacing(0)
+        self.rows: list[RecoveredRow] = []
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, SECTION_SPACING + SPACING, 0, 0)
+        layout.setSpacing(SPACING // 2)
+        layout.addWidget(self.heading)
+        layout.addWidget(self.note)
+        layout.addSpacing(SPACING // 2)
+        layout.addWidget(self.frame)
+
+    def set_rows(self, rows: list[RecoveredRow]) -> None:
+        for old in self.rows:
+            self.rows_layout.removeWidget(old)
+            old.deleteLater()
+        for line in self.frame.findChildren(QFrame, "recoveredSeparator"):
+            line.deleteLater()
+        self.rows = rows
+        for i, row in enumerate(rows):
+            if i:
+                line = QFrame(self.frame)
+                line.setObjectName("recoveredSeparator")
+                line.setFrameShape(QFrame.Shape.HLine)
+                line.setFrameShadow(QFrame.Shadow.Plain)
+                line.setForegroundRole(_R.Mid)
+                self.rows_layout.addWidget(line)
+            row.setParent(self.frame)
+            self.rows_layout.addWidget(row)
+            row.show()
+        self.setVisible(bool(rows))
+
+
 # --- the launcher --------------------------------------------------------------------
 
 
@@ -635,6 +751,8 @@ class _Content:
         self.column = LauncherColumn(launcher)
         self.column.setMaximumWidth(COLUMN_WIDTH)
         self.tile_row = TileRow(tiles, self.column)
+        self.recovered = RecoveredSection(self.column)
+        self.recovered.hide()
 
         self.recent_list = RecentList(self.column)
         self.recent_label = QLabel("&Recent projects", self.column)
@@ -655,6 +773,7 @@ class _Content:
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(0)
         column.addWidget(self.tile_row)
+        column.addWidget(self.recovered)
         column.addSpacing(SECTION_SPACING + SPACING)
         column.addLayout(heading)
         column.addSpacing(SPACING)
@@ -666,7 +785,12 @@ class _Content:
         self.outer.setContentsMargins(MARGIN, TOP_MARGIN, MARGIN, BOTTOM_MARGIN)
         self.outer.addWidget(self.column, 0, Qt.AlignmentFlag.AlignHCenter)
 
-        set_tab_order([*self.tile_row.buttons, self.open_button, self.recent_list])
+        self.update_tab_order()
+
+    def update_tab_order(self) -> None:
+        """Tiles, the buttons of the recovered projects, *Open project…*, the list."""
+        buttons = [b for row in self.recovered.rows for b in row.buttons()]
+        set_tab_order([*self.tile_row.buttons, *buttons, self.open_button, self.recent_list])
 
 
 class LauncherWidget(QWidget):
@@ -680,6 +804,10 @@ class LauncherWidget(QWidget):
     """Take this project off the recent list; the file is not touched."""
     tile_chosen = Signal(str)
     """A tile other than *Blank project* was chosen: the key of a sample project."""
+    recovered_open_requested = Signal(object)
+    """Open this :class:`~curvis.io.recovery.RecoveredCopy`."""
+    recovered_discard_requested = Signal(object)
+    """Discard this :class:`~curvis.io.recovery.RecoveredCopy` (after asking)."""
 
     def __init__(
         self,
@@ -692,6 +820,7 @@ class LauncherWidget(QWidget):
         self._clock = clock
         self._tiles = list(tiles) if tiles is not None else default_tiles()
         self._projects: list[RecentProject] = []
+        self._recovered: list[RecoveredCopy] = []
         self._content: _Content | None = None
 
     def _ensure_built(self) -> _Content:
@@ -705,6 +834,7 @@ class LauncherWidget(QWidget):
             c.recent_list.open_requested.connect(self._open_row)
             c.recent_list.menu_requested.connect(self._show_menu)
             self._fill_list()
+            self._fill_recovered()
             # Made during the first show: Qt has shown the children already.
             c.column.show()
             c.outer.activate()
@@ -735,6 +865,14 @@ class LauncherWidget(QWidget):
         return self._ensure_built().empty_state
 
     @property
+    def recovered_section(self) -> RecoveredSection:
+        return self._ensure_built().recovered
+
+    @property
+    def recovered_rows(self) -> list[RecoveredRow]:
+        return self.recovered_section.rows
+
+    @property
     def tiles(self) -> list[TileButton]:
         return self.tile_row.buttons
 
@@ -753,6 +891,45 @@ class LauncherWidget(QWidget):
         self._projects = list(projects)
         if self._content is not None:
             self._fill_list()
+
+    def set_recovered(self, copies: Sequence[RecoveredCopy]) -> None:
+        """Show these recovered projects above the recent projects (none: no section)."""
+        self._recovered = list(copies)
+        if self._content is not None:
+            self._fill_recovered()
+
+    @property
+    def recovered(self) -> list[RecoveredCopy]:
+        return list(self._recovered)
+
+    def remove_recovered(self, copy: RecoveredCopy) -> None:
+        """Take ``copy`` off the list (it was opened or discarded)."""
+        self.set_recovered([c for c in self._recovered if c != copy])
+
+    def mark_unrecoverable(self, copy: RecoveredCopy) -> RecoveredCopy:
+        """Show ``copy`` as *Cannot be recovered* (it could not be read); returns the
+        copy as now listed."""
+        damaged = copy.damaged()
+        self.set_recovered([damaged if c == copy else c for c in self._recovered])
+        return damaged
+
+    def _fill_recovered(self) -> None:
+        assert self._content is not None
+        now = self._clock()
+        rows = []
+        for copy in self._recovered:
+            info = copy.info
+            when = format_relative(info.copied_at, now) if info and copy.recoverable else ""
+            row = RecoveredRow(copy, when[:1].upper() + when[1:])
+            row.open_button.clicked.connect(
+                functools.partial(self.recovered_open_requested.emit, copy)
+            )
+            row.discard_button.clicked.connect(
+                functools.partial(self.recovered_discard_requested.emit, copy)
+            )
+            rows.append(row)
+        self._content.recovered.set_rows(rows)
+        self._content.update_tab_order()
 
     def _fill_list(self) -> None:
         assert self._content is not None

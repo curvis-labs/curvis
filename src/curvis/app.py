@@ -97,7 +97,9 @@ def main(argv: list[str] | None = None) -> int:
         lambda key: themes.apply(settings.theme) if key == Settings.THEME else None
     )
 
-    window = MainWindow(settings)
+    from curvis.io.recovery import RecoveryStore, default_directory
+
+    window = MainWindow(settings, recovery=RecoveryStore(default_directory()))
     crash_log.show = lambda report, path: show_crash_report(window, report, path)
     settings.changed.connect(
         lambda key: crash_log.set_enabled(settings.crash_log) if key == Settings.CRASH_LOG else None

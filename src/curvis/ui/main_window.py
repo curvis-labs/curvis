@@ -51,6 +51,8 @@ if TYPE_CHECKING:
     from curvis.compute import JobError, Scheduler
     from curvis.core import Command
     from curvis.io.importers import CsvOptions
+    from curvis.io.recovery import RecoveredCopy, RecoveryStore
+    from curvis.ui.autosave import Autosave
 
 PROJECT_SUFFIX = ".cvp"
 PROJECT_FILTER = "Curvis projects (*.cvp)"
@@ -144,13 +146,38 @@ def _file_key(path: Path) -> str:
     return os.path.normcase(str(path.resolve(strict=False)))
 
 
+DISCARD_RECOVERED_QUESTION = "Discard the recovered copy of '{name}'? Its changes are lost."
+FILE_CHANGED_QUESTION = (
+    "'{name}' was changed after this recovered copy was made. Save the recovered project "
+    "over it anyway?"
+)
+
+
+def _mtime_ns(path: Path) -> int | None:
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return None
+
+
 class MainWindow(QMainWindow):
-    """Top-level window with one tab per open document."""
+    """Top-level window with one tab per open document.
+
+    With a ``recovery`` store, every open project with unsaved changes gets a recovery
+    copy at the interval set in Settings (:mod:`curvis.ui.autosave`), and the launcher
+    offers the copies a session that did not close normally left behind.
+    """
 
     warm_up_done = Signal()
     """The formula warm-up job has finished (or failed): start-up is over."""
 
-    def __init__(self, settings: Settings | None = None, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        parent: QWidget | None = None,
+        *,
+        recovery: RecoveryStore | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Curvis")
         self.resize(1200, 800)
@@ -161,6 +188,9 @@ class MainWindow(QMainWindow):
         # scheduler node -> (file, tab and table to import into; None for a new project)
         self._pending_imports: dict[str, tuple[Path, DocumentTab | None, str | None]] = {}
         self._untitled_count = 0
+        self.recovery = recovery
+        self._autosave: Autosave | None = None
+        self._pending_recoveries: dict[str, RecoveredCopy] = {}  # scheduler node -> copy
         self._sample_menu: QMenu | None = None
         self._table_actions_created = False
 
@@ -185,12 +215,38 @@ class MainWindow(QMainWindow):
         self.launcher.open_requested.connect(self.open_document)
         self.launcher.recent_chosen.connect(self.open_path)
         self.launcher.remove_requested.connect(self.settings.remove_recent_project)
+        self.launcher.recovered_open_requested.connect(self.open_recovered)
+        self.launcher.recovered_discard_requested.connect(self.discard_recovered)
         self.tabs.currentChanged.connect(self._on_current_tab_changed)
         self.tabs.tabCloseRequested.connect(self._on_tab_close_requested)
         self.settings.changed.connect(self._on_setting_changed)
 
         self._refresh_recent()
+        self._start_recovery()
         self._update_state()
+
+    def _start_recovery(self) -> None:
+        """Lock this session's recovery folder and list what a crashed session left."""
+        if self.recovery is None:
+            return
+        try:
+            self.recovery.start()
+        except OSError:
+            self.recovery = None  # an unusable app data folder must not stop the app
+            return
+        self.launcher.set_recovered(self.recovery.scan())
+
+    @property
+    def autosave(self) -> Autosave | None:
+        """Writes the recovery copies; made with the first tab (it needs the scheduler)."""
+        if self._autosave is None and self.recovery is not None:
+            from curvis.ui.autosave import MINUTE_MS, Autosave
+
+            self._autosave = Autosave(
+                self.recovery, self.scheduler, self.settings.autosave_minutes * MINUTE_MS, self
+            )
+            self._autosave.failed.connect(self._show_status)
+        return self._autosave
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 (Qt API)
         # The main toolbar is made when the window is first shown, not with the shell,
@@ -713,11 +769,16 @@ class MainWindow(QMainWindow):
         if node in self._pending_imports:
             self._finish_import(*self._pending_imports.pop(node), result)
             return
+        if node in self._pending_recoveries:
+            assert isinstance(result, Document)
+            self._finish_recovery(self._pending_recoveries.pop(node), result)
+            return
         path = self._pending_opens.pop(node, None)
         if path is None:
             return
         assert isinstance(result, Document)
-        self._add_tab(result, path)
+        tab = self._add_tab(result, path)
+        tab.file_mtime_ns = _mtime_ns(path)
         self.settings.add_recent_project(path)
         from curvis.core import fix_name_clashes
 
@@ -734,6 +795,14 @@ class MainWindow(QMainWindow):
                 "Cannot import data", f"'{source.name}' could not be imported.\n\n{error.message}"
             )
             return
+        if node in self._pending_recoveries:
+            copy = self._pending_recoveries.pop(node)
+            self.launcher.mark_unrecoverable(copy)
+            self._show_error(
+                "Cannot recover project",
+                f"The recovered copy of '{copy.name}' cannot be read.\n\n{error.message}",
+            )
+            return
         path = self._pending_opens.pop(node, None)
         if path is None:
             return
@@ -741,7 +810,9 @@ class MainWindow(QMainWindow):
             "Cannot open project", f"'{path.name}' could not be opened.\n\n{error.message}"
         )
 
-    def _add_tab(self, document: Document, path: Path | None) -> DocumentTab:
+    def _add_tab(
+        self, document: Document, path: Path | None, *, copy_id: str | None = None
+    ) -> DocumentTab:
         self._create_table_actions()
         tab = DocumentTab(
             document,
@@ -764,10 +835,54 @@ class MainWindow(QMainWindow):
         index = self.tabs.addTab(tab, tab.title)
         self.tabs.setTabToolTip(index, str(path) if path else tab.title)
         document.undo_stack.subscribe(functools.partial(self._on_undo_event, tab))
+        if self.autosave is not None:
+            self.autosave.add(tab, copy_id)
         self.tabs.setCurrentIndex(index)
         self.stack.setCurrentWidget(self.tabs)
         self._update_state()
         return tab
+
+    # --- recovery -------------------------------------------------------------------
+
+    def open_recovered(self, copy: RecoveredCopy) -> None:
+        """Open a recovered project: with unsaved changes and its original file (if it
+        had one), so Save writes there; a project that was never saved opens untitled."""
+        if self.recovery is None or not copy.recoverable:
+            return
+        from curvis.compute import Job
+
+        node = f"recover:{copy.folder.name}/{copy.copy_id}"
+        if node in self._pending_recoveries:
+            return
+        self._pending_recoveries[node] = copy
+        job = Job(
+            _load_project, (str(copy.project_path),), imports=("pyarrow", "curvis.io.project")
+        )
+        self.scheduler.submit(node, job, delay_ms=0)
+
+    def _finish_recovery(self, copy: RecoveredCopy, document: Document) -> None:
+        assert self.recovery is not None and copy.info is not None
+        try:
+            copy_id: str | None = self.recovery.claim(copy)
+        except OSError:
+            copy_id = None  # left where it is: offered again after the next crash
+        self.launcher.remove_recovered(copy)
+        info = copy.info
+        document.undo_stack.set_modified()
+        tab = self._add_tab(document, info.original_path, copy_id=copy_id)
+        if info.original_path is not None:
+            tab.file_mtime_ns = info.original_mtime_ns
+            tab.check_file_changed = True
+        self._update_tab(tab)
+
+    def discard_recovered(self, copy: RecoveredCopy) -> None:
+        """Delete a recovered copy, after asking."""
+        if self.recovery is None:
+            return
+        if not self._ask_discard_recovered(copy):
+            return
+        self.recovery.discard(copy)
+        self.launcher.remove_recovered(copy)
 
     # --- import ---------------------------------------------------------------------
 
@@ -913,9 +1028,16 @@ class MainWindow(QMainWindow):
         return self.save_tab_as(tab) if tab is not None else False
 
     def save_tab(self, tab: DocumentTab) -> bool:
-        """Save ``tab`` to its file (asking for one if it has none). True if saved."""
+        """Save ``tab`` to its file (asking for one if it has none). True if saved.
+
+        A recovered project warns first if its file was changed after the copy was made.
+        """
         if tab.path is None:
             return self.save_tab_as(tab)
+        if tab.check_file_changed and tab.file_mtime_ns is not None:
+            now = _mtime_ns(tab.path)
+            if now is not None and now > tab.file_mtime_ns and not self._ask_overwrite_changed(tab):
+                return False
         return self._write(tab, tab.path)
 
     def save_tab_as(self, tab: DocumentTab) -> bool:
@@ -943,7 +1065,11 @@ class MainWindow(QMainWindow):
             self._show_error("Cannot save project", f"'{path}' could not be saved.\n\n{error}")
             return False
         tab.path = path
+        tab.file_mtime_ns = _mtime_ns(path)
+        tab.check_file_changed = False
         tab.document.undo_stack.set_clean()
+        if self.autosave is not None:
+            self.autosave.saved(tab)
         self.settings.add_recent_project(path)
         self._update_tab(tab)
         return True
@@ -962,6 +1088,8 @@ class MainWindow(QMainWindow):
             if choice is SaveChoice.SAVE and not self.save_tab(tab):
                 return False
         self.tabs.removeTab(self.tabs.indexOf(tab))
+        if self._autosave is not None:
+            self._autosave.remove(tab)
         tab.close_engine()
         tab.deleteLater()
         if self.tabs.count() == 0:
@@ -979,6 +1107,8 @@ class MainWindow(QMainWindow):
             return
         if self._scheduler is not None:
             self._scheduler.shutdown(wait=False)
+        if self.recovery is not None:
+            self.recovery.close()  # a clean exit: nothing to recover
         event.accept()
 
     # --- edit -------------------------------------------------------------------------
@@ -1101,6 +1231,11 @@ class MainWindow(QMainWindow):
         elif key == Settings.P_DISPLAY:
             for tab in self.document_tabs():
                 tab.set_p_display(self.settings.p_display)
+        elif key == Settings.AUTOSAVE_MINUTES:
+            if self._autosave is not None:
+                from curvis.ui.autosave import MINUTE_MS
+
+                self._autosave.set_interval(self.settings.autosave_minutes * MINUTE_MS)
         elif key == Settings.GLOBAL_CONSTANTS:
             for tab in self.document_tabs():
                 if tab.engine is not None:
@@ -1251,6 +1386,28 @@ class MainWindow(QMainWindow):
         return {buttons.Save: SaveChoice.SAVE, buttons.Discard: SaveChoice.DISCARD}.get(
             answer, SaveChoice.CANCEL
         )
+
+    def _ask_discard_recovered(self, copy: RecoveredCopy) -> bool:
+        buttons = QMessageBox.StandardButton
+        answer = QMessageBox.question(
+            self,
+            "Discard recovered project",
+            DISCARD_RECOVERED_QUESTION.format(name=copy.name),
+            buttons.Discard | buttons.Cancel,
+            buttons.Cancel,
+        )
+        return answer == buttons.Discard
+
+    def _ask_overwrite_changed(self, tab: DocumentTab) -> bool:
+        buttons = QMessageBox.StandardButton
+        answer = QMessageBox.warning(
+            self,
+            "File changed",
+            FILE_CHANGED_QUESTION.format(name=tab.path.name if tab.path else tab.title),
+            buttons.Save | buttons.Cancel,
+            buttons.Cancel,
+        )
+        return answer == buttons.Save
 
     def _ask_open_path(self) -> Path | None:
         name, _ = QFileDialog.getOpenFileName(self, "Open project", "", PROJECT_FILTER)

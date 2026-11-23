@@ -94,6 +94,11 @@ class DocumentTab(QWidget):
         self._palettes = palettes
         self._export_defaults = export_defaults
         self.path = path
+        self.file_mtime_ns: int | None = None
+        """The modification time of ``path`` when the project was last opened or saved."""
+        self.check_file_changed = False
+        """A recovered project: Save warns first if ``path`` changed after
+        ``file_mtime_ns`` (another program, or another copy of the project, saved it)."""
         self._decimal_places = decimal_places
         self._global_constants = global_constants
         self._recent_analyses = recent_analyses
