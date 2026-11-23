@@ -648,10 +648,10 @@ Make a plan first. When done, report which Prism table types import and any that
 **Gate for phase 3:** every item in SPEC.md works; check it line by line.
 
 **Done when**
-- [ ] The analyses are a grouped list with a filter field; options sit under the data; *About this analysis* replaces *What will run*, as in `docs/mockups/analyze-dialog.html`.
-- [ ] The X range is two number fields and fixed parameters are a table; nothing has to be typed in a syntax.
-- [ ] Every fit shows its equation and a sketch computed from its own model function; every test shows its null hypothesis and assumptions.
-- [ ] Projects saved before this step open unchanged, and the dialog fits 900 × 640 in light and dark themes with Advanced open.
+- [x] The analyses are a grouped list with a filter field; options sit under the data; *About this analysis* replaces *What will run*, as in `docs/mockups/analyze-dialog.html`.
+- [x] The X range is two number fields and fixed parameters are a table; nothing has to be typed in a syntax.
+- [x] Every fit shows its equation and a sketch computed from its own model function; every test shows its null hypothesis and assumptions.
+- [x] Projects saved before this step open unchanged, and the dialog fits 900 × 640 in light and dark themes with Advanced open.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md, docs/DESIGN.md (section 11) and step 3.8 in docs/PHASES.md, and open docs/mockups/analyze-dialog.html.

@@ -176,6 +176,41 @@ with SE = 2 · sqrt(2 ln 2) · SE(SD) and CI ± t · SE.
 
 Fixing Baseline at 0 gives the plain Gaussian, Y = Amplitude · exp(−½ ((X − Center) / SD)²).
 
+## Equations and sketches
+
+*About this analysis* in the Analyze dialog shows each model's equation and a sketch of
+its curve (step 3.8).
+
+- **Equations** are stored on the analysis type in the formula language
+  (`CurveFit.equation`, e.g. `Y = Top / (1 + 10^((LogEC50 - X)*HillSlope))`) and rendered
+  from the parsed formula (`curvis.formula.display`): − for minus, · for times, powers as
+  superscripts, `_1` as a subscript. `tests/unit/test_analysis_about.py` compiles every
+  equation with the formula compiler and checks that it equals the model's own function
+  at perturbed example values, so the equation shown is the one that is fitted. The
+  dose-response models add "where X is log10(concentration)".
+- **Sketches** are computed, never drawn by hand: the model's own function at the
+  example values below, at 100 points over the X range below (well under 5 ms). A fixed
+  parameter's value replaces its example value, and its marker is drawn in the accent
+  colour with its value ("Top = 100 (fixed)"). For the dose-response models the X range
+  runs from 3 below the lowest LogEC50 to 3 above the highest, so a fixed LogEC50 stays
+  in view. A marker whose position is not defined (the half-life for K ≤ 0) is left out.
+  A model without markers gets the plain curve.
+
+| Model | Example values | X range | Markers |
+| --- | --- | --- | --- |
+| Linear regression | Slope 1, Intercept 1 | 0 to 10 | dot at X = 0 ("Intercept") |
+| Polynomial regression | degree 2: B0 1, B1 −1, B2 0.2; degree 3–6: roots evenly spaced over 1 to 9, scaled so that the largest \|Y\| on 0 to 10 is 10 | 0 to 10 | none |
+| Hill 4PL | Bottom 0, Top 100, LogEC50 −7, Hill slope 1 | −10 to −4 | lines at Top and Bottom; line at EC50; "Hill slope: steepness at EC50" beside the curve at EC50 |
+| 3PL | Top 100, LogEC50 −7, Hill slope 1 | −10 to −4 | line at Top; line at EC50; Hill slope label |
+| Biphasic | Bottom 0, Top 100, Frac 0.4, LogEC50 −8 and −5, Hill slopes 1 | −11 to −2 | lines at Top and Bottom; lines at EC50 1 and EC50 2 |
+| Bell-shaped | Plateau 1 0, Dip 100, Plateau 2 10, LogEC50 −8 and −5, Hill slopes 1.5 | −11 to −2 | line at Dip; lines at EC50 1 and EC50 2 |
+| Exponential association | Y0 0, Plateau 100, K 0.3 | 0 to 20 | line at Plateau; line at the half-time (ln 2 / K) |
+| Exponential decay | Y0 100, Plateau 10, K 0.3 | 0 to 20 | line at Plateau; line at the half-life (ln 2 / K) |
+| Michaelis-Menten | Vmax 100, Km 2 | 0 to 20 | line at Vmax; line at Km (up to the curve, at Vmax / 2) |
+| Gaussian | Baseline 5, Amplitude 100, Center 0, SD 1 | −4 to 4 | line at Baseline; line at Center; "Amplitude" beside the peak |
+
+The example values are also what the Fix table fills in when *Fix* is ticked.
+
 ## Validation
 
 | Model | Fixtures | R script | Other checks |
