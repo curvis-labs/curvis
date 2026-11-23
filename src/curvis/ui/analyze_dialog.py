@@ -33,12 +33,14 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDoubleSpinBox,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QTreeWidget,
@@ -335,6 +337,31 @@ class ParamsForm(QWidget):
         return widgets
 
 
+class _AboutContent(QWidget):
+    """The inside of *About this analysis*. It asks the scroll area for the height its
+    text needs with the sketch at its smallest, so it scrolls only when even that
+    doesn't fit; any room left over goes to the sketch."""
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802 (Qt API)
+        layout = self.layout()
+        if layout is None:
+            return super().heightForWidth(width)
+        margins = layout.contentsMargins()
+        inner = width - margins.left() - margins.right()
+        heights = []
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            widget = item.widget() if item is not None else None
+            if widget is None or widget.isHidden():
+                continue
+            if widget.hasHeightForWidth():
+                heights.append(widget.heightForWidth(inner))
+            else:
+                heights.append(max(widget.minimumHeight(), widget.minimumSizeHint().height()))
+        spacing = layout.spacing() * max(len(heights) - 1, 0)
+        return sum(heights) + spacing + margins.top() + margins.bottom()
+
+
 class AnalysisList(QTreeWidget):
     """The analyses of a family, in sections; about :data:`LIST_ROWS` rows high."""
 
@@ -498,7 +525,19 @@ class AnalyzeDialog(QDialog):
 
     def _build_about(self) -> QGroupBox:
         box = QGroupBox("About this analysis")
-        layout = QVBoxLayout(box)
+        # The text scrolls when it doesn't fit: long equations and wide fonts (macOS)
+        # need more height than the right column has at the minimum size.
+        self.about_scroll = QScrollArea()
+        self.about_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.about_scroll.setWidgetResizable(True)
+        self.about_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.about_scroll.setAccessibleName("About this analysis")
+        self.about_scroll.viewport().setAutoFillBackground(False)
+        content = _AboutContent()
+        self.about_scroll.setWidget(content)
+        QVBoxLayout(box).addWidget(self.about_scroll)
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
         selectable = Qt.TextInteractionFlag.TextSelectableByMouse
 
         def label(secondary: bool = False) -> QLabel:
