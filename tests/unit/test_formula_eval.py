@@ -302,6 +302,14 @@ def test_unknown_column() -> None:
     assert (e.start, e.end) == (6, 14)
 
 
+def test_a_deleted_reference_is_reported_even_where_the_name_exists() -> None:
+    e = error("[A] + #DELETED[B]")
+    assert e.reason == "Column 'B' was deleted"
+    assert (e.start, e.end) == (6, 17)
+    with pytest.raises(FormulaError, match="Column 'B' was deleted"):
+        check("#DELETED[B]", ["A", "B"], [])
+
+
 def test_unknown_constant() -> None:
     e = error("[A] * k_off")
     assert e.reason == "Unknown constant 'k_off'"

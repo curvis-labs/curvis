@@ -265,6 +265,27 @@ def _follow_references(doc: Document, table_id: str, before: _References) -> Non
     ]
 
 
+def _mark_deleted_references(
+    doc: Document, table_id: str, before: _References, deleted: set[str]
+) -> None:
+    """Write the formula references that pointed at a ``deleted`` column (by id, from
+    ``before``, taken with :func:`_references`) as ``#DELETED[name]``.
+
+    Left as written, ``[Control]`` would read "Male: Control" once the column called
+    "Control" is gone, or any column that later takes the name; marked, the formula
+    reports the deleted column until it is edited.
+    """
+    names = [name for name, (column_id, _full) in before.items() if column_id in deleted]
+    if not names:
+        return
+    from curvis.formula.rewrite import mark_deleted
+
+    doc.calculations = [
+        replace(c, formula=mark_deleted(c.formula, names)) if c.table_id == table_id else c
+        for c in doc.calculations
+    ]
+
+
 def _check_column_names(table: Table, renames: Mapping[str, str]) -> None:
     """Refuse column names (by id) that are blank or whose full names are taken."""
     error = name_error(table, column_names=renames)
@@ -534,7 +555,9 @@ class RemoveColumn(Command):
     """Remove a column. A replicate group (or category) left empty is removed too.
 
     A calculated column leaves its calculation; a calculation left without columns is
-    removed. Undo puts both back.
+    removed. Formula references to the column are written ``#DELETED[name]``, so they
+    report the deletion instead of reading another column of that name. Undo puts all
+    of it back.
     """
 
     def __init__(self, table_id: str, column_id: str) -> None:
@@ -549,9 +572,11 @@ class RemoveColumn(Command):
         self._column = _get_column(table, self.column_id)
         self._before = _Layout.capture(table)
         self._calculations = doc.calculations
+        references = _references(doc, self.table_id)
         del table.columns[table.column_index(self.column_id)]
         _drop_empty_groups(table)
         _drop_calculated(doc, {self.column_id})
+        _mark_deleted_references(doc, self.table_id, references, {self.column_id})
 
     def undo(self, doc: Document) -> None:
         assert self._before is not None

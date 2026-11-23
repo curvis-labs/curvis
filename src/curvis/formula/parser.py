@@ -6,10 +6,12 @@ The grammar, from loosest to tightest binding::
     a × b, a ÷ b, a % b   left to right (% is modulo)
     −a, +a                so −2^2 = −(2^2) = −4
     a ^ b                 right to left: 2^3^2 = 2^9; the exponent may be negative: 2^−1
-    number, [column], {role}, {role:mean}, CONSTANT, FUNCTION(…), (…)
+    number, [column], #DELETED[column], {role}, {role:mean}, CONSTANT, FUNCTION(…), (…)
 
 ``*``, ``/`` and ``-`` are accepted as well as ``×``, ``÷`` and ``−``. A ``]`` inside
-a column name is written ``]]``. Function names, role names and ``mean`` ignore case;
+a column name is written ``]]``. ``#DELETED[name]`` (any case) marks a reference to a
+column that was deleted; Curvis writes it when a column a formula uses is removed, and
+checking the formula always reports it. Function names, role names and ``mean`` ignore case;
 constant names do not. Role references are used by the Calculate dialog to apply one
 formula to many columns (see :mod:`curvis.data.pairing`).
 
@@ -32,6 +34,7 @@ from curvis.formula.ast import (
     Call,
     ColumnRef,
     ConstantRef,
+    DeletedRef,
     Function,
     Node,
     Number,
@@ -67,6 +70,7 @@ GRAMMAR = r"""
 
 ?atom: NUMBER                -> number
     | COLUMN                 -> column
+    | DELETED                -> deleted
     | ROLE                   -> role
     | NAME LPAR [arguments] RPAR -> call
     | NAME                   -> constant
@@ -85,6 +89,7 @@ RPAR: ")"
 COMMA: ","
 NUMBER: /([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?/
 COLUMN: /\[([^\]]|\]\])*\]/
+DELETED: /#DELETED\[([^\]]|\]\])*\]/i
 ROLE: /\{[^{}]*\}/
 NAME: /[^\W\d]\w*/
 
@@ -116,6 +121,9 @@ class Formula:
     """Constant names referenced, in order of first use."""
     roles: tuple[str, ...] = ()
     """Keys (:attr:`RoleRef.key`) of the role references, in order of first use."""
+    deleted: tuple[str, ...] = ()
+    """Names in ``#DELETED[name]`` marks, in order of first use (duplicates ignoring case
+    are dropped). They are not in :attr:`columns`: they read nothing."""
 
 
 @lru_cache(maxsize=256)
@@ -136,28 +144,42 @@ def parse(text: str) -> Formula:
     columns: dict[str, str] = {}
     constants: dict[str, None] = {}
     roles: dict[str, None] = {}
-    _collect(root, columns, constants, roles)
-    return Formula(text, root, tuple(columns.values()), tuple(constants), tuple(roles))
+    deleted: dict[str, str] = {}
+    _collect(root, columns, constants, roles, deleted)
+    return Formula(
+        text,
+        root,
+        tuple(columns.values()),
+        tuple(constants),
+        tuple(roles),
+        tuple(deleted.values()),
+    )
 
 
 def _collect(
-    node: Node, columns: dict[str, str], constants: dict[str, None], roles: dict[str, None]
+    node: Node,
+    columns: dict[str, str],
+    constants: dict[str, None],
+    roles: dict[str, None],
+    deleted: dict[str, str],
 ) -> None:
     match node:
         case ColumnRef(name):
             columns.setdefault(name_key(name), name)
+        case DeletedRef(name):
+            deleted.setdefault(name_key(name), name)
         case ConstantRef(name):
             constants.setdefault(name)
         case RoleRef():
             roles.setdefault(node.key)
         case Unary(_, operand):
-            _collect(operand, columns, constants, roles)
+            _collect(operand, columns, constants, roles, deleted)
         case Binary(_, left, right):
-            _collect(left, columns, constants, roles)
-            _collect(right, columns, constants, roles)
+            _collect(left, columns, constants, roles, deleted)
+            _collect(right, columns, constants, roles, deleted)
         case Call(_, args):
             for arg in args:
-                _collect(arg, columns, constants, roles)
+                _collect(arg, columns, constants, roles, deleted)
 
 
 def _character_error(text: str, pos: int) -> FormulaError:
@@ -221,6 +243,13 @@ class _Build:
         if not name.strip():
             raise FormulaError("The column name is empty", token.start_pos or 0, token.end_pos)
         return ColumnRef(name, _span(token))
+
+    def deleted(self, children: list[Token]) -> DeletedRef:
+        (token,) = children
+        name = str(token)[len("#DELETED[") : -1].replace("]]", "]")
+        if not name.strip():
+            raise FormulaError("The column name is empty", token.start_pos or 0, token.end_pos)
+        return DeletedRef(name, _span(token))
 
     def role(self, children: list[Token]) -> RoleRef:
         (token,) = children

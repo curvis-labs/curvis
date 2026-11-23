@@ -41,6 +41,7 @@ from curvis.formula.ast import (
     Call,
     ColumnRef,
     ConstantRef,
+    DeletedRef,
     Function,
     Node,
     Number,
@@ -142,6 +143,8 @@ class CompiledFormula:
             case ColumnRef(name):
                 index = self._column_keys.index(name_key(name))
                 return lambda env: env.columns[index]
+            case DeletedRef():
+                return lambda env: np.nan  # never run: check() reports the deleted column
             case ConstantRef(name):
                 index = self.formula.constants.index(name)
                 return lambda env: env.constants[index]
@@ -179,7 +182,8 @@ def check(
     constants: Iterable[str],
     roles: Iterable[str] = (),
 ) -> None:
-    """Raise :class:`FormulaError` at the first column, constant or role that does not exist.
+    """Raise :class:`FormulaError` at the first column, constant or role that does not exist,
+    or at the first reference marked as deleted (``#DELETED[name]``).
 
     ``roles`` are role keys (:attr:`~curvis.formula.ast.RoleRef.key`).
     """
@@ -189,6 +193,9 @@ def check(
     constant_names = set(constants)
     role_keys = set(roles)
     for node in _walk(formula.root):
+        if isinstance(node, DeletedRef):
+            message = f"Column '{node.name}' was deleted"
+            raise FormulaError(message, node.span.start, node.span.end)
         if isinstance(node, ColumnRef) and name_key(node.name) not in column_keys:
             raise FormulaError(f"Unknown column '{node.name}'", node.span.start, node.span.end)
         if isinstance(node, RoleRef) and node.key not in role_keys:

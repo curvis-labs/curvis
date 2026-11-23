@@ -47,7 +47,7 @@ Columns and column groups are movable by drag and drop.
 - Fold change relative to a reference value
 - Custom formula
 
-Formulas use `[column]` references, the operators + − × ÷ ^ and %, and the column functions FIRST, LAST, ROW(column, n) (the value in row n of a column), MIN, MAX, MEAN, SUM and COUNT. They are parsed safely. Calculated columns can be edited after they are created.
+Formulas use `[column]` references, the operators + − × ÷ ^ and %, and the column functions FIRST, LAST, ROW(column, n) (the value in row n of a column), MIN, MAX, MEAN, SUM and COUNT. They are parsed safely. Calculated columns can be edited after they are created. Deleting a column that a formula uses writes its references as `#DELETED[name]` (like a spreadsheet's #REF!): the calculated column then reports "Column 'name' was deleted" until the formula is edited, and no other column of that name, now or later, is read in its place. Undo restores the formula.
 
 One calculation can be applied to many columns at once: it makes one calculated column per selected column, named with a suffix. The selected columns can be **paired** with two roles, A and B (the names can be changed, e.g. "Control" and "Treated"). Columns are paired by position: the first B column with the first A column, and so on (index-matched replicates); a single A column goes with every B column. The same pairing is used later by paired analyses. Formulas refer to roles with `{A}` (the matching column), `{B}` (the column being calculated) and `{A:mean}` (the row-wise mean of all columns of the role, ignoring missing values). Baseline subtraction, fold change and custom formulas can use pairing; normalizing works on each column by itself, to its own minimum and maximum or to typed 0% and 100% values.
 

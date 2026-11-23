@@ -1,6 +1,6 @@
 """Change the column names a formula refers to, keeping the rest of its text as written."""
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 
 from curvis.data.names import name_key
 from curvis.formula.ast import Binary, Call, ColumnRef, Node, Unary
@@ -14,6 +14,23 @@ def rename_columns(text: str, renames: Mapping[str, str]) -> str:
     Names match ignoring case, as everywhere in formulas. All references are replaced at
     once, so names can be swapped. A formula that does not parse is returned unchanged.
     """
+    return _replace_refs(text, renames, "[")
+
+
+def mark_deleted(text: str, names: Iterable[str]) -> str:
+    """``text`` with every ``[name]`` of ``names`` written ``#DELETED[name]``.
+
+    Used when the column a reference points at is deleted, so that the reference cannot
+    silently move to another column that has (or later takes) the name. Names match
+    ignoring case; each reference keeps the name as it was written. A formula that does
+    not parse is returned unchanged.
+    """
+    return _replace_refs(text, {name: None for name in names}, "#DELETED[")
+
+
+def _replace_refs(text: str, renames: Mapping[str, str | None], opening: str) -> str:
+    """Rewrite the column references of ``text`` named in ``renames`` as ``opening``,
+    the new name (the name as written for None) and ``]``."""
     if not renames:
         return text
     by_key = {name_key(old): new for old, new in renames.items()}
@@ -23,7 +40,8 @@ def rename_columns(text: str, renames: Mapping[str, str]) -> str:
         return text
     refs = [n for n in column_refs(root) if name_key(n.name) in by_key]
     for ref in sorted(refs, key=lambda n: n.span.start, reverse=True):
-        new = "[" + by_key[name_key(ref.name)].replace("]", "]]") + "]"
+        name = by_key[name_key(ref.name)]
+        new = opening + (ref.name if name is None else name).replace("]", "]]") + "]"
         text = text[: ref.span.start] + new + text[ref.span.end :]
     return text
 
