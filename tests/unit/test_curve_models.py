@@ -214,6 +214,18 @@ def test_a_phase_with_no_span_makes_a_biphasic_fit_ambiguous() -> None:
     f = fit_curve(BIPHASIC, points)
     assert f.status is FitStatus.AMBIGUOUS
     assert "not change the curve" in f.message
+    # The warning names the parameters as the results show them.
+    assert "LogEC50 " in f.message and "Hill slope " in f.message
+    assert "_" not in f.message
+
+
+def test_fit_warnings_name_the_parameters_as_the_results_show_them() -> None:
+    # With Frac fixed at 1 the second phase has no effect on the curve.
+    x = np.linspace(-9.0, -4.0, 12)
+    y = 10 + 90 / (1 + 10 ** (-6.5 - x)) + np.sin(x)
+    f = fit_curve(BIPHASIC, Points(x, y), {"frac": 1.0})
+    assert f.status is FitStatus.AMBIGUOUS
+    assert f.message == ("The fit is ambiguous: LogEC50 2, Hill slope 2 do not change the curve.")
 
 
 def test_a_fixed_parameter_is_kept_and_the_others_fitted() -> None:

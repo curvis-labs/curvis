@@ -221,16 +221,19 @@ def fit_model(
     start: npt.ArrayLike | None = None,
     confidence: float = 0.95,
     max_nfev: int | None = None,
+    labels: Mapping[str, str] | None = None,
 ) -> NonlinearFit:
     """Fit ``model`` to ``points`` from ``start`` (default: the model's guess).
 
     ``max_nfev`` limits the model evaluations (default 1000 per free parameter + 1;
-    a fit that reaches it has not converged)."""
+    a fit that reaches it has not converged). ``labels`` are the parameters' display
+    names, used in :attr:`NonlinearFit.message` (default: the parameter names)."""
     import lmfit
 
     constraints = constraints or NO_CONSTRAINTS
     x, y = points.x, points.y
     names = model.parameters
+    shown = tuple((labels or {}).get(nm, nm) for nm in names)
     k_all = len(names)
     unknown = (set(constraints.fixed) | set(constraints.bounds)) - set(names)
     if unknown:
@@ -339,7 +342,7 @@ def fit_model(
             "determine the shape of the curve."
         )
     elif k and (not np.all(np.isfinite(norms)) or np.any(no_effect)):
-        flat = [names[i] for i, z in zip(var_index, no_effect, strict=True) if z]
+        flat = [shown[i] for i, z in zip(var_index, no_effect, strict=True) if z]
         status = FitStatus.AMBIGUOUS
         verb = "do" if len(flat) > 1 else "does"
         message = (
@@ -358,7 +361,7 @@ def fit_model(
             max_corr = float(np.max(np.abs(corr - np.eye(k)))) if k > 1 else 0.0
             if max_corr > MAX_CORRELATION:
                 pair = np.unravel_index(np.argmax(np.abs(corr - np.eye(k))), corr.shape)
-                a, b = (names[var_index[i]] for i in pair)
+                a, b = (shown[var_index[i]] for i in pair)
                 status = FitStatus.AMBIGUOUS
                 message = (
                     f"The fit is ambiguous: {a} and {b} depend on each other too strongly "
@@ -373,7 +376,7 @@ def fit_model(
                 ci_low[var_index] = p[var_index] - qt * se_free
                 ci_high[var_index] = p[var_index] + qt * se_free
     if status is FitStatus.OK:
-        at_bound = [names[i] for i in var_index if _near(p[i], low[i]) or _near(p[i], high[i])]
+        at_bound = [shown[i] for i in var_index if _near(p[i], low[i]) or _near(p[i], high[i])]
         if at_bound:
             status = FitStatus.AMBIGUOUS
             message = f"The fit is ambiguous: {', '.join(at_bound)} ended on its limit."
