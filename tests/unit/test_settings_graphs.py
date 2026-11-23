@@ -106,6 +106,7 @@ def test_reset_restores_every_setting_and_keeps_recent_and_constants(
 ) -> None:
     settings.theme = Theme.DARK
     settings.decimal_places = 9
+    settings.import_decimal_comma = True
     settings.crash_log = True
     settings.graph_palette = COLOR_BLIND_SAFE
     settings.set_graph_size("square")
@@ -125,6 +126,7 @@ def test_reset_restores_every_setting_and_keeps_recent_and_constants(
     settings.reset_to_defaults()
 
     assert settings.theme is Theme.SYSTEM and settings.decimal_places == 4
+    assert not settings.import_decimal_comma
     assert not settings.crash_log
     assert settings.graph_defaults() == GraphDefaults()
     assert settings.palettes == []

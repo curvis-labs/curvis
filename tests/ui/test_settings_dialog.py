@@ -48,6 +48,16 @@ def test_cancel_discards_changes(qtbot: QtBot, settings: Settings) -> None:
     assert settings.decimal_places == 4
 
 
+def test_import_decimal_mark_default(qtbot: QtBot, settings: Settings) -> None:
+    assert not settings.import_decimal_comma
+    dialog = SettingsDialog(settings)
+    qtbot.addWidget(dialog)
+    assert dialog.import_decimal.currentData() is False
+    dialog.import_decimal.setCurrentIndex(dialog.import_decimal.findData(True))
+    dialog.accept()
+    assert settings.import_decimal_comma
+
+
 def test_decimal_places_limited_to_valid_range(qtbot: QtBot, settings: Settings) -> None:
     dialog = SettingsDialog(settings)
     qtbot.addWidget(dialog)
