@@ -206,6 +206,43 @@ def _analyze_fit_advanced(ctx: Context) -> QDialog:
     return dialog
 
 
+def _analyze_biphasic_advanced(ctx: Context) -> QDialog:
+    """The longest equation and Fix table (seven parameters), two of them fixed."""
+    dialog = AnalyzeDialog(grouped_document(), "t", recent=["hill_4pl", "linear_regression"])
+    dialog.set_analysis_type("biphasic")
+    form = dialog.forms["biphasic"]
+    assert form.advanced is not None and form.fixed is not None
+    form.advanced.set_expanded(True)
+    form.fixed.set_fixed("hill_slope_1", True)
+    form.fixed.set_fixed("top", True)
+    return dialog
+
+
+def _analyze_bell_advanced(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.set_analysis_type("bell_shaped")
+    form = dialog.forms["bell_shaped"]
+    assert form.advanced is not None
+    form.advanced.set_expanded(True)
+    return dialog
+
+
+def _analyze_filtered_out(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t")
+    dialog.set_analysis_type("hill_4pl")
+    dialog.filter_edit.setText("no such analysis")
+    return dialog
+
+
+def _analyze_repeated_spherical(ctx: Context) -> QDialog:
+    dialog = AnalyzeDialog(grouped_document(), "t", recent=["t_test", "kruskal_wallis"])
+    dialog.set_analysis_type("one_way_anova")
+    combo = dialog.forms["one_way_anova"].fields["design"]
+    assert isinstance(combo, QComboBox)
+    combo.setCurrentIndex(combo.findData("repeated_sphericity"))
+    return dialog
+
+
 def _import(ctx: Context) -> QDialog:
     dialog = ImportDialog(CSV, ctx.scheduler)
     dialog.header_row.setValue(3)
@@ -440,6 +477,10 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "format_interaction_series": _format_interaction_series,
     "analyze_fit": _analyze_fit,
     "analyze_fit_advanced": _analyze_fit_advanced,
+    "analyze_biphasic_advanced": _analyze_biphasic_advanced,
+    "analyze_bell_advanced": _analyze_bell_advanced,
+    "analyze_filtered_out": _analyze_filtered_out,
+    "analyze_repeated_spherical": _analyze_repeated_spherical,
     "constants": _constants,
     "constant_editor": _constant_editor,
     "settings": _settings,

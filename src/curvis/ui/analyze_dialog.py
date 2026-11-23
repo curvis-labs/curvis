@@ -1,40 +1,44 @@
 """The Analyze dialog: pick an analysis, its data and its options, then run it.
 
-A workbench dialog (docs/DESIGN.md, mockup in docs/mockups/index.html):
+A workbench dialog (docs/DESIGN.md, section 11; mockup in docs/mockups/analyze-dialog.html):
 
 - the families as tabs, only those the table supports, opening on the one that best
   fits the data (:func:`curvis.analysis.base.opening_family`);
-- on the left the data: the series to analyze, with their number of values;
-- on the right the analyses of the family that the table supports (recently used ones
-  marked), the options of the selected analysis with a collapsed Advanced section, and
-  one sentence that says what will run.
+- on the left the data (the series to analyze, with their number of values) and under it
+  the options of the chosen analysis, with a collapsed Advanced section;
+- on the right the analyses of the family that the table supports, as one list grouped in
+  the sections of the analysis types with the recently used ones on top and a filter
+  field, and *About this analysis*: the equation and a sketch of the model (fits) or the
+  null hypothesis and assumptions (tests), the sentence that says what will run, and when
+  to use it.
 
-The dialog only builds an :class:`~curvis.analysis.base.Analysis`; the caller stores it
-with :func:`~curvis.core.add_analysis` or :func:`~curvis.core.edit_analysis`.
+All the text comes from the analysis types (:attr:`AnalysisType.about`,
+:attr:`CurveFit.equation`); the dialog only lays it out. The dialog builds an
+:class:`~curvis.analysis.base.Analysis`; the caller stores it with
+:func:`~curvis.core.add_analysis` or :func:`~curvis.core.edit_analysis`.
 """
 
 from __future__ import annotations
 
 import dataclasses
-import math
+import html
 from collections.abc import Sequence
 from typing import Any
 
-from PySide6.QtCore import QSignalBlocker, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, QSignalBlocker, QSize, Qt, Signal
+from PySide6.QtGui import QFont, QKeyEvent, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QButtonGroup,
     QCheckBox,
     QComboBox,
     QDialog,
     QDoubleSpinBox,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QPushButton,
-    QRadioButton,
     QSizePolicy,
     QSpinBox,
     QTreeWidget,
@@ -45,6 +49,7 @@ from PySide6.QtWidgets import (
 
 from curvis.analysis.base import (
     Analysis,
+    AnalysisError,
     AnalysisType,
     Family,
     Params,
@@ -57,6 +62,7 @@ from curvis.analysis.base import (
 )
 from curvis.core import Document
 from curvis.data import ColumnRole, Table
+from curvis.ui.analyze_options import FixedTable, XRangeEditor
 from curvis.ui.dialogs import (
     FIELD_WIDTH,
     CollapsibleSection,
@@ -71,12 +77,28 @@ from curvis.ui.dialogs import (
     set_tab_order,
     size_workbench,
 )
+from curvis.ui.sketch_view import SketchView
 
 _ID = Qt.ItemDataRole.UserRole
 _N_COLUMN = 1
-ONE_COLUMN_MAX = 4
-"""Rows of analyses in one column; a family with more lists them in several columns
-(the dialog's minimum size has room for four rows)."""
+RECENT = "Recent"
+RECENT_MAX = 3
+COMBO_CHARACTERS = 14
+"""Characters an option's drop-down list shows at least; its popup shows them all."""
+LIST_ROWS = 6
+"""The analysis list is about this many rows high, then scrolls."""
+
+
+def _curve_fit(kind: AnalysisType) -> Any:
+    """``kind`` if it is a curve fit (which has an equation and a sketch), else None."""
+    from curvis.analysis.fit.analyses import CurveFit
+
+    return kind if isinstance(kind, CurveFit) else None
+
+
+def _children(item: QTreeWidgetItem) -> list[QTreeWidgetItem]:
+    children = (item.child(i) for i in range(item.childCount()))
+    return [c for c in children if c is not None]
 
 
 class ParamsForm(QWidget):
@@ -85,7 +107,9 @@ class ParamsForm(QWidget):
     Parameters marked ``advanced`` go in a collapsed Advanced section at the bottom. A
     parameter picked ``from_inputs`` is a list of the ticked series
     (:meth:`set_inputs`), and one with ``enabled_when`` is enabled only while the other
-    parameter has the given value.
+    parameter has the given value. A parameter with an ``editor`` gets its own widget: the
+    X range of a fit two number fields (last in the main form), its fixed parameters a
+    table.
     """
 
     changed = Signal()
@@ -97,6 +121,8 @@ class ParamsForm(QWidget):
         self.labels: dict[str, QLabel] = {}
         self.infos = {f.name: info for f, info in param_fields(analysis_type.params_type)}
         self._wanted: dict[str, str] = {}  # value of each from_inputs field, kept while unticked
+        self.x_range: XRangeEditor | None = None
+        self.fixed: FixedTable | None = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         main = form_layout()
@@ -105,6 +131,16 @@ class ParamsForm(QWidget):
         advanced_form = form_layout()
         defaults = analysis_type.default_params()
         for f, info in param_fields(analysis_type.params_type):
+            if info.editor == "x_range":
+                self.x_range = XRangeEditor(info.label)
+                self.x_range.changed.connect(self.changed)
+                self.fields[f.name] = self.x_range
+                continue
+            if info.editor == "fixed":
+                self.fixed = self._fixed_table(defaults)
+                self.fields[f.name] = self.fixed
+                (advanced_form if info.advanced else main).addRow(self.fixed)
+                continue
             widget = self._field_widget(f, info.label, info.choices, info.minimum, info.maximum)
             if info.from_inputs:
                 assert isinstance(widget, QComboBox)
@@ -117,6 +153,9 @@ class ParamsForm(QWidget):
                 label = buddy_label(info.label, widget)
                 self.labels[f.name] = label
                 form.addRow(label, widget)
+        if self.x_range is not None:
+            main.addRow(self.x_range)  # directly under the log check box (DESIGN.md)
+        for f, _info in param_fields(analysis_type.params_type):
             self._set(f.name, getattr(defaults, f.name))
         self.changed.connect(self._update_enabled)
         self._update_enabled()
@@ -126,6 +165,16 @@ class ParamsForm(QWidget):
             layout.addWidget(self.advanced)
         if not main.rowCount() and self.advanced is None:
             main.addRow(secondary_label("This analysis has no options."))
+
+    def _fixed_table(self, defaults: Params) -> FixedTable:
+        fit = _curve_fit(self.analysis_type)
+        table = FixedTable()
+        table.setObjectName("param_fixed")
+        if fit is not None:
+            sketch = fit.sketch_for(defaults)
+            table.set_parameters(fit.parameters(defaults), sketch.values if sketch else {})
+        table.changed.connect(self.changed)
+        return table
 
     def _field_widget(
         self,
@@ -170,6 +219,12 @@ class ParamsForm(QWidget):
             edit = QLineEdit()
             edit.textChanged.connect(self.changed)
             widget = edit
+        if isinstance(widget, QComboBox):
+            # Long choices must not widen the left column: the combo shows what fits.
+            widget.setSizeAdjustPolicy(
+                QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+            )
+            widget.setMinimumContentsLength(COMBO_CHARACTERS)
         widget.setObjectName(f"param_{f.name}")
         return widget
 
@@ -189,6 +244,10 @@ class ParamsForm(QWidget):
                 for value, text in choices:
                     combo.addItem(text, value)
                 combo.setCurrentIndex(max(0, combo.findData(self._wanted.get(name, ""))))
+
+    def set_point_count(self, count: tuple[int, int] | None) -> None:
+        if self.x_range is not None:
+            self.x_range.set_count(count)
 
     def _remember(self, name: str) -> None:
         combo = self.fields[name]
@@ -211,7 +270,11 @@ class ParamsForm(QWidget):
         if self.infos[name].from_inputs:
             self._wanted[name] = str(value)
         with QSignalBlocker(widget):
-            if isinstance(widget, QCheckBox):
+            if isinstance(widget, XRangeEditor):
+                widget.set_text(str(value))
+            elif isinstance(widget, FixedTable):
+                widget.set_text(str(value), self._fixed_values(str(value)))
+            elif isinstance(widget, QCheckBox):
                 widget.setChecked(bool(value))
             elif isinstance(widget, QComboBox):
                 widget.setCurrentIndex(max(0, widget.findData(value)))
@@ -220,8 +283,22 @@ class ParamsForm(QWidget):
             elif isinstance(widget, QLineEdit):
                 widget.setText(str(value))
 
+    def _fixed_values(self, text: str) -> dict[str, float] | None:
+        """The values of a ``fixed`` text, read by the analysis' own parser (None if it
+        cannot be read)."""
+        fit = _curve_fit(self.analysis_type)
+        if fit is None:
+            return None
+        params: Any = self.analysis_type.default_params()
+        try:
+            return dict(fit.fixed_values(dataclasses.replace(params, fixed=text)))
+        except AnalysisError:
+            return None
+
     def _get(self, name: str) -> Any:
         widget = self.fields[name]
+        if isinstance(widget, XRangeEditor | FixedTable):
+            return widget.text()
         if isinstance(widget, QCheckBox):
             return widget.isChecked()
         if isinstance(widget, QComboBox):
@@ -249,8 +326,46 @@ class ParamsForm(QWidget):
         for f, info in param_fields(self.analysis_type.params_type):
             if info.advanced and self.advanced is not None and self.advanced.toggle not in widgets:
                 widgets.append(self.advanced.toggle)
+            if f.name == "x_range" and self.x_range is not None:
+                continue  # last in the main form
             widgets.append(self.fields[f.name])
+        if self.x_range is not None:
+            position = widgets.index(self.advanced.toggle) if self.advanced else len(widgets)
+            widgets[position:position] = self.x_range.focus_order()
         return widgets
+
+
+class AnalysisList(QTreeWidget):
+    """The analyses of a family, in sections; about :data:`LIST_ROWS` rows high."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setColumnCount(2)
+        self.setHeaderHidden(True)
+        self.setRootIsDecorated(False)
+        self.setItemsExpandable(False)
+        self.setIndentation(12)
+        self.setUniformRowHeights(True)
+        self.setAccessibleName("Analyses")
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        header = self.header()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+
+    def _row_height(self) -> int:
+        return max(self.fontMetrics().height() + 6, 18)
+
+    def sizeHint(self) -> QSize:  # noqa: N802 (Qt API)
+        hint = super().sizeHint()
+        hint.setHeight(int((LIST_ROWS + 0.5) * self._row_height()) + 2 * self.frameWidth())
+        return hint
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (Qt API)
+        hint = super().minimumSizeHint()
+        hint.setHeight(3 * self._row_height() + 2 * self.frameWidth())
+        return hint
 
 
 class AnalyzeDialog(QDialog):
@@ -276,6 +391,8 @@ class AnalyzeDialog(QDialog):
         self.recent = list(recent)
         self._checked: set[str] = set()
         self._started: set[str] = set()  # analysis types whose inputs were filled in
+        self._type_id: str | None = None
+        self._shown_family: Family | None = None
         self.types: dict[Family, list[AnalysisType]] = {}
         for family in available_families(self.table):
             self.types[family] = runnable(self.table, family)
@@ -312,9 +429,9 @@ class AnalyzeDialog(QDialog):
 
         left, right = columns(body)
         left.addWidget(self._build_data(), 1)
+        left.addWidget(self._build_options())
         right.addWidget(self._build_analyses())
-        right.addWidget(self._build_options())
-        right.addWidget(self._build_summary(), 1)
+        right.addWidget(self._build_about(), 1)
 
         self.family_tabs.currentChanged.connect(lambda _i: self._on_family_changed())
 
@@ -327,7 +444,7 @@ class AnalyzeDialog(QDialog):
         self.tree.setAccessibleName("Data to analyze")
         self.tree.setRootIsDecorated(False)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.tree.setMinimumHeight(140)
+        self.tree.setMinimumHeight(100)
         self.empty = EmptyState(self.tree, "This table has no Y columns to analyze.")
         layout.addWidget(self.tree, 1)
         buttons = QHBoxLayout()
@@ -343,40 +460,23 @@ class AnalyzeDialog(QDialog):
         return box
 
     def _build_analyses(self) -> QGroupBox:
-        self.analyses_box = QGroupBox("Analysis")
+        self.analyses_box = QGroupBox("A&nalysis")
         self.analyses_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         layout = QVBoxLayout(self.analyses_box)
-        self.analysis_stack = FittedStack()
-        self.radio_group = QButtonGroup(self)
-        self.radios: dict[str, QRadioButton] = {}
-        self.badges: dict[str, QLabel] = {}
-        self._family_pages: dict[Family, int] = {}
-        for family, kinds in self.types.items():
-            page = QWidget()
-            page_layout = QGridLayout(page)
-            page_layout.setContentsMargins(0, 0, 0, 0)
-            # A long list (the curve fits) goes in columns of at most ONE_COLUMN_MAX
-            # rows, filled top to bottom.
-            per_column = math.ceil(len(kinds) / math.ceil(len(kinds) / ONE_COLUMN_MAX))
-            for index, kind in enumerate(kinds):
-                row = QHBoxLayout()
-                radio = QRadioButton(kind.label)
-                radio.setProperty("analysis_type", kind.id)
-                self.radio_group.addButton(radio)
-                self.radios[kind.id] = radio
-                row.addWidget(radio)
-                if kind.id in self.recent:
-                    badge = secondary_label("recent")
-                    badge.setWordWrap(False)
-                    badge.setAccessibleName(f"{kind.name} was used recently")
-                    self.badges[kind.id] = badge
-                    row.addWidget(badge)
-                row.addStretch(1)
-                page_layout.addLayout(row, index % per_column, index // per_column)
-            page_layout.setRowStretch(per_column, 1)
-            self._family_pages[family] = self.analysis_stack.addWidget(page)
-        layout.addWidget(self.analysis_stack)
-        self.radio_group.buttonToggled.connect(self._on_radio_toggled)
+        self.filter_edit = QLineEdit()
+        self.filter_edit.setPlaceholderText("Type to filter…")
+        self.filter_edit.setAccessibleName("Filter analyses")
+        self.filter_edit.installEventFilter(self)
+        self.analysis_list = AnalysisList()
+        self.no_match = secondary_label("", self.analysis_list.viewport())
+        self.no_match.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.no_match.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.no_match.hide()
+        layout.addWidget(self.filter_edit)
+        layout.addWidget(self.analysis_list)
+        self.filter_edit.textChanged.connect(self._apply_filter)
+        self.analysis_list.currentItemChanged.connect(self._on_current_item_changed)
+        self.analysis_list.itemDoubleClicked.connect(lambda _item, _col: self._run_if_ready())
         return self.analyses_box
 
     def _build_options(self) -> QGroupBox:
@@ -396,14 +496,44 @@ class AnalyzeDialog(QDialog):
         layout.addWidget(self.options)
         return self.options_box
 
-    def _build_summary(self) -> QGroupBox:
-        box = QGroupBox("What will run")
+    def _build_about(self) -> QGroupBox:
+        box = QGroupBox("About this analysis")
         layout = QVBoxLayout(box)
-        self.summary = QLabel()
-        self.summary.setWordWrap(True)
-        self.summary.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        self.summary.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        layout.addWidget(self.summary, 1)
+        selectable = Qt.TextInteractionFlag.TextSelectableByMouse
+
+        def label(secondary: bool = False) -> QLabel:
+            widget = secondary_label() if secondary else QLabel()
+            widget.setWordWrap(True)
+            widget.setTextInteractionFlags(selectable)
+            widget.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            return widget
+
+        self.equation = label()
+        self.equation.setTextFormat(Qt.TextFormat.RichText)
+        self.equation.setAccessibleName("Equation")
+        font = QFont(self.equation.font())
+        font.setPointSizeF(font.pointSizeF() + 1)
+        self.equation.setFont(font)
+        self.equation_note = label(secondary=True)
+        self.hypothesis = label()
+        self.hypothesis.setTextFormat(Qt.TextFormat.RichText)
+        self.assumptions = label()
+        self.assumptions.setTextFormat(Qt.TextFormat.RichText)
+        self.sketch = SketchView()
+        self.summary = label()
+        self.summary.setTextFormat(Qt.TextFormat.PlainText)
+        self.use_when = label(secondary=True)
+        for widget in (
+            self.equation,
+            self.equation_note,
+            self.hypothesis,
+            self.assumptions,
+            self.sketch,
+            self.summary,
+            self.use_when,
+        ):
+            layout.addWidget(widget)
+        layout.addStretch(1)
         return box
 
     # --- state -------------------------------------------------------------------------
@@ -413,13 +543,12 @@ class AnalyzeDialog(QDialog):
         data = self.family_tabs.tabData(self.family_tabs.currentIndex())
         return Family(data) if data else None
 
+    def _kind(self, type_id: str) -> AnalysisType:
+        return next(k for kinds in self.types.values() for k in kinds if k.id == type_id)
+
     @property
     def analysis_type(self) -> AnalysisType | None:
-        button = self.radio_group.checkedButton()
-        if button is None:
-            return None
-        type_id = button.property("analysis_type")
-        return next(k for kinds in self.types.values() for k in kinds if k.id == type_id)
+        return self._kind(self._type_id) if self._type_id is not None else None
 
     def set_family(self, family: Family) -> None:
         for i in range(self.family_tabs.count()):
@@ -429,9 +558,25 @@ class AnalyzeDialog(QDialog):
         raise ValueError(f"The family {family.label} is not available for this table.")
 
     def set_analysis_type(self, type_id: str) -> None:
-        kind = next(k for kinds in self.types.values() for k in kinds if k.id == type_id)
+        kind = self._kind(type_id)
         self.set_family(kind.family)
-        self.radios[type_id].setChecked(True)
+        self._fill_list(kind.family)
+        item = self._items_of(type_id)[0]
+        self.analysis_list.setCurrentItem(item)
+        if self._type_id != type_id:  # the item was current already
+            self._choose(type_id)
+
+    def listed_types(self) -> list[str]:
+        """The ids of the analyses in the list's sections (not Recent), in order."""
+        return [i.data(0, _ID) for i in self._analysis_items() if not self._in_recent(i)]
+
+    def recent_types(self) -> list[str]:
+        """The ids in the Recent section, newest first."""
+        return [i.data(0, _ID) for i in self._analysis_items() if self._in_recent(i)]
+
+    def visible_types(self) -> list[str]:
+        """The ids of the rows the filter leaves, in list order."""
+        return [i.data(0, _ID) for i in self._analysis_items() if not i.isHidden()]
 
     def _checkable_items(self) -> list[QTreeWidgetItem]:
         items = (self.tree.topLevelItem(i) for i in range(self.tree.topLevelItemCount()))
@@ -469,6 +614,142 @@ class AnalyzeDialog(QDialog):
             )
         return Analysis(kind.id, self.table.id, self.checked_inputs(), params)
 
+    # --- the analysis list ---------------------------------------------------------------
+
+    def _sections(self) -> list[QTreeWidgetItem]:
+        items = (
+            self.analysis_list.topLevelItem(i)
+            for i in range(self.analysis_list.topLevelItemCount())
+        )
+        return [i for i in items if i is not None]
+
+    def _analysis_items(self) -> list[QTreeWidgetItem]:
+        found: list[QTreeWidgetItem] = []
+        for section in self._sections():
+            found += _children(section)
+        return found
+
+    def _items_of(self, type_id: str) -> list[QTreeWidgetItem]:
+        return [i for i in self._analysis_items() if i.data(0, _ID) == type_id]
+
+    @staticmethod
+    def _in_recent(item: QTreeWidgetItem) -> bool:
+        parent = item.parent()
+        return parent is not None and parent.data(0, _ID) == RECENT
+
+    def _fill_list(self, family: Family) -> None:
+        if self._shown_family is family:
+            return
+        self._shown_family = family
+        kinds = self.types.get(family, [])
+        quiet = self.palette().color(QPalette.ColorRole.PlaceholderText)
+        with QSignalBlocker(self.analysis_list), QSignalBlocker(self.filter_edit):
+            self.filter_edit.clear()
+            self.analysis_list.clear()
+            recent = [k for t in self.recent for k in kinds if k.id == t][:RECENT_MAX]
+            sections: dict[str, list[AnalysisType]] = {}
+            if recent:
+                sections[RECENT] = recent
+            for kind in kinds:
+                sections.setdefault(kind.section or family.label, []).append(kind)
+            for title, members in sections.items():
+                header = QTreeWidgetItem([title])
+                header.setData(0, _ID, RECENT if title == RECENT and members is recent else "")
+                header.setFlags(Qt.ItemFlag.ItemIsEnabled)  # children of a disabled item are too
+                font = QFont(self.analysis_list.font())
+                font.setBold(True)
+                font.setPointSizeF(max(font.pointSizeF() - 1, 7))
+                header.setFont(0, font)
+                header.setForeground(0, quiet)
+                header.setFirstColumnSpanned(True)
+                self.analysis_list.addTopLevelItem(header)
+                for kind in members:
+                    item = QTreeWidgetItem([kind.name, kind.about.reports])
+                    item.setData(0, _ID, kind.id)
+                    item.setTextAlignment(
+                        1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+                    )
+                    item.setForeground(1, quiet)
+                    item.setToolTip(0, kind.about.use_when)
+                    header.addChild(item)
+            self.analysis_list.expandAll()
+        self.no_match.hide()
+
+    def _apply_filter(self, text: str) -> None:
+        needle = " ".join(text.lower().split())
+        for section in self._sections():
+            recent = section.data(0, _ID) == RECENT
+            shown = 0
+            for item in _children(section):
+                kind = self._kind(item.data(0, _ID))
+                haystack = f"{kind.name} {kind.about.reports}".lower()
+                hide = bool(needle) and (recent or needle not in haystack)
+                item.setHidden(hide)
+                shown += not hide
+            section.setHidden(shown == 0)
+        visible = [i for i in self._analysis_items() if not i.isHidden()]
+        current = self.analysis_list.currentItem()
+        if visible and (current is None or current.isHidden()):
+            chosen = [i for i in visible if i.data(0, _ID) == self._type_id]
+            self.analysis_list.setCurrentItem(chosen[0] if chosen else visible[0])
+        self.no_match.setVisible(not visible)
+        if not visible:
+            self.no_match.setText(f"No analysis matches “{text.strip()}”.")
+            self.no_match.setGeometry(self.analysis_list.viewport().rect())
+
+    def _move_in_list(self, step: int) -> None:
+        visible = [i for i in self._analysis_items() if not i.isHidden()]
+        if not visible:
+            return
+        current = self.analysis_list.currentItem()
+        index = visible.index(current) if current in visible else (-1 if step > 0 else 0)
+        self.analysis_list.setCurrentItem(visible[max(0, min(len(visible) - 1, index + step))])
+
+    def _on_current_item_changed(
+        self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None
+    ) -> None:
+        if current is None:
+            return
+        type_id = current.data(0, _ID)
+        if current.parent() is None or not type_id:
+            # A section header: move on to the analysis next to it, the way the user went.
+            items = [i for i in self._analysis_items() if not i.isHidden()]
+            if not items:
+                return
+            below = [i for i in items if self._list_index(i) > self._list_index(current)]
+            above = [i for i in items if self._list_index(i) < self._list_index(current)]
+            going_up = previous is not None and self._list_index(previous) > self._list_index(
+                current
+            )
+            target = (
+                (above[-1] if above else below[0])
+                if going_up
+                else (below[0] if below else above[-1])
+            )
+            self.analysis_list.setCurrentItem(target)
+            return
+        if type_id != self._type_id:
+            self._choose(type_id)
+
+    def _list_index(self, item: QTreeWidgetItem) -> int:
+        order = []
+        for section in self._sections():
+            order.append(section)
+            order += _children(section)
+        return order.index(item)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 (Qt API)
+        if watched is self.filter_edit and event.type() == QEvent.Type.KeyPress:
+            assert isinstance(event, QKeyEvent)
+            if event.key() in (Qt.Key.Key_Down, Qt.Key.Key_Up):
+                self._move_in_list(1 if event.key() == Qt.Key.Key_Down else -1)
+                return True
+        return super().eventFilter(watched, event)
+
+    def _run_if_ready(self) -> None:
+        if self.ok_button.isEnabled():
+            self.accept()
+
     # --- starting ----------------------------------------------------------------------
 
     def _start(self) -> None:
@@ -486,11 +767,13 @@ class AnalyzeDialog(QDialog):
         kind = analysis.analysis_type
         with QSignalBlocker(self.family_tabs):
             self.set_family(kind.family)
-        self.analysis_stack.setCurrentIndex(self._family_pages[kind.family])
+        self._fill_list(kind.family)
         self._started.add(kind.id)
         self.forms[kind.id].set_params(analysis.params)
         self._checked = set(analysis.inputs)
-        self.radios[kind.id].setChecked(True)
+        with QSignalBlocker(self.analysis_list):
+            self.analysis_list.setCurrentItem(self._items_of(kind.id)[0])
+        self._choose(kind.id)
         self._fill_tree(kind)
         self.set_checked(analysis.inputs)
         self._set_focus_order()
@@ -501,10 +784,10 @@ class AnalyzeDialog(QDialog):
             self.tree,
             self.select_all_button,
             self.deselect_all_button,
-            *self.radios.values(),
         ]
         for form in self.forms.values():
             widgets += form.focus_order()
+        widgets += [self.filter_edit, self.analysis_list]
         set_tab_order(widgets)
         self.tree.setFocus()
 
@@ -523,21 +806,24 @@ class AnalyzeDialog(QDialog):
         self.family_description.setText(family.description if family else "")
         if family is None:
             self.skeleton.set_problem("This table has no data that Curvis can analyze yet.")
-            self.summary.setText("")
+            self._show_about(None, None)
             return
-        self.analysis_stack.setCurrentIndex(self._family_pages[family])
+        self._fill_list(family)
         current = self.analysis_type
         if current is not None and current.family is family:
+            items = self._items_of(current.id)
+            if items and self.analysis_list.currentItem() not in items:
+                with QSignalBlocker(self.analysis_list):
+                    self.analysis_list.setCurrentItem(items[0])
             return
         kind = self._default_type(family)
         if kind is not None:
-            self.radios[kind.id].setChecked(True)
+            self.analysis_list.setCurrentItem(self._items_of(kind.id)[0])
 
-    def _on_radio_toggled(self, button: QRadioButton, checked: bool) -> None:
-        if not checked:
-            return
-        kind = self.analysis_type
-        assert kind is not None
+    def _choose(self, type_id: str) -> None:
+        """Make ``type_id`` the chosen analysis: its options, its data, its About."""
+        self._type_id = type_id
+        kind = self._kind(type_id)
         self.options.setCurrentWidget(self.forms[kind.id])
         self._fill_tree(kind)
         if kind.id not in self._started and self.editing is None:
@@ -597,6 +883,7 @@ class AnalyzeDialog(QDialog):
         if kind is None:
             if self.family is not None:
                 self.skeleton.set_problem("Choose an analysis.")
+            self._show_about(None, None)
             return
         inputs = self.checked_inputs()
         form = self.forms[kind.id]
@@ -607,5 +894,60 @@ class AnalyzeDialog(QDialog):
             self.skeleton.set_problem(f"{str(exc).capitalize()}.")
             return
         problem = kind.problem(self.table) or kind.check(self.table, inputs, params)
+        fit = _curve_fit(kind)
+        if fit is not None:
+            form.set_point_count(fit.point_count(self.table, inputs, params))
+        self._show_about(kind, params)
         self.summary.setText(kind.describe(self.table, inputs, params) if not problem else "")
+        self.summary.setVisible(bool(self.summary.text()))
         self.skeleton.set_problem(problem)
+
+    # --- About this analysis -----------------------------------------------------------
+
+    def _show_about(self, kind: AnalysisType | None, params: Params | None) -> None:
+        fit = _curve_fit(kind) if kind is not None else None
+        if fit is not None and params is not None:
+            from curvis.formula.display import render_equation
+
+            self.equation.setText(render_equation(fit.equation_for(params)))
+            self.equation_note.setText(fit.equation_note)
+            self.sketch.set_sketch(fit.sketch_data(params))
+        else:
+            self.equation.setText("")
+            self.equation_note.setText("")
+            self.sketch.set_sketch(None)
+        hypothesis = kind.about.hypothesis_for(params) if kind and params else None
+        self.hypothesis.setText(
+            self._keyed("Null hypothesis", hypothesis.null if hypothesis else "")
+        )
+        self.assumptions.setText(self._keyed("Assumes", hypothesis.assumes if hypothesis else ""))
+        self.use_when.setText(kind.about.use_when if kind else "")
+        if kind is None:
+            self.summary.setText("")
+        for label in (
+            self.equation,
+            self.equation_note,
+            self.hypothesis,
+            self.assumptions,
+            self.use_when,
+        ):
+            label.setVisible(bool(label.text()))
+
+    def _keyed(self, key: str, text: str) -> str:
+        """``key: text`` with the key in the PlaceholderText colour (rich text)."""
+        if not text:
+            return ""
+        colour = self.palette().color(QPalette.ColorRole.PlaceholderText).name()
+        return f'<span style="color:{colour}">{key}:</span> {html.escape(text)}'
+
+    def changeEvent(self, event: QEvent) -> None:  # noqa: N802 (Qt API)
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.PaletteChange and hasattr(self, "summary"):
+            self._shown_family = None  # the list's quiet text takes the new palette
+            if self.family is not None:
+                self._fill_list(self.family)
+                items = self._items_of(self._type_id) if self._type_id else []
+                if items:
+                    with QSignalBlocker(self.analysis_list):
+                        self.analysis_list.setCurrentItem(items[0])
+            self._update()

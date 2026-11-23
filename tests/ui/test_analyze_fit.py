@@ -4,12 +4,16 @@ and a parameter that cannot be read keeps Run disabled with a message."""
 
 import numpy as np
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QLineEdit
 from pytestqt.qtbot import QtBot
 
+from curvis.analysis.base import Analysis
+from curvis.analysis.fit.analyses import Hill4Params, MichaelisMentenParams, TwoPhaseParams
 from curvis.core import AddColumn, Document, GroupColumns, RemoveColumn, SetCellBlock
 from curvis.data import Column
 from curvis.ui.analyze_dialog import AnalyzeDialog
+from curvis.ui.analyze_options import FixedTable, XRangeEditor
 from curvis.ui.document_tab import DocumentTab
 from curvis.ui.main_window import MainWindow
 from tests.ui.test_analyze import run_dialog, settle
@@ -87,9 +91,9 @@ def test_fixing_a_parameter_from_the_advanced_section(
     doc_tab = dose_tab(window)
 
     def fix_slope(dialog: AnalyzeDialog) -> None:
-        edit = dialog.forms["hill_4pl"].fields["fixed"]
-        assert isinstance(edit, QLineEdit)
-        edit.setText("hill slope = 1")
+        table = fixed_table(dialog, "hill_4pl")
+        table.set_fixed("hill_slope", True)  # filled in with the example value, 1
+        assert table.value("hill_slope") == "1"
 
     run_dialog(monkeypatch, fix_slope, analysis="hill_4pl")
     doc_tab.analyze()
@@ -98,29 +102,67 @@ def test_fixing_a_parameter_from_the_advanced_section(
     assert r["Hill slope"] == ("1.000",) and r["SE of Hill slope"] == ("(fixed)",)
 
 
+def fixed_table(dialog: AnalyzeDialog, type_id: str) -> FixedTable:
+    table = dialog.forms[type_id].fixed
+    assert table is not None
+    return table
+
+
+def range_editor(dialog: AnalyzeDialog, type_id: str) -> XRangeEditor:
+    editor = dialog.forms[type_id].x_range
+    assert editor is not None
+    return editor
+
+
+def type_into(qtbot: QtBot, edit: QLineEdit, text: str) -> None:
+    edit.selectAll()
+    qtbot.keyClick(edit, Qt.Key.Key_Delete)
+    if text:
+        qtbot.keyClicks(edit, text)
+
+
 @pytest.mark.parametrize(
-    ("field", "text", "message"),
+    ("low", "high", "message"),
     [
-        ("x_range", "5 to 1", "The low end of the X range is above the high end."),
-        ("x_range", "1e-9", 'Write the X range as "low to high"'),
-        ("fixed", "top 100", 'Fix parameters as "name = value"'),
+        ("5", "1", "The low end of the X range is above the high end."),
+        ("1e", "", "The low end of the X range must be a number"),
+        ("", "-", "The high end of the X range must be a number"),
     ],
 )
-def test_run_is_disabled_until_a_parameter_can_be_read(
-    qtbot: QtBot, window: MainWindow, field: str, text: str, message: str
+def test_run_is_disabled_until_the_x_range_can_be_read(
+    qtbot: QtBot, window: MainWindow, low: str, high: str, message: str
 ) -> None:
     doc_tab = dose_tab(window)
     dialog = AnalyzeDialog(doc_tab.document, doc_tab.document.tables[0].id)
     qtbot.addWidget(dialog)
     dialog.set_analysis_type("hill_4pl")
     assert dialog.ok_button.isEnabled()
-    edit = dialog.forms["hill_4pl"].fields[field]
-    assert isinstance(edit, QLineEdit)
-    edit.setText(text)
+    editor = range_editor(dialog, "hill_4pl")
+    type_into(qtbot, editor.low, low)
+    type_into(qtbot, editor.high, high)
     assert not dialog.ok_button.isEnabled()
     assert message in dialog.skeleton.feedback.text()
-    edit.setText("")
+    type_into(qtbot, editor.low, "")
+    type_into(qtbot, editor.high, "")
     assert dialog.ok_button.isEnabled()
+    assert dialog.params() == Hill4Params()
+
+
+def test_a_fixed_value_that_is_not_a_number_keeps_run_disabled(
+    qtbot: QtBot, window: MainWindow
+) -> None:
+    doc_tab = dose_tab(window)
+    dialog = AnalyzeDialog(doc_tab.document, doc_tab.document.tables[0].id)
+    qtbot.addWidget(dialog)
+    dialog.set_analysis_type("hill_4pl")
+    table = fixed_table(dialog, "hill_4pl")
+    table.set_fixed("top", True)
+    table.set_value("top", "a lot")
+    assert not dialog.ok_button.isEnabled()
+    assert "The value of Top must be a number" in dialog.skeleton.feedback.text()
+    table.set_value("top", "100")
+    assert dialog.ok_button.isEnabled()
+    assert dialog.params() == Hill4Params(fixed="Top = 100")
 
 
 def kinetics_tab(window: MainWindow) -> DocumentTab:
@@ -185,9 +227,12 @@ def test_a_biphasic_fit_with_fixed_slopes_draws_on_log_x(
     doc_tab = biphasic_tab(window)
 
     def fix_slopes(dialog: AnalyzeDialog) -> None:
-        edit = dialog.forms["biphasic"].fields["fixed"]
-        assert isinstance(edit, QLineEdit)
-        edit.setText("nH1 = 1; hill slope 2 = 1")
+        table = fixed_table(dialog, "biphasic")
+        table.set_fixed("hill_slope_1", True)
+        table.set_fixed("hill_slope_2", True)
+        assert dialog.params() == TwoPhaseParams(
+            x_is_log=False, fixed="Hill slope 1 = 1, Hill slope 2 = 1"
+        )
 
     run_dialog(monkeypatch, fix_slopes, analysis="biphasic")
     doc_tab.analyze()
@@ -203,17 +248,39 @@ def test_a_biphasic_fit_with_fixed_slopes_draws_on_log_x(
     assert result.curves and result.curves[0].log_x
 
 
-def test_a_name_that_cannot_be_fixed_keeps_run_disabled(qtbot: QtBot, window: MainWindow) -> None:
+def test_the_last_free_parameter_cannot_be_fixed(qtbot: QtBot, window: MainWindow) -> None:
     doc_tab = kinetics_tab(window)
     dialog = AnalyzeDialog(doc_tab.document, doc_tab.document.tables[0].id)
     qtbot.addWidget(dialog)
     dialog.set_analysis_type("michaelis_menten")
-    edit = dialog.forms["michaelis_menten"].fields["fixed"]
-    assert isinstance(edit, QLineEdit)
-    edit.setText("top = 100")
+    table = fixed_table(dialog, "michaelis_menten")
+    table.set_fixed("km", True)
+    table.set_value("km", "6")
+    table.set_fixed("vmax", True)  # refused: Vmax is the last free parameter
+    assert not table.is_fixed("vmax")
+    assert dialog.ok_button.isEnabled()
+    assert dialog.params() == MichaelisMentenParams(fixed="Km = 6")
+    table.set_fixed("km", False)
+    table.set_fixed("vmax", True)
+    assert table.is_fixed("vmax") and not table.is_fixed("km")
+
+
+def test_a_stored_fixed_text_that_cannot_be_read_keeps_its_message(
+    qtbot: QtBot, window: MainWindow
+) -> None:
+    """A text the table cannot show (it never came from the table) keeps the parser's
+    message, and is kept as it is until the table is changed."""
+    doc_tab = kinetics_tab(window)
+    table_id = doc_tab.document.tables[0].id
+    stored = Analysis(
+        "michaelis_menten", table_id, ("g",), MichaelisMentenParams(fixed="top = 100")
+    )
+    dialog = AnalyzeDialog(doc_tab.document, table_id, analysis=stored)
+    qtbot.addWidget(dialog)
     assert not dialog.ok_button.isEnabled()
     assert "where the name is Vmax or Km" in dialog.skeleton.feedback.text()
-    edit.setText("Vmax = 120, Km = 6")
-    assert "Leave at least one parameter free" in dialog.skeleton.feedback.text()
-    edit.setText("km = 6")
+    table = fixed_table(dialog, "michaelis_menten")
+    assert not table.is_fixed("vmax") and not table.is_fixed("km")
+    table.set_fixed("km", True)
     assert dialog.ok_button.isEnabled()
+    assert dialog.params() == MichaelisMentenParams(fixed="Km = 2")
