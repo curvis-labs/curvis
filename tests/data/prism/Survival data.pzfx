@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GraphPadPrismFile xmlns="http://graphpad.com/prism/Prism.htm" PrismXMLVersion="5.00">
+<Created>
+<OriginalVersion CreatedByProgram="GraphPad Prism" CreatedByVersion="10.6.1.892" Login="wichertm" DateTime="2026-11-23T11:40:10+01:00"/>
+</Created>
+<InfoSequence>
+<Ref ID="Info0" Selected="1"/>
+</InfoSequence>
+<Info ID="Info0">
+<Title>Project info 1</Title>
+<Notes/>
+<Constant><Name>Experiment Date</Name><Value>2026-11-23</Value></Constant>
+<Constant><Name>Experiment ID</Name><Value/></Constant>
+<Constant><Name>Notebook ID</Name><Value/></Constant>
+<Constant><Name>Project</Name><Value/></Constant>
+<Constant><Name>Experimenter</Name><Value/></Constant>
+<Constant><Name>Protocol</Name><Value/></Constant>
+</Info>
+
+<TableSequence Selected="1">
+<Ref ID="Table0" Selected="1"/>
+</TableSequence>
+<Table ID="Table0" XFormat="numbers" TableType="Survival" EVFormat="AsteriskAfterNumber">
+<Title>Survival: Three groups</Title>
+<FloatingNote ID="Sticky0" Auto="0" Color="Yellow" Left="2376" Top="1177" Width="166" Height="1275" ScrWidth="4000" ScrHeight="2560" ScrDPI="96">
+<WebLink Flags="0" ToolTip="@help:stat_howto_survival" URL="@help:stat_howto_survival">
+Step by step instructions for analyzing survival data
+</WebLink>
+
+<B><Font Size="11" Color="#000000" Face="Verdana">How the data are organized</Font></B>
+<Font Size="11" Color="#000000" Face="Verdana"><BR/>Each row represents one subject. The X values are time.  The Y values are entered into three columns that define the treatment groups  The Y value is  "1" when the subject died at the specified time, and "0" when the subject's data was </Font>
+<I><Font Size="11" Color="#000000" Face="Verdana">censored </Font></I>
+<Font Size="11" Color="#000000" Face="Verdana">at that time (either because we don't know what happened after that time, or we do know but can't use the data because the protocol was not being followed).   Note that unlike some programs, you don't enter group ID into a column in Prism, but rather define the treatment groups by the Y columns. </Font>
+<B><Font Size="11" Color="#000000" Face="Verdana"><BR/><BR/>The goals</Font></B>
+<Font Size="11" Color="#000000" Face="Verdana"><BR/>- To create a Kaplan-Meier survival curve.<BR/>- To determine whether the difference between survival <BR/>   curves is more than expected by  chance. </Font>
+<B><Font Size="11" Color="#000000" Face="Verdana"><BR/><BR/>Viewing the results</Font></B>
+<Font Size="11" Color="#000000" Face="Verdana"><BR/>Survival analysis is unique. You don't need to click the Analyze button because Prism automatically analyzes survival data. Simply view the linked results sheet and graph.  Click below to learn more about survival analysis.</Font>
+</FloatingNote>
+
+<RowTitlesColumn Width="39">
+<Subcolumn>
+<d>CO</d>
+<d>NT</d>
+<d>RO</d>
+<d>LT</d>
+<d>RE</d>
+<d>AT</d>
+<d>ME</d>
+<d>NT</d>
+<d>WO</d>
+<d>RK</d>
+<d>PL</d>
+<d>AC</d>
+<d>EB</d>
+<d>OT</d>
+<d>RE</d>
+<d>AT</d>
+<d>ME</d>
+<d>NT</d>
+<d>XX</d>
+<d>XY</d>
+<d>BO</d>
+<d>OW</d>
+<d>HO</d>
+<d>TO</d>
+<d>YO</d>
+<d>UT</d>
+<d>OO</d>
+</Subcolumn>
+</RowTitlesColumn>
+<XColumn Width="81" Subcolumns="1" Decimals="0">
+<Title>Days </Title>
+<Subcolumn>
+<d>78</d>
+<d>34</d>
+<d>123</d>
+<d>45</d>
+<d>234</d>
+<d>345</d>
+<d>123</d>
+<d>211</d>
+<d>356</d>
+<d>378</d>
+<d>88</d>
+<d>321</d>
+<d>211</d>
+<d>111</d>
+<d>156</d>
+<d>178</d>
+<d>236</d>
+<d>198</d>
+<d>211</d>
+<d>234</d>
+<d>257</d>
+<d>322</d>
+<d>344</d>
+<d>365</d>
+<d>245</d>
+<d>299</d>
+<d>351</d>
+</Subcolumn>
+</XColumn>
+<XAdvancedColumn Version="1" Width="81" Decimals="0" Subcolumns="1">
+<Title>Days </Title>
+<Subcolumn>
+<d>78</d>
+<d>34</d>
+<d>123</d>
+<d>45</d>
+<d>234</d>
+<d>345</d>
+<d>123</d>
+<d>211</d>
+<d>356</d>
+<d>378</d>
+<d>88</d>
+<d>321</d>
+<d>211</d>
+<d>111</d>
+<d>156</d>
+<d>178</d>
+<d>236</d>
+<d>198</d>
+<d>211</d>
+<d>234</d>
+<d>257</d>
+<d>322</d>
+<d>344</d>
+<d>365</d>
+<d>245</d>
+<d>299</d>
+<d>351</d>
+</Subcolumn>
+</XAdvancedColumn>
+<YColumn Width="81" Decimals="0" Subcolumns="1">
+<Title>Control</Title>
+<Subcolumn>
+<d>1</d>
+<d>1</d>
+<d>0</d>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+<d>0</d>
+</Subcolumn>
+</YColumn>
+<YColumn Width="81" Decimals="0" Subcolumns="1">
+<Title>Treatment A</Title>
+<Subcolumn>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+<d>0</d>
+<d>0</d>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+</Subcolumn>
+</YColumn>
+<YColumn Width="81" Decimals="0" Subcolumns="1">
+<Title>Treatment B</Title>
+<Subcolumn>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d/>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+<d>1</d>
+<d>0</d>
+<d>1</d>
+<d>1</d>
+</Subcolumn>
+</YColumn>
+</Table>
+
+<!--Analyses, graphs and layouts as compressed binary. Don't edit this part of the file.-->
+
+<Template xmlns:dt="urn:schemas-microsoft-com:datatypes" dt:dt="bin.base64">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</Template></GraphPadPrismFile>

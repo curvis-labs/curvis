@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GraphPadPrismFile xmlns="http://graphpad.com/prism/Prism.htm" PrismXMLVersion="5.00">
+<Created>
+<OriginalVersion CreatedByProgram="GraphPad Prism" CreatedByVersion="10.6.1.892" Login="wichertm" DateTime="2026-11-23T11:44:48+01:00"/>
+</Created>
+<DefGraphButton ButtonID="201"/>
+<InfoSequence>
+<Ref ID="Info0" Selected="1"/>
+</InfoSequence>
+<Info ID="Info0">
+<Title>Project info 1</Title>
+<Notes/>
+<Constant><Name>Experiment Date</Name><Value>2026-11-23</Value></Constant>
+<Constant><Name>Experiment ID</Name><Value/></Constant>
+<Constant><Name>Notebook ID</Name><Value/></Constant>
+<Constant><Name>Project</Name><Value/></Constant>
+<Constant><Name>Experimenter</Name><Value/></Constant>
+<Constant><Name>Protocol</Name><Value/></Constant>
+</Info>
+
+<TableSequence Selected="1">
+<Ref ID="Table0" Selected="1"/>
+</TableSequence>
+<Table ID="Table0" XFormat="none" TableType="OneWay" EVFormat="AsteriskAfterNumber">
+<Title>Col: Entering replicate data</Title>
+<FloatingNote ID="Sticky0" Auto="0" Color="Yellow" Left="2376" Top="1177" Width="530" Height="388" ScrWidth="4000" ScrHeight="2560" ScrDPI="96">
+<WebLink Flags="0" ToolTip="@help:column_tables" URL="@help:column_tables">
+More about Column tables
+</WebLink>
+
+<B><Font Size="11" Color="#000000" Face="Arial">How the data are organized</Font></B>
+<Font Size="11" Color="#000000" Face="Arial"><BR/>The three columns define three groups. The replicate values are stacked in each column</Font>
+<B><Font Size="11" Color="#000000" Face="Arial"><BR/><BR/>How to graph these data</Font></B>
+<Font Size="11" Color="#000000" Face="Arial"><BR/>Look in the navigator to the left and find the Graphs folder. Click on the graph in bold. Prism will present several choices for graphing these data. With small numbers of values (like here), it is best to create a scatter plot that shows every value. </Font>
+<B><Font Size="11" Color="#000000" Face="Arial"><BR/><BR/>Notes</Font></B>
+<Font Size="11" Color="#000000" Face="Arial"><BR/><BR/>-Unlike many statistics programs, Prism does not define groups using a grouping variable. Instead, the groups are defined by which column each value is entered into. <BR/><BR/>-When you make a graph, you can choose to plot a column scatter graph (showing each value) or various kinds of graphs that summarize the data (bar graphs, box-and-whisker graphs, violin plots). </Font>
+</FloatingNote>
+
+<YColumn Width="81" Decimals="1" Subcolumns="1">
+<Title>Untreated</Title>
+<Subcolumn>
+<d>3.4</d>
+<d>4.3</d>
+<d>3</d>
+<d>3.9</d>
+<d>4.1</d>
+</Subcolumn>
+</YColumn>
+<YColumn Width="81" Decimals="1" Subcolumns="1">
+<Title>Placebo</Title>
+<Subcolumn>
+<d>2.3</d>
+<d>5.2</d>
+<d>4.5</d>
+<d>3.1</d>
+<d>5</d>
+</Subcolumn>
+</YColumn>
+<YColumn Width="81" Decimals="1" Subcolumns="1">
+<Title>Treated</Title>
+<Subcolumn>
+<d>4.2</d>
+<d>7.8</d>
+<d>5.9</d>
+<d>6.4</d>
+<d>7.6</d>
+</Subcolumn>
+</YColumn>
+</Table>
+
+<!--Analyses, graphs and layouts as compressed binary. Don't edit this part of the file.-->
+
+<Template xmlns:dt="urn:schemas-microsoft-com:datatypes" dt:dt="bin.base64">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</Template></GraphPadPrismFile>
