@@ -36,9 +36,11 @@ def window(qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Ite
     win = MainWindow(settings, recovery=RecoveryStore(tmp_path / "recovery"))
     qtbot.addWidget(win)
     yield win
-    win.close()
+    # Shut the scheduler down (and wait) before closing: the window's own shutdown does
+    # not wait, which leaves garbage collection on the main thread for later benchmarks.
     if win._scheduler is not None:
         win._scheduler.shutdown()
+    win.close()
 
 
 def test_recovery_copy_of_10mb_project_does_not_block_ui(
