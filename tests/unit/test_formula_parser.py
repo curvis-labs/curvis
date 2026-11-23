@@ -9,6 +9,7 @@ from curvis.formula.ast import (
     Call,
     ColumnRef,
     ConstantRef,
+    DeletedRef,
     Number,
     Span,
     Unary,
@@ -131,7 +132,15 @@ def test_spans() -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ["1 + 2 * 3", "-2^2", "2^-1^2", "MEAN([a]] b]) % ROW([A], 3)", "-(1 - -pi)", "k_B * 1e-5"],
+    [
+        "1 + 2 * 3",
+        "-2^2",
+        "2^-1^2",
+        "MEAN([a]] b]) % ROW([A], 3)",
+        "-(1 - -pi)",
+        "k_B * 1e-5",
+        "#DELETED[a]] b] - [c]",
+    ],
 )
 def test_to_text_round_trip(text: str) -> None:
     root = parse(text).root
@@ -215,3 +224,34 @@ def test_warm_up_from_many_threads_builds_the_parser_once(monkeypatch: pytest.Mo
     parse.cache_clear()
     assert parse("1 + 2").root == b(BinaryOp.ADD, n(1), n(2))
     assert builds == [1]
+
+
+# --- references to deleted columns ----------------------------------------------------
+
+
+def test_deleted_references_read_no_column() -> None:
+    formula = parse("#DELETED[Male: Control] * 2 + [a]")
+    assert formula.root == b(
+        BinaryOp.ADD, b(BinaryOp.MUL, DeletedRef("Male: Control", S), n(2)), col("a")
+    )
+    assert formula.columns == ("a",)
+    assert formula.deleted == ("Male: Control",)
+
+
+def test_deleted_marks_ignore_case_and_escape_brackets() -> None:
+    formula = parse("#deleted[a]] b] + #Deleted[A]] B]")
+    assert formula.deleted == ("a] b",)
+    assert formula.root.span == Span(0, 33)  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("#DELETED[]", "The column name is empty"),
+        ("#DELETED [a]", "'#' cannot be used in a formula"),
+        ("#[a]", "'#' cannot be used in a formula"),
+    ],
+)
+def test_malformed_deleted_marks(text: str, message: str) -> None:
+    with pytest.raises(FormulaError, match=message.replace("[", r"\[")):
+        parse(text)

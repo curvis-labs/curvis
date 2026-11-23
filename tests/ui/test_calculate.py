@@ -194,6 +194,22 @@ def test_invalid_formula_disables_ok_and_explains(
     assert shown and tab.document.calculations == []
 
 
+def test_a_deleted_reference_disables_ok_until_replaced(
+    tab: DocumentTab, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def setup(dialog: CalculateDialog) -> None:
+        dialog.set_formula("{A} + #DELETED[X]")
+        assert not dialog.ok_button.isEnabled()
+        assert dialog.formula_error.text() == "Column 'X' was deleted."
+        assert dialog.highlighter.error_span == (6, 17)
+        dialog.set_formula("{A} + [X]")
+        assert dialog.ok_button.isEnabled()
+
+    shown = run_dialog(monkeypatch, setup)
+    assert tab.calculate()
+    assert shown
+
+
 def test_palette_inserts_at_the_cursor(tab: DocumentTab, monkeypatch: pytest.MonkeyPatch) -> None:
     def setup(dialog: CalculateDialog) -> None:
         dialog.set_kind(CalculationKind.CUSTOM)
@@ -366,7 +382,7 @@ def test_formula_error_shows_in_the_header(
     header = model.headerData(1, Qt.Orientation.Horizontal)
     assert str(header).endswith(ERROR_MARK)
     tip = str(model.headerData(1, Qt.Orientation.Horizontal, Qt.ItemDataRole.ToolTipRole))
-    assert "Unknown column 'X'" in tip
+    assert "Column 'X' was deleted" in tip
 
 
 def test_double_click_reopens_the_dialog_with_its_definition(

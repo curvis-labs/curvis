@@ -72,6 +72,16 @@ class ColumnRef:
 
 
 @dataclass(frozen=True, slots=True)
+class DeletedRef:
+    """``#DELETED[name]``: a reference to the column ``name``, which was deleted. It reads
+    nothing and always fails the check, so the formula reports it instead of reading a
+    column that later takes the name."""
+
+    name: str
+    span: Span = field(compare=False)
+
+
+@dataclass(frozen=True, slots=True)
 class ConstantRef:
     name: str
     span: Span = field(compare=False)
@@ -115,7 +125,7 @@ class Call:
     span: Span = field(compare=False)
 
 
-type Node = Number | ColumnRef | ConstantRef | RoleRef | Unary | Binary | Call
+type Node = Number | ColumnRef | DeletedRef | ConstantRef | RoleRef | Unary | Binary | Call
 
 
 def to_text(node: Node) -> str:
@@ -125,6 +135,8 @@ def to_text(node: Node) -> str:
             return repr(value)
         case ColumnRef(name):
             return "[" + name.replace("]", "]]") + "]"
+        case DeletedRef(name):
+            return "#DELETED[" + name.replace("]", "]]") + "]"
         case ConstantRef(name):
             return name
         case RoleRef(role, stat):

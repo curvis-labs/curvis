@@ -108,14 +108,17 @@ class _PaletteEntry:
     description: str
 
 
+_ANY_CASE = QRegularExpression.PatternOption.CaseInsensitiveOption
+
+
 class FormulaHighlighter(QSyntaxHighlighter):
     """Colours column and role references, functions and constants; underlines an error."""
 
-    _COLUMN = QRegularExpression(r"\[([^\]]|\]\])*\]")
+    _COLUMN = QRegularExpression(r"(#DELETED)?\[([^\]]|\]\])*\]", _ANY_CASE)
     _ROLE = QRegularExpression(r"\{[^{}]*\}")
     _FUNCTION = QRegularExpression(
         r"\b(" + "|".join(f.value for f in Function) + r")\b(?=\s*\()",
-        QRegularExpression.PatternOption.CaseInsensitiveOption,
+        _ANY_CASE,
     )
     _NAME = QRegularExpression(r"(?<![\w\[{])[^\W\d]\w*(?![\w(])")
 

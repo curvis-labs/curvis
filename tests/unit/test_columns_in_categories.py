@@ -5,6 +5,7 @@ See SPEC.md, "Columns in a category": a Y column in a category has the full name
 """
 
 import copy
+from pathlib import Path
 
 import pytest
 
@@ -17,6 +18,7 @@ from curvis.core import (
     Document,
     GroupColumns,
     ImportColumns,
+    RemoveColumn,
     RenameColumn,
     SetCategory,
     UngroupColumns,
@@ -36,6 +38,8 @@ from curvis.data import (
     name_error,
     resolve_reference,
 )
+from curvis.formula import FormulaError, check
+from curvis.io.project import load, save
 
 
 @pytest.fixture
@@ -270,6 +274,44 @@ def test_a_new_column_of_the_same_short_name_keeps_formulas_on_theirs(doc: Docum
     doc.undo()
     check_undo_redo(doc, AddColumn("t", new))
     assert formula(doc) == "[Male: Control] - [a]"
+
+
+def test_deleting_a_column_marks_its_references(doc: Document) -> None:
+    calc(doc, "[a] * 2 + MEAN([b])")
+    check_undo_redo(doc, RemoveColumn("t", "a"))
+    assert formula(doc) == "#DELETED[a] * 2 + MEAN([b])"
+    # A new column called "a" does not bring the formula back to life unnoticed.
+    doc.execute(RenameColumn("t", "b", "a"))
+    assert formula(doc) == "#DELETED[a] * 2 + MEAN([a])"
+
+
+def test_deleting_control_does_not_move_control_to_another_column(doc: Document) -> None:
+    # "Control" outside every category next to "Male: Control": [Control] reads it.
+    doc.execute(RenameColumn("t", "b", "Control"))
+    calc(doc, "[Control] - [Male: Control] - [control]")
+    assert resolve_reference(table(doc), "Control").id == "b"
+    # Once it is gone, [Control] would read "Male: Control": it is marked instead.
+    check_undo_redo(doc, RemoveColumn("t", "b"))
+    assert formula(doc) == "#DELETED[Control] - [Male: Control] - #DELETED[control]"
+    assert resolve_reference(table(doc), "Control").id == "mc"
+    with pytest.raises(FormulaError, match="Column 'Control' was deleted"):
+        check(formula(doc), names(doc), [])
+    doc.undo()
+    assert formula(doc) == "[Control] - [Male: Control] - [control]"
+
+
+def test_deleting_an_unused_column_leaves_formulas_as_written(doc: Document) -> None:
+    calc(doc, "[Control] - [a]")
+    check_undo_redo(doc, RemoveColumn("t", "b"))
+    assert formula(doc) == "[Control] - [a]"
+
+
+def test_a_deleted_reference_survives_save_and_load(doc: Document, tmp_path: Path) -> None:
+    calc(doc, "[Control] - [a]")
+    doc.execute(RemoveColumn("t", "a"))
+    path = tmp_path / "p.cvp"
+    save(doc, path)
+    assert load(path).calculations[-1].formula == "[Control] - #DELETED[a]"
 
 
 def test_importing_a_column_of_the_same_name(doc: Document) -> None:

@@ -34,7 +34,7 @@ from curvis.core import (
 from curvis.core import calculation_formulas as cf
 from curvis.core.constants import ProjectConstant
 from curvis.data import Column, ColumnRole, Pairing, Table, role_values
-from curvis.formula import FormulaError, evaluate, parse, rename_columns, to_text
+from curvis.formula import FormulaError, evaluate, mark_deleted, parse, rename_columns, to_text
 from curvis.io.project import PROJECT_JSON, load, save
 
 NAN = math.nan
@@ -80,6 +80,16 @@ def test_rename_columns_keeps_the_rest_of_the_text() -> None:
     )
     assert rename_columns("[A] - [B]", {"A": "B", "B": "A"}) == "[B] - [A]"
     assert rename_columns("[A] +", {"A": "B"}) == "[A] +"  # does not parse: left alone
+
+
+def test_mark_deleted_keeps_the_name_as_written() -> None:
+    assert mark_deleted("[control] *2+ MEAN([x]]y]) - [B]", ["Control", "X]Y"]) == (
+        "#DELETED[control] *2+ MEAN(#DELETED[x]]y]) - [B]"
+    )
+    assert mark_deleted("#DELETED[A] + [A]", ["a"]) == "#DELETED[A] + #DELETED[A]"
+    assert rename_columns("#DELETED[A] + [A]", {"A": "B"}) == "#DELETED[A] + [B]"
+    assert mark_deleted("[A] +", ["A"]) == "[A] +"  # does not parse: left alone
+    assert mark_deleted("[A]", []) == "[A]"
 
 
 # --- pairing ----------------------------------------------------------------------------
