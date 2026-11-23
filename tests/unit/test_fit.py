@@ -90,7 +90,7 @@ def test_a_parameter_that_ends_on_its_bound_makes_the_fit_ambiguous() -> None:
     d = fit_dose_response(points, bounds={"hill_slope": (0.0, 0.5)})  # the slope is near 1
     assert d.fit.status is FitStatus.AMBIGUOUS
     assert d.fit.value("hill_slope") == pytest.approx(0.5)
-    assert "hill_slope ended on its limit" in d.fit.message
+    assert d.fit.message == "The fit is ambiguous: Hill slope ended on its limit."
 
 
 def test_bounds_that_hold_leave_the_fit_ok() -> None:
@@ -131,6 +131,36 @@ def test_parameters_that_depend_on_each_other_make_the_fit_ambiguous() -> None:
     f = fit_model(Redundant(), Points(x, 2 * x + np.sin(x)), start=[1.0, 1.0])
     assert f.status is FitStatus.AMBIGUOUS
     assert "a" in f.message and "b" in f.message
+
+
+class Line(FitModel):
+    """y = a + b * x."""
+
+    name = "line"
+    parameters = ("a", "b")
+
+    def f(self, x: FloatArray, p: FloatArray) -> FloatArray:
+        return np.asarray(p[0] + p[1] * x, dtype=np.float64)
+
+
+def test_an_ambiguous_fit_names_the_parameters_by_their_labels() -> None:
+    # Far from X = 0 the intercept and slope are correlated with |r| > 0.9999.
+    x = 1000 + np.arange(7.0)
+    labels = {"a": "Intercept", "b": "Slope"}
+    f = fit_model(Line(), Points(x, 2 * x + np.sin(x)), start=[0.0, 1.0], labels=labels)
+    assert f.status is FitStatus.AMBIGUOUS
+    assert f.message.startswith("The fit is ambiguous: Intercept and Slope depend on each other")
+
+
+EC50_X = np.linspace(-9.0, -4.0, 12)
+EC50_Y = 10 + 90 / (1 + 10 ** (-6.5 - EC50_X)) + np.sin(EC50_X)
+
+
+def test_a_4pl_parameter_with_no_effect_is_named_as_in_the_results() -> None:
+    # With a Hill slope of 0 the curve is flat, whatever the LogEC50.
+    d = fit_dose_response(Points(EC50_X, EC50_Y), x_is_log=True, fixed={"hill_slope": 0.0})
+    assert d.fit.status is FitStatus.AMBIGUOUS
+    assert d.fit.message == "The fit is ambiguous: LogEC50 does not change the curve."
 
 
 class Root(FitModel):

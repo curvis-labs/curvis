@@ -41,6 +41,8 @@ type FloatArray = npt.NDArray[np.float64]
 
 LN10 = math.log(10.0)
 PARAMETERS = ("bottom", "top", "log_ec50", "hill_slope")
+LABELS = {"bottom": "Bottom", "top": "Top", "log_ec50": "LogEC50", "hill_slope": "Hill slope"}
+"""Display name of each parameter, as the results show it."""
 MAX_NFEV = 500
 """Model evaluations per attempt. With the analytic Jacobian a fit that converges needs
 far fewer (< 100 on every fixture); the limit keeps a fit that cannot converge (and is
@@ -176,7 +178,9 @@ def fit_dose_response(
     if three_parameter:
         fixed["bottom"] = 0.0
     constraints = Constraints(fixed, dict(bounds or {}))
-    fit = fit_model(LOGISTIC, points, constraints, confidence=confidence, max_nfev=MAX_NFEV)
+    fit = fit_model(
+        LOGISTIC, points, constraints, confidence=confidence, max_nfev=MAX_NFEV, labels=LABELS
+    )
     if not fit.ok and fit.status is not FitStatus.TOO_FEW_POINTS:
         fit = _retry(points, constraints, confidence, fit)
     return DoseResponseFit(fit, three_parameter, x_is_log)
@@ -198,7 +202,7 @@ def _retry(
             start = base.copy()
             start[2] = float(np.quantile(finite, q))
             start[3] = h
-            fit = fit_model(LOGISTIC, points, constraints, start, confidence, MAX_NFEV)
+            fit = fit_model(LOGISTIC, points, constraints, start, confidence, MAX_NFEV, LABELS)
             if fit.ok and (not best.converged or fit.rss < best.rss):
                 best = fit
     return best

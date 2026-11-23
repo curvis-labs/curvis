@@ -341,16 +341,10 @@ class PolynomialRegression(CurveFit):
 
 # --- dose-response ---------------------------------------------------------------------------
 
-LOGISTIC_LABELS = {
-    "bottom": "Bottom",
-    "top": "Top",
-    "log_ec50": "LogEC50",
-    "hill_slope": "Hill slope",
-}
-
 
 def run_logistic(inputs: AnalysisInputs, params: Hill3Params, three: bool) -> Result:
     from curvis.analysis.compare.common import number
+    from curvis.analysis.fit.dose_response import LABELS as LOGISTIC_LABELS
     from curvis.analysis.fit.dose_response import dose_response_points, fit_dose_response
 
     x = _no_x(inputs)

@@ -165,11 +165,11 @@ def fit_curve(
     model = spec.model
     k = len(model.parameters) - len(constraints.fixed)
     if points.n < max(k, 1):
-        return fit_model(model, points, constraints, confidence=confidence)
+        return fit_model(model, points, constraints, confidence=confidence, labels=spec.labels)
     starts = model.starts(points.x, points.y)
     best: NonlinearFit | None = None
     for start in starts[:TRIES]:
-        fit = fit_model(model, points, constraints, start, confidence, spec.max_nfev)
+        fit = fit_model(model, points, constraints, start, confidence, spec.max_nfev, spec.labels)
         if best is None or _better(fit, best):
             best = fit
         if fit.ok:
