@@ -36,7 +36,9 @@ Columns can be organized further:
 
 Columns and column groups are movable by drag and drop.
 
-**Import.** CSV, TSV and Excel (.xlsx and .xls) files load through a preview dialog where you pick the header row, the delimiter (auto-detect, comma, semicolon, tab or space) and the decimal mark (auto-detect, point or comma; the default comes from Settings), and optionally the range of rows and columns to import.
+**Import.** CSV, TSV and Excel (.xlsx and .xls) files load through a preview dialog where you pick the header row, the delimiter (auto-detect, comma, semicolon, tab or space; for Excel, the sheet instead) and the decimal mark (auto-detect, point or comma; the default comes from Settings), and optionally the range of rows and columns to import. Auto-detect reads the mark only from cells that settle it ("1,5" or "1.234,5"); a cell such as "1,234" could be a thousands separator, so when nothing settles it the Settings default is used and the preview says so. In Excel the decimal mark applies to text cells only; number cells are used as they are.
+
+**Prism import.** The data tables of GraphPad Prism files (.pzfx and .prism) import through a dialog that lists them, each ticked, with its kind and size; each imported table becomes a new table in the project (a blank selected table is replaced). XY tables give an X column and a Y column or replicate group per data set; column tables a Y column per data set; survival tables a Time column and an Event column per group; row titles a Text column. Grouped tables of raw values put each Prism column in a category, with one column per row (named by its row title) holding that row's replicates, ready for two-way ANOVA. Means entered with SD or SEM become a Y column with its Error column, and N a Text column (these are not put in categories); %CV, ± errors and upper/lower limits are kept as Text columns. Values Prism marks as excluded are left empty, with a note. Contingency, parts-of-whole, multiple-variables and nested tables, analyses, graphs and their styling are not imported; the dialog says so.
 
 **Calculated columns.** The Calculate dialog adds derived columns from four ready-made calculations or a custom formula:
 
@@ -126,4 +128,5 @@ Clicking a legend entry on XY and survival charts toggles that series on or off.
 
 Not part of 1.0; do not build. Listed so that 1.0 does not make it harder.
 
+- **Excluding values.** The user marks single values as excluded: they stay in the table, shown as excluded, and analyses and graphs leave them out. Prism import already keeps the values Prism marks as excluded and their places (they import empty in 1.0), so they can then import as excluded. Needs a per-column mask in the project file (a `schema_version` bump with a migration) and fixtures that check analyses skip excluded values.
 - **User-defined curve fits.** The user types a model as a formula (in the same formula language, never evaluated as Python), names its parameters and gives starting values; it appears in the Analyze dialog under its own section, with a sketch drawn from the formula and the same parameter table as the built-in fits (later with bounds). Validation comes from the fit engine (NIST StRD and fixtures for general formulas), as a user's model has no R reference of its own.
