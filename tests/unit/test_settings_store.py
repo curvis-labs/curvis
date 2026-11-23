@@ -146,3 +146,21 @@ def test_recent_analyses_newest_first_capped(settings: Settings) -> None:
 def test_damaged_recent_analyses_are_skipped(ini: QSettings, settings: Settings, raw: str) -> None:
     ini.setValue(Settings.RECENT_ANALYSES, raw)
     assert settings.recent_analyses == []
+
+
+def test_autosave_interval(settings: Settings, ini: QSettings) -> None:
+    assert settings.autosave_minutes == 3
+    changed: list[str] = []
+    settings.changed.connect(changed.append)
+    settings.autosave_minutes = 30
+    assert settings.autosave_minutes == 30
+    assert changed == [Settings.AUTOSAVE_MINUTES]
+    for bad in (0, 31):
+        with pytest.raises(ValueError):
+            settings.autosave_minutes = bad
+    for stored in ("0", "99", "soon"):
+        ini.setValue(Settings.AUTOSAVE_MINUTES, stored)
+        assert settings.autosave_minutes == 3
+    settings.autosave_minutes = 12
+    settings.reset_to_defaults()
+    assert settings.autosave_minutes == 3

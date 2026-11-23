@@ -1,7 +1,7 @@
 """App settings stored with QSettings: theme, decimal places, what new graphs start
 with (palette, size, font, text size) and the palettes the user made, how P values are
-shown, export defaults, the crash log, recent projects, recently used analyses and
-global constants.
+shown, export defaults, the crash log, how often to autosave recovery copies, recent
+projects, recently used analyses and global constants.
 
 Settings only give starting values: a new graph copies them into its chart spec
 (:meth:`Settings.graph_defaults`), so a later change never alters an existing graph.
@@ -61,6 +61,8 @@ EXPORT_FORMAT_DEFAULT = "png"
 PNG_DPI_DEFAULT = 300
 PNG_DPI_MIN, PNG_DPI_MAX = 72, 1200
 MAX_PALETTES = 50
+AUTOSAVE_MINUTES_DEFAULT = 3
+AUTOSAVE_MINUTES_MIN, AUTOSAVE_MINUTES_MAX = 1, 30
 
 
 class Theme(StrEnum):
@@ -122,6 +124,7 @@ class Settings(QObject):
     P_DISPLAY = "results/p_display"
     EXPORT_FORMAT = "export/format"
     PNG_DPI = "export/png_dpi"
+    AUTOSAVE_MINUTES = "projects/autosave_minutes"
 
     RESET_KEYS = (
         THEME,
@@ -137,6 +140,7 @@ class Settings(QObject):
         P_DISPLAY,
         EXPORT_FORMAT,
         PNG_DPI,
+        AUTOSAVE_MINUTES,
     )
     """What Reset to defaults restores: every setting of the Settings dialog. Recent
     projects, recently used analyses and global constants are kept."""
@@ -363,6 +367,27 @@ class Settings(QObject):
         if not PNG_DPI_MIN <= dpi <= PNG_DPI_MAX:
             raise ValueError(f"Choose a resolution from {PNG_DPI_MIN} to {PNG_DPI_MAX} dpi.")
         self._set(self.PNG_DPI, int(dpi))
+
+    # --- autosave ---------------------------------------------------------------------
+
+    @property
+    def autosave_minutes(self) -> int:
+        """Minutes between recovery copies of projects with unsaved changes (always on)."""
+        try:
+            minutes = int(str(self._store.value(self.AUTOSAVE_MINUTES, AUTOSAVE_MINUTES_DEFAULT)))
+        except ValueError:
+            return AUTOSAVE_MINUTES_DEFAULT
+        if not AUTOSAVE_MINUTES_MIN <= minutes <= AUTOSAVE_MINUTES_MAX:
+            return AUTOSAVE_MINUTES_DEFAULT
+        return minutes
+
+    @autosave_minutes.setter
+    def autosave_minutes(self, minutes: int) -> None:
+        if not AUTOSAVE_MINUTES_MIN <= minutes <= AUTOSAVE_MINUTES_MAX:
+            raise ValueError(
+                f"Choose from {AUTOSAVE_MINUTES_MIN} to {AUTOSAVE_MINUTES_MAX} minutes."
+            )
+        self._set(self.AUTOSAVE_MINUTES, int(minutes))
 
     # --- reset -----------------------------------------------------------------------
 
