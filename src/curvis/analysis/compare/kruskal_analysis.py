@@ -7,8 +7,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from curvis.analysis.base import (
+    About,
     AnalysisError,
     AnalysisInputs,
+    Hypothesis,
     Params,
     input_param,
     param,
@@ -46,6 +48,16 @@ class KruskalWallis(GroupComparison):
     id = "kruskal_wallis"
     label = "&Kruskal-Wallis test"
     method = METHOD
+    section = "Three or more groups"
+    about = About(
+        "ranks, post-hoc tests",
+        "Use when comparing three or more groups whose values are skewed or have outliers. "
+        "For roughly normal data, one-way ANOVA has more power.",
+        Hypothesis(
+            "All groups come from the same distribution.",
+            "Values are independent. No normal distribution needed.",
+        ),
+    )
     params_type = KruskalParams
     min_groups = 3
 

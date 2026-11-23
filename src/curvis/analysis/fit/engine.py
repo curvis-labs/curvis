@@ -34,7 +34,6 @@ from enum import StrEnum
 
 import numpy as np
 import numpy.typing as npt
-from scipy import stats
 
 from curvis.analysis.fit.points import Points
 
@@ -149,6 +148,8 @@ class NonlinearFit:
             return fit, nan, nan.copy()
         g = _jacobian(self.model, x, self.values)[:, np.array(self.free)]
         se_fit = np.sqrt(np.maximum(np.sum((g @ self.cov) * g, axis=1), 0.0))
+        from scipy import stats  # lazy: the sketches use the models
+
         q = float(stats.t.ppf(0.5 + self.confidence / 2, self.df))
         return fit, fit - q * se_fit, fit + q * se_fit
 
@@ -371,6 +372,8 @@ def fit_model(
                 s2 = rss / df
                 cov = c_scaled / np.outer(norms, norms) * s2
                 se_free = np.sqrt(np.diag(cov))
+                from scipy import stats  # lazy: the sketches use the models
+
                 qt = float(stats.t.ppf(0.5 + confidence / 2, df))
                 se[var_index] = se_free
                 ci_low[var_index] = p[var_index] - qt * se_free

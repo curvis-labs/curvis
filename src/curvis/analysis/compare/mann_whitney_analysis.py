@@ -7,7 +7,14 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from curvis.analysis.base import AnalysisError, AnalysisInputs, Params, register
+from curvis.analysis.base import (
+    About,
+    AnalysisError,
+    AnalysisInputs,
+    Hypothesis,
+    Params,
+    register,
+)
 from curvis.analysis.compare.common import (
     GroupComparison,
     few_values_warnings,
@@ -29,6 +36,16 @@ class MannWhitney(GroupComparison):
     id = "mann_whitney"
     label = "&Mann-Whitney test"
     method = METHOD
+    section = "Two groups"
+    about = About(
+        "two groups, ranks",
+        "Use when comparing two independent groups whose values are skewed, have outliers or "
+        "are ranks. For roughly normal data, the t test has more power.",
+        Hypothesis(
+            "Values of either group are as likely to be higher than those of the other as lower.",
+            "Values are independent. No normal distribution needed.",
+        ),
+    )
     params_type = MannWhitneyParams
     min_groups = 2
     max_groups = 2

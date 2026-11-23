@@ -7,8 +7,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from curvis.analysis.base import (
+    About,
     AnalysisError,
     AnalysisInputs,
+    Hypothesis,
     Params,
     param,
     register,
@@ -43,6 +45,27 @@ class TTest(GroupComparison):
     id = "t_test"
     label = "&t test"
     method = "t test"
+    section = "Two groups"
+    about = About(
+        "two groups, means",
+        "Use when comparing the means of two groups. For skewed data or outliers, use the "
+        "Mann-Whitney test.",
+        option="test",
+        by_option={
+            TTestKind.WELCH.value: Hypothesis(
+                "The two means are equal.",
+                "Values are independent and roughly normal in each group; the SDs may differ.",
+            ),
+            TTestKind.STUDENT.value: Hypothesis(
+                "The two means are equal.",
+                "Values are independent and roughly normal in each group, with equal SDs.",
+            ),
+            TTestKind.PAIRED.value: Hypothesis(
+                "The mean of the differences is 0.",
+                "The pairs are independent, and their differences are roughly normal.",
+            ),
+        },
+    )
     params_type = TTestParams
     min_groups = 2
     max_groups = 2

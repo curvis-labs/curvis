@@ -13,8 +13,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from curvis.analysis.base import (
+    About,
     AnalysisError,
     AnalysisInputs,
+    Hypothesis,
     Params,
     input_param,
     param,
@@ -85,6 +87,31 @@ class OneWayAnova(GroupComparison):
     id = "one_way_anova"
     label = "&One-way ANOVA"
     method = METHOD
+    section = "Three or more groups"
+    about = About(
+        "means, post-hoc tests",
+        "Use when comparing the means of three or more groups. For skewed data or outliers, "
+        "use the Kruskal-Wallis test.",
+        option="design",
+        by_option={
+            ORDINARY: Hypothesis(
+                "All group means are equal.",
+                "Values are independent and roughly normal in each group, with similar SDs.",
+            ),
+            REPEATED: Hypothesis(
+                "All group means are equal.",
+                "Each row is one subject measured in every group; the values are roughly "
+                "normal. The correction allows for unequal variances of the differences (no "
+                "sphericity needed).",
+            ),
+            REPEATED_SPHERICAL: Hypothesis(
+                "All group means are equal.",
+                "Each row is one subject measured in every group; the values are roughly "
+                "normal, and the differences between every pair of groups have the same "
+                "variance (sphericity).",
+            ),
+        },
+    )
     params_type = AnovaParams
     min_groups = 2
 

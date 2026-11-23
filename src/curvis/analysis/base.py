@@ -22,7 +22,7 @@ import dataclasses
 import importlib
 import math
 from abc import ABC, abstractmethod
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
@@ -81,6 +81,39 @@ _FAMILY_DESCRIPTIONS = {
 }
 
 
+@dataclass(frozen=True)
+class Hypothesis:
+    """What a test assumes: its null hypothesis ("" for an analysis without one, such as
+    Kaplan-Meier) and its assumptions, as the Analyze dialog shows them."""
+
+    null: str
+    assumes: str
+
+
+@dataclass(frozen=True)
+class About:
+    """The text of *About this analysis* in the Analyze dialog (docs/DESIGN.md, section 11).
+
+    ``reports`` is the short text at the right of the analysis' row in the list. The
+    hypothesis may depend on one option (``option``): ``by_option`` maps that
+    parameter's values to the hypothesis that goes with each.
+    """
+
+    reports: str
+    use_when: str
+    hypothesis: Hypothesis | None = None
+    option: str = ""
+    by_option: Mapping[str, Hypothesis] = field(default_factory=dict)
+
+    def hypothesis_for(self, params: Params) -> Hypothesis | None:
+        """The hypothesis for ``params``: the one of its option value, else the default."""
+        if self.option:
+            found = self.by_option.get(str(getattr(params, self.option, "")))
+            if found is not None:
+                return found
+        return self.hypothesis
+
+
 class AnalysisError(Exception):
     """An analysis cannot run on its inputs. The message says what to change."""
 
@@ -111,6 +144,10 @@ class ParamInfo:
     enabled_when: tuple[str, str] | None = None
     """(other parameter, value): the field is enabled only while the other parameter has
     that value."""
+    editor: Literal["", "x_range", "fixed"] = ""
+    """A text parameter edited with its own widget instead of a text field: "x_range"
+    (two number fields, written "low to high") or "fixed" (a table of the model's
+    parameters, written "name = value, …")."""
 
 
 PARAM_INFO = "curvis.param"
@@ -126,11 +163,16 @@ def param(
     maximum: float | None = None,
     from_inputs: bool = False,
     enabled_when: tuple[str, str] | None = None,
+    editor: Literal["", "x_range", "fixed"] = "",
 ) -> Any:
     """A parameters dataclass field with its default and how the dialog shows it."""
     if from_inputs and (not isinstance(default, str) or choices):
         raise TypeError("a parameter picked from the inputs is text without fixed choices")
-    info = ParamInfo(label, advanced, tuple(choices), minimum, maximum, from_inputs, enabled_when)
+    if editor and not isinstance(default, str):
+        raise TypeError("a parameter with its own editor is text")
+    info = ParamInfo(
+        label, advanced, tuple(choices), minimum, maximum, from_inputs, enabled_when, editor
+    )
     return field(default=default, metadata={PARAM_INFO: info})
 
 
@@ -338,6 +380,10 @@ class AnalysisType(ABC):
     method: ClassVar[str]
     """Exact method name shown with the results."""
     family: ClassVar[Family]
+    section: ClassVar[str] = ""
+    """The section of the family's list in the Analyze dialog (e.g. "Dose-response")."""
+    about: ClassVar[About] = About("", "")
+    """The text of *About this analysis*, beside :meth:`describe`."""
     params_type: ClassVar[type[Params]]
     weight: ClassVar[Weight] = "light"
     """Heavy analyses (many fits) run in a worker process."""
