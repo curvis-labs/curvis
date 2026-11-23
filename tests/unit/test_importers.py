@@ -410,3 +410,52 @@ def test_range_options_start_at_1() -> None:
     for name in ("first_row", "last_row", "first_column", "last_column"):
         with pytest.raises(ValueError):
             CsvOptions(**{name: 0})
+
+
+# --- decimal mark --------------------------------------------------------------------
+
+
+def test_decimal_comma_is_detected_from_the_data(tmp_path: Path) -> None:
+    path = tmp_path / "tab_comma.tsv"
+    path.write_text("Dose\tResp\n0,5\t1.234,5\n1\t2,25\n", encoding="utf-8")
+    data = read_csv(path)
+    assert data.delimiter == "\t"
+    assert data.decimal_comma and not data.decimal_unsure
+    assert summary(data) == [("Dose", "Y", [0.5, 1.0]), ("Resp", "Y", [1234.5, 2.25])]
+
+
+def test_a_thousands_separator_is_not_taken_for_a_decimal_mark(tmp_path: Path) -> None:
+    path = tmp_path / "thousands.csv"
+    path.write_text("Name;Count\na;1,234\nb;12,500\n", encoding="utf-8")
+    point = read_csv(path)
+    assert point.decimal_unsure and not point.decimal_comma
+    assert summary(point)[1] == ("Count", "Y", [1234.0, 12500.0])
+    comma = read_csv(path, CsvOptions(default_decimal_comma=True))
+    assert comma.decimal_unsure and comma.decimal_comma
+    assert summary(comma)[1] == ("Count", "Y", [1.234, 12.5])
+    preview = read_preview(path)
+    assert preview.decimal_unsure and not preview.decimal_comma
+
+
+def test_one_clear_cell_settles_the_ambiguous_ones(tmp_path: Path) -> None:
+    path = tmp_path / "settled.csv"
+    path.write_text("Name;Count\na;1,234\nb;0,5\n", encoding="utf-8")
+    data = read_csv(path)
+    assert data.decimal_comma and not data.decimal_unsure
+    assert summary(data)[1] == ("Count", "Y", [1.234, 0.5])
+
+
+def test_point_decimals_with_comma_thousands(tmp_path: Path) -> None:
+    path = tmp_path / "us.tsv"
+    path.write_text("Name\tValue\na\t1,234.5\nb\t2.25\n", encoding="utf-8")
+    data = read_csv(path)
+    assert not data.decimal_comma and not data.decimal_unsure
+    assert summary(data)[1] == ("Value", "Y", [1234.5, 2.25])
+
+
+def test_a_chosen_decimal_mark_overrides_detection(tmp_path: Path) -> None:
+    path = tmp_path / "chosen.csv"
+    path.write_text("A;B\n1,5;2\n", encoding="utf-8")
+    data = read_csv(path, CsvOptions(decimal_comma=False))
+    assert not data.decimal_comma and not data.decimal_unsure
+    assert summary(data)[0] == ("A", "Text", ["1,5"])

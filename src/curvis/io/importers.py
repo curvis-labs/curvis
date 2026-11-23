@@ -1,4 +1,4 @@
-"""CSV and TSV import: read a delimited text file into columns for a table.
+"""CSV, TSV and Excel import: read a delimited text file or a sheet into columns.
 
 Polars parses the file, with every cell read as text first. A column becomes a number
 column (role Y) when every non-empty cell is a number, and is kept as Text otherwise;
@@ -9,6 +9,11 @@ end of the file are dropped.
 The file is decoded once: UTF-8 (with or without a byte-order mark), UTF-16 with a
 byte-order mark, and otherwise Windows-1252, the encoding of "CSV" files that Excel
 saves on Windows. Nothing here uses Qt, so :func:`read_csv` can run in a worker process.
+
+The decimal mark is detected from the first data rows (those the preview shows), see
+:mod:`curvis.io.decimal_mark`. Excel workbooks (:mod:`curvis.io.excel`) go through
+the same options and rules; :func:`read_data` and :func:`read_preview` pick the reader
+from the file's extension.
 
 Row numbers (the header row, the row range, and rows named in messages) count records
 from the top of the file, starting at 1. A quoted field may hold a line break; it is
@@ -33,6 +38,7 @@ import numpy as np
 
 from curvis.data import Column, ColumnRole
 from curvis.data.names import next_column_names, unique_name
+from curvis.io.decimal_mark import DecimalGuess, detect, parse_numbers
 
 if TYPE_CHECKING:
     import polars as pl
@@ -76,8 +82,11 @@ class CsvOptions:
 
     ``delimiter`` ``None`` detects it. ``header_row`` is the row holding the column
     names (rows above it are skipped), or ``None`` when the file has no header and the
-    columns are named A, B, C, …. ``decimal_comma`` ``None`` means: on for a semicolon
-    delimiter, off otherwise. It never applies to a comma delimiter.
+    columns are named A, B, C, …. ``decimal_comma`` ``None`` detects the decimal mark,
+    falling back to ``default_decimal_comma`` (the Settings default) when the data does
+    not settle it. A decimal comma never applies to a comma delimiter. ``sheet`` is the
+    sheet of an Excel workbook (``None``: the first); it is ignored for text files, and
+    the delimiter is ignored for workbooks.
 
     Only rows ``first_row`` to ``last_row`` and columns ``first_column`` to
     ``last_column`` are imported (both ends included). ``first_row`` ``None`` starts at
@@ -93,6 +102,8 @@ class CsvOptions:
     last_row: int | None = None
     first_column: int = 1
     last_column: int | None = None
+    default_decimal_comma: bool = False
+    sheet: str | None = None
 
     def __post_init__(self) -> None:
         if self.delimiter is not None and self.delimiter not in DELIMITERS:
@@ -128,12 +139,18 @@ class CsvOptions:
 
 @dataclass(frozen=True)
 class CsvData:
-    """The columns read from a file, and the settings that were used."""
+    """The columns read from a file, and the settings that were used.
+
+    ``delimiter`` is ``None`` for an Excel sheet, and ``encoding`` is "Excel".
+    ``decimal_unsure`` is True when auto-detect could not tell the decimal mark and
+    used the default.
+    """
 
     columns: tuple[Column, ...]
-    delimiter: Delimiter
+    delimiter: Delimiter | None
     decimal_comma: bool
     encoding: str
+    decimal_unsure: bool = False
 
     @property
     def n_rows(self) -> int:
@@ -149,7 +166,8 @@ class CsvPreview:
     rows from the start of the row range; ``row_numbers`` gives each one's row number in
     the file. ``names`` and ``roles`` describe the columns the import would make,
     judged from the data rows shown; the first of them is column ``column_start`` of
-    the file (0-based).
+    the file (0-based). For an Excel workbook, ``sheets`` lists its sheets and
+    ``sheet`` is the one shown; ``delimiter`` is then ``None``.
     """
 
     rows: tuple[tuple[str, ...], ...]
@@ -158,10 +176,13 @@ class CsvPreview:
     column_start: int
     names: tuple[str, ...]
     roles: tuple[ColumnRole, ...]
-    delimiter: Delimiter
+    delimiter: Delimiter | None
     decimal_comma: bool
     encoding: str
     more_rows: bool
+    decimal_unsure: bool = False
+    sheets: tuple[str, ...] = ()
+    sheet: str | None = None
 
     @property
     def data_start(self) -> int:
@@ -173,16 +194,32 @@ class CsvPreview:
 
 # --- public API --------------------------------------------------------------------
 
+EXCEL_SUFFIXES = (".xlsx", ".xls")
+
+
+def is_excel(path: str | Path) -> bool:
+    """True for a file the Excel reader handles (by its extension)."""
+    return Path(path).suffix.lower() in EXCEL_SUFFIXES
+
+
+def read_data(path: str | Path, options: CsvOptions | None = None) -> CsvData:
+    """Read a CSV/TSV file or an Excel sheet, whichever ``path`` is."""
+    if is_excel(path):
+        from curvis.io.excel import read_excel
+
+        return read_excel(path, options)
+    return read_csv(path, options)
+
 
 def read_csv(path: str | Path, options: CsvOptions | None = None) -> CsvData:
     """Read the whole file at ``path``. Raises :class:`CsvImportError` with a message."""
     import polars as pl
 
     options = options or CsvOptions()
-    _check_ranges(options)
+    check_ranges(options)
     data = _read_bytes(path)
     text, encoding = _decode(data)
-    delimiter, decimal_comma = _resolve(text, options)
+    delimiter = _resolve(text, options)
     if delimiter == " ":
         text = _collapse_spaces(text)
         source = text.encode("utf-8")
@@ -218,15 +255,15 @@ def read_csv(path: str | Path, options: CsvOptions | None = None) -> CsvData:
     if options.header_row is not None:
         if frame.height == 0:
             count = _count_records(text, delimiter)
-            raise CsvImportError(_past_end_message(count, options.header_row))
+            raise CsvImportError(past_end_message(count, options.header_row))
         header: Sequence[str | None] = frame.row(0)
         if all(cell is None or not cell.strip() for cell in header):
-            raise CsvImportError(_empty_header_message(options.header_row))
+            raise CsvImportError(empty_header_message(options.header_row))
         frame = frame.slice(1)
     else:
         if options.first_row is not None and frame.height == 0:
             count = _count_records(text, delimiter)
-            raise CsvImportError(_row_past_end_message(options.first_row, count))
+            raise CsvImportError(row_past_end_message(options.first_row, count))
         if frame.width == 0 or frame.height == 0:
             raise CsvImportError("The file is empty.")
         header = ()
@@ -234,13 +271,14 @@ def read_csv(path: str | Path, options: CsvOptions | None = None) -> CsvData:
     offset = options.start_row - first_read  # rows between the header and the range
     if options.first_row is not None and offset >= frame.height:
         count = _count_records(text, delimiter)
-        raise CsvImportError(_row_past_end_message(options.first_row, count))
-    start, stop = _column_span(options, frame.width)
+        raise CsvImportError(row_past_end_message(options.first_row, count))
+    start, stop = column_span(options, frame.width)
     frame = frame.slice(offset).select(frame.columns[start:stop])
-    names = _column_names(header[start:stop], stop - start)
-    frame = _drop_trailing_empty_rows(frame)
-    columns = _typed_columns(frame, names, decimal_comma, options.first_column_is_x)
-    return CsvData(tuple(columns), delimiter, decimal_comma, encoding)
+    names = column_names(header[start:stop], stop - start)
+    guess = decide_decimal(options, delimiter, frame.head(PREVIEW_ROWS))
+    frame = drop_trailing_empty_rows(frame)
+    columns = typed_columns(frame, names, guess.comma, options.first_column_is_x)
+    return CsvData(tuple(columns), delimiter, guess.comma, encoding, guess.unsure)
 
 
 def read_preview(
@@ -250,19 +288,24 @@ def read_preview(
 
     Uses the same rules as :func:`read_csv`, applied to the rows shown, and raises the
     same :class:`CsvImportError` for those rows. The delimiter and encoding are judged
-    from the start of the file; only the rows up to the last one shown are read.
+    from the start of the file; only the rows up to the last one shown are read. An
+    Excel workbook is read by :func:`curvis.io.excel.read_excel_preview`.
     """
     import polars as pl
 
+    if is_excel(path):
+        from curvis.io.excel import read_excel_preview
+
+        return read_excel_preview(path, options, rows)
     options = options or CsvOptions()
-    _check_ranges(options)
+    check_ranges(options)
     with open(path, "rb") as file:
         data = file.read(_PREVIEW_BYTES + 1)
     complete = len(data) <= _PREVIEW_BYTES
     text, encoding = _decode(data[:_PREVIEW_BYTES], final=complete)
     if not complete and "\n" in text:
         text = text[: text.rindex("\n") + 1]  # drop the cut-off last line
-    delimiter, decimal_comma = _resolve(text, options)
+    delimiter = _resolve(text, options)
 
     head: list[tuple[str, ...]] = []  # rows above the header, and the header
     shown: list[tuple[int, tuple[str, ...]]] = []
@@ -290,29 +333,30 @@ def read_preview(
 
     if options.header_row is not None:
         if count < options.header_row:
-            raise CsvImportError(_past_end_message(count, options.header_row))
+            raise CsvImportError(past_end_message(count, options.header_row))
         header: Sequence[str] = head[options.skip_rows]
         if not any(cell.strip() for cell in header):
-            raise CsvImportError(_empty_header_message(options.header_row))
+            raise CsvImportError(empty_header_message(options.header_row))
     else:
         header = ()
     if options.first_row is not None and not shown and count < options.start_row:
-        raise CsvImportError(_row_past_end_message(options.first_row, count))
+        raise CsvImportError(row_past_end_message(options.first_row, count))
     if not width:
         raise CsvImportError("The file is empty.")
     for number, record in shown:
         if len(record) > width:
             raise CsvImportError(_ragged_message(number, len(record), width))
 
-    start, stop = _column_span(options, width)
+    start, stop = column_span(options, width)
     frame = pl.DataFrame(
         {str(i): [r[i] if i < len(r) else None for _, r in shown] for i in range(start, stop)},
         schema={str(i): pl.String for i in range(start, stop)},
     )
+    guess = decide_decimal(options, delimiter, frame)
     if not more_rows:
-        frame = _drop_trailing_empty_rows(frame)
-    names = _column_names(header[start:stop], stop - start)
-    columns = _typed_columns(frame, names, decimal_comma, options.first_column_is_x)
+        frame = drop_trailing_empty_rows(frame)
+    names = column_names(header[start:stop], stop - start)
+    columns = typed_columns(frame, names, guess.comma, options.first_column_is_x)
     return CsvPreview(
         rows=(*head, *(record for _, record in shown)),
         row_numbers=(*range(1, len(head) + 1), *(number for number, _ in shown)),
@@ -321,9 +365,10 @@ def read_preview(
         names=tuple(c.name for c in columns),
         roles=tuple(c.role for c in columns),
         delimiter=delimiter,
-        decimal_comma=decimal_comma,
+        decimal_comma=guess.comma,
         encoding=encoding,
         more_rows=more_rows,
+        decimal_unsure=guess.unsure,
     )
 
 
@@ -391,14 +436,35 @@ def _decode(data: bytes, final: bool = True) -> tuple[str, str]:
     raise CsvImportError("The file is not readable text. Save it as UTF-8 and try again.")
 
 
-def _resolve(text: str, options: CsvOptions) -> tuple[Delimiter, bool]:
-    """The delimiter and decimal-comma setting to use for ``text``."""
-    delimiter = options.delimiter or detect_delimiter(text, options.skip_rows)
+def _resolve(text: str, options: CsvOptions) -> Delimiter:
+    """The delimiter to use for ``text``."""
+    return options.delimiter or detect_delimiter(text, options.skip_rows)
+
+
+def decide_decimal(
+    options: CsvOptions,
+    delimiter: Delimiter | None,
+    sample: pl.DataFrame,
+    numbers: pl.DataFrame | None = None,
+) -> DecimalGuess:
+    """The decimal mark for the data rows in ``sample`` (text cells).
+
+    A comma delimiter always means a decimal point. Otherwise the chosen mark is used,
+    or, for auto-detect, the mark the text cells show. ``numbers`` (Excel) holds the
+    cells that are numbers already; they are left out of the detection.
+    """
     if delimiter == ",":
-        return delimiter, False
-    if options.decimal_comma is None:
-        return delimiter, delimiter == ";"
-    return delimiter, options.decimal_comma
+        return DecimalGuess(False, False)
+    if options.decimal_comma is not None:
+        return DecimalGuess(options.decimal_comma, False)
+    cells: list[str | None] = []
+    for i, column in enumerate(sample.get_columns()):
+        values = column.to_list()
+        if numbers is not None:
+            is_number = numbers.to_series(i).is_not_null().to_list()
+            values = [v for v, n in zip(values, is_number, strict=True) if not n]
+        cells.extend(values)
+    return detect(cells, options.default_decimal_comma)
 
 
 def _collapse_spaces(text: str) -> str:
@@ -433,7 +499,7 @@ def _file_records(path: str | Path, encoding: str, delimiter: Delimiter) -> Iter
         yield csv.reader(lines, delimiter=delimiter, quotechar='"')
 
 
-def _check_ranges(options: CsvOptions) -> None:
+def check_ranges(options: CsvOptions) -> None:
     """Refuse a row or column range that ends before it starts."""
     first, last = options.first_row, options.last_row
     if first is not None and last is not None and last < first:
@@ -447,7 +513,7 @@ def _check_ranges(options: CsvOptions) -> None:
         )
 
 
-def _column_span(options: CsvOptions, width: int) -> tuple[int, int]:
+def column_span(options: CsvOptions, width: int) -> tuple[int, int]:
     """The 0-based start and end of the column range in a file with ``width`` columns."""
     last = options.last_column or width
     if options.first_column > width or last > width:
@@ -466,15 +532,15 @@ def _ragged_message(row: int, fields: int, width: int) -> str:
     )
 
 
-def _empty_header_message(row: int) -> str:
+def empty_header_message(row: int) -> str:
     return f"Row {row} is empty. Choose the row that holds the column names."
 
 
-def _past_end_message(count: int, header_row: int) -> str:
+def past_end_message(count: int, header_row: int) -> str:
     return f"The file has only {count} rows, so row {header_row} cannot be the header."
 
 
-def _row_past_end_message(row: int, count: int) -> str:
+def row_past_end_message(row: int, count: int) -> str:
     return f"The file has only {count} rows, so there is no row {row}."
 
 
@@ -493,21 +559,21 @@ def _shape_error(text: str, delimiter: Delimiter, options: CsvOptions) -> CsvImp
                 break
             if width is None:
                 if options.header_row is not None and not any(c.strip() for c in record):
-                    return CsvImportError(_empty_header_message(number))
+                    return CsvImportError(empty_header_message(number))
                 width = len(record)
             elif number >= options.start_row and len(record) > width:
                 return CsvImportError(_ragged_message(number, len(record), width))
     except csv.Error as exc:
         return CsvImportError(f"The file could not be read: {exc}")
     if width is None and options.header_row is not None:
-        return CsvImportError(_past_end_message(number, options.header_row))
+        return CsvImportError(past_end_message(number, options.header_row))
     return None
 
 
 # --- columns -----------------------------------------------------------------------
 
 
-def _column_names(header: Sequence[str | None], width: int) -> list[str]:
+def column_names(header: Sequence[str | None], width: int) -> list[str]:
     """Names from the header cells: blanks become A, B, …, duplicates get " (2)"."""
     cells = [(cell or "").strip() for cell in header[:width]]
     cells += [""] * (width - len(cells))
@@ -519,7 +585,7 @@ def _column_names(header: Sequence[str | None], width: int) -> list[str]:
     return names
 
 
-def _drop_trailing_empty_rows(frame: pl.DataFrame) -> pl.DataFrame:
+def drop_trailing_empty_rows(frame: pl.DataFrame) -> pl.DataFrame:
     import polars as pl
 
     if frame.width == 0 or frame.height == 0:
@@ -533,26 +599,35 @@ def _drop_trailing_empty_rows(frame: pl.DataFrame) -> pl.DataFrame:
     return frame.head(int(last[-1]) + 1 if len(last) else 0)
 
 
-def _typed_columns(
-    frame: pl.DataFrame, names: Sequence[str], decimal_comma: bool, first_column_is_x: bool
+def typed_columns(
+    frame: pl.DataFrame,
+    names: Sequence[str],
+    decimal_comma: bool,
+    first_column_is_x: bool,
+    numbers: pl.DataFrame | None = None,
 ) -> list[Column]:
-    """Columns from text cells: number columns (Y, or the first one X) and Text columns."""
+    """Columns from text cells: number columns (Y, or the first one X) and Text columns.
+
+    ``numbers`` (Excel) has the same shape as ``frame`` and holds the cells that are
+    numbers already (null elsewhere); they are used as they are, never re-read as text.
+    """
     import polars as pl
 
     columns: list[Column] = []
     want_x = first_column_is_x
-    for name, cells in zip(names, frame.get_columns(), strict=True):
+    for i, (name, cells) in enumerate(zip(names, frame.get_columns(), strict=True)):
         cells = cells.str.strip_chars()
         missing = cells.is_null() | cells.is_in(list(MISSING_NUMBERS))
-        number_text = cells.str.replace_all(",", ".", literal=True) if decimal_comma else cells
-        numbers = number_text.cast(pl.Float64, strict=False)
-        if (numbers.is_null() & ~missing).any():
+        parsed = parse_numbers(cells, decimal_comma)
+        if numbers is not None:
+            parsed = pl.select(pl.coalesce(numbers.to_series(i), parsed)).to_series()
+        if (parsed.is_null() & ~missing).any():
             values = np.empty(len(cells), dtype=object)
             values[:] = [cell or None for cell in cells.to_list()]
             columns.append(Column(name, ColumnRole.TEXT, values))
         else:
             role = ColumnRole.X if want_x else ColumnRole.Y
             want_x = False
-            values = numbers.fill_null(np.nan).to_numpy().astype(np.float64, copy=True)
+            values = parsed.fill_null(np.nan).to_numpy().astype(np.float64, copy=True)
             columns.append(Column(name, role, values))
     return columns
