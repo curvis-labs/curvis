@@ -17,6 +17,7 @@ from curvis.ui.main_window import MainWindow
 from tests.ui.conftest import Prompts
 
 DATA = Path(__file__).parents[1] / "data" / "csv"
+EXCEL = Path(__file__).parents[1] / "data" / "excel"
 
 
 @pytest.fixture
@@ -105,18 +106,15 @@ def test_no_header_names_columns_by_letter(qtbot: QtBot, scheduler: Scheduler) -
     assert dialog.model.rowCount() == 2
 
 
-def test_decimal_comma_follows_the_delimiter_until_chosen(
-    qtbot: QtBot, scheduler: Scheduler
-) -> None:
+def test_decimal_mark_is_detected_and_can_be_chosen(qtbot: QtBot, scheduler: Scheduler) -> None:
     dialog = open_dialog(qtbot, scheduler, "semicolon_decimal_comma.csv")
-    assert dialog.decimal_comma.isChecked()
-    assert dialog.decimal_comma.isEnabled()
+    assert dialog.decimal_mark.currentData() is None
+    assert dialog.decimal_mark.itemText(0) == "Auto-detect (comma)"
+    assert dialog.decimal_mark.isEnabled()
     assert header(dialog, 1) == "Wert\nY"
     assert "decimal comma" in dialog.status.text()
 
-    dialog.advanced_toggle.click()
-    assert not dialog.advanced.isHidden()
-    dialog.decimal_comma.click()  # untick
+    dialog.decimal_mark.setCurrentIndex(dialog.decimal_mark.findData(False))  # point
     wait_preview(qtbot, dialog)
     assert dialog.options().decimal_comma is False
     assert header(dialog, 1) == "Wert\nText"
@@ -124,7 +122,50 @@ def test_decimal_comma_follows_the_delimiter_until_chosen(
     dialog.delimiter.setCurrentIndex(dialog.delimiter.findData(","))
     wait_preview(qtbot, dialog)
     assert dialog.options().decimal_comma is None
-    assert not dialog.decimal_comma.isEnabled()
+    assert not dialog.decimal_mark.isEnabled()
+
+
+def test_unsure_decimal_mark_uses_the_settings_default_and_says_so(
+    qtbot: QtBot, scheduler: Scheduler, tmp_path: Path
+) -> None:
+    path = tmp_path / "thousands.csv"
+    path.write_text("Name;Value\na;1,234\nb;5,678\n", encoding="utf-8")
+    dialog = ImportDialog(path, scheduler, default_decimal_comma=True)
+    qtbot.addWidget(dialog)
+    wait_preview(qtbot, dialog)
+    assert dialog.options().default_decimal_comma
+    assert dialog.decimal_mark.itemText(0) == "Auto-detect (comma)"
+    assert "does not show the decimal mark" in dialog.status.text()
+    assert dialog.model.index(0, 1).data() == "1,234"
+
+
+def test_excel_shows_a_sheet_picker_instead_of_the_delimiter(
+    qtbot: QtBot, scheduler: Scheduler
+) -> None:
+    dialog = ImportDialog(EXCEL / "basic.xlsx", scheduler)
+    qtbot.addWidget(dialog)
+    wait_preview(qtbot, dialog)
+    assert dialog.delimiter.isHidden()
+    assert not dialog.sheet.isHidden()
+    assert [dialog.sheet.itemText(i) for i in range(dialog.sheet.count())] == [
+        "Results",
+        "Plate 2",
+        "Empty",
+    ]
+    assert header(dialog, 0) == "Dose\nY"
+    assert dialog.status.text() == "Sheet 'Results', 3 columns, 3 rows."
+
+    dialog.sheet.setCurrentText("Plate 2")
+    dialog.header_row.setValue(3)
+    wait_preview(qtbot, dialog)
+    assert dialog.options().sheet == "Plate 2"
+    assert header(dialog, 1) == "OD\nY"
+    assert dialog.model.index(3, 1).data() == "1e-09"
+
+    dialog.sheet.setCurrentText("Empty")
+    wait_preview(qtbot, dialog)
+    assert dialog.error == "The sheet 'Empty' is empty."
+    assert not dialog.ok_button.isEnabled()
 
 
 def test_unreadable_file_shows_the_message_and_disables_import(
@@ -315,3 +356,17 @@ def test_import_is_in_the_file_menu_and_command_palette(window: MainWindow) -> N
     action = window.registry.action("file.import")
     assert action.shortcut().toString() == "Ctrl+Shift+I"
     assert any(entry.id == "file.import" for entry in window.registry.entries())
+
+
+def test_import_reads_an_excel_sheet(qtbot: QtBot, window: MainWindow) -> None:
+    window.start_import(EXCEL / "basic.xls", CsvOptions(sheet="Plate 2", header_row=3))
+    wait_import(qtbot, window)
+    tab = window.current_tab
+    assert tab is not None
+    table = tab.document.tables[0]
+    assert [(c.name, c.role) for c in table.columns][:3] == [
+        ("Well", ColumnRole.TEXT),
+        ("OD", ColumnRole.Y),
+        ("Time", ColumnRole.Y),
+    ]
+    assert table.columns[2].values.tolist() == [0.0, 5.0, 10.0]
