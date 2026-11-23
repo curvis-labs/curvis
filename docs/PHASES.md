@@ -7,7 +7,7 @@ Curvis is built in 5 phases and 30 steps. Each step is one Claude Code session t
 | 0 Foundations | 0.1–0.5 | App starts on Windows, macOS and Linux from CI-built installers |
 | 1 Data tables | 1.1–1.6 | You can type, paste, import and calculate data comfortably; dialogs follow one design |
 | 2 Core analyses + MVP | 2.1–2.9 | MVP beta: core tests match R, speed targets met |
-| 3 Full outline | 3.1–3.7 | Every feature in SPEC.md works |
+| 3 Full outline | 3.1–3.8 | Every feature in SPEC.md works |
 | 4 Release 1.0 | 4.1–4.3 | Validation report published, 1.0 installers released |
 
 ## How to use this file

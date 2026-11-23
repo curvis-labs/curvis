@@ -28,6 +28,8 @@ from curvis.ui.settings_dialog import SettingsDialog
 from curvis.ui.table.bulk_rename import BulkRenameDialog
 
 CSV = Path(__file__).parents[1] / "data" / "csv" / "plate_reader.csv"
+EXCEL = Path(__file__).parents[1] / "data" / "excel" / "basic.xlsx"
+PRISM = Path(__file__).parents[1] / "data" / "prism" / "2025-03-21 Analysis, LacY-GFP, ONPG.prism"
 
 
 @dataclass
@@ -208,6 +210,16 @@ def _import(ctx: Context) -> QDialog:
     dialog = ImportDialog(CSV, ctx.scheduler)
     dialog.header_row.setValue(3)
     return dialog
+
+
+def _import_excel(ctx: Context) -> QDialog:
+    return ImportDialog(EXCEL, ctx.scheduler)
+
+
+def _import_prism(ctx: Context) -> QDialog:
+    from curvis.ui.prism_import_dialog import PrismImportDialog
+
+    return PrismImportDialog(PRISM, ctx.scheduler)
 
 
 def _bulk_rename(ctx: Context) -> QDialog:
@@ -411,6 +423,8 @@ def _crash(_ctx: Context) -> QDialog:
 
 SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "import": _import,
+    "import_excel": _import_excel,
+    "import_prism": _import_prism,
     "bulk_rename": _bulk_rename,
     "bulk_rename_numbered": _bulk_rename_numbered,
     "calculate": _calculate,

@@ -108,6 +108,7 @@ class Settings(QObject):
 
     THEME = "appearance/theme"
     DECIMAL_PLACES = "tables/decimal_places"
+    IMPORT_DECIMAL_COMMA = "tables/import_decimal_comma"
     RECENT = "projects/recent"
     GLOBAL_CONSTANTS = "formulas/global_constants"
     RECENT_ANALYSES = "analyses/recent"
@@ -125,6 +126,7 @@ class Settings(QObject):
     RESET_KEYS = (
         THEME,
         DECIMAL_PLACES,
+        IMPORT_DECIMAL_COMMA,
         CRASH_LOG,
         GRAPH_PALETTE,
         GRAPH_SIZE,
@@ -182,6 +184,19 @@ class Settings(QObject):
                 f"Decimal places must be between {DECIMAL_PLACES_MIN} and {DECIMAL_PLACES_MAX}."
             )
         self._set(self.DECIMAL_PLACES, int(places))
+
+    # --- import decimal mark ----------------------------------------------------
+
+    @property
+    def import_decimal_comma(self) -> bool:
+        """The default decimal mark for import: a comma (True) or a point (False, the
+        default). Auto-detect falls back to it when the data does not settle it."""
+        value = self._store.value(self.IMPORT_DECIMAL_COMMA, False)
+        return str(value).lower() in ("true", "1")
+
+    @import_decimal_comma.setter
+    def import_decimal_comma(self, comma: bool) -> None:
+        self._set(self.IMPORT_DECIMAL_COMMA, bool(comma))
 
     # --- crash log -----------------------------------------------------------------
 

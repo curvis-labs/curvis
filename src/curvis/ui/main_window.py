@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import functools
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import numpy as np
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import (
     QAction,
@@ -53,7 +54,11 @@ if TYPE_CHECKING:
 
 PROJECT_SUFFIX = ".cvp"
 PROJECT_FILTER = "Curvis projects (*.cvp)"
-IMPORT_FILTER = "Text data (*.csv *.tsv *.txt);;All files (*)"
+IMPORT_FILTER = (
+    "Data files (*.csv *.tsv *.txt *.xlsx *.xls *.pzfx *.prism);;"
+    "Text data (*.csv *.tsv *.txt);;Excel workbooks (*.xlsx *.xls);;"
+    "Prism files (*.pzfx *.prism);;All files (*)"
+)
 
 STATUS_MESSAGE_MS = 6000
 """How long a note such as a refused edit stays in the status bar."""
@@ -767,14 +772,25 @@ class MainWindow(QMainWindow):
     # --- import ---------------------------------------------------------------------
 
     def import_data(self) -> None:
-        """Ask for a CSV or TSV file, show the Import dialog, then import the file."""
+        """Ask for a file, show the Import dialog, then import the file.
+
+        CSV, TSV and Excel files go through the Import dialog; Prism files through the
+        Prism import dialog, which adds their data tables as new tables.
+        """
         path = self._ask_import_path()
         if path is None:
+            return
+        from curvis.io.prism import is_prism
+
+        if is_prism(path):
+            self.import_prism(path)
             return
         from curvis.ui.import_dialog import ImportDialog
 
         self.scheduler.start_process_pool()  # warm up the workers while the dialog is open
-        dialog = ImportDialog(path, self.scheduler, self)
+        dialog = ImportDialog(
+            path, self.scheduler, self, default_decimal_comma=self.settings.import_decimal_comma
+        )
         try:
             if self._exec_import_dialog(dialog):
                 self.start_import(path, dialog.options())
@@ -788,14 +804,14 @@ class MainWindow(QMainWindow):
         otherwise, as one undo step. Without an open project, a new one is made.
         """
         from curvis.compute import Job
-        from curvis.io.importers import read_csv
+        from curvis.io.importers import read_data
 
         node = f"import:{_file_key(path)}"
         tab = self.current_tab
         table_id = tab.current_table_id if tab is not None else None
         self._pending_imports[node] = (path, tab, table_id)
         self._show_status(f"Importing {path.name}…")
-        job = Job(read_csv, (str(path), options))
+        job = Job(read_data, (str(path), options))
         self.scheduler.submit(node, job, weight="heavy", delay_ms=0)
 
     def _finish_import(
@@ -835,6 +851,57 @@ class MainWindow(QMainWindow):
         self._show_status(
             f"Imported {rows} and {columns} column{'s' if columns != 1 else ''} "
             f"from {path.name} into {into}."
+        )
+
+    def import_prism(self, path: Path) -> None:
+        """Show the Prism import dialog for ``path``, then add the tables picked."""
+        from curvis.ui.prism_import_dialog import PrismImportDialog
+
+        dialog = PrismImportDialog(path, self.scheduler, self)
+        try:
+            if self._exec_import_dialog(dialog):
+                self.add_imported_tables(path, [t.table for t in dialog.chosen()])
+        finally:
+            dialog.deleteLater()
+
+    def add_imported_tables(self, path: Path, tables: Sequence[Table]) -> None:
+        """Add ``tables`` (from a Prism file) after the selected table, as one undo step.
+
+        A selected table that is still blank (no values, analyses or graphs) is replaced.
+        Names that are taken get " (2)", " (3)", …. Without an open project, a new one
+        is made.
+        """
+        from curvis.core import AddTable, CommandError, CommandGroup, RemoveTable
+        from curvis.data.names import unique_name
+
+        if not tables:
+            return
+        tab = self.current_tab
+        if tab is None:
+            tab = self.new_document()
+        document = tab.document
+        current = tab.current_table_id
+        index = document.table_index(current) + 1 if current is not None else None
+        taken = [t.name for t in document.tables]
+        commands: list[Command] = []
+        for offset, table in enumerate(tables):
+            table.name = unique_name(table.name, taken)
+            taken.append(table.name)
+            at = None if index is None else index + offset
+            commands.append(AddTable(table, at))
+        if current is not None and _is_blank_table(document, current):
+            commands.append(RemoveTable(current))
+        try:
+            document.execute(CommandGroup(f"Import '{path.name}'", commands))
+        except CommandError as exc:
+            self._show_error("Cannot import data", f"'{path.name}' could not be imported.\n\n{exc}")
+            return
+        self.tabs.setCurrentWidget(tab)
+        tab.select_table(tables[0].id)
+        count = len(tables)
+        self._show_status(
+            f"Imported {count} table{'s' if count != 1 else ''} from {path.name}. "
+            "Analyses and graphs are not imported."
         )
 
     def save_current(self) -> bool:
@@ -1203,6 +1270,26 @@ class MainWindow(QMainWindow):
 
     def _show_error(self, title: str, message: str) -> None:
         QMessageBox.warning(self, title, message)
+
+
+def _is_blank_table(document: Document, table_id: str) -> bool:
+    """True for a table with no values, groups, calculated columns, analyses or graphs."""
+    table = document.table(table_id)
+    if table.replicate_groups or table.category_groups:
+        return False
+    if any(a.table_id == table_id for a in document.analyses):
+        return False
+    if any(g.table_id == table_id for g in document.graphs):
+        return False
+    for column in table.columns:
+        if document.is_calculated(column.id):
+            return False
+        if column.role.is_numeric:
+            if not np.isnan(column.values).all():
+                return False
+        elif any(v not in (None, "") for v in column.values):
+            return False
+    return True
 
 
 def _load_project(path: str) -> Document:

@@ -69,6 +69,8 @@ NO_MNEMONIC_NEEDED = {"Set role A", "Set role B"}
 
 WORKBENCH = {
     "import",
+    "import_excel",
+    "import_prism",
     "calculate",
     "calculate_paired",
     "calculate_custom",

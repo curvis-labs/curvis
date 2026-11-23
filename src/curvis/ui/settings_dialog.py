@@ -121,11 +121,21 @@ class SettingsDialog(QDialog):
         self.decimal_places.setRange(DECIMAL_PLACES_MIN, DECIMAL_PLACES_MAX)
         self.decimal_places.setToolTip("Number of decimal places shown in calculated columns.")
         self.decimal_places.setMaximumWidth(FIELD_WIDTH)
+        self.import_decimal = QComboBox(page)
+        self.import_decimal.addItem("Point (1.5)", False)
+        self.import_decimal.addItem("Comma (1,5)", True)
+        self.import_decimal.setToolTip(
+            "Used on import when auto-detect cannot tell the decimal mark from the data."
+        )
+        self.import_decimal.setMaximumWidth(FIELD_WIDTH * 2)
         form = form_layout()
         form.addRow(buddy_label("&Theme", self.theme), self.theme)
         form.addRow(
             buddy_label("&Decimal places in calculated columns", self.decimal_places),
             self.decimal_places,
+        )
+        form.addRow(
+            buddy_label("Decimal &mark for import", self.import_decimal), self.import_decimal
         )
         self.clear_recent_button = QPushButton("C&lear recent projects…", page)
         self.clear_recent_button.clicked.connect(self.clear_recent_projects)
@@ -229,6 +239,7 @@ class SettingsDialog(QDialog):
         s = self._settings
         self.theme.setCurrentIndex(self.theme.findData(s.theme))
         self.decimal_places.setValue(s.decimal_places)
+        self.import_decimal.setCurrentIndex(self.import_decimal.findData(s.import_decimal_comma))
         self.crash_log.setChecked(s.crash_log)
         self._palettes = s.palettes
         self._palette = s.graph_palette
@@ -364,6 +375,8 @@ class SettingsDialog(QDialog):
             s.theme = theme
         if self.decimal_places.value() != s.decimal_places:
             s.decimal_places = self.decimal_places.value()
+        if bool(self.import_decimal.currentData()) != s.import_decimal_comma:
+            s.import_decimal_comma = bool(self.import_decimal.currentData())
         if self.crash_log.isChecked() != s.crash_log:
             s.crash_log = self.crash_log.isChecked()
         if self._palettes != s.palettes:
