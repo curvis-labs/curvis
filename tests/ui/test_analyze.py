@@ -113,7 +113,7 @@ def means(tab: DocumentTab) -> list[str]:
 def test_only_supported_families_and_analyses_are_shown(qtbot: QtBot) -> None:
     dialog = dialog_for(qtbot, doc_with(Column.new("a", "Y", [1, 2])))
     assert tab_names(dialog) == ["Compare groups"]
-    assert list(dialog.radios) == [DESCRIPTIVE]
+    assert dialog.listed_types() == [DESCRIPTIVE]
     assert dialog.analysis_type is not None and dialog.analysis_type.id == DESCRIPTIVE
 
 
@@ -125,7 +125,7 @@ def test_it_opens_on_curve_fits_for_xy_data(qtbot: QtBot) -> None:
     first_fit = base.runnable(dialog.table, Family.FIT)[0]
     assert dialog.analysis_type is not None and dialog.analysis_type.id == first_fit.id
     assert first_fit.id == "linear_regression"
-    assert FakeSurvival.id not in dialog.radios  # the table has no time/event pair
+    assert FakeSurvival.id not in dialog.listed_types()  # the table has no time/event pair
     assert dialog.family_description.text() == Family.FIT.description
 
 
@@ -207,10 +207,10 @@ def test_options_have_defaults_and_a_closed_advanced_section(qtbot: QtBot) -> No
     assert "95% CI" not in dialog.summary.text()
 
 
-def test_recently_used_analyses_are_marked(qtbot: QtBot) -> None:
+def test_recently_used_analyses_are_listed_on_top(qtbot: QtBot) -> None:
     doc = doc_with(Column.new("a", "Y", [1, 2]))
-    assert DESCRIPTIVE not in dialog_for(qtbot, doc).badges
-    assert DESCRIPTIVE in dialog_for(qtbot, doc, recent=[DESCRIPTIVE]).badges
+    assert dialog_for(qtbot, doc).recent_types() == []
+    assert dialog_for(qtbot, doc, recent=[DESCRIPTIVE]).recent_types() == [DESCRIPTIVE]
 
 
 def toggle_ci(dialog: AnalyzeDialog) -> None:

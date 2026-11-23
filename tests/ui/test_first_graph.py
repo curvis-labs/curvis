@@ -55,7 +55,7 @@ def test_csv_to_an_exported_dose_response_graph(
     # 3. Analyze: choose Hill 4PL and click Run; 4. Export: OK on PNG at 300 dpi.
     def run_dialog(self: DocumentTab, dialog: QDialog) -> int:
         if isinstance(dialog, AnalyzeDialog):
-            dialog.radios["hill_4pl"].setChecked(True)
+            dialog.set_analysis_type("hill_4pl")
         assert isinstance(dialog, AnalyzeDialog | ExportDialog)
         return QDialog.DialogCode.Accepted.value
 

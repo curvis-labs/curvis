@@ -28,7 +28,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
-from scipy import stats
 
 from curvis.analysis.fit.engine import Constraints, FitModel, NonlinearFit, fit_model
 from curvis.analysis.fit.points import Points, XRange, fit_points
@@ -85,6 +84,8 @@ def derived_value(fit: NonlinearFit, d: Derived) -> DerivedValue | None:
             return DerivedValue(value, nan, nan, nan)
         cf = c[free]
         se = math.sqrt(max(float(cf @ fit.cov @ cf), 0.0))
+        from scipy import stats  # lazy: the sketches use the models
+
         q = float(stats.t.ppf(0.5 + fit.confidence / 2, fit.df))
         return DerivedValue(value, se, value - q * se, value + q * se)
     assert d.transform is not None

@@ -24,7 +24,7 @@ def survival_doc() -> Document:
 def test_the_dialog_opens_on_survival_with_every_pair_ticked(qtbot: QtBot) -> None:
     dialog = dialog_for(qtbot, survival_doc())
     assert tab_names(dialog) == ["Survival"]
-    assert list(dialog.radios) == ["kaplan_meier"]
+    assert dialog.listed_types() == ["kaplan_meier"]
     analysis = dialog.analysis()
     assert analysis.type == "kaplan_meier" and analysis.inputs == ("d", "p")
     assert "survival curves of Drug, Placebo" in dialog.summary.text()

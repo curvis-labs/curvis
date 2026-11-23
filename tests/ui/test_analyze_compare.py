@@ -42,11 +42,11 @@ def choose(box: QComboBox, data: str) -> None:
 
 def test_the_comparisons_are_offered_for_two_or_more_series(qtbot: QtBot) -> None:
     dialog = dialog_for(qtbot, three_groups())
-    assert list(dialog.radios) == [
+    assert dialog.listed_types() == [  # in sections: Describe, Two groups, Three or more
         "descriptive_statistics",
         "t_test",
-        ANOVA,
         "mann_whitney",
+        ANOVA,
         KRUSKAL,
     ]
 
@@ -199,7 +199,7 @@ def test_two_way_lists_the_series_with_their_category(qtbot: QtBot) -> None:
 
     dialog = AnalyzeDialog(two_way_document(), "t")
     qtbot.addWidget(dialog)
-    assert "two_way_anova" in dialog.radios
+    assert "two_way_anova" in dialog.listed_types()
     dialog.set_analysis_type("two_way_anova")
     tree = dialog.tree
     names = [tree.topLevelItem(i).text(0) for i in range(tree.topLevelItemCount())]

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from curvis.analysis.base import (
+    About,
     AnalysisError,
     AnalysisInputs,
     AnalysisType,
@@ -50,6 +51,11 @@ class DescriptiveStatistics(AnalysisType):
     label = "D&escriptive statistics"
     method = METHOD
     family = Family.COMPARE
+    section = "Describe"
+    about = About(
+        "mean, SD, SEM, CI",
+        "Use when you want to summarise each group, or each row of replicates, before testing.",
+    )
     params_type = DescriptiveParams
     uses_x = True
     imports = ("scipy.special",)

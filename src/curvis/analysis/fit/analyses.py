@@ -16,13 +16,14 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
 
 from curvis.analysis.base import (
+    About,
     AnalysisError,
     AnalysisInputs,
     AnalysisType,
@@ -32,6 +33,14 @@ from curvis.analysis.base import (
     register,
     rows_match_x,
     series_choices,
+)
+from curvis.analysis.fit.sketch import (
+    FloatArray,
+    Marker,
+    Sketch,
+    SketchData,
+    compute,
+    half_time,
 )
 from curvis.analysis.result import Cell, FittedCurve, Kind, Result, ResultColumn, ResultTable
 from curvis.data import Table
@@ -82,7 +91,8 @@ def parse_number(text: str, what: str) -> float | None:
 
 @dataclass(frozen=True)
 class FitParams(Params):
-    x_range: str = param("", "Fit only &X from … to … (empty: all)", advanced=True)
+    x_range: str = param("", "Fit only &X from", editor="x_range")
+    """Written "low to high"; the dialog edits it as two number fields."""
 
 
 RANGE_SEPARATOR = re.compile(r"\s*(?:\bto\b|…|\.\.|;)\s*", re.IGNORECASE)
@@ -122,12 +132,13 @@ class PolynomialParams(FitParams):
 @dataclass(frozen=True)
 class Hill3Params(FitParams):
     x_is_log: bool = param(False, "X values are lo&g10(concentration)")
-    fixed: str = param("", "&Fix parameters (e.g. top = 100)", advanced=True)
+    fixed: str = param("", "&Fix parameters", advanced=True, editor="fixed")
+    """Written "name = value, …"; the dialog edits it as a table of the parameters."""
 
 
 @dataclass(frozen=True)
 class Hill4Params(Hill3Params):
-    fixed: str = param("", "&Fix parameters (e.g. bottom = 0)", advanced=True)
+    pass
 
 
 # --- shared --------------------------------------------------------------------------------
@@ -135,6 +146,24 @@ class Hill4Params(Hill3Params):
 
 def _int(value: int) -> str:
     return str(value)
+
+
+def _zero(_values: Mapping[str, float]) -> float:
+    return 0.0
+
+
+def polynomial_sketch(degree: int) -> Sketch:
+    """Example coefficients for a polynomial of ``degree`` on 0 to 10: 1 − X + 0.2 X² for
+    degree 2; for a higher degree, roots spread evenly over 1 to 9, scaled so that the
+    largest |Y| is 10."""
+    if degree == 2:
+        values = {"b0": 1.0, "b1": -1.0, "b2": 0.2}
+    else:
+        coefficients = np.poly(np.linspace(1.0, 9.0, degree))  # highest power first
+        x = np.linspace(0.0, 10.0, 101)
+        scale = 10.0 / float(np.max(np.abs(np.polyval(coefficients, x))))
+        values = {f"b{degree - i}": float(c * scale) for i, c in enumerate(coefficients)}
+    return Sketch(values, (0.0, 10.0))
 
 
 class CurveFit(AnalysisType):
@@ -166,6 +195,74 @@ class CurveFit(AnalysisType):
 
     def fixed_values(self, params: Params) -> dict[str, float]:
         return {}
+
+    # --- About this analysis: the equation, the sketch and the points used -------------
+
+    equation: ClassVar[str] = ""
+    """The model in the formula language ("Y = …", parameters as names); the Analyze
+    dialog renders it (:mod:`curvis.formula.display`), and a test checks that it is the
+    model :meth:`curve` evaluates."""
+    equation_note: ClassVar[str] = ""
+    """A line under the equation (e.g. what X is)."""
+    sketch: ClassVar[Sketch | None] = None
+
+    def equation_for(self, params: Params) -> str:
+        return self.equation
+
+    def sketch_for(self, params: Params) -> Sketch | None:
+        return self.sketch
+
+    def parameters(self, params: Params) -> list[tuple[str, str]]:
+        """The parameters that can be fixed, as (name, display name), in model order."""
+        return []
+
+    def curve(self, x: FloatArray, values: Mapping[str, float], params: Params) -> FloatArray:
+        """The model's own function at ``x`` for parameter ``values`` (by name)."""
+        raise NotImplementedError
+
+    def sketch_data(self, params: Params) -> SketchData | None:
+        """The sketch for ``params``: fixed values replace their example values."""
+        sketch = self.sketch_for(params)
+        if sketch is None:
+            return None
+        try:
+            fixed = self.fixed_values(params)
+        except AnalysisError:
+            fixed = {}
+        labels = dict(self.parameters(params))
+        return compute(sketch, lambda x, v: self.curve(x, v, params), fixed, labels)
+
+    def points(
+        self, x: FloatArray, columns: Sequence[FloatArray], params: Params, xr: XRange
+    ) -> Points:
+        """The points the fit uses (as :meth:`run` makes them)."""
+        return fit_points(x, list(columns), xr)
+
+    def point_count(
+        self, table: Table, inputs: Sequence[str], params: Params
+    ) -> tuple[int, int] | None:
+        """(points used, points with values) of the ticked series, or None when the X
+        range cannot be read."""
+        from curvis.analysis.base import x_column_id
+        from curvis.analysis.fit.points import XRange
+
+        x_id = x_column_id(table)
+        assert isinstance(params, FitParams)
+        try:
+            xr = x_range(params)
+        except AnalysisError:
+            return None
+        if x_id is None:
+            return (0, 0)
+        x = np.asarray(table.column(x_id).values, dtype=np.float64)
+        columns = [
+            np.asarray(table.column(c).values, dtype=np.float64)
+            for choice in self.selected(table, inputs)
+            for c in choice.column_ids
+        ]
+        if not columns:
+            return (0, 0)
+        return self.points(x, columns, params, xr).n, self.points(x, columns, params, XRange()).n
 
     def describe(self, table: Table, inputs: Sequence[str], params: Params) -> str:
         from curvis.analysis.descriptive import name_list
@@ -316,6 +413,17 @@ class LinearRegression(CurveFit):
     params_type = LinearParams
     what = "a straight line"
     reports = "slope, Y-intercept and R²"
+    section = "Linear"
+    about = About(
+        "slope, intercept, R²", "Use when Y changes in proportion to X, along a straight line."
+    )
+    equation = "Y = Slope*X + Intercept"
+    sketch = Sketch(
+        {"slope": 1.0, "intercept": 1.0}, (0.0, 10.0), (Marker("point", "Intercept", "", _zero),)
+    )
+
+    def curve(self, x: FloatArray, values: Mapping[str, float], params: Params) -> FloatArray:
+        return values["slope"] * x + values["intercept"]
 
     @staticmethod
     def run(inputs: AnalysisInputs, params: LinearParams) -> Result:
@@ -328,6 +436,28 @@ class PolynomialRegression(CurveFit):
     method = "Polynomial regression (least squares)"
     params_type = PolynomialParams
     reports = "the coefficients and R²"
+    section = "Linear"
+    about = About(
+        "degree 2–6",
+        "Use when the points follow a smooth curve with no known model, such as a calibration "
+        "curve. The coefficients rarely have a physical meaning.",
+    )
+
+    def equation_for(self, params: Params) -> str:
+        assert isinstance(params, PolynomialParams)
+        terms = ["B0", "B1*X"] + [f"B{i}*X^{i}" for i in range(2, params.degree + 1)]
+        return "Y = " + " + ".join(terms)
+
+    def sketch_for(self, params: Params) -> Sketch:
+        assert isinstance(params, PolynomialParams)
+        return polynomial_sketch(params.degree)
+
+    def curve(self, x: FloatArray, values: Mapping[str, float], params: Params) -> FloatArray:
+        assert isinstance(params, PolynomialParams)
+        y = np.zeros_like(x)
+        for i in range(params.degree, -1, -1):
+            y = y * x + values[f"b{i}"]
+        return y
 
     def describe(self, table: Table, inputs: Sequence[str], params: Params) -> str:
         assert isinstance(params, PolynomialParams)
@@ -496,6 +626,23 @@ def _logistic_fixed(params: Hill3Params) -> dict[str, float]:
     return fixed
 
 
+LOG_X_NOTE = "where X is log10(concentration)"
+
+
+def _log_ec50(values: Mapping[str, float]) -> float:
+    return values["log_ec50"]
+
+
+def _center(values: Mapping[str, float]) -> float:
+    return values["center"]
+
+
+def _logistic(x: FloatArray, values: Mapping[str, float]) -> FloatArray:
+    from curvis.analysis.fit.dose_response import LOGISTIC, PARAMETERS
+
+    return LOGISTIC.f(x, np.array([values[p] for p in PARAMETERS]))
+
+
 class Hill4(CurveFit):
     id = "hill_4pl"
     label = "Hill &4PL (variable slope)"
@@ -503,6 +650,40 @@ class Hill4(CurveFit):
     params_type = Hill4Params
     what = "a 4PL (Hill) curve"
     reports = "bottom, top, EC50 and Hill slope"
+    section = "Dose-response"
+    about = About(
+        "EC50, Hill slope, top, bottom",
+        "Use when the response rises or falls between two plateaus as log dose increases.",
+    )
+    equation = "Y = Bottom + (Top - Bottom) / (1 + 10^((LogEC50 - X)*HillSlope))"
+    equation_note = LOG_X_NOTE
+    sketch = Sketch(
+        {"bottom": 0.0, "top": 100.0, "log_ec50": -7.0, "hill_slope": 1.0},
+        (-10.0, -4.0),
+        (
+            Marker("h", "Top", "top"),
+            Marker("h", "Bottom", "bottom"),
+            Marker("v", "EC50", "log_ec50"),
+            Marker("label", "Hill slope: steepness at EC50", "hill_slope", _log_ec50),
+        ),
+        follow=("log_ec50",),
+    )
+
+    def parameters(self, params: Params) -> list[tuple[str, str]]:
+        from curvis.analysis.fit.dose_response import LABELS, PARAMETERS
+
+        return [(p, LABELS[p]) for p in PARAMETERS]
+
+    def curve(self, x: FloatArray, values: Mapping[str, float], params: Params) -> FloatArray:
+        return _logistic(x, values)
+
+    def points(
+        self, x: FloatArray, columns: Sequence[FloatArray], params: Params, xr: XRange
+    ) -> Points:
+        from curvis.analysis.fit.dose_response import dose_response_points
+
+        assert isinstance(params, Hill3Params)
+        return dose_response_points(x, list(columns), params.x_is_log, xr)
 
     def fixed_values(self, params: Params) -> dict[str, float]:
         assert isinstance(params, Hill3Params)
@@ -520,6 +701,40 @@ class Hill3(CurveFit):
     params_type = Hill3Params
     what = "a 3PL curve (bottom 0)"
     reports = "top, EC50 and Hill slope"
+    section = "Dose-response"
+    about = About(
+        "EC50, Hill slope, top",
+        "Use when the response starts at 0, for example after subtracting the baseline. If "
+        "the low plateau is not 0, use Hill 4PL.",
+    )
+    equation = "Y = Top / (1 + 10^((LogEC50 - X)*HillSlope))"
+    equation_note = LOG_X_NOTE
+    sketch = Sketch(
+        {"top": 100.0, "log_ec50": -7.0, "hill_slope": 1.0},
+        (-10.0, -4.0),
+        (
+            Marker("h", "Top", "top"),
+            Marker("v", "EC50", "log_ec50"),
+            Marker("label", "Hill slope: steepness at EC50", "hill_slope", _log_ec50),
+        ),
+        follow=("log_ec50",),
+    )
+
+    def parameters(self, params: Params) -> list[tuple[str, str]]:
+        from curvis.analysis.fit.dose_response import LABELS
+
+        return [(p, LABELS[p]) for p in ("top", "log_ec50", "hill_slope")]
+
+    def curve(self, x: FloatArray, values: Mapping[str, float], params: Params) -> FloatArray:
+        return _logistic(x, {**values, "bottom": 0.0})
+
+    def points(
+        self, x: FloatArray, columns: Sequence[FloatArray], params: Params, xr: XRange
+    ) -> Points:
+        from curvis.analysis.fit.dose_response import dose_response_points
+
+        assert isinstance(params, Hill3Params)
+        return dose_response_points(x, list(columns), params.x_is_log, xr)
 
     def fixed_values(self, params: Params) -> dict[str, float]:
         assert isinstance(params, Hill3Params)
@@ -536,27 +751,27 @@ class Hill3(CurveFit):
 @dataclass(frozen=True)
 class TwoPhaseParams(FitParams):
     x_is_log: bool = param(False, "X values are lo&g10(concentration)")
-    fixed: str = param("", "&Fix parameters (e.g. hill slope 1 = 1)", advanced=True)
+    fixed: str = param("", "&Fix parameters", advanced=True, editor="fixed")
 
 
 @dataclass(frozen=True)
 class AssociationParams(FitParams):
-    fixed: str = param("", "&Fix parameters (e.g. Y0 = 0)", advanced=True)
+    fixed: str = param("", "&Fix parameters", advanced=True, editor="fixed")
 
 
 @dataclass(frozen=True)
 class DecayParams(FitParams):
-    fixed: str = param("", "&Fix parameters (e.g. plateau = 0)", advanced=True)
+    fixed: str = param("", "&Fix parameters", advanced=True, editor="fixed")
 
 
 @dataclass(frozen=True)
 class MichaelisMentenParams(FitParams):
-    fixed: str = param("", "&Fix parameters (e.g. Vmax = 100)", advanced=True)
+    fixed: str = param("", "&Fix parameters", advanced=True, editor="fixed")
 
 
 @dataclass(frozen=True)
 class GaussianParams(FitParams):
-    fixed: str = param("", "&Fix parameters (e.g. baseline = 0)", advanced=True)
+    fixed: str = param("", "&Fix parameters", advanced=True, editor="fixed")
 
 
 def curve_fixed(spec: CurveSpec, text: str, example: str) -> dict[str, float]:
@@ -732,6 +947,22 @@ class NonlinearCurve(CurveFit):
     def fixed_values(self, params: Params) -> dict[str, float]:
         return curve_fixed(self.spec(), str(getattr(params, "fixed", "")), self.example)
 
+    def parameters(self, params: Params) -> list[tuple[str, str]]:
+        spec = self.spec()
+        return [(p, spec.labels[p]) for p in spec.model.parameters]
+
+    def curve(self, x: FloatArray, values: Mapping[str, float], params: Params) -> FloatArray:
+        model = self.spec().model
+        return model.f(x, np.array([values[p] for p in model.parameters]))
+
+    def points(
+        self, x: FloatArray, columns: Sequence[FloatArray], params: Params, xr: XRange
+    ) -> Points:
+        from curvis.analysis.fit.nonlinear import curve_points
+
+        x_is_log = bool(getattr(params, "x_is_log", False))
+        return curve_points(self.spec(), x, list(columns), x_is_log, xr)
+
     def reading(self, sf: _SeriesFit) -> str:
         from curvis.analysis.compare.common import number
 
@@ -773,6 +1004,36 @@ class Biphasic(NonlinearCurve):
     what = "a biphasic dose-response curve"
     reports = "bottom, top, the fraction in phase 1, both EC50s and Hill slopes"
     example = "hill slope 1 = 1"
+    section = "Dose-response"
+    about = About(
+        "two EC50s, fraction",
+        "Use when the curve rises or falls in two steps, such as a drug acting on two binding "
+        "sites with different potencies.",
+    )
+    equation = (
+        "Y = Bottom + (Top - Bottom)*(Frac / (1 + 10^((LogEC50_1 - X)*HillSlope_1))"
+        " + (1 - Frac) / (1 + 10^((LogEC50_2 - X)*HillSlope_2)))"
+    )
+    equation_note = LOG_X_NOTE
+    sketch = Sketch(
+        {
+            "bottom": 0.0,
+            "top": 100.0,
+            "frac": 0.4,
+            "log_ec50_1": -8.0,
+            "log_ec50_2": -5.0,
+            "hill_slope_1": 1.0,
+            "hill_slope_2": 1.0,
+        },
+        (-11.0, -2.0),
+        (
+            Marker("h", "Top", "top"),
+            Marker("h", "Bottom", "bottom"),
+            Marker("v", "EC50 1", "log_ec50_1"),
+            Marker("v", "EC50 2", "log_ec50_2"),
+        ),
+        follow=("log_ec50_1", "log_ec50_2"),
+    )
 
     @staticmethod
     def spec() -> CurveSpec:
@@ -819,6 +1080,35 @@ class BellShaped(NonlinearCurve):
     what = "a bell-shaped dose-response curve"
     reports = "both plateaus, the dip, both EC50s and Hill slopes, and the peak center, width and amplitude"  # noqa: E501
     example = "hill slope 1 = 1"
+    section = "Shape-based"  # SPEC.md lists it with the Gaussian
+    about = About(
+        "two EC50s, peak",
+        "Use when the response first rises and then falls as dose increases, or falls and "
+        "then rises.",
+    )
+    equation = (
+        "Y = Dip + (Plateau_1 - Dip) / (1 + 10^((X - LogEC50_1)*HillSlope_1))"
+        " + (Plateau_2 - Dip) / (1 + 10^((LogEC50_2 - X)*HillSlope_2))"
+    )
+    equation_note = LOG_X_NOTE
+    sketch = Sketch(
+        {
+            "plateau_1": 0.0,
+            "dip": 100.0,
+            "plateau_2": 10.0,
+            "log_ec50_1": -8.0,
+            "log_ec50_2": -5.0,
+            "hill_slope_1": 1.5,
+            "hill_slope_2": 1.5,
+        },
+        (-11.0, -2.0),
+        (
+            Marker("h", "Dip", "dip"),
+            Marker("v", "EC50 1", "log_ec50_1"),
+            Marker("v", "EC50 2", "log_ec50_2"),
+        ),
+        follow=("log_ec50_1", "log_ec50_2"),
+    )
 
     @staticmethod
     def spec() -> CurveSpec:
@@ -920,6 +1210,18 @@ class ExpAssociation(_Exponential):
     what = "a one-phase exponential association"
     reports = "Y0, plateau, the rate constant K and the half-time"
     example = "Y0 = 0"
+    section = "Kinetics"
+    about = About(
+        "plateau, K, half-time",
+        "Use when Y rises towards a plateau over time, at a rate proportional to the distance "
+        "left, such as ligand binding. For a fall towards a plateau, use exponential decay.",
+    )
+    equation = "Y = Y0 + (Plateau - Y0)*(1 - e^(-K*X))"
+    sketch = Sketch(
+        {"y0": 0.0, "plateau": 100.0, "k": 0.3},
+        (0.0, 20.0),
+        (Marker("h", "Plateau", "plateau"), Marker("v", "Half-time", "k", half_time)),
+    )
     half = "half_time"
     half_label = "half-time"
     moves = "rises"
@@ -943,6 +1245,18 @@ class ExpDecay(_Exponential):
     what = "a one-phase exponential decay"
     reports = "Y0, plateau, the rate constant K and the half-life"
     example = "plateau = 0"
+    section = "Kinetics"
+    about = About(
+        "plateau, K, half-life",
+        "Use when Y falls towards a plateau over time, such as radioactive decay, drug "
+        "elimination or dissociation.",
+    )
+    equation = "Y = Plateau + (Y0 - Plateau)*e^(-K*X)"
+    sketch = Sketch(
+        {"y0": 100.0, "plateau": 10.0, "k": 0.3},
+        (0.0, 20.0),
+        (Marker("h", "Plateau", "plateau"), Marker("v", "Half-life", "k", half_time)),
+    )
 
     @staticmethod
     def spec() -> CurveSpec:
@@ -963,6 +1277,17 @@ class MichaelisMenten(NonlinearCurve):
     what = "a Michaelis-Menten curve"
     reports = "Vmax and Km"
     example = "Vmax = 100"
+    section = "Kinetics"
+    about = About(
+        "Vmax, Km",
+        "Use when enzyme velocity (Y) levels off as substrate concentration (X) increases.",
+    )
+    equation = "Y = Vmax*X / (Km + X)"
+    sketch = Sketch(
+        {"vmax": 100.0, "km": 2.0},
+        (0.0, 20.0),
+        (Marker("h", "Vmax", "vmax"), Marker("v", "Km", "km")),
+    )
 
     @staticmethod
     def spec() -> CurveSpec:
@@ -1004,6 +1329,21 @@ class Gaussian(NonlinearCurve):
     what = "a Gaussian peak"
     reports = "the peak center, width (SD and FWHM), amplitude and baseline"
     example = "baseline = 0"
+    section = "Shape-based"
+    about = About(
+        "center, SD, amplitude",
+        "Use when the data form one symmetric peak or dip, such as a spectral band.",
+    )
+    equation = "Y = Baseline + Amplitude*e^(-0.5*((X - Center) / SD)^2)"
+    sketch = Sketch(
+        {"baseline": 5.0, "amplitude": 100.0, "center": 0.0, "sd": 1.0},
+        (-4.0, 4.0),
+        (
+            Marker("h", "Baseline", "baseline"),
+            Marker("v", "Center", "center"),
+            Marker("label", "Amplitude", "amplitude", _center),
+        ),
+    )
 
     @staticmethod
     def spec() -> CurveSpec:

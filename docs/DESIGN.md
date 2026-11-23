@@ -360,11 +360,16 @@ A workbench dialog (section 1) with one change of layout:
 - **Options** sit under the data at the height of their page. Fields that belong together sit
   on one line (*Fit only X from [ ] to [ ]*, with the count of points used after them).
   Values the user would otherwise type as text (a range, fixed parameters) are number fields
-  or a table, never a syntax to learn.
+  or a table, never a syntax to learn. The Fix table has a row per model parameter (*Fix*, *Parameter*,
+  *Value*); ticking *Fix* fills in the sketch's example value, and the last free parameter
+  cannot be ticked. Both write the same stored text as before, so saved projects do not
+  change.
 - **About this analysis** takes the rest of the right column's height. From the top: the
   equation (fits) or the null hypothesis and assumptions (tests), the sketch (fits), the
   sentence that says what will run, and a “use when” line in `PlaceholderText`. The sketch is
   drawn from the model with `Link` for the curve, `PlaceholderText` for markers and labels,
-  and `Highlight` for a fixed parameter; it is an illustration, never a fit of the data.
+  and `Highlight` for a fixed parameter; it is an illustration, never a fit of the data. All
+  of this text is data on the analysis types (`AnalysisType.about`, `CurveFit.equation`),
+  never written in the dialog; the equation is rendered from the formula language.
 - **Height.** Extra height goes to the series list on the left and to *About this analysis*
   on the right. At 900 × 640 with Advanced open nothing is cut off.

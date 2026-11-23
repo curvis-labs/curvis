@@ -17,9 +17,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from curvis.analysis.base import (
+    About,
     Analysis,
     AnalysisError,
     AnalysisInputs,
+    Hypothesis,
     InputChoice,
     Params,
     SeriesData,
@@ -54,7 +56,7 @@ DEFAULT_FACTOR = "Group"
 
 @dataclass(frozen=True)
 class TwoWayParams(Params):
-    factor_name: str = param(DEFAULT_FACTOR, "&Name of the first factor")
+    factor_name: str = param(DEFAULT_FACTOR, "Name of the first &factor")
 
 
 @dataclass(frozen=True)
@@ -105,6 +107,18 @@ class TwoWayAnova(GroupComparison):
     id = "two_way_anova"
     label = "T&wo-way ANOVA"
     method = METHOD
+    section = "Three or more groups"
+    about = About(
+        "two factors, interaction",
+        "Use when the groups differ in two ways at once, such as treatment and sex, and you "
+        "want to know if the factors interact.",
+        Hypothesis(
+            "Three hypotheses: neither factor changes the mean, and the effect of one factor "
+            "does not depend on the other (no interaction).",
+            "Values are independent and roughly normal in every combination of the factors, "
+            "with similar SDs.",
+        ),
+    )
     params_type = TwoWayParams
     min_groups = 4
 

@@ -10,10 +10,12 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from curvis.analysis.base import (
+    About,
     Analysis,
     AnalysisError,
     AnalysisInputs,
     Family,
+    Hypothesis,
     InputChoice,
     Params,
     register,
@@ -40,6 +42,17 @@ class KaplanMeierAnalysis(_AnalysisType):
     label = "&Kaplan-Meier survival"
     method = METHOD
     family = Family.SURVIVAL
+    section = "Survival"
+    about = About(
+        "survival curve, median",
+        "Use when subjects are followed until an event, and some leave the study or end it "
+        "without the event (censored).",
+        Hypothesis(
+            "",
+            "Censoring is unrelated to the outcome: subjects lost to follow-up are as likely to "
+            "have the event as those who stay.",
+        ),
+    )
     params_type = KaplanMeierParams
 
     def candidates(self, table: Table) -> list[InputChoice]:
