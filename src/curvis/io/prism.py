@@ -35,7 +35,8 @@ Mapping to Curvis (see :func:`build_table`):
   Curvis and are kept as Text columns.
 - Survival: X as the Time column and each data set as an Event column.
 - Row titles become a Text column on the left (in grouped tables, the column names).
-- Excluded values are left empty, as Prism's analyses leave them out.
+- Excluded values are left empty, as Prism's analyses leave them out. Their values and
+  places are kept (:class:`ExcludedValue`) for a later version that can exclude values.
 
 Other table types (contingency, parts of whole, multiple variables, nested) are listed
 as not imported. Nothing here uses Qt, so :func:`read_prism` can run in a worker
@@ -169,13 +170,33 @@ class DataSet:
 
 
 @dataclass(frozen=True)
+class ExcludedValue:
+    """A value Prism marks as excluded, kept so a later version can import it as such.
+
+    ``data_set`` is the index in :attr:`PrismTable.data_sets`, or ``X_DATA_SET`` for
+    the X column; ``subcolumn`` and ``row`` count from 0, as in the Prism table, and
+    ``value`` is the cell's text without Prism's marker. Until Curvis can exclude
+    values, these cells import empty.
+    """
+
+    data_set: int
+    subcolumn: int
+    row: int
+    value: str
+
+
+X_DATA_SET = -1
+"""``ExcludedValue.data_set`` for a value in the X column."""
+
+
+@dataclass(frozen=True)
 class PrismTable:
     """One Prism data table as read from the file, before it becomes a Curvis table.
 
     ``kind`` is one of :data:`KIND_LABELS` (or the file's own name for an unknown
     kind), ``y_format`` :data:`REPLICATES` or a key of :data:`SUMMARY_FORMATS` (or the
-    file's own name). ``excluded`` counts the values Prism marks as excluded, which are
-    left empty.
+    file's own name). ``excluded`` lists the values Prism marks as excluded; their
+    cells are empty (``None``) in the subcolumns.
     """
 
     title: str
@@ -184,17 +205,22 @@ class PrismTable:
     row_titles: tuple[Cell, ...] | None
     x: DataSet | None
     data_sets: tuple[DataSet, ...]
-    excluded: int = 0
+    excluded: tuple[ExcludedValue, ...] = ()
 
 
 @dataclass(frozen=True)
 class ImportedTable:
-    """A Prism table that imports: the Curvis table, and notes for the user."""
+    """A Prism table that imports: the Curvis table, and notes for the user.
+
+    ``excluded`` holds the values Prism marks as excluded, by their place in the Prism
+    table (they are empty in ``table``).
+    """
 
     title: str
     kind: str
     table: Table
     notes: tuple[str, ...] = ()
+    excluded: tuple[ExcludedValue, ...] = ()
 
     @property
     def summary(self) -> str:
@@ -324,35 +350,37 @@ def _pzfx_table(element: ET.Element) -> PrismTable:
         kind = "xy" if (element.get("XFormat") or "none") != "none" else "column"
     y_format_name = (element.get("YFormat") or "replicates").lower()
     y_format = _PZFX_FORMATS.get(y_format_name, y_format_name)
-    excluded = 0
+    excluded: list[ExcludedValue] = []
 
-    def subcolumns(column: ET.Element) -> tuple[tuple[Cell, ...], ...]:
-        nonlocal excluded
+    def subcolumns(column: ET.Element, where: int | None) -> tuple[tuple[Cell, ...], ...]:
         result = []
-        for sub in _children(column, "Subcolumn"):
+        for s, sub in enumerate(_children(column, "Subcolumn")):
             cells: list[Cell] = []
-            for d in _children(sub, "d"):
+            for r, d in enumerate(_children(sub, "d")):
                 value = _text(d)
-                if d.get("Excluded") == "1" or value.endswith("*"):
-                    if value:
-                        excluded += 1
+                marked = d.get("Excluded") == "1" or value.endswith("*")
+                if marked and where is not None:
+                    if value.rstrip("*").strip():
+                        excluded.append(ExcludedValue(where, s, r, value.rstrip("*").strip()))
                     cells.append(None)
                 else:
                     cells.append(value or None)
             result.append(tuple(cells))
         return tuple(result)
 
-    def data_set(column: ET.Element) -> DataSet:
-        return DataSet(_text(next(iter(_children(column, "Title")), None)), subcolumns(column))
+    def data_set(column: ET.Element, where: int) -> DataSet:
+        title = _text(next(iter(_children(column, "Title")), None))
+        return DataSet(title, subcolumns(column, where))
 
     row_titles: tuple[Cell, ...] | None = None
     for column in _children(element, "RowTitlesColumn"):
-        subs = subcolumns(column)
+        subs = subcolumns(column, None)
         row_titles = subs[0] if subs else ()
     x_columns = _children(element, "XColumn") or _children(element, "XAdvancedColumn")
-    x = data_set(x_columns[0]) if x_columns else None
-    data_sets = [data_set(c) for c in element if _local(c.tag) in ("YColumn", "YAdvancedColumn")]
-    return PrismTable(title, kind, y_format, row_titles, x, tuple(data_sets), excluded)
+    x = data_set(x_columns[0], X_DATA_SET) if x_columns else None
+    y_columns = [c for c in element if _local(c.tag) in ("YColumn", "YAdvancedColumn")]
+    data_sets = [data_set(c, i) for i, c in enumerate(y_columns)]
+    return PrismTable(title, kind, y_format, row_titles, x, tuple(data_sets), tuple(excluded))
 
 
 # --- .prism ----------------------------------------------------------------------------
@@ -420,15 +448,15 @@ def _prism_table(
     width = max((len(r) for r in rows), default=0)
     if rows and width != sum(widths):
         return PrismTable(title, f"damaged:{width}:{sum(widths)}", y_format, None, None, ())
-    excluded = 0
+    excluded: list[ExcludedValue] = []
 
-    def column(index: int) -> tuple[Cell, ...]:
-        nonlocal excluded
+    def column(index: int, where: int | None, subcolumn: int) -> tuple[Cell, ...]:
         cells: list[Cell] = []
-        for row in rows:
+        for r, row in enumerate(rows):
             value = row[index].strip() if index < len(row) else ""
-            if value.endswith("*"):
-                excluded += 1
+            if value.endswith("*") and where is not None:
+                if value.rstrip("*").strip():
+                    excluded.append(ExcludedValue(where, subcolumn, r, value.rstrip("*").strip()))
                 value = ""
             cells.append(value or None)
         return tuple(cells)
@@ -438,7 +466,8 @@ def _prism_table(
     data_sets: list[DataSet] = []
     start = 0
     for (role, data_set), count in zip(sets, widths, strict=True):
-        subs = tuple(column(start + i) for i in range(count))
+        where = None if role == "rows" else X_DATA_SET if role == "x" else len(data_sets)
+        subs = tuple(column(start + i, where, i) for i in range(count))
         start += count
         if role == "rows":
             row_titles = subs[0] if subs else ()
@@ -446,7 +475,7 @@ def _prism_table(
             x = DataSet(_title(data_set.get("title")), subs)
         else:
             data_sets.append(DataSet(_title(data_set.get("title")), subs))
-    return PrismTable(title, kind, y_format, row_titles, x, tuple(data_sets), excluded)
+    return PrismTable(title, kind, y_format, row_titles, x, tuple(data_sets), tuple(excluded))
 
 
 def _subcolumn_count(data_set: dict[str, Any], replicates: int) -> int:
@@ -604,15 +633,16 @@ def build_table(raw: PrismTable) -> ImportedTable | SkippedTable:
     except _RefusedError as refused:
         return SkippedTable(raw.title, raw.kind, str(refused))
     if raw.excluded:
-        values = "value" if raw.excluded == 1 else "values"
-        notes.append(f"{raw.excluded} excluded {values} left empty.")
+        count = len(raw.excluded)
+        values = "value" if count == 1 else "values"
+        notes.append(f"{count} excluded {values} left empty.")
     try:
         table = builder.table(raw.title)
     except ValueError as exc:
         return SkippedTable(raw.title, raw.kind, f"The table could not be imported: {exc}.")
     if not table.columns:
         return SkippedTable(raw.title, raw.kind, "The table is empty.")
-    return ImportedTable(raw.title, raw.kind, table, tuple(notes))
+    return ImportedTable(raw.title, raw.kind, table, tuple(notes), raw.excluded)
 
 
 class _RefusedError(Exception):

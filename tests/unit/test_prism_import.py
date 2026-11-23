@@ -11,6 +11,8 @@ import pytest
 from curvis.data import ColumnRole, Table, series
 from curvis.data.survival import survival_pairs
 from curvis.io.prism import (
+    X_DATA_SET,
+    ExcludedValue,
     ImportedTable,
     PrismImportError,
     is_prism,
@@ -314,6 +316,30 @@ def test_excluded_values_are_left_empty(tmp_path: Path) -> None:
     imported = only(path)
     assert cells(imported.table) == [("A", "Y", [1.0, None, 3.0])]
     assert imported.notes == ("1 excluded value left empty.",)
+    assert imported.excluded == (ExcludedValue(0, 0, 1, "2"),)
+
+
+def test_excluded_values_keep_their_place_in_x_and_replicates(tmp_path: Path) -> None:
+    path = pzfx(
+        tmp_path,
+        (
+            {"TableType": "XY", "XFormat": "numbers", "Replicates": "2"},
+            "Places",
+            [
+                column("XColumn", "X", ["1", "!2"]),
+                column("YColumn", "A", ["5", "6"]),
+                column("YColumn", "B", ["7", "8"], ["9", "!10.5"]),
+            ],
+        ),
+    )
+    imported = only(path)
+    assert imported.excluded == (
+        ExcludedValue(X_DATA_SET, 0, 1, "2"),
+        ExcludedValue(1, 1, 1, "10.5"),
+    )
+    assert imported.notes[-1] == "2 excluded values left empty."
+    group_b = imported.table.group_columns(imported.table.replicate_groups[0].id)
+    assert np.isnan(group_b[1].values[1])
 
 
 def test_x_error_and_untitled_data_sets(tmp_path: Path) -> None:
