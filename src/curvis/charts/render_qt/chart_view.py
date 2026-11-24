@@ -13,9 +13,11 @@ and the ranges and ticks come from :mod:`curvis.charts.axes`, as in the export r
 - **Font.** The graph's chart font, loaded from the same file Matplotlib exports with
   (:mod:`curvis.charts.fonts`), with the same line metrics.
 - Colours come from the spec's colour scheme, not the app theme (docs/DESIGN.md §3).
-- **Legend** to the right of the plot when the spec shows one, listing the series that
-  are in the legend. Clicking an XY entry sends :attr:`ChartView.series_toggled`; the
-  owner turns it into an undoable command, and the next render shows the result.
+- **Legend** where :func:`curvis.charts.legend.graph_layout` puts it, as on export:
+  right of the plot, under it in columns, or in an empty corner of the plot, listing
+  the series that are in the legend. Clicking an XY entry sends
+  :attr:`ChartView.series_toggled`; the owner turns it into an undoable command, and
+  the next render shows the result.
 - Hovering a point, bar or box shows its values as typed in the table; hovering a
   survival curve shows the step under the pointer, and a censor tick its subjects
   (:mod:`curvis.charts.tooltips`).
@@ -68,8 +70,6 @@ from curvis.charts.axes import (
     TITLE_SCALE,
     AxesLayout,
     AxisLayout,
-    axes_layout,
-    legend_columns,
     page_px,
     points_to_px,
     wrap_to_fit,
@@ -77,6 +77,13 @@ from curvis.charts.axes import (
 from curvis.charts.colors import ColorScheme
 from curvis.charts.data import CategoryData, ChartData, SurvivalCurveData, XYSeriesData
 from curvis.charts.fonts import ChartFont, chart_font_info
+from curvis.charts.legend import (
+    LEGEND_INSET_EM,
+    LegendLayout,
+    LegendPlace,
+    graph_layout,
+    legend_names,
+)
 from curvis.charts.marks import Hit, Label, LegendEntry, Marks, Polygon, Rect, bar_marks
 from curvis.charts.spec import (
     LINE_VARIANTS,
@@ -623,6 +630,13 @@ class ChartView(QWidget):
         self.legend.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.legend.sigSampleClicked.connect(self._on_legend_clicked)
         self._legend_shown = False
+        self._legend_inside = False
+        """The legend is a child of the plot's view box (not in the page layout)."""
+        self._legend_plan: LegendLayout | None = None
+        self._legend_records: list[tuple[Any, str, bool, bool]] = []
+        """(item, name, patch, clickable) of each legend entry, before the plan shortens
+        or leaves out names."""
+        self.plot_item.vb.sigResized.connect(self._position_inside_legend)
         self._xy_parts: _XYParts | None = None
         self.spec: ChartSpec | None = None
         self.data: ChartData | None = None
@@ -633,7 +647,6 @@ class ChartView(QWidget):
         """Why nothing is drawn (an unsupported variant), or ""."""
         self._drawn = _Drawn()
         self._margins = (0.0, 0.0, 0.0)
-        self._legend_below = False
         for name in ("bottom", "left"):
             self._axis(name).on_overflow = self._update_margins
         self.plot_widget.scene().sigMouseMoved.connect(self._on_mouse_moved)
@@ -684,11 +697,21 @@ class ChartView(QWidget):
         xy = spec.variant in XY_VARIANTS
         parts = self._xy_parts
         if xy and data is not None and parts is not None and parts.key == _xy_key(spec, data):
-            self.layout_ = axes_layout(spec, data)
-            self._update_xy(spec, data)
-            self._apply_layout(spec, self.layout_)
-            return
+            layout, plan = self._layouts(spec, data)
+            # A legend inside the plot may have to move to another corner.
+            if plan == self._legend_plan:
+                self.layout_ = layout
+                self._update_xy(spec, data)
+                self._apply_layout(spec, self.layout_)
+                return
         self._redraw()
+
+    def _layouts(
+        self, spec: ChartSpec, data: ChartData | None
+    ) -> tuple[AxesLayout, LegendLayout | None]:
+        """The axes and the legend (None: no legend) of ``spec`` drawing ``data``."""
+        names = legend_names(spec, data) if self._legend_wanted(spec) else []
+        return graph_layout(spec, data, names)
 
     def _redraw(self) -> None:
         spec, data = self.spec, self.data
@@ -697,13 +720,14 @@ class ChartView(QWidget):
         plot = self.plot_item
         plot.clear()
         self.legend.clear()
+        self._legend_records = []
         self._show_legend(False)
         self._drawn = _Drawn()
         self.message = ""
         colors = spec.palette
         self.font_info = chart_font_info(spec.font)
         self.family = chart_font_family(spec.font)
-        self.layout_ = axes_layout(spec, data)
+        self.layout_, self._legend_plan = self._layouts(spec, data)
         self._style(spec, colors)
         if data is not None:
             if spec.variant in XY_VARIANTS:
@@ -714,6 +738,7 @@ class ChartView(QWidget):
                 self._draw_survival(spec, data)
             else:
                 self.message = UNSUPPORTED
+        self._fill_legend()
         self._place_legend()
         self._apply_layout(spec, self.layout_)
 
@@ -779,7 +804,8 @@ class ChartView(QWidget):
         pad = self._px(PAGE_PAD_PT)
         left, top, right = self._margins
         right += pad
-        if self._legend_shown and not self._legend_below:
+        plan = self._legend_plan
+        if self._legend_shown and plan is not None and plan.place is LegendPlace.RIGHT:
             right = 0.0  # all the room goes between the plot and the legend (_place_legend)
         self.plot_widget.ci.setContentsMargins(pad + left, pad + top, right, pad)
 
@@ -806,34 +832,74 @@ class ChartView(QWidget):
     def _legend_wanted(self, spec: ChartSpec) -> bool:
         return spec.show_legend and any(s.in_legend for s in spec.series)
 
-    def _add_legend_entry(self, item: Any, name: str, patch: bool = False) -> None:
-        assert self.spec is not None
-        em = self._px(self.spec.text_size)
-        sample = LegendSample(item, LEGEND_SAMPLE_EM * em, LEGEND_ROW_EM * em, patch)
-        self.legend.addItem(sample, name)
-        _sample, label = self.legend.items[-1]
-        label.item.setFont(chart_font(self.family))
-        label.item.document().setDocumentMargin(0)
-        label.setText(name, size=self.legend.opts["labelTextSize"])
+    def _add_legend_entry(
+        self, item: Any, name: str, patch: bool = False, clickable: bool = True
+    ) -> None:
+        """List ``item`` in the legend (:meth:`_fill_legend` makes the entries)."""
+        self._legend_records.append((item, name, patch, clickable))
+
+    def _fill_legend(self) -> None:
+        """The legend's entries as the plan has them: its text size, the names
+        shortened, and the entries that do not fit counted in a last one."""
+        self.legend.clear()
+        plan = self._legend_plan
+        if plan is None or not self._legend_shown:
+            return
+        em = self._px(plan.text_size)
+        self.legend.opts["labelTextSize"] = f"{self._font_pt(plan.text_size):.3f}pt"
+        entries = [
+            (item, text, patch, clickable)
+            for (item, _name, patch, clickable), text in zip(
+                self._legend_records, plan.names, strict=False
+            )
+        ]
+        if plan.more:
+            entries.append((pg.PlotDataItem(pen=None), plan.more_text, False, False))
+        for item, text, patch, clickable in entries:
+            sample = LegendSample(item, LEGEND_SAMPLE_EM * em, LEGEND_ROW_EM * em, patch)
+            self.legend.addItem(sample, text)
+            _sample, label = self.legend.items[-1]
+            label.item.setFont(chart_font(self.family))
+            label.item.document().setDocumentMargin(0)
+            label.setText(text, size=self.legend.opts["labelTextSize"])
+            if not clickable:
+                sample.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         self.legend.layout.setHorizontalSpacing(LEGEND_GAP_EM * em)
         self.legend.layout.setVerticalSpacing(0)
 
+    def _detach_legend(self) -> None:
+        """Take the legend out of the page layout, or off the plot."""
+        if self._legend_inside:
+            self.legend.setParentItem(None)
+            scene = self.legend.scene()
+            if scene is not None:
+                scene.removeItem(self.legend)
+            self._legend_inside = False
+        else:
+            self.plot_widget.ci.removeItem(self.legend)
+
     def _place_legend(self) -> None:
-        """Put the legend right of the plot, or under it in columns when the page is
-        too narrow (curvis.charts.axes.legend_columns), as on export."""
-        if not self._legend_shown or self.spec is None:
+        """Put the legend where the plan has it (curvis.charts.legend.graph_layout), as
+        on export: right of the plot, under it in columns, or in a corner of the plot."""
+        plan = self._legend_plan
+        if not self._legend_shown or self.spec is None or plan is None:
             return
-        columns = legend_columns(self.spec, self.legend_names())
-        em = self._px(self.spec.text_size)
+        em = self._px(plan.text_size)
         border, pad = LEGEND_BORDER_EM * em, self._px(PAGE_PAD_PT)
         layout = self.plot_widget.ci
-        layout.removeItem(self.legend)
-        self.legend.setColumnCount(max(columns, 1))
-        if columns:
-            # Matplotlib's column spacing sits between a name and the next sample.
-            for column in range(1, 2 * columns, 2):
-                if column < 2 * columns - 1:
-                    self.legend.layout.setColumnSpacing(column, LEGEND_COLUMN_GAP_EM * em)
+        self._detach_legend()
+        self.legend.setColumnCount(plan.columns)
+        # Matplotlib's column spacing sits between a name and the next sample.
+        for column in range(1, 2 * plan.columns - 1, 2):
+            self.legend.layout.setColumnSpacing(column, LEGEND_COLUMN_GAP_EM * em)
+        if plan.place is LegendPlace.INSIDE:
+            # Matplotlib's border pad is the half row above the first name and below the
+            # last (in the rows' height); left and right it is the legend's margin.
+            self.legend.layout.setContentsMargins(border, 0, border, 0)
+            self.legend.setParentItem(self.plot_item.vb)
+            self.legend.setZValue(1000)
+            self._legend_inside = True
+        elif plan.place is LegendPlace.BELOW:
             self.legend.layout.setContentsMargins(border, 2 * pad, border, 0)
             layout.addItem(self.legend, 1, 0)
             layout.layout.setAlignment(self.legend, Qt.AlignmentFlag.AlignHCenter)
@@ -846,13 +912,27 @@ class ChartView(QWidget):
             self.legend.layout.setContentsMargins(3 * pad + border + overflow, 0, border, 0)
             layout.addItem(self.legend, 0, 1)
             layout.layout.setAlignment(self.legend, Qt.AlignmentFlag.AlignTop)
-        self._legend_below = bool(columns)
         self.legend.updateSize()
+        self._position_inside_legend()
         self._set_margins()
+
+    def _position_inside_legend(self) -> None:
+        """Put an inside legend in its corner of the plot, :data:`LEGEND_INSET_EM` from
+        the plot's edges (Matplotlib's ``borderaxespad``)."""
+        plan = self._legend_plan
+        if not self._legend_inside or plan is None or plan.corner is None:
+            return
+        size = self.legend.layout.effectiveSizeHint(Qt.SizeHint.PreferredSize)
+        box = self.plot_item.vb.boundingRect()
+        inset = self._px(LEGEND_INSET_EM * plan.text_size)
+        corner = plan.corner
+        x = box.right() - inset - size.width() if corner.is_right else box.left() + inset
+        y = box.top() + inset if corner.is_upper else box.bottom() - inset - size.height()
+        self.legend.setGeometry(QRectF(x, y, size.width(), size.height()))
 
     def _draw_xy(self, spec: ChartSpec, data: ChartData, colors: ColorScheme) -> None:
         plot = self.plot_item
-        legend = self._legend_wanted(spec)
+        legend = self._legend_plan is not None
         self._show_legend(legend)
         styles = {s.source: s for s in spec.series}
         parts = _XYParts(_xy_key(spec, data), [], [])
@@ -933,7 +1013,7 @@ class ChartView(QWidget):
         """Kaplan-Meier steps, their confidence bands and a tick at each censored time.
         Clicking a legend entry toggles the curve (with its band and ticks)."""
         plot = self.plot_item
-        legend = self._legend_wanted(spec)
+        legend = self._legend_plan is not None
         self._show_legend(legend)
         styles = {s.source: s for s in spec.series}
         for curve in data.survival:
@@ -981,7 +1061,7 @@ class ChartView(QWidget):
             layout.addItem(self.legend, 0, 1)
             layout.layout.setAlignment(self.legend, Qt.AlignmentFlag.AlignTop)
         else:
-            layout.removeItem(self.legend)
+            self._detach_legend()
         self._legend_shown = shown
 
     def _draw_categories(self, spec: ChartSpec, data: ChartData, colors: ColorScheme) -> None:
@@ -991,12 +1071,12 @@ class ChartView(QWidget):
         marks = bar_marks(spec, data, self.layout_)
         self._drawn.categories = [c for c in data.categories if c.source in self.layout_.positions]
         self._drawn.hits = list(marks.hits)
-        legend = self._legend_wanted(spec) and bool(marks.legend)
+        legend = self._legend_plan is not None and bool(marks.legend)
         self._show_legend(legend)
         if legend:
             for entry in marks.legend:
-                self._add_legend_entry(self._legend_item(entry), entry.name, entry.symbol is None)
-                self.legend.items[-1][0].setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+                item = self._legend_item(entry)
+                self._add_legend_entry(item, entry.name, entry.symbol is None, clickable=False)
         if marks.shapes or marks.lines:
             plot.addItem(MarksItem(marks, self._px))
         for points in marks.points:
@@ -1091,10 +1171,21 @@ class ChartView(QWidget):
         ]
 
     def legend_names(self) -> list[str]:
-        """The names listed in the legend (empty without one)."""
+        """The names the legend lists, in full (empty without one)."""
+        if not self._legend_shown:
+            return []
+        return [name for _item, name, _patch, _clickable in self._legend_records]
+
+    def legend_texts(self) -> list[str]:
+        """The lines of the legend as shown: names shortened with "…", and "+N more"."""
         if not self._legend_shown:
             return []
         return [label.text for _sample, label in self.legend.items]
+
+    @property
+    def legend_plan(self) -> LegendLayout | None:
+        """Where the legend is, its text size and columns (None: no legend)."""
+        return self._legend_plan if self._legend_shown else None
 
     def plot_rect(self) -> QRectF:
         """The plot area (inside the axes) in this widget's coordinates."""

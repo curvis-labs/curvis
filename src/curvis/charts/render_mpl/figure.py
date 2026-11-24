@@ -44,14 +44,19 @@ from curvis.charts.axes import (
     TITLE_SCALE,
     AxesLayout,
     AxisLayout,
-    axes_layout,
     column_major,
-    legend_columns,
     wrap_to_fit,
 )
 from curvis.charts.colors import ColorScheme
 from curvis.charts.data import ChartData, XYSeriesData
 from curvis.charts.fonts import FONTS, chart_font_info
+from curvis.charts.legend import (
+    LEGEND_INSET_EM,
+    LegendLayout,
+    LegendPlace,
+    graph_layout,
+    legend_names,
+)
 from curvis.charts.marks import LegendEntry, Marks, Polygon, Rect, bar_marks
 from curvis.charts.spec import (
     LINE_VARIANTS,
@@ -144,7 +149,7 @@ def make_figure(spec: ChartSpec, data: ChartData | None) -> Figure:
     pad = PAGE_PAD_PT / 72
     fig.set_layout_engine(_title_layout()(w_pad=pad, h_pad=pad, wspace=0, hspace=0))
     ax = fig.add_subplot(axes_class=_chart_axes())
-    layout = axes_layout(spec, data)
+    layout, legend = graph_layout(spec, data, legend_names(spec, data, hidden=False))
     _style(ax, spec, colors, layout)
     marks: Marks | None = None
     if data is not None:
@@ -157,7 +162,8 @@ def make_figure(spec: ChartSpec, data: ChartData | None) -> Figure:
             _draw_survival(ax, spec, data)
         else:
             raise ValueError(UNSUPPORTED)
-    _legend(ax, spec, data, colors, layout, marks)
+    if legend is not None:
+        _legend(ax, spec, data, colors, legend, marks)
     return fig
 
 
@@ -533,16 +539,17 @@ def _legend(
     spec: ChartSpec,
     data: ChartData | None,
     colors: ColorScheme,
-    layout: AxesLayout,
+    legend: LegendLayout,
     marks: Marks | None = None,
 ) -> None:
-    if not spec.show_legend or data is None:
+    """The legend where :func:`~curvis.charts.legend.graph_layout` puts it: right of the
+    plot at the top of the page, under it in columns, or in a corner of the plot."""
+    if data is None:
         return
     from matplotlib.lines import Line2D
 
     styles = {s.source: s for s in spec.series}
     handles: list[Any] = []
-    names: list[str] = []
     if spec.variant in XY_VARIANTS:
         for series in data.xy:
             style = styles[series.source]
@@ -561,7 +568,6 @@ def _legend(
             )
             _dashes(handle, line, style.line_width)
             handles.append(handle)
-            names.append(series.name)
     elif spec.variant is ChartVariant.KAPLAN_MEIER:
         for curve in data.survival:
             style = styles[curve.source]
@@ -573,37 +579,45 @@ def _legend(
             )
             _dashes(handle, line, style.line_width)
             handles.append(handle)
-            names.append(curve.name)
     elif marks is not None:
-        for entry in marks.legend:
-            handles.append(_legend_handle(entry))
-            names.append(entry.name)
-    if handles:
-        figure = ax.get_figure()
-        assert figure is not None
-        # Right of the plot, at the top of the page, as in the Graph panel; under the
-        # plot, row by row, when the page is too narrow for that.
-        columns = legend_columns(spec, names)
-        if columns:
-            order = column_major(len(names), columns)
-            handles, names = [handles[i] for i in order], [names[i] for i in order]
-        figure.legend(
-            handles,
-            names,
-            loc="outside lower center" if columns else "outside right upper",
-            ncols=max(columns, 1),
-            columnspacing=LEGEND_COLUMN_GAP_EM,
-            frameon=False,
-            fontsize=spec.text_size,
-            labelcolor=colors.ink,
-            # The sizes of the Graph panel's legend (curvis.charts.axes), in ems.
-            borderaxespad=0.0,
-            borderpad=LEGEND_BORDER_EM,  # the half row above the first name
-            handlelength=LEGEND_SAMPLE_EM,
-            handleheight=0.7,
-            handletextpad=LEGEND_GAP_EM,
-            labelspacing=LEGEND_ROW_EM - 1.0,
-        )
+        handles = [_legend_handle(entry) for entry in marks.legend]
+    if not handles:
+        return
+    handles = handles[: legend.shown]
+    if legend.more:
+        handles.append(Line2D([], [], linestyle="None"))  # "+12 more": no sample
+    names = list(legend.texts)
+    if legend.columns > 1:
+        # Matplotlib fills columns first; the Graph panel rows, as read.
+        order = column_major(len(names), legend.columns)
+        handles, names = [handles[i] for i in order], [names[i] for i in order]
+    options: dict[str, Any] = {
+        "ncols": legend.columns,
+        "columnspacing": LEGEND_COLUMN_GAP_EM,
+        "frameon": False,
+        "fontsize": legend.text_size,
+        "labelcolor": colors.ink,
+        # The sizes of the Graph panel's legend (curvis.charts.axes), in ems.
+        "borderpad": LEGEND_BORDER_EM,  # the half row above the first name
+        "handlelength": LEGEND_SAMPLE_EM,
+        "handleheight": 0.7,
+        "handletextpad": LEGEND_GAP_EM,
+        "labelspacing": LEGEND_ROW_EM - 1.0,
+    }
+    if legend.place is LegendPlace.INSIDE:
+        assert legend.corner is not None
+        ax.legend(handles, names, loc=legend.corner.value, borderaxespad=LEGEND_INSET_EM, **options)
+        return
+    figure = ax.get_figure()
+    assert figure is not None
+    below = legend.place is LegendPlace.BELOW
+    figure.legend(
+        handles,
+        names,
+        loc="outside lower center" if below else "outside right upper",
+        borderaxespad=0.0,
+        **options,
+    )
 
 
 __all__ = ("RC_PARAMS", "chart_rc", "make_figure")

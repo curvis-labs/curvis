@@ -45,7 +45,6 @@ from curvis.charts.axes import (
     BOX_LINE_PT,
     BOX_WIDTH,
     CM_PER_INCH,
-    LEGEND_SHARE,
     SCATTER_WIDTH,
     VIOLIN_WIDTH,
     AxesLayout,
@@ -395,16 +394,9 @@ class _Spread:
         horizontal = layout.horizontal
         category = layout.y if horizontal else layout.x
         value = layout.x if horizontal else layout.y
-        across = (
-            (width * (AXIS_SHARE - (LEGEND_SHARE if spec.show_legend else 0.0)))
-            if not horizontal
-            else height * AXIS_SHARE
-        )
-        along = (
-            height * AXIS_SHARE
-            if not horizontal
-            else width * (AXIS_SHARE - (LEGEND_SHARE if spec.show_legend else 0.0))
-        )
+        wide = width * max(AXIS_SHARE - layout.legend_room[0], 0.1)
+        high = height * max(AXIS_SHARE - layout.legend_room[1], 0.1)
+        across, along = (high, wide) if horizontal else (wide, high)
         self.category_per_pt = (category.high - category.low) / max(across, 1.0)
         self.value_per_pt = (value.high - value.low) / max(along, 1.0)
 

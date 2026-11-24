@@ -152,3 +152,26 @@ def spread_table() -> Table:
         padded[: len(v)] = np.round(v, 2)
         columns.append(Column.new(name, ColumnRole.Y, padded, unit="mM"))
     return Table("Spread", columns)
+
+
+SPECTRA_NAMES = (
+    "BL21 Star - 80 uM - 500 ml_bl",
+    "BL21 Star - 80 uM - 250 ml_bl",
+    "BL21 Star - 800 uM_bl",
+    "C41 - 80 uM_bl",
+    "C41 - 800 uM_bl",
+    "C43 - 80 uM_bl",
+    "C43 - 800 uM_bl",
+)
+
+
+def spectra_table(names: tuple[str, ...] = SPECTRA_NAMES) -> Table:
+    """Absorbance spectra: X (wavelength) and one Y column per sample, each a peak near
+    505 nm that falls to zero by 530 nm, so the upper right of the plot is empty."""
+    wavelengths = np.arange(480.0, 551.0, 1.0)
+    columns = [Column.new("Wavelength", ColumnRole.X, wavelengths, unit="nm")]
+    for i, name in enumerate(names):
+        height = 0.1 + 0.1 * (i % 7)
+        peak = height * np.exp(-(((wavelengths - 505.0) / 10.0) ** 2))
+        columns.append(Column.new(name, ColumnRole.Y, peak))
+    return Table("Data 1", columns)

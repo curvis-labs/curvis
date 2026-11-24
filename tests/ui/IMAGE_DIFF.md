@@ -115,6 +115,17 @@ one, also where another version of the font is installed).
   `LEGEND_BORDER_EM`). Before, the screen put one padding to the right of the legend and
   let the end label reach into the gap, so its legend sat about 7 px further left.
 
+- **Legend places.** `test_legend_places_match` covers the legends added after 1.0
+  (`curvis.charts.legend`): seven long names under the plot (two columns, smaller text,
+  names shortened in the middle), sixty series ending in "+N more", and legends inside the
+  plot of a line graph of spectra, a scatter graph, a line graph with a fit, a survival
+  graph and a histogram. Both renderers take the place, text size, columns and shortened
+  names from `graph_layout`. Inside the plot, the legend's text is the only ink there: a
+  few hundred pixels at 7.5 pt that sit up to 2 px apart in the two renderers (the screen
+  legend's top is the view box's, the export's the axes box's), so the plot measure of
+  those cases has its own threshold, `INSIDE_PLOT_THRESHOLD` = 0.05 (measured 0 – 0.038;
+  the other cases measure at most 0.0015 in the plot and 0.052 on the page).
+
 When a comparison fails, both images are saved side by side in `build/image-diff/` (CI
 uploads them as an artifact), and the failure message says where each key colour's pixels
 are on screen and in the export, so it can be read from the log alone.
