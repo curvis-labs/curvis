@@ -161,13 +161,56 @@ def crop(image: Image.Image, box: Box) -> Image.Image:
     )
 
 
-def compare(spec: ChartSpec, data: ChartData | None) -> Diff:
+LEGEND_MASK_PX = 6
+"""Pixels added round an inside legend's box when it is left out of the plot measure:
+the two renderers put it up to 2 px apart."""
+
+
+def legend_box(spec: ChartSpec, data: ChartData | None) -> Box | None:
+    """The export's legend box (left, top, width, height) in pixels at :data:`SCALE`
+    when the legend is inside the plot, else None."""
+    import matplotlib
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    from curvis.charts.render_mpl.figure import chart_rc, make_figure
+
+    with matplotlib.rc_context(chart_rc(spec)):
+        fig = make_figure(spec, data)
+        fig.set_dpi(96 * SCALE)
+        FigureCanvasAgg(fig).draw()
+        legend = fig.axes[0].get_legend()
+        if legend is None:
+            return None
+        box = legend.get_window_extent()
+        height = fig.get_figheight() * fig.dpi
+    return (float(box.x0), float(height - box.y1), float(box.width), float(box.height))
+
+
+def _blank(image: Image.Image, box: Box, color: tuple[int, int, int]) -> Image.Image:
+    left, top, width, height = box
+    pad = LEGEND_MASK_PX
+    out = image.copy()
+    out.paste(
+        color,
+        (round(left) - pad, round(top) - pad, round(left + width) + pad, round(top + height) + pad),
+    )
+    return out
+
+
+def compare(spec: ChartSpec, data: ChartData | None, *, mask_legend: bool = False) -> Diff:
+    """``mask_legend``: leave a legend inside the plot out of the plot measure (its text
+    is then compared by the page measure only)."""
     screen, screen_box, export, export_box = draw_both(spec, data)
     assert screen.size == export.size, (screen.size, export.size)
     colors = key_colors(spec)
     page_color = _rgb(spec.palette.page)
-    plot_screen = crop(screen, screen_box)
-    plot_export = crop(export, export_box)
+    plot_screen, plot_export = screen, export
+    box = legend_box(spec, data) if mask_legend else None
+    if box is not None:
+        plot_screen = _blank(screen, box, page_color)
+        plot_export = _blank(export, box, page_color)
+    plot_screen = crop(plot_screen, screen_box)
+    plot_export = crop(plot_export, export_box)
     plot = miss(plot_screen, plot_export, colors, PLOT_RADIUS, page_color)
     page = miss(screen, export, colors, PAGE_RADIUS, page_color)
     details = [f"plot area: screen {_box(screen_box)}, export {_box(export_box)}"]

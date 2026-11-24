@@ -120,11 +120,13 @@ one, also where another version of the font is installed).
   names shortened in the middle), sixty series ending in "+N more", and legends inside the
   plot of a line graph of spectra, a scatter graph, a line graph with a fit, a survival
   graph and a histogram. Both renderers take the place, text size, columns and shortened
-  names from `graph_layout`. Inside the plot, the legend's text is the only ink there: a
-  few hundred pixels at 7.5 pt that sit up to 2 px apart in the two renderers (the screen
-  legend's top is the view box's, the export's the axes box's), so the plot measure of
-  those cases has its own threshold, `INSIDE_PLOT_THRESHOLD` = 0.05 (measured 0 – 0.038;
-  the other cases measure at most 0.0015 in the plot and 0.052 on the page).
+  names from `graph_layout`. An inside legend is left out of the plot measure
+  (`compare(..., mask_legend=True)` paints the export's legend box, plus 6 px, in the page
+  colour in both images): its text would be the only ink in the plot, so a 1 – 2 px
+  shift of a few hundred pixels of 7.5 pt text was up to 0.16 of that colour on CI. The
+  legend is still compared by the page measure, and `tests/unit/test_chart_legend.py`
+  checks that no data is drawn under it. Measured: plot at most 0.0015, page at most
+  0.052, with the usual thresholds.
 
 When a comparison fails, both images are saved side by side in `build/image-diff/` (CI
 uploads them as an artifact), and the failure message says where each key colour's pixels

@@ -207,11 +207,6 @@ LEGEND_PLACES = {
 """Legends since the bug report: under the plot in columns, with smaller text, shortened
 names and a count of the rest; and in an empty corner of the plot (or outside when every
 corner has data: the line graph with a fit)."""
-INSIDE_PLOT_THRESHOLD = 0.05
-"""Largest miss allowed in the plot area when the legend is inside it. The legend's text
-is then the only ink in the plot: a few hundred pixels at 7.5 pt, which move by up to
-2 px between the renderers (as text does on the page, where the radius is 8 px), so a
-small shift is a large share (measured: at most 0.038). See IMAGE_DIFF.md."""
 
 
 def _survival() -> tuple[ChartSpec, ChartData]:
@@ -304,20 +299,20 @@ def test_title_and_turned_labels_match(layout: str, qapp: QApplication) -> None:
 @pytest.mark.parametrize("layout", LEGEND_PLACES)
 def test_legend_places_match(layout: str, qapp: QApplication) -> None:
     spec, data = LEGEND_PLACES[layout]()
-    inside = spec.legend_position is LegendPosition.INSIDE
-    _check(spec, data, layout, INSIDE_PLOT_THRESHOLD if inside else PLOT_THRESHOLD)
+    # An inside legend is left out of the plot measure (the page measure compares it):
+    # its text would be the only ink in the plot. That no data is under it is checked
+    # in tests/unit/test_chart_legend.py.
+    _check(spec, data, layout, mask_legend=spec.legend_position is LegendPosition.INSIDE)
 
 
-def _check(
-    spec: ChartSpec, data: ChartData, name: str, plot_threshold: float = PLOT_THRESHOLD
-) -> None:
-    diff = compare(spec, data)
+def _check(spec: ChartSpec, data: ChartData, name: str, *, mask_legend: bool = False) -> None:
+    diff = compare(spec, data, mask_legend=mask_legend)
     report = f"{name}: plot {diff.plot:.4f}, page {diff.page:.4f}"
     print(report)
-    if diff.plot > plot_threshold or diff.page > PAGE_THRESHOLD:
+    if diff.plot > PLOT_THRESHOLD or diff.page > PAGE_THRESHOLD:
         path = save_pair(diff, FAILED, name)
         pytest.fail(
-            f"{report} (thresholds {plot_threshold}, {PAGE_THRESHOLD}); see {path}\n" + diff.details
+            f"{report} (thresholds {PLOT_THRESHOLD}, {PAGE_THRESHOLD}); see {path}\n" + diff.details
         )
 
 
