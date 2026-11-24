@@ -7,10 +7,12 @@ command and whenever the data or the fits it shows change.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from curvis.charts.spec import ChartFamily, ChartSpec
 from curvis.core.commands import Command, CommandError
+from curvis.data.names import name_key
 
 if TYPE_CHECKING:
     from curvis.core.document import Document
@@ -100,6 +102,64 @@ def remove_graph(doc: Document, graph_id: str) -> Command:
     except KeyError:
         raise CommandError("There is no such graph.") from None
     return SetGraph(graph, f"Delete {_family(graph)} graph", remove=True)
+
+
+MAX_GRAPH_NAME = 80
+"""Longest graph name, in characters."""
+
+
+def default_graph_names(graphs: list[ChartSpec]) -> dict[str, str]:
+    """The name each of ``graphs`` (the graphs of one table, in order) has until it is
+    renamed: its family and number, e.g. "Bar graph", "Bar graph 2". A renamed graph
+    still counts, so renaming one never changes the others' names."""
+    counts: dict[str, int] = {}
+    names: dict[str, str] = {}
+    for graph in graphs:
+        family = graph.family.label
+        counts[family] = counts.get(family, 0) + 1
+        number = f" {counts[family]}" if counts[family] > 1 else ""
+        names[graph.id] = f"{family} graph{number}"
+    return names
+
+
+def graph_names(doc: Document, table_id: str) -> dict[str, str]:
+    """The name of each graph of the table ``table_id``: its own, or its default."""
+    graphs = doc.graphs_of(table_id)
+    defaults = default_graph_names(graphs)
+    return {g.id: g.name or defaults[g.id] for g in graphs}
+
+
+def graph_name(doc: Document, graph_id: str) -> str:
+    """The name of the graph ``graph_id`` (see :func:`graph_names`)."""
+    graph = doc.graph(graph_id)
+    return graph_names(doc, graph.table_id)[graph_id]
+
+
+def rename_graph(doc: Document, graph_id: str, name: str) -> Command:
+    """A command that renames the graph ``graph_id``. A blank name gives the graph its
+    default name back; a name another graph of the same table has (ignoring case) is
+    refused."""
+    try:
+        graph = doc.graph(graph_id)
+    except KeyError:
+        raise CommandError("There is no such graph.") from None
+    name = " ".join(name.split())
+    if len(name) > MAX_GRAPH_NAME:
+        raise CommandError(f"A graph name can have at most {MAX_GRAPH_NAME} characters.")
+    defaults = default_graph_names(doc.graphs_of(graph.table_id))
+    if name == defaults[graph_id]:
+        name = ""
+    if name:
+        names = graph_names(doc, graph.table_id)
+        key = name_key(name)
+        for other_id, other in names.items():
+            if other_id != graph_id and name_key(other) == key:
+                raise CommandError(f"There is already a graph called '{other}'.")
+    if name == graph.name:
+        raise CommandError("The graph already has this name.")
+    old = graph_names(doc, graph.table_id)[graph_id]
+    new = name or defaults[graph_id]
+    return SetGraph(replace(graph, name=name), f"Rename graph '{old}' to '{new}'")
 
 
 def set_series_visible(doc: Document, graph_id: str, source: str, visible: bool) -> Command:

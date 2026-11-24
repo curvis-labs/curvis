@@ -87,6 +87,33 @@ def test_graph_tab_title_size_and_legend(qtbot: QtBot, context: Context) -> None
     assert dialog.preview.spec == dialog.spec  # the preview follows at once
 
 
+def test_graph_tab_name(qtbot: QtBot, context: Context) -> None:
+    dialog, _doc = open_dialog(qtbot, context)
+    assert dialog.name_edit.text() == "" and dialog.name_edit.placeholderText() == "XY graph"
+    qtbot.keyClicks(dialog.name_edit, "  Dose   response ")
+    assert dialog.spec.name == "Dose response" and dialog.skeleton.ok_button.isEnabled()
+    dialog.name_edit.clear()
+    qtbot.keyClicks(dialog.name_edit, "XY graph")  # the default name: stored as ""
+    assert dialog.spec.name == ""
+
+
+def test_graph_tab_name_taken_by_another_graph(qtbot: QtBot, context: Context) -> None:
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily
+    from curvis.core import add_graph
+
+    doc, graph_id = graph_document()
+    doc.execute(add_graph(doc, default_spec(doc.table("t"), ChartFamily.XY)))
+    dialog = FormatDialog(doc, graph_id, scheduler=context.scheduler)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    qtbot.keyClicks(dialog.name_edit, "xy GRAPH 2")
+    assert not dialog.skeleton.ok_button.isEnabled()
+    assert "already a graph called 'XY graph 2'" in dialog.skeleton.feedback.text()
+    qtbot.keyClick(dialog.name_edit, Qt.Key.Key_Backspace)
+    assert dialog.skeleton.ok_button.isEnabled() and dialog.spec.name == "xy GRAPH"
+
+
 def test_axes_tab(qtbot: QtBot, context: Context) -> None:
     dialog, _doc = open_dialog(qtbot, context)
     dialog.set_section(AXES)
@@ -330,7 +357,9 @@ def test_graph_toolbar_buttons_are_registered_actions(window: MainWindow, tab: D
     assert [a.objectName() for a in actions] == [b.action_id for b in GRAPH_BUTTONS]
     for action in actions:
         assert window.registry.action(action.objectName()) is action
-        assert action.isEnabled()
+        # an XY graph cannot show comparisons: that button says why
+        assert action.isEnabled() is (action.objectName() != "graph.comparisons")
+    assert "bar, box, violin" in window.registry.action("graph.comparisons").toolTip()
     for action_id, name, keys in (
         ("graph.format", "Format graph", "Ctrl+Shift+F"),
         ("graph.export", "Export graph", "Ctrl+Shift+X"),
@@ -549,3 +578,26 @@ def test_other_graphs_have_no_anova_choice(qtbot: QtBot, context: Context) -> No
     qtbot.addWidget(dialog)
     dialog.show()
     assert not dialog.anova_combo.isVisible() and not dialog.anova_label.isVisible()
+
+
+def test_hidden_graph_options_take_no_space(qtbot: QtBot, context: Context) -> None:
+    """Rows of options the graph type does not use are hidden whole, so the Graph
+    section is no taller than the rows it shows."""
+    dialog, _doc = open_dialog(qtbot, context, "bar")
+    form = dialog.graph_form
+    assert not form.isRowVisible(dialog.violin_trim)
+    assert not form.isRowVisible(dialog.show_bands)
+    assert not form.isRowVisible(dialog.anova_combo)
+    assert not dialog.bin_mode.isVisible() and not dialog.bin_width.isVisible()
+    shown = [r for r in range(form.rowCount()) if form.isRowVisible(r)]
+    page = dialog.left_stack.widget(0)
+    rows = sum(
+        max(
+            form.itemAt(r, role).sizeHint().height()
+            for role in (form.ItemRole.LabelRole, form.ItemRole.FieldRole)
+            if form.itemAt(r, role) is not None
+        )
+        for r in shown
+    )
+    slack = (len(shown) + 4) * form.verticalSpacing() + 3 * page.fontMetrics().height()
+    assert page.minimumSizeHint().height() <= rows + slack

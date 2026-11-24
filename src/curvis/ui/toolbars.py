@@ -65,6 +65,7 @@ TABLE_BUTTONS: tuple[Button | None, ...] = (
 )
 GRAPH_BUTTONS: tuple[Button, ...] = (
     Button("graph.type", "graph_type", "Change graph type"),
+    Button("graph.comparisons", "comparisons", "Show comparisons"),
     Button("graph.format", "format_graph", "Format graph"),
     Button("graph.delete", "delete_graph", "Delete graph"),
     Button("graph.export", "export_graph", "Export graph"),

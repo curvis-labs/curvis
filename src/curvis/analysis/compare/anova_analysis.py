@@ -39,6 +39,7 @@ from curvis.analysis.compare.common import (
     name_list,
     number,
     p_text,
+    pair_ps,
     significant,
     zero_variance_warnings,
 )
@@ -184,7 +185,8 @@ class OneWayAnova(GroupComparison):
             _groups_table(a, names),
             _posthoc_table(posthoc, params.posthoc, comparisons, names),
         )
-        return Result(METHOD, summary, tuple(warnings), values, tables)
+        pairs = pair_ps(inputs.series, [(c.i, c.j, c.p_value) for c in comparisons])
+        return Result(METHOD, summary, tuple(warnings), values, tables, pairs=pairs)
 
 
 def _repeated(params: AnovaParams) -> bool:
@@ -272,7 +274,8 @@ def _run_repeated(
         _groups_table(a, names),
         _posthoc_table(posthoc, params.posthoc, comparisons, names),
     )
-    return Result(method, summary, tuple(warnings), values, tables)
+    pairs = pair_ps(inputs.series, [(c.i, c.j, c.p_value) for c in comparisons])
+    return Result(method, summary, tuple(warnings), values, tables, pairs=pairs)
 
 
 def _df(df: float) -> str:

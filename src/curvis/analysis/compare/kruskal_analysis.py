@@ -23,6 +23,7 @@ from curvis.analysis.compare.common import (
     name_list,
     number,
     p_text,
+    pair_ps,
     significant,
 )
 from curvis.analysis.compare.kruskal import DUNN, METHOD, DunnComparison, KruskalStats, dunn
@@ -117,7 +118,10 @@ class KruskalWallis(GroupComparison):
         )
         tables = (_groups_table(kw, names), _dunn_table(comparisons, names))
         warnings = few_values_warnings(kw.samples, names)
-        return Result(METHOD, summary, tuple(warnings), values, tables, notes=tuple(notes))
+        pairs = pair_ps(inputs.series, [(c.i, c.j, c.p_value) for c in comparisons])
+        return Result(
+            METHOD, summary, tuple(warnings), values, tables, notes=tuple(notes), pairs=pairs
+        )
 
 
 def _groups_table(kw: KruskalStats, names: Sequence[str]) -> ResultTable:

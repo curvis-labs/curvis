@@ -721,6 +721,19 @@ Prepare for 1.0:
 Make a plan first. When done, report results for each item.
 ```
 
+### Step 4.2b — Comparisons on graphs, graph names
+
+**Done when**
+- [x] Bar, box, violin and column scatter graphs show the comparisons of a t-test, Mann-Whitney U test, one-way ANOVA post-hoc test or Dunn's test as brackets with stars or P values, added by the user from the Graph panel toolbar, the Graph menu or the Format dialog, the same on screen and in exports.
+- [x] Brackets follow a new run and the P value setting, and go when the analysis is deleted (one undo step).
+- [x] Graphs can be renamed in place or in the Format dialog; names are unique per table; projects saved before this step open unchanged (format 11).
+
+```text
+Read CLAUDE.md, docs/SPEC.md (Graphs: graph names, comparisons on graphs) and this step.
+
+Draw the P values the comparison analyses already report (no new statistics) as brackets on bar-family graphs, and let graphs be renamed. Store both in the chart spec, with a migration. Make a plan first.
+```
+
 ### Step 4.3 — Validation report and 1.0 release
 
 **Gate for phase 4:** you read the validation report and approve the release.

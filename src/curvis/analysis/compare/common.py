@@ -15,7 +15,7 @@ import numpy.typing as npt
 
 from curvis.analysis.base import AnalysisType, Family, Params, SeriesData, series_choices
 from curvis.analysis.compare.samples import Sample
-from curvis.analysis.result import format_number, p_marker
+from curvis.analysis.result import PairP, format_number, p_marker
 from curvis.data import Table
 
 type FloatArray = npt.NDArray[np.float64]
@@ -34,6 +34,13 @@ def group_values(series: SeriesData) -> FloatArray:
     if not series.columns:
         return np.zeros(0)
     return np.concatenate([np.asarray(c, dtype=np.float64) for c in series.columns])
+
+
+def pair_ps(
+    series: Sequence[SeriesData], comparisons: Sequence[tuple[int, int, float]]
+) -> tuple[PairP, ...]:
+    """The comparisons (index i, index j, P value) of ``series`` as :class:`PairP`."""
+    return tuple(PairP(series[i].id, series[j].id, p) for i, j, p in comparisons)
 
 
 def name_list(names: Sequence[str]) -> str:

@@ -469,6 +469,18 @@ def _draw_marks(ax: Axes, marks: Marks) -> None:
             ),
             autolim=False,
         )
+    for label in marks.labels:
+        ax.text(
+            label.x,
+            label.y,
+            label.text,
+            color=label.color,
+            fontsize=label.size_pt,
+            ha="center",
+            va="bottom",
+            zorder=6,
+            clip_on=False,
+        )
     for points in marks.points:
         ax.plot(
             points.xs,

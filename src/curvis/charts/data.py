@@ -39,14 +39,26 @@ import numpy as np
 import numpy.typing as npt
 
 from curvis.analysis.base import x_column_id
-from curvis.analysis.result import CellMeans, FittedCurve, Result
+from curvis.analysis.result import (
+    DEFAULT_P_DISPLAY,
+    CellMeans,
+    FittedCurve,
+    PairP,
+    PDisplay,
+    Result,
+    p_phrase,
+    stars,
+)
 from curvis.analysis.survival.km import KaplanMeier, kaplan_meier
 from curvis.charts.spec import (
+    COMPARISON_VARIANTS,
     HORIZONTAL_VARIANTS,
     ChartFamily,
     ChartSpec,
     ChartVariant,
     ErrorBars,
+    Grouping,
+    PLabel,
     Scale,
 )
 from curvis.charts.stats import ViolinDensity, histogram_bins, violin_density
@@ -96,12 +108,21 @@ class ChartInputs:
     """Interaction graphs: the cells of the two-way ANOVA (None: it has no result)."""
     line_names: tuple[tuple[str, str], ...] = ()
     """Interaction graphs: (source, name) of each category group the spec draws."""
+    pairs: tuple[PairP, ...] | None = None
+    """Bar-family graphs with comparisons: the analysis' pairs (None: it has no result)."""
+    p_display: PDisplay = DEFAULT_P_DISPLAY
+    """How P values are shown (Settings), for brackets labelled with their P value."""
 
 
-def gather(table: Table, spec: ChartSpec, results: Mapping[str, Result]) -> ChartInputs:
+def gather(
+    table: Table,
+    spec: ChartSpec,
+    results: Mapping[str, Result],
+    p_display: PDisplay = DEFAULT_P_DISPLAY,
+) -> ChartInputs:
     """Copy what ``spec`` draws out of ``table``; ``results`` are the analysis results
-    by id (for fit overlays and interaction graphs). Series whose source is gone are
-    counted, not drawn."""
+    by id (for fit overlays, interaction graphs and comparisons). Series whose source is
+    gone are counted, not drawn."""
     if spec.family is ChartFamily.INTERACTION:
         return _gather_interaction(table, spec, results)
     if spec.family is ChartFamily.SURVIVAL:
@@ -139,7 +160,20 @@ def gather(table: Table, spec: ChartSpec, results: Mapping[str, Result]) -> Char
             if result is None:
                 continue
             curves.extend(CurveInput(c, overlay.show_band) for c in result.curves)
-    return ChartInputs(spec, x, tuple(inputs), tuple(curves), missing, tuple(notes))
+    pairs: tuple[PairP, ...] | None = None
+    if spec.family is ChartFamily.BAR and spec.comparisons is not None:
+        compared = results.get(spec.comparisons.analysis_id)
+        pairs = compared.pairs if compared is not None else None
+    return ChartInputs(
+        spec,
+        x,
+        tuple(inputs),
+        tuple(curves),
+        missing,
+        tuple(notes),
+        pairs=pairs,
+        p_display=p_display,
+    )
 
 
 def _gather_interaction(
@@ -174,6 +208,12 @@ def _gather_survival(table: Table, spec: ChartSpec) -> ChartInputs:
 
 NO_TWO_WAY_RESULT = (
     "The two-way ANOVA this graph draws has no results. Check it in the Results panel."
+)
+NO_COMPARISON_RESULT = (
+    "The analysis whose comparisons this graph shows has no results. Check it in the Results panel."
+)
+COMPARISONS_NOT_DRAWN = (
+    "Comparisons are drawn on bar, box, violin and column scatter graphs that are not grouped."
 )
 
 
@@ -303,6 +343,17 @@ class SurvivalCurveData:
 
 
 @dataclass(frozen=True)
+class PairMark:
+    """One comparison bracket to draw: between the series ``first`` and ``second``, with
+    ``text`` above it (stars, "ns" or a P value)."""
+
+    first: str
+    second: str
+    text: str
+    p_value: float
+
+
+@dataclass(frozen=True)
 class ChartData:
     family: ChartFamily
     variant: ChartVariant
@@ -316,6 +367,8 @@ class ChartData:
     survival: tuple[SurvivalCurveData, ...] = ()
     """Survival graphs: one Kaplan-Meier curve per Time + Event pair."""
     histogram: HistogramData | None = None
+    pairs: tuple[PairMark, ...] = ()
+    """Bar-family graphs: the comparison brackets to draw, in the analysis' order."""
 
 
 # --- statistics ------------------------------------------------------------------------
@@ -410,12 +463,52 @@ def compute(inputs: ChartInputs) -> ChartData:
                 f"{outside} value{'s' if many else ''} below the start of the bins "
                 f"{'are' if many else 'is'} left out."
             )
+        _pair_marks(inputs, notes)  # says that a histogram draws no comparisons
         return ChartData(spec.family, spec.variant, notes=tuple(notes), histogram=histogram)
     categories, dropped = _categories(inputs)
     if dropped:
         s = "s" if dropped != 1 else ""
         notes.append(f"{dropped} value{s} at or below 0 cannot be shown on a log axis.")
-    return ChartData(spec.family, spec.variant, categories=categories, notes=tuple(notes))
+    pairs = _pair_marks(inputs, notes)
+    return ChartData(
+        spec.family, spec.variant, categories=categories, notes=tuple(notes), pairs=pairs
+    )
+
+
+def comparisons_drawn(spec: ChartSpec) -> bool:
+    """Whether ``spec``'s variant and grouping can draw comparison brackets."""
+    return spec.variant in COMPARISON_VARIANTS and spec.grouping is Grouping.NONE
+
+
+def pair_text(p: float, label: PLabel, display: PDisplay = DEFAULT_P_DISPLAY) -> str:
+    """What a bracket shows: stars ("ns" when not significant), or "P = 0.012" /
+    "P < 0.001" as the Settings show P values."""
+    if label is PLabel.P_VALUE:
+        return p_phrase(p, display)
+    return stars(p) or "ns"
+
+
+def _pair_marks(inputs: ChartInputs, notes: list[str]) -> tuple[PairMark, ...]:
+    """The brackets of the graph's comparisons: the significant pairs, and the others
+    when it shows "ns" too."""
+    spec = inputs.spec
+    comparisons = spec.comparisons
+    if comparisons is None:
+        return ()
+    if not comparisons_drawn(spec):
+        notes.append(COMPARISONS_NOT_DRAWN)
+        return ()
+    if inputs.pairs is None:
+        notes.append(NO_COMPARISON_RESULT)
+        return ()
+    out: list[PairMark] = []
+    for pair in inputs.pairs:
+        significant = bool(stars(pair.p_value))
+        if not (significant or comparisons.show_ns) or math.isnan(pair.p_value):
+            continue
+        text = pair_text(pair.p_value, comparisons.label, inputs.p_display)
+        out.append(PairMark(pair.first, pair.second, text, pair.p_value))
+    return tuple(out)
 
 
 def _histogram(inputs: ChartInputs) -> tuple[HistogramData, int]:
