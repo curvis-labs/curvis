@@ -10,7 +10,15 @@ from typing import TYPE_CHECKING
 from weakref import WeakKeyDictionary
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QDialog, QLabel, QSplitter, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QLabel,
+    QSplitter,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from curvis.analysis.result import DEFAULT_P_DISPLAY, PDisplay
 from curvis.charts.colors import ColorScheme
@@ -743,10 +751,32 @@ class DocumentTab(QWidget):
         else:
             self._sync_tabs()
 
+    def focus_next_pane(self, step: int = 1) -> None:
+        """Move the keyboard focus to the next pane (F6), or the previous one (Shift+F6):
+        the table, the side panel shown (Results or Graph) and the table tabs. Tab cannot
+        leave the table, where it moves between cells, so these keys are the way out."""
+        panes: list[QWidget] = [
+            w
+            for w in (self.table_view, self.side_tabs.currentWidget(), self.table_tabs)
+            if w is not None
+        ]
+        panes = [p for p in panes if p.isVisible()]
+        if not panes:
+            return
+        focus = QApplication.focusWidget()
+        here = next((i for i, p in enumerate(panes) if focus is p or p.isAncestorOf(focus)), -1)
+        if here < 0:
+            here = 0 if step < 0 else len(panes) - 1  # outside every pane: start from the ends
+        target = panes[(here + step) % len(panes)]
+        first_focusable(target).setFocus(Qt.FocusReason.TabFocusReason)
+
     def _sync_tabs(self) -> None:
         tables = self.document.tables
         if self._table_id is not None:
             self._table_index = self.document.table_index(self._table_id)
+            if self.table_view is not None:
+                name = self.document.table(self._table_id).name
+                self.table_view.setAccessibleName(f"Table {name}")
         self.table_tabs.set_tables([(t.id, t.name) for t in tables], self._table_id)
 
     def _show_table(self, table_id: str | None) -> None:
@@ -781,6 +811,24 @@ class DocumentTab(QWidget):
         self.results_panel.set_table(table_id)
         self.graph_panel.set_table(table_id)
         self.state_changed.emit()
+
+
+def first_focusable(container: QWidget) -> QWidget:
+    """The first widget in ``container`` that Tab can reach (``container`` if none)."""
+    if container.focusPolicy() & Qt.FocusPolicy.TabFocus and container.isEnabled():
+        return container
+    widget = container.nextInFocusChain()
+    while widget is not container:
+        if (
+            container.isAncestorOf(widget)
+            and widget.isVisibleTo(container)
+            and widget.isEnabled()
+            and widget.focusPolicy() & Qt.FocusPolicy.TabFocus
+            and widget.focusProxy() is None
+        ):
+            return widget
+        widget = widget.nextInFocusChain()
+    return container
 
 
 def is_empty_table(table: Table) -> bool:

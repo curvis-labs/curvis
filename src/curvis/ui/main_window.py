@@ -89,6 +89,8 @@ TABLE_ACTIONS = (
     "graph.plot",
     "view.results",
     "view.graph",
+    "view.next_pane",
+    "view.previous_pane",
 )
 """Actions that need a table view in the current tab."""
 
@@ -532,6 +534,20 @@ class MainWindow(QMainWindow):
             category="View",
         )
         r.register(
+            "view.next_pane",
+            "Ne&xt pane",
+            self._tab_call(functools.partial(DocumentTab.focus_next_pane, step=1)),
+            category="View",
+            shortcut="F6",
+        )
+        r.register(
+            "view.previous_pane",
+            "Previous pa&ne",
+            self._tab_call(functools.partial(DocumentTab.focus_next_pane, step=-1)),
+            category="View",
+            shortcut="Shift+F6",
+        )
+        r.register(
             "view.graph",
             "&Graph panel",
             self._tab_call(DocumentTab.show_graph),
@@ -649,7 +665,8 @@ class MainWindow(QMainWindow):
         graph_menu.addSeparator()
         graph_menu.addAction(a("graph.delete"))
         self._view_menu.insertActions(
-            self._view_menu.actions()[0], [a("view.results"), a("view.graph")]
+            self._view_menu.actions()[0],
+            [a("view.results"), a("view.graph"), a("view.next_pane"), a("view.previous_pane")],
         )
         self._view_menu.insertSeparator(a("view.command_palette"))
         self._view_menu.insertActions(
