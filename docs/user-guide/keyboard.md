@@ -47,6 +47,7 @@ panel next to it and back. **View › Next pane** and **Previous pane** do the s
 | Ctrl+Shift+K | Calculate |
 | Ctrl+Shift+E | Edit calculation |
 | Ctrl+Shift+A | Analyze |
+| Ctrl+Shift+M | Rename graph |
 | Ctrl+Shift+F | Format graph |
 | Ctrl+Shift+X | Export graph |
 | Ctrl+, | Settings |

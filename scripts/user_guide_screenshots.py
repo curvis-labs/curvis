@@ -109,6 +109,14 @@ def group_comparison_results(window: MainWindow) -> None:
     tab.show_results()
 
 
+def group_comparison_brackets(window: MainWindow) -> None:
+    tab = window.new_from_sample("group_comparison")
+    tab.show_graph()
+    pump(QApplication.instance(), window)  # type: ignore[arg-type]
+    analysis = tab.document.analyses[0]
+    tab.set_comparisons(analysis.id)
+
+
 def categories(window: MainWindow) -> None:
     tab = window._add_tab(two_way_document(), None)
     tab.show_results()
@@ -151,6 +159,7 @@ def main() -> None:
             window_shot(settings, app, "main-window", dose_response_results)
             window_shot(settings, app, "graph-panel", dose_response_graph)
             window_shot(settings, app, "results-panel", group_comparison_results)
+            window_shot(settings, app, "graph-comparisons", group_comparison_brackets)
             window_shot(settings, app, "categories", categories, (1400, 620))
         finally:
             ctx.scheduler.shutdown()
