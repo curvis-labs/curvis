@@ -1,9 +1,10 @@
 """Benchmark: a recovery copy of a 10 MB project never blocks the UI thread for > 16 ms.
 
 The UI thread does two things for a copy: it takes a snapshot of the document (plain
-data) and hands the write to the scheduler. The write itself runs on a worker thread;
-while it runs, a 1 ms timer on the UI thread records the longest gap between its ticks,
-which is how long the window could not respond (the worker holding the GIL, say).
+data that shares the column arrays, so it copies no cells) and hands the write to the
+scheduler. The write itself runs on a worker thread; while it runs, a 1 ms timer on the
+UI thread records the longest gap between its ticks, which is how long the window could
+not respond (the worker holding the GIL, say).
 
 The warm-up round writes the session's first copy, which loads what pyarrow loads on
 first use; in the app the preloader has loaded those modules long before the first

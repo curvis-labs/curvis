@@ -39,8 +39,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 from curvis.core.calculations import Calculation
 from curvis.core.change_log import ChangeLog
 from curvis.core.constants import ProjectConstant
@@ -437,8 +435,11 @@ def _remove_if_empty(folder: Path) -> None:
 
 def snapshot(document: Document) -> Document:
     """A copy of ``document`` that later commands cannot change, for writing on a worker
-    thread. Cheap: column arrays are copied as blocks (commands change them in place),
-    frozen definitions are shared. Its undo stack is new and empty."""
+    thread. Cheap, whatever the size of the data: column arrays never change once made
+    (a command puts a new array in the column, :func:`curvis.data.column.with_cells`), so
+    the copy shares them, and frozen definitions too. Only the small mutable objects
+    around them (tables, columns, groups, settings) are copied. Its undo stack is new and
+    empty."""
     tables = [
         Table(
             name=t.name,
@@ -469,8 +470,11 @@ def snapshot(document: Document) -> Document:
 
 
 def _copy_column(column: Column) -> Column:
-    values = np.array(column.values, copy=True)
-    values.flags.writeable = False
+    if column.values.flags.writeable:  # never in the app; a copy keeps the snapshot safe
+        values = column.values.copy()
+        values.flags.writeable = False
+    else:
+        values = column.values  # read-only and never changed in place: shared
     copy = Column.__new__(Column)  # skip coerce_values: the array is right already
     copy.name = column.name
     copy.role = column.role

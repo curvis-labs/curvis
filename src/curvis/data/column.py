@@ -3,13 +3,13 @@
 Numeric columns hold ``float64`` arrays with NaN for missing values. Text columns
 hold ``object`` arrays of ``str`` with ``None`` for missing values.
 
-Column arrays are stored read-only so nothing outside a command can change cells
-by accident. Commands unlock an array briefly with :func:`writable`.
+Column arrays are read-only and never change once made: a command that changes cells
+puts a new array in the column (:func:`with_cells`). So anything that holds an array,
+such as a recovery copy being written on a worker thread, can keep it without copying.
 """
 
 import math
-from collections.abc import Iterable, Iterator
-from contextlib import contextmanager
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -28,14 +28,12 @@ def _freeze(arr: npt.NDArray[Any]) -> npt.NDArray[Any]:
     return arr
 
 
-@contextmanager
-def writable(arr: npt.NDArray[Any]) -> Iterator[npt.NDArray[Any]]:
-    """Make a column array writable for the duration of the block (commands only)."""
-    arr.flags.writeable = True
-    try:
-        yield arr
-    finally:
-        arr.flags.writeable = False
+def with_cells(values: npt.NDArray[Any], start: int, cells: Any) -> npt.NDArray[Any]:
+    """A new read-only array: ``values`` with ``cells`` written from row ``start`` on.
+    ``values`` itself is left as it is (commands only)."""
+    arr = values.copy()
+    arr[start : start + len(cells)] = cells
+    return _freeze(arr)
 
 
 def format_number(value: float) -> str | None:

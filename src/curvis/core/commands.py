@@ -28,7 +28,7 @@ from curvis.data import (
     new_id,
     normalized_order,
 )
-from curvis.data.column import coerce_cell, convert_values, role_problem, writable
+from curvis.data.column import coerce_cell, convert_values, role_problem, with_cells
 from curvis.data.layout import (
     FULL_NAME_SEPARATOR,
     column_by_full_name,
@@ -1166,15 +1166,13 @@ class SetCellBlock(Command):
         self._old_values = []
         for column, new in zip(columns, cells, strict=True):
             self._old_values.append(column.values[self.top_row : end].copy())
-            with writable(column.values) as arr:
-                arr[self.top_row : end] = new
+            column.values = with_cells(column.values, self.top_row, new)
 
     def undo(self, doc: Document) -> None:
         table = doc.table(self.table_id)
-        end = self.top_row + self._height
         for column_id, old in zip(self._column_ids, self._old_values, strict=True):
-            with writable(table.column(column_id).values) as arr:
-                arr[self.top_row : end] = old
+            column = table.column(column_id)
+            column.values = with_cells(column.values, self.top_row, old)
         table.resize(self._old_rows)
 
     @property

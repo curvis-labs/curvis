@@ -2,6 +2,7 @@
 
 import json
 import threading
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import numpy as np
 import pytest
 
 from curvis.core import Document
-from curvis.core.commands import RenameTable, SetCellValue
+from curvis.core.commands import RenameTable, SetCellBlock, SetCellValue, SetColumnRole
 from curvis.data import Table
 from curvis.io import project
 from curvis.io.recovery import CopyInfo, RecoveryStore, snapshot
@@ -242,6 +243,34 @@ def test_snapshot_does_not_change_when_the_document_does() -> None:
     assert len(copy.change_log) == 1
     assert not copy.tables[0].columns[1].values.flags.writeable
     assert copy.undo_stack.count == 0
+
+
+def test_snapshot_shares_the_column_arrays() -> None:
+    doc = edited_document()
+    copy = snapshot(doc)
+    for table, copied in zip(doc.tables, copy.tables, strict=True):
+        assert copied is not table
+        for column, copied_column in zip(table.columns, copied.columns, strict=True):
+            assert copied_column is not column
+            assert copied_column.values is column.values
+
+
+def test_snapshot_keeps_its_values_through_edits_undo_and_redo() -> None:
+    doc = edited_document()
+    table = doc.tables[0]
+    x, a = table.columns[0], table.columns[1]
+    copy = snapshot(doc)
+    expected = deepcopy(copy.tables[0])
+    doc.execute(SetCellBlock(table.id, 0, 0, [[1.0, 2.0], [3.0, 4.0]]))
+    doc.execute(SetCellValue(table.id, a.id, 9, 7.0))  # adds rows
+    doc.undo()
+    doc.redo()
+    doc.execute(SetColumnRole(table.id, x.id, "Text"))
+    doc.execute(SetCellValue(table.id, x.id, 0, "label"))
+    for _ in range(4):
+        doc.undo()
+    assert copy.tables[0] == expected
+    assert copy.tables[0].n_rows == 1
 
 
 def test_snapshot_writes_the_same_project_as_the_document(tmp_path: Path) -> None:

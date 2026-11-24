@@ -2,8 +2,9 @@
 
 At each tick (every few minutes, as set in Settings) a document gets a copy only when it
 has unsaved changes and has changed since its last copy. The document is copied on the
-main thread (:func:`curvis.io.recovery.snapshot`, plain data and cheap) and written on a
-worker thread through the scheduler, so the window never waits for the disk. A newer
+main thread (:func:`curvis.io.recovery.snapshot`: it shares the column arrays, which never
+change once made, so it costs well under a millisecond whatever the size of the data) and
+written on a worker thread through the scheduler, so the window never waits for the disk. A newer
 copy of the same document cancels an older one still being written.
 
 Saving, closing or discarding a document deletes its copy (:meth:`Autosave.saved`,
