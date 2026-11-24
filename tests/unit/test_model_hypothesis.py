@@ -2,6 +2,7 @@
 
 import copy
 from collections import deque
+from typing import Any
 
 from hypothesis import given
 from hypothesis import strategies as st
@@ -198,25 +199,53 @@ def snapshot(doc: Document) -> object:
     return copy.deepcopy((doc.tables, doc.calculations))
 
 
+class ArrayWatch:
+    """Remembers every column array it has seen with its contents, to check that no
+    command changes an array in place (recovery copies share the arrays)."""
+
+    def __init__(self) -> None:
+        self._seen: dict[int, tuple[Any, list[object]]] = {}
+
+    def look(self, doc: Document) -> None:
+        for table in doc.tables:
+            for column in table.columns:
+                values = column.values
+                self._seen.setdefault(id(values), (values, values.tolist()))
+        for values, contents in self._seen.values():
+            assert _same_with_nan(values.tolist(), contents)
+
+
+def _same_with_nan(a: list[object], b: list[object]) -> bool:
+    return len(a) == len(b) and all(
+        x == y or (isinstance(x, float) and isinstance(y, float) and x != x and y != y)
+        for x, y in zip(a, b, strict=True)
+    )
+
+
 @given(doc=documents(), data=st.data())
 def test_random_commands_then_full_undo_restores_document(
     doc: Document, data: st.DataObject
 ) -> None:
     original = snapshot(doc)
+    watch = ArrayWatch()
+    watch.look(doc)
     n_steps = data.draw(st.integers(1, UNDO_LIMIT))
     applied = 0
     for _ in range(n_steps):
         if try_execute(doc, draw_command(data, doc)):
             applied += 1
+        watch.look(doc)
     final = snapshot(doc)
 
     assert doc.undo_stack.index == applied
     while doc.undo_stack.can_undo:
         doc.undo()
+        watch.look(doc)
     assert snapshot(doc) == original
 
     while doc.undo_stack.can_redo:
         doc.redo()
+        watch.look(doc)
     assert snapshot(doc) == final
     assert len(doc.change_log) == 3 * applied
 

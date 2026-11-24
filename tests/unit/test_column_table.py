@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from curvis.data import Column, ColumnRole, Table, name_key
-from curvis.data.column import coerce_cell, convert_values, resized, writable
+from curvis.data.column import coerce_cell, convert_values, resized, with_cells
 
 
 def test_numeric_column_stores_float64_with_nan_for_missing() -> None:
@@ -35,12 +35,13 @@ def test_values_are_copied_and_read_only() -> None:
         col.values[0] = 5.0
 
 
-def test_writable_unlocks_temporarily() -> None:
-    col = Column.new("A", ColumnRole.Y, [1.0])
-    with writable(col.values) as arr:
-        arr[0] = 2.0
-    assert col.values[0] == 2.0
-    assert not col.values.flags.writeable
+def test_with_cells_makes_a_new_array() -> None:
+    col = Column.new("A", ColumnRole.Y, [1.0, 2.0, 3.0])
+    old = col.values
+    new = with_cells(old, 1, [5.0, 6.0])
+    assert new.tolist() == [1.0, 5.0, 6.0]
+    assert old.tolist() == [1.0, 2.0, 3.0]
+    assert not new.flags.writeable
 
 
 def test_role_accepts_string_value() -> None:
