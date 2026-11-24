@@ -190,6 +190,7 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   | Ctrl+Shift+N | New table |
   | Ctrl+Shift+R | Bulk rename |
   | Ctrl+Page Down / Ctrl+Page Up | Next / previous table |
+  | F6 / Shift+F6 | Next / previous pane: the table, the Results or Graph panel, the table tabs |
   | Ctrl+Shift+K | Calculate |
   | Ctrl+Shift+E | Edit calculation |
   | Ctrl+Shift+A | Analyze |

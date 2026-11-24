@@ -705,9 +705,9 @@ Make a plan first. When done, report what you built, test and benchmark results.
 ### Step 4.2 — Robustness, accessibility and documentation
 
 **Done when**
-- [ ] Old-version project files open.
-- [ ] Screen-reader labels and full keyboard access are in place.
-- [ ] User guide covers every feature.
+- [x] Old-version project files open.
+- [x] Screen-reader labels and full keyboard access are in place.
+- [x] User guide covers every feature.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 4.2 in docs/PHASES.md.

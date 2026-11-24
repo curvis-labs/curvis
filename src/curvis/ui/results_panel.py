@@ -262,6 +262,7 @@ class ResultsPanel(QWidget):
         layout.addWidget(self.empty, 1)
 
         self.scroll_area = QScrollArea(self)
+        self.scroll_area.setAccessibleName("Analysis results")
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)

@@ -107,6 +107,53 @@ def test_collect_if_due_follows_the_thresholds(qapp: QApplication) -> None:
             gc.enable()
 
 
+def full_collections() -> int:
+    return int(gc.get_stats()[2]["collections"])
+
+
+def make_cycles(n: int) -> list[object]:
+    """``n`` objects that each reference themselves (kept alive by the list)."""
+    kept: list[object] = []
+    for _ in range(n):
+        cycle: list[object] = []
+        cycle.append(cycle)
+        kept.append(cycle)
+    return kept
+
+
+def test_a_full_collection_waits_for_a_quarter_more_long_lived_objects(
+    qapp: QApplication, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """As in Python: a full collection visits every object, so it waits until the oldest
+    generation has grown by a quarter since the last one, not only for its count."""
+    old = gc.get_threshold()
+    was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        gc.collect()
+        gc.set_threshold(10, 1, 1)
+        monkeypatch.setattr(gc_main_thread, "_long_lived_total", 1_000_000)
+        monkeypatch.setattr(gc_main_thread, "_long_lived_pending", 0)
+        before = full_collections()
+        kept = []
+        for _ in range(20):
+            kept.append(make_cycles(20))  # survivors, promoted to the oldest generation
+            gc_main_thread.collect_if_due()
+        assert full_collections() == before  # 400 new long-lived objects: not a quarter
+        assert gc_main_thread._long_lived_pending >= 300  # less what the young collections freed
+        monkeypatch.setattr(gc_main_thread, "_long_lived_total", 1_000)
+        kept.append(make_cycles(20))
+        gc_main_thread.collect_if_due()
+        assert full_collections() == before + 1
+        assert gc_main_thread._long_lived_pending == 0
+        assert gc_main_thread._long_lived_total >= 400  # counted again after it
+        del kept
+    finally:
+        gc.set_threshold(*old)
+        if was_enabled:
+            gc.enable()
+
+
 def test_hold_and_release_only_on_the_main_thread(qapp: QApplication) -> None:
     errors: list[BaseException] = []
 

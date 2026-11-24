@@ -15,6 +15,12 @@ collection is switched off and a main-thread timer does the same work: every
 ``GarbageCollector`` uses the same approach. When the last holder lets go, automatic
 collection is restored.
 
+Like Python, a full collection (generation 2) waits until the objects that reached the
+oldest generation since the last one are at least a quarter of those that were there
+after it. A full collection visits every tracked object, which takes 100 ms or more on a
+large heap; run each time the generation-2 count passes its threshold, it would stall the
+window every few seconds while the app allocates.
+
 Call :func:`hold` and :func:`release` from the main thread only.
 """
 
@@ -54,6 +60,8 @@ _holders = 0
 _frozen = False
 _reenable = False  # automatic collection was on when it was switched off here
 _collector: _Collector | None = None
+_long_lived_total: int | None = None  # objects in generation 2 after the last full collection
+_long_lived_pending = 0  # objects that have reached generation 2 since then
 
 
 def _check_main_thread() -> None:
@@ -83,6 +91,7 @@ def hold() -> None:
         _collector = _Collector(app)
     _reenable = _reenable or gc.isenabled()
     gc.disable()
+    _count_long_lived()
     _collector.start()
 
 
@@ -107,19 +116,41 @@ def is_held() -> bool:
     return _active() and not gc.isenabled()
 
 
+def _count_long_lived() -> None:
+    """Count the oldest generation once, so the first full collection waits as it would."""
+    global _long_lived_total, _long_lived_pending
+    if _long_lived_total is None:
+        _long_lived_total = len(gc.get_objects(2))
+        _long_lived_pending = 0
+
+
 def collect_if_due() -> int:
     """Collect the generations whose thresholds have been passed, on this thread, as
     Python's automatic collection would. Returns the number of unreachable objects
     found (0 if nothing was due)."""
+    global _long_lived_total, _long_lived_pending
     threshold = gc.get_threshold()
     count = gc.get_count()
     if threshold[0] <= 0 or count[0] <= threshold[0]:
         return 0
     generation = 0
-    for gen in (1, 2):
-        if count[gen] > threshold[gen]:
-            generation = gen
-    return gc.collect(generation)
+    if count[1] > threshold[1]:
+        generation = 1
+    _count_long_lived()
+    total = _long_lived_total or 0
+    if count[2] > threshold[2] and _long_lived_pending >= total / 4:
+        generation = 2
+    if generation == 0:
+        return gc.collect(0)
+    # what survives a collection of the young generations moves to the oldest one
+    young = len(gc.get_objects(0)) + len(gc.get_objects(1))
+    found = gc.collect(generation)
+    if generation == 1:
+        _long_lived_pending += max(young - found, 0)
+    else:
+        _long_lived_total = max(total + _long_lived_pending + young - found, 0)
+        _long_lived_pending = 0
+    return found
 
 
 def freeze_startup_objects() -> None:
@@ -129,10 +160,11 @@ def freeze_startup_objects() -> None:
     Frozen objects are still freed when their reference count drops to zero; only a
     reference cycle made entirely of start-up objects would no longer be collected.
     """
-    global _frozen
+    global _frozen, _long_lived_total, _long_lived_pending
     _check_main_thread()
     if _frozen:
         return
     _frozen = True
     gc.collect()
     gc.freeze()
+    _long_lived_total, _long_lived_pending = 0, 0  # frozen objects are not collected

@@ -2,7 +2,7 @@
 
 Curvis is an open-source desktop application for analyzing and plotting scientific data, comparable to GraphPad Prism. You enter or import measurements into data tables, run statistical tests, curve fits and survival analyses, and draw publication-ready graphs, all from one project window and without writing code. It is aimed at lab scientists, runs on Windows, macOS and Linux, and puts correct statistics first: every analysis is validated against reference results from R.
 
-**New to Curvis?** Read [Getting started](docs/getting-started.md).
+**New to Curvis?** Read [Getting started](docs/getting-started.md), then the [user guide](docs/user-guide/README.md) for every feature.
 
 ## Development
 

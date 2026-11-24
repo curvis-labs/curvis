@@ -6,14 +6,19 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A newer push to a pull request cancels its older run. Runs on main are never cancelled:
+# each merge gets a complete run, so a red main points at one merge.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # Tests take about 10 minutes on the slowest runner; a stuck job fails instead of
+    # holding the run for GitHub's six-hour limit.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -67,6 +72,7 @@ jobs:
   validation:
     name: validation (R reference results)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
@@ -93,6 +99,7 @@ jobs:
   bench:
     name: benchmarks
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     env:
       QT_QPA_PLATFORM: offscreen
       # The commit to compare with: the PR base, the previous main, or main.

@@ -5,9 +5,9 @@ statistical test or a curve fit, and export a graph for a paper or slides. This 
 takes you from installing Curvis to an exported dose-response graph in about five
 minutes.
 
-This is a **beta** (version 0.1.0b1). The core analyses are checked against R, but some
-features in the plan are not there yet: Excel import, two-way ANOVA, Kruskal-Wallis,
-survival curves and some fits. Please tell us what works and what does not.
+This is a **beta** (version 0.1.0b1). Every analysis is checked against R. The
+[user guide](user-guide/README.md) covers every feature, one area per page. Please tell
+us what works and what does not.
 
 ## 1. Install
 
