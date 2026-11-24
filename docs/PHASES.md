@@ -740,7 +740,7 @@ Draw the P values the comparison analyses already report (no new statistics) as 
 
 **Done when**
 - [ ] A generated validation report lists every analysis, its R reference, versions and measured agreement.
-- [ ] Signed installers for Windows and macOS and an AppImage for Linux are attached to the v1.0.0 release.
+- [ ] Installers for Windows and macOS and an AppImage for Linux are attached to the v1.0.0 release. (Unsigned: the project owner decided on 2026-11-24 not to sign 1.0.)
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 4.3 in docs/PHASES.md.

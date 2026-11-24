@@ -8,8 +8,9 @@ version opens in every later version.
 The first stable release. Every analysis is checked against reference results from R
 and, for curve fits, the NIST Statistical Reference Datasets; the
 [validation report](docs/validation-report.md) lists each one with its R reference and
-the largest difference found. The Windows installer is signed, and the macOS app is
-signed and notarized by Apple, so neither warns before the first start any more.
+the largest difference found. The installers are not signed, so Windows and macOS
+warn before the first start; [Getting started](docs/getting-started.md) shows how to
+open Curvis anyway.
 
 ### New since the 0.1.0 beta
 

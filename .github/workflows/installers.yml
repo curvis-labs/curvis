@@ -1,25 +1,14 @@
 name: Installers
 
-# Builds installers for Windows, macOS and Linux and checks that each one starts the
-# app. The installers are uploaded as artifacts.
-#
-# CI (ci.yml) builds them unsigned. With `sign: true` (release.yml, or a manual run from
-# the Actions tab) the Windows installer is signed and the macOS app is signed,
-# notarized and stapled; the run fails if a signing secret is missing. The secrets are
-# listed in docs/releasing.md.
+# Builds unsigned installers for Windows, macOS and Linux and checks that each one
+# starts the app (1.0 is not signed, by the project owner's decision). The installers
+# are uploaded as artifacts.
+
+# Run as part of CI (ci.yml calls it, and its concurrency setting covers these jobs),
+# or on its own from the Actions tab.
 on:
   workflow_call:
-    inputs:
-      sign:
-        description: Sign (and notarize) the Windows and macOS installers
-        type: boolean
-        default: false
   workflow_dispatch:
-    inputs:
-      sign:
-        description: Sign (and notarize) the Windows and macOS installers
-        type: boolean
-        default: false
 
 env:
   # Quit as soon as the launcher has been shown (see curvis.app).
@@ -130,37 +119,16 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :CFBundleDocumentTypes:0:LSItemContentTypes:0" "$plist"
           /usr/libexec/PlistBuddy -c "Print :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0" "$plist" | grep -qx cvp
 
-      - name: Sign the app
-        if: inputs.sign
-        env:
-          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-        run: packaging/macos/sign.sh dist/Curvis.app
-
       - name: Build .dmg
         run: |
           dmg="dist/Curvis-${VERSION}-macos-$(uname -m).dmg"
           hdiutil create -volname Curvis -srcfolder dist/Curvis.app -ov -format UDZO "$dmg"
           echo "DMG=$dmg" >> "$GITHUB_ENV"
 
-      - name: Sign, notarize and staple the .dmg
-        if: inputs.sign
-        env:
-          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-        run: packaging/macos/notarize.sh "$DMG"
-
       - name: Smoke test the .dmg
         run: |
           hdiutil attach "$DMG" -mountpoint /Volumes/Curvis -nobrowse
           time /Volumes/Curvis/Curvis.app/Contents/MacOS/Curvis
-          if [[ "${{ inputs.sign }}" == "true" ]]; then
-            # Gatekeeper accepts the signed, notarized app as a user's Mac would.
-            spctl --assess --type execute --verbose=2 /Volumes/Curvis/Curvis.app
-          fi
           hdiutil detach /Volumes/Curvis
 
       - uses: actions/upload-artifact@v7

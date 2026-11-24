@@ -1,10 +1,8 @@
 name: Release
 
-# Pushing a tag such as v1.0.0 builds the signed installers for Windows, macOS and
-# Linux (installers.yml: each one is installed and started on its runner), writes the
+# Pushing a tag such as v1.0.0 builds the installers for Windows, macOS and Linux (installers.yml: each one is installed and started on its runner), writes the
 # validation report, and publishes them all as a GitHub release whose notes are the
 # version's section of CHANGELOG.md. A tag with a hyphen (v1.0.0-rc1) is a pre-release.
-# The steps and the signing secrets are in docs/releasing.md.
 #
 #     git tag -a v1.0.0 -m "Curvis 1.0.0" && git push origin v1.0.0
 
@@ -23,9 +21,6 @@ jobs:
   installers:
     name: installers
     uses: ./.github/workflows/installers.yml
-    with:
-      sign: true
-    secrets: inherit
 
   validation:
     name: validation report

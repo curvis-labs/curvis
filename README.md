@@ -50,7 +50,7 @@ packaging/linux/build-deb.sh 1.0.0                     # Linux: dist/curvis_1.0.
 
 ### Releases
 
-Pushing a version tag builds the installers (signed on Windows, signed and notarized on macOS), writes the validation report and publishes them as a GitHub release (`.github/workflows/release.yml`); a tag with a hyphen, such as `v1.0.0-rc1`, is a pre-release. The release notes are the version's section of `CHANGELOG.md`. The checklist and the signing secrets are in `docs/releasing.md`.
+Pushing a version tag builds the installers (unsigned), writes the validation report and publishes them as a GitHub release (`.github/workflows/release.yml`); a tag with a hyphen, such as `v1.0.0-rc1`, is a pre-release. The release notes are the version's section of `CHANGELOG.md`.
 
 ```bash
 git tag -a v1.0.0 -m "Curvis 1.0.0" && git push origin v1.0.0

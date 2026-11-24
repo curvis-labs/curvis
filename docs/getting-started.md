@@ -5,22 +5,22 @@ statistical test or a curve fit, and export a graph for a paper or slides. This 
 takes you from installing Curvis to an exported dose-response graph in about five
 minutes.
 
-This is a **beta** (version 0.1.0b1). Every analysis is checked against R. The
-[user guide](user-guide/README.md) covers every feature, one area per page. Please tell
-us what works and what does not.
+This guide is for version 1.0.0. Every analysis is checked against R; the
+[validation report](validation-report.md) lists each one with the largest difference
+found. The [user guide](user-guide/README.md) covers every feature, one area per page.
 
 ## 1. Install
 
 Download the installer for your computer from the
-[v0.1.0-beta release](https://github.com/curvis-labs/curvis/releases/tag/v0.1.0-beta).
-The installers are not signed yet, so Windows and macOS ask before the first start.
+[v1.0.0 release](https://github.com/curvis-labs/curvis/releases/tag/v1.0.0).
+The installers are not signed, so Windows and macOS ask before the first start.
 
 | Computer | File | How to install |
 | --- | --- | --- |
-| Windows 10 or 11 | `Curvis-0.1.0b1-setup.exe` | Run it. If Windows says "Windows protected your PC", click **More info**, then **Run anyway**. No administrator rights are needed. |
-| Mac with Apple silicon (M1 or later), macOS 12 or later | `Curvis-0.1.0b1-macos-arm64.dmg` | Open it and drag **Curvis** to **Applications**. The first time, right-click Curvis in Applications and choose **Open**, then **Open** again (or allow it under **System Settings › Privacy & Security**). |
-| Linux: Debian, Ubuntu | `curvis_0.1.0b1_amd64.deb` | `sudo apt install ./curvis_0.1.0b1_amd64.deb`, then start Curvis from the app menu or with `curvis`. |
-| Linux: other | `Curvis-0.1.0b1-x86_64.AppImage` | `chmod +x Curvis-0.1.0b1-x86_64.AppImage`, then run it. |
+| Windows 10 or 11 | `Curvis-1.0.0-setup.exe` | Run it. If Windows says "Windows protected your PC", click **More info**, then **Run anyway**. No administrator rights are needed. |
+| Mac with Apple silicon (M1 or later), macOS 12 or later | `Curvis-1.0.0-macos-arm64.dmg` | Open it and drag **Curvis** to **Applications**. The first time, right-click Curvis in Applications and choose **Open**, then **Open** again (or allow it under **System Settings › Privacy & Security**). |
+| Linux: Debian, Ubuntu | `curvis_1.0.0_amd64.deb` | `sudo apt install ./curvis_1.0.0_amd64.deb`, then start Curvis from the app menu or with `curvis`. |
+| Linux: other | `Curvis-1.0.0-x86_64.AppImage` | `chmod +x Curvis-1.0.0-x86_64.AppImage`, then run it. |
 
 The installer for Windows, the Mac app and the `.deb` let you open `.cvp` project files
 with a double-click.

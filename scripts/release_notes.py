@@ -68,6 +68,8 @@ def notes(tag: str, repository: str = "curvis-labs/curvis") -> str:
 - **macOS** (Apple silicon): `Curvis-{version}-macos-arm64.dmg`
 - **Linux**: `curvis_{version}_amd64.deb` (Debian, Ubuntu) or `Curvis-{version}-x86_64.AppImage`
 
+The installers are not signed, so Windows and macOS warn before the first start.
+
 [Getting started]({base}/docs/getting-started.md) explains how to install, and how to go
 from a CSV file to an exported graph; the [user guide]({base}/docs/user-guide) covers
 every feature. The validation report is attached as `curvis-validation-report.pdf`.
