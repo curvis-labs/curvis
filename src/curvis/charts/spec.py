@@ -88,6 +88,10 @@ _VARIANT_FAMILY = {
 }
 
 
+COMPARISON_VARIANTS = frozenset(
+    {ChartVariant.BAR, ChartVariant.BOX, ChartVariant.VIOLIN, ChartVariant.COLUMN_SCATTER}
+)
+"""Variants that draw comparison brackets (when not grouped)."""
 XY_VARIANTS = frozenset({ChartVariant.SCATTER, ChartVariant.LINE, ChartVariant.INTERACTION})
 """Variants drawn as points with error bars (an interaction graph draws its lines so)."""
 LINE_VARIANTS = frozenset({ChartVariant.LINE, ChartVariant.INTERACTION})
@@ -286,6 +290,30 @@ class FitOverlay:
     """Also draw the confidence band."""
 
 
+class PLabel(StrEnum):
+    """What a comparison bracket has above it."""
+
+    STARS = "stars"
+    """* P < 0.05, ** P < 0.01, *** P < 0.001 (and "ns" when shown)."""
+    P_VALUE = "p_value"
+    """The P value, as the Settings show P values."""
+
+    @property
+    def label(self) -> str:
+        return {"stars": "Stars", "p_value": "P value"}[self.value]
+
+
+@dataclass(frozen=True)
+class Comparisons:
+    """The comparisons of a group-comparison analysis (t-test, Mann-Whitney U, one-way
+    ANOVA, Kruskal-Wallis), drawn as brackets between the groups of a bar-family graph."""
+
+    analysis_id: str
+    label: PLabel = PLabel.STARS
+    show_ns: bool = False
+    """Also draw the pairs that are not significant (P ≥ 0.05), marked "ns"."""
+
+
 @dataclass(frozen=True)
 class ChartSpec:
     """A graph as the document stores it."""
@@ -294,6 +322,9 @@ class ChartSpec:
     family: ChartFamily
     variant: ChartVariant
     series: tuple[SeriesSpec, ...] = ()
+    name: str = ""
+    """The graph's name in the Graph panel ("" until renamed: "Bar graph 2"). Unlike
+    the title, it is not drawn on the graph."""
     x_axis: AxisSpec = AxisSpec()
     y_axis: AxisSpec = AxisSpec()
     title: str = ""
@@ -320,6 +351,8 @@ class ChartSpec:
     """Violins end at the smallest and largest value (False: 3 bandwidths further)."""
     bins: HistogramBins = HistogramBins()
     """Histograms: how the bins are chosen."""
+    comparisons: Comparisons | None = None
+    """Bar-family graphs: the comparisons drawn as brackets between the groups."""
     id: str = field(default_factory=new_id)
 
     def __post_init__(self) -> None:
@@ -405,6 +438,8 @@ def spec_problem(spec: ChartSpec) -> str | None:
     overlays = [o.analysis_id for o in spec.overlays]
     if len(set(overlays)) != len(overlays):
         return "a fit is overlaid twice"
+    if spec.comparisons is not None and spec.family is not ChartFamily.BAR:
+        return "only bar-family graphs show comparisons"
     return None
 
 
@@ -425,9 +460,11 @@ def spec_to_json(spec: ChartSpec) -> dict[str, Any]:
         "series": [_series_to_json(s) for s in spec.series],
         "x_axis": _axis_to_json(spec.x_axis),
         "y_axis": _axis_to_json(spec.y_axis),
+        "name": spec.name,
         "title": spec.title,
         "aspect_ratio": spec.aspect_ratio,
         "custom_size": None if spec.custom_size is None else list(spec.custom_size),
+        "comparisons": _comparisons_to_json(spec.comparisons),
         "palette": palette_to_json(spec.palette),
         "font": spec.font,
         "text_size": spec.text_size,
@@ -490,6 +527,27 @@ def _series_to_json(s: SeriesSpec) -> dict[str, Any]:
     }
 
 
+def _comparisons_to_json(comparisons: Comparisons | None) -> dict[str, Any] | None:
+    if comparisons is None:
+        return None
+    return {
+        "analysis_id": comparisons.analysis_id,
+        "label": comparisons.label.value,
+        "show_ns": comparisons.show_ns,
+    }
+
+
+def _comparisons_from_json(data: Any) -> Comparisons | None:
+    if data is None:
+        return None
+    obj = _obj(data, "comparisons")
+    return Comparisons(
+        _str(obj.get("analysis_id"), "comparisons analysis_id"),
+        _enum(PLabel, obj.get("label", PLabel.STARS), "comparisons label"),
+        _bool(obj.get("show_ns", False), "comparisons show_ns"),
+    )
+
+
 def _axis_to_json(axis: AxisSpec) -> dict[str, Any]:
     return {
         "title": axis.title,
@@ -524,6 +582,7 @@ def spec_from_json(data: Any) -> ChartSpec:
             family=family,
             variant=_enum(ChartVariant, obj.get("variant"), "variant"),
             series=series,
+            name=_str(obj.get("name", ""), "name"),
             x_axis=_axis_from_json(obj.get("x_axis", {}), "x_axis"),
             y_axis=_axis_from_json(obj.get("y_axis", {}), "y_axis"),
             title=_str(obj.get("title", ""), "title"),
@@ -546,6 +605,7 @@ def spec_from_json(data: Any) -> ChartSpec:
             show_points=_bool(obj.get("show_points", False), "show_points"),
             violin_trim=_bool(obj.get("violin_trim", True), "violin_trim"),
             bins=_bins_from_json(obj.get("bins", {})),
+            comparisons=_comparisons_from_json(obj.get("comparisons")),
         )
     except TypeError as exc:  # pragma: no cover - guarded by the checks above
         raise ValueError(str(exc)) from None

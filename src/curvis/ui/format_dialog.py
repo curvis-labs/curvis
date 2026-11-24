@@ -69,15 +69,17 @@ from PySide6.QtWidgets import (
 )
 
 from curvis.analysis.base import Analysis, analysis_labels
-from curvis.analysis.result import Result
+from curvis.analysis.result import DEFAULT_P_DISPLAY, PDisplay, Result
 from curvis.charts.builder import (
     GRAPH_TYPES,
     INTERACTION_ONLY,
     SURVIVAL_ONLY,
+    comparison_problem,
     default_series_of,
     error_column_of,
     first_factor_name,
     graph_series_names,
+    is_comparison,
     is_fit,
     two_way_analyses,
     variant_problem,
@@ -104,17 +106,19 @@ from curvis.charts.spec import (
     ChartFamily,
     ChartSpec,
     ChartVariant,
+    Comparisons,
     ErrorBars,
     FitOverlay,
     Grouping,
     HistogramBins,
     LabelAngle,
     LineStyle,
+    PLabel,
     Scale,
     SeriesSpec,
     Symbol,
 )
-from curvis.core import Document
+from curvis.core import MAX_GRAPH_NAME, Document, default_graph_names, graph_names
 from curvis.data import Table
 from curvis.data import series as _table_series
 from curvis.ui.dialogs import (
@@ -138,10 +142,10 @@ if TYPE_CHECKING:
 GRAPH, AXES, SERIES, COLORS = range(4)
 SECTIONS = ("Graph", "Axes", "Series", "Colors and text")
 DESCRIPTIONS = (
-    "The title, type, size and legend of the graph.",
+    "The name, title, type, size and legend of the graph.",
     "Titles, ranges, labels and scales of the axes.",
-    "Symbols, lines, colors, error bars and fitted curves. Select several series to change "
-    "them together.",
+    "Symbols, lines, colors, error bars, fitted curves and comparisons. Select several "
+    "series to change them together.",
     "The colors, the font and the size of the graph's text.",
 )
 MIXED = "Mixed"
@@ -175,6 +179,12 @@ Y_ANGLE_NOTE = "Y axis labels are always horizontal."
 FIT_PREFIX = "fit:"
 """Item data of a fitted curve in the series list: the prefix and the analysis id."""
 FIT_NOTE = "A fitted curve is drawn in the color of its series. Remove takes it off the graph."
+COMPARISONS_KEY = "comparisons"
+"""Item data of the comparison brackets in the series list."""
+COMPARISONS_NOTE = (
+    "Brackets join the groups the analysis compared. * P < 0.05, ** P < 0.01, "
+    "*** P < 0.001. Remove takes them off the graph."
+)
 EVERY_SERIES_SHOWN = "Every series of the table is in the graph."
 LAST_SERIES = "A graph needs at least one series."
 PREVIEW_NODE = "format-preview"
@@ -238,6 +248,8 @@ def data_key(spec: ChartSpec) -> object:
         spec.show_points,
         spec.violin_trim,
         spec.bins,
+        spec.comparisons,
+        spec.grouping if spec.comparisons is not None else None,
     )
 
 
@@ -396,6 +408,7 @@ class FormatDialog(QDialog):
         data: ChartData | None = None,
         palettes: Sequence[ColorScheme] = (),
         parent: QWidget | None = None,
+        p_display: PDisplay = DEFAULT_P_DISPLAY,
     ) -> None:
         super().__init__(parent)
         self._palettes = list(palettes)
@@ -406,6 +419,7 @@ class FormatDialog(QDialog):
         self.table: Table = document.table(self.original.table_id)
         self._scheduler = scheduler
         self._results: Mapping[str, Result] = results or {}
+        self._p_display = p_display
         self._data = data
         self._data_key = data_key(self.spec) if data is not None else None
         self._node = f"{PREVIEW_NODE}:{graph_id}"
@@ -447,6 +461,7 @@ class FormatDialog(QDialog):
         self.options = FittedStack()
         self.options.addWidget(self._build_axis_options())
         self.options.addWidget(self._build_series_options())
+        self.options.addWidget(self._build_comparison_options())
         options_layout.addWidget(self.options)
         right.addWidget(self.options_box)
         right.addWidget(self._build_preview(), 1)
@@ -456,6 +471,12 @@ class FormatDialog(QDialog):
         box = QGroupBox("Graph")
         outer = QVBoxLayout(box)
         form = form_layout()
+        self.graph_form = form
+        self.name_edit = QLineEdit()
+        self.name_edit.setMaxLength(MAX_GRAPH_NAME)
+        self.name_edit.setPlaceholderText(self._default_name)
+        self.name_edit.setToolTip("The graph's name in the Graph panel; not drawn on the graph")
+        form.addRow(buddy_label("&Name", self.name_edit), self.name_edit)
         self.title_edit = QLineEdit()
         form.addRow(buddy_label("&Title", self.title_edit), self.title_edit)
         self.type_combo = QComboBox()
@@ -499,7 +520,7 @@ class FormatDialog(QDialog):
         self.show_bands = QCheckBox("Show confidence band&s")
         self.show_bands.setToolTip("The 95% confidence band of each survival curve")
         form.addRow("", self.show_bands)
-        self.show_bands.setVisible(self.original.family is ChartFamily.SURVIVAL)
+        form.setRowVisible(self.show_bands, self.original.family is ChartFamily.SURVIVAL)
         # Interaction graphs: which two-way ANOVA of the table the graph draws.
         self.anova_combo = QComboBox()
         self.anova_combo.setAccessibleName("Two-way ANOVA drawn")
@@ -508,11 +529,11 @@ class FormatDialog(QDialog):
         self.anova_label = buddy_label("A&NOVA", self.anova_combo)
         form.addRow(self.anova_label, self.anova_combo)
         interaction = self.original.family is ChartFamily.INTERACTION
-        self.anova_label.setVisible(interaction)
-        self.anova_combo.setVisible(interaction)
+        form.setRowVisible(self.anova_combo, interaction)
         self._build_bar_options(form)
         outer.addLayout(form)
         outer.addStretch(1)
+        self.name_edit.textEdited.connect(self._on_name_edited)
         self.title_edit.textEdited.connect(lambda text: self._edit(title=text))
         self.aspect_group.buttonClicked.connect(self._on_aspect_clicked)
         self.width_spin.valueChanged.connect(lambda _v: self._on_size_changed())
@@ -597,6 +618,7 @@ class FormatDialog(QDialog):
         bins_row.addStretch(1)
         self.bins_label = buddy_label("&Bins", self.bin_mode)
         form.addRow(self.bins_label, bins_row)
+        self._bins_row = bins_row
         self.bin_width = QLineEdit()
         self.bin_start = QLineEdit()
         width_row = QHBoxLayout()
@@ -610,15 +632,7 @@ class FormatDialog(QDialog):
         width_row.addStretch(1)
         self.bin_width_label = buddy_label("Wi&dth", self.bin_width)
         form.addRow(self.bin_width_label, width_row)
-        self._bin_widgets: tuple[QWidget, ...] = (
-            self.bins_label,
-            self.bin_mode,
-            self.bin_count,
-            self.bin_width_label,
-            self.bin_width,
-            self.bin_start_label,
-            self.bin_start,
-        )
+        self._width_row = width_row
         self.grouping.activated.connect(lambda _i: self._on_grouping_chosen())
         self.show_points.toggled.connect(lambda on: self._edit(show_points=on))
         self.violin_trim.toggled.connect(lambda on: self._edit(violin_trim=on))
@@ -628,14 +642,16 @@ class FormatDialog(QDialog):
         self.bin_start.textEdited.connect(lambda _t: self._edit_bins())
 
     def _show_variant_options(self) -> None:
-        """Show the Graph options that the graph's current type uses."""
+        """Show the Graph options that the graph's current type uses. Whole rows are
+        hidden, so the ones not shown take no space."""
         variant = self.spec.variant
-        for widget in (self.grouping_label, self.grouping):
-            widget.setVisible(variant in GROUPABLE_VARIANTS)
-        self.show_points.setVisible(variant in POINTS_VARIANTS)
-        self.violin_trim.setVisible(variant is ChartVariant.VIOLIN)
-        for bin_widget in self._bin_widgets:
-            bin_widget.setVisible(variant is ChartVariant.HISTOGRAM)
+        form = self.graph_form
+        form.setRowVisible(self.grouping, variant in GROUPABLE_VARIANTS)
+        form.setRowVisible(self.show_points, variant in POINTS_VARIANTS)
+        form.setRowVisible(self.violin_trim, variant is ChartVariant.VIOLIN)
+        histogram = variant is ChartVariant.HISTOGRAM
+        form.setRowVisible(self._bins_row, histogram)
+        form.setRowVisible(self._width_row, histogram)
 
     def _build_axes_list(self) -> QGroupBox:
         box = QGroupBox("Axes")
@@ -787,6 +803,49 @@ class FormatDialog(QDialog):
         self.error_bars.activated.connect(self._on_error_bars_chosen)
         return page
 
+    def _build_comparison_options(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        form = form_layout()
+        self.comparison_label = QComboBox()
+        for choice in PLabel:
+            self.comparison_label.addItem(choice.label, choice)
+        form.addRow(buddy_label("Te&xt", self.comparison_label), self.comparison_label)
+        self.show_ns = QCheckBox("Show &non-significant pairs (ns)")
+        form.addRow("", self.show_ns)
+        layout.addLayout(form)
+        self.comparison_note = secondary_label(COMPARISONS_NOTE)
+        layout.addWidget(self.comparison_note)
+        self.comparison_label.activated.connect(lambda _i: self._edit_comparisons())
+        self.show_ns.clicked.connect(lambda _on: self._edit_comparisons())
+        return page
+
+    def _edit_comparisons(self) -> None:
+        comparisons = self.spec.comparisons
+        if comparisons is None:
+            return
+        label = self.comparison_label.currentData()
+        changed = replace(
+            comparisons,
+            label=PLabel(label) if label is not None else comparisons.label,
+            show_ns=self.show_ns.isChecked(),
+        )
+        if changed != comparisons:
+            self._apply(replace(self.spec, comparisons=changed))
+
+    def _load_comparison_options(self) -> None:
+        comparisons = self.spec.comparisons
+        if comparisons is None:
+            return
+        with QSignalBlocker(self.comparison_label):
+            self.comparison_label.setCurrentIndex(self.comparison_label.findData(comparisons.label))
+        with QSignalBlocker(self.show_ns):
+            self.show_ns.setChecked(comparisons.show_ns)
+        problem = comparison_problem(self.spec)
+        note = f"{problem}." if problem else COMPARISONS_NOTE
+        self.comparison_note.setText(note)
+
     def _build_colors(self) -> QGroupBox:
         box = QGroupBox("Colors and text")
         outer = QVBoxLayout(box)
@@ -864,6 +923,7 @@ class FormatDialog(QDialog):
         widgets: list[QWidget] = [self.tabs]
         if section == GRAPH:
             widgets += [
+                self.name_edit,
                 self.title_edit,
                 self.type_combo,
                 *self.aspect_buttons.values(),
@@ -904,6 +964,8 @@ class FormatDialog(QDialog):
                 self.line_width,
                 self.color,
                 self.error_bars,
+                self.comparison_label,
+                self.show_ns,
             ]
         else:
             widgets += [self.scheme_combo, self.edit_colors, self.font_combo, self.text_size]
@@ -915,6 +977,9 @@ class FormatDialog(QDialog):
 
     def _load(self) -> None:
         spec = self.spec
+        with QSignalBlocker(self.name_edit):
+            if self.name_edit.text() != spec.name:
+                self.name_edit.setText(spec.name)
         with QSignalBlocker(self.title_edit):
             if self.title_edit.text() != spec.title:
                 self.title_edit.setText(spec.title)
@@ -1035,6 +1100,12 @@ class FormatDialog(QDialog):
                 item.setData(Qt.ItemDataRole.UserRole, key)
                 self.series_list.addItem(item)
                 item.setSelected(key in keep)
+            if self.spec.comparisons is not None:
+                name = self._analysis_name(self.spec.comparisons.analysis_id)
+                item = QListWidgetItem(f"Comparisons: {name}")
+                item.setData(Qt.ItemDataRole.UserRole, COMPARISONS_KEY)
+                self.series_list.addItem(item)
+                item.setSelected(COMPARISONS_KEY in keep)
             if not self.series_list.selectedItems() and self.series_list.count():
                 self.series_list.item(0).setSelected(True)
                 self.series_list.setCurrentRow(0)
@@ -1054,7 +1125,17 @@ class FormatDialog(QDialog):
         self._fill_series_list(self.selected_sources())
 
     def _fit_name(self, overlay: FitOverlay) -> str:
-        return self._labels.get(overlay.analysis_id, "analysis no longer in the project")
+        return self._analysis_name(overlay.analysis_id)
+
+    def _analysis_name(self, analysis_id: str) -> str:
+        return self._labels.get(analysis_id, "analysis no longer in the project")
+
+    def comparisons_selected(self) -> bool:
+        """Whether the comparison brackets are selected in the series list."""
+        return any(
+            item.data(Qt.ItemDataRole.UserRole) == COMPARISONS_KEY
+            for item in self.series_list.selectedItems()
+        )
 
     def selected_fits(self) -> list[str]:
         """Analysis ids of the selected fitted curves, in the graph's order."""
@@ -1081,12 +1162,20 @@ class FormatDialog(QDialog):
         styles = self._selected_styles()
         n = len(styles)
         fits = len(self.selected_fits())
+        compared = self.comparisons_selected()
         parts = [
             f"{n} series" if n else "",
             f"{fits} fitted curve{'s' if fits > 1 else ''}" if fits else "",
+            "the comparisons" if compared else "",
         ]
         picked = " and ".join(p for p in parts if p)
+        picked = picked[:1].upper() + picked[1:]
         self.selection_note.setText(f"{picked} selected." if picked else "No series selected.")
+        if self.tabs.currentIndex() == SERIES:
+            only_comparisons = compared and not n and not fits
+            self.options.setCurrentIndex(2 if only_comparisons else 1)
+            if only_comparisons:
+                self._load_comparison_options()
         widgets: list[QWidget] = [
             self.in_legend,
             self.symbol,
@@ -1199,7 +1288,11 @@ class FormatDialog(QDialog):
         self.add_button.setEnabled(bool(missing))
         self.add_button.setToolTip("" if missing else EVERY_SERIES_SHOWN)
         fits = self.selected_fits()
-        removable = bool(fits) or (bool(selected) and len(selected) < len(order))
+        removable = (
+            bool(fits)
+            or self.comparisons_selected()
+            or (bool(selected) and len(selected) < len(order))
+        )
         self.remove_button.setEnabled(removable)
         self.remove_button.setToolTip("" if removable or not selected else LAST_SERIES)
         indexes = [order.index(s) for s in selected]
@@ -1222,6 +1315,33 @@ class FormatDialog(QDialog):
             return
         self._problems.pop("graph", None)
         self._apply(spec)
+
+    @property
+    def _default_name(self) -> str:
+        graphs = self.document.graphs_of(self.original.table_id)
+        return default_graph_names(graphs)[self.original.id]
+
+    def _on_name_edited(self, text: str) -> None:
+        """A blank name, or the default one, keeps the default; a name another graph of
+        the table has is refused (OK stays off until it is changed)."""
+        name = " ".join(text.split())
+        if name == self._default_name:
+            name = ""
+        if name:
+            key = name.casefold()
+            names = graph_names(self.document, self.original.table_id)
+            other = next(
+                (n for g, n in names.items() if g != self.original.id and n.casefold() == key),
+                None,
+            )
+            if other is not None:
+                self._problems["name"] = f"There is already a graph called '{other}'."
+                self._show_problem()
+                return
+        self._problems.pop("name", None)
+        self._show_problem()
+        if name != self.spec.name:
+            self._apply(replace(self.spec, name=name))
 
     def _on_aspect_clicked(self, button: QPushButton) -> None:
         key = next(k for k, b in self.aspect_buttons.items() if b is button)
@@ -1418,7 +1538,19 @@ class FormatDialog(QDialog):
         the graph does not show."""
         shown = {s.source for s in self.spec.series}
         missing = [source for source in self._names if source not in shown]
-        return missing + [FIT_PREFIX + a.id for a in self._missing_fits()]
+        missing += [FIT_PREFIX + a.id for a in self._missing_fits()]
+        return missing + [COMPARISONS_KEY + a.id for a in self._comparison_choices()]
+
+    def _comparison_choices(self) -> list[Analysis]:
+        """The analyses of the table whose comparisons the graph can show and does not."""
+        if comparison_problem(self.spec) is not None:
+            return []
+        shown = self.spec.comparisons.analysis_id if self.spec.comparisons else None
+        return [
+            a
+            for a in self.document.analyses_of(self.table.id)
+            if is_comparison(a) and a.id != shown
+        ]
 
     def _missing_fits(self) -> list[Analysis]:
         if self.spec.family is not ChartFamily.XY:
@@ -1441,6 +1573,20 @@ class FormatDialog(QDialog):
         for analysis in fits:
             action = self.add_menu.addAction(f"Fitted curve: {self._labels[analysis.id]}")
             action.triggered.connect(lambda _c=False, a=analysis: self.add_fit(a))
+        comparisons = self._comparison_choices()
+        if comparisons and self.add_menu.actions():
+            self.add_menu.addSeparator()
+        for analysis in comparisons:
+            action = self.add_menu.addAction(f"Comparisons: {self._labels[analysis.id]}")
+            action.triggered.connect(lambda _c=False, a=analysis: self.add_comparisons(a))
+
+    def add_comparisons(self, analysis: Analysis) -> None:
+        """Show the comparisons of ``analysis`` as brackets (instead of the ones shown),
+        keeping how they are labelled."""
+        old = self.spec.comparisons
+        new = replace(old, analysis_id=analysis.id) if old is not None else Comparisons(analysis.id)
+        self._apply(replace(self.spec, comparisons=new))
+        self._fill_series_list([COMPARISONS_KEY])
 
     def add_fit(self, analysis: Analysis) -> None:
         """Lay the fitted curves of ``analysis`` over the graph again."""
@@ -1485,15 +1631,17 @@ class FormatDialog(QDialog):
         """Remove the selected series (a graph keeps at least one) and fitted curves."""
         chosen = set(self.selected_sources())
         fits = set(self.selected_fits())
+        compared = self.comparisons_selected()
         kept = tuple(s for s in self.spec.series if s.source not in chosen)
         if not kept:
-            if not fits:
+            if not fits and not compared:
                 return
             kept, chosen = self.spec.series, set()
-        if not chosen and not fits:
+        if not chosen and not fits and not compared:
             return
         overlays = tuple(o for o in self.spec.overlays if o.analysis_id not in fits)
-        self._apply(replace(self.spec, series=kept, overlays=overlays))
+        comparisons = None if compared else self.spec.comparisons
+        self._apply(replace(self.spec, series=kept, overlays=overlays, comparisons=comparisons))
         self._fill_series_list([kept[0].source])
 
     def move_selected(self, by: int) -> None:
@@ -1522,7 +1670,7 @@ class FormatDialog(QDialog):
         if self._data is not None and key == self._data_key:
             self.preview.render_chart(self.spec, self._data)
             return
-        inputs = gather(self.table, self.spec, self._results)
+        inputs = gather(self.table, self.spec, self._results, self._p_display)
         self._pending_key = key
         if self._scheduler is None:
             self._set_data(compute(inputs), key)

@@ -22,6 +22,7 @@ from curvis.analysis.compare.common import (
     group_values,
     number,
     p_text,
+    pair_ps,
     significant,
     zero_variance_warnings,
 )
@@ -109,6 +110,7 @@ class TTest(GroupComparison):
             _summary(r, kind, names),
             tuple(_warnings(r, kind, names)),
             tuple(_values(r, kind, names)),
+            pairs=pair_ps(inputs.series, [(0, 1, r.p_value)]),
         )
 
 

@@ -238,6 +238,28 @@ def is_fit(analysis: Analysis) -> bool:
         return False
 
 
+COMPARISON_TYPES = ("t_test", "mann_whitney", "one_way_anova", "kruskal_wallis")
+"""Analyses whose comparisons a bar-family graph can show as brackets."""
+
+
+def is_comparison(analysis: Analysis) -> bool:
+    """True for an analysis whose comparisons a graph can show (SPEC.md, Graphs)."""
+    return analysis.type in COMPARISON_TYPES
+
+
+def comparison_problem(spec: ChartSpec) -> str | None:
+    """Why ``spec`` cannot show comparisons, or None."""
+    from curvis.charts.data import comparisons_drawn
+
+    if comparisons_drawn(spec):
+        return None
+    if spec.family is not ChartFamily.BAR or spec.variant is ChartVariant.HISTOGRAM:
+        return "Comparisons are shown on bar, box, violin and column scatter graphs"
+    if spec.variant is ChartVariant.HORIZONTAL_BAR:
+        return "Comparisons are shown on upright bars, not horizontal ones"
+    return "Comparisons are shown on graphs that are not grouped"
+
+
 def fits_on_log_x(analysis: Analysis) -> bool:
     """True for a dose-response fit whose X values are concentrations: its curve is
     spaced for, and only reads well on, a log X axis."""

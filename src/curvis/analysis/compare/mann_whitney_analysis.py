@@ -20,6 +20,7 @@ from curvis.analysis.compare.common import (
     few_values_warnings,
     group_values,
     p_text,
+    pair_ps,
     significant,
 )
 from curvis.analysis.compare.mann_whitney import EXACT_LIMIT, METHOD, mann_whitney
@@ -103,7 +104,8 @@ class MannWhitney(GroupComparison):
             Value(f"n ({names[1]})", r.b.n, Kind.INTEGER),
         )
         warnings = few_values_warnings((r.a, r.b), names)
-        return Result(METHOD, summary, tuple(warnings), values, notes=(note,))
+        pairs = pair_ps(inputs.series, [(0, 1, r.p_value)])
+        return Result(METHOD, summary, tuple(warnings), values, notes=(note,), pairs=pairs)
 
 
 register(MannWhitney())

@@ -42,7 +42,8 @@ from pathlib import Path
 
 import numpy as np
 
-from curvis.charts.data import CategoryData, ChartData, value_axis_scale
+from curvis.charts.brackets import Bracket, category_top, place_brackets, settle
+from curvis.charts.data import CategoryData, ChartData, comparisons_drawn, value_axis_scale
 from curvis.charts.fonts import FONTS, chart_font_info
 from curvis.charts.grouping import Entry, grouped_layout
 from curvis.charts.spec import (
@@ -164,6 +165,9 @@ class AxesLayout:
     """Bar-family graphs: the width each series' place has (1 unless grouped)."""
     horizontal: bool = False
     """The categories are on the Y axis (horizontal bars)."""
+    brackets: tuple[Bracket, ...] = ()
+    """Bar, box, violin and column scatter graphs: the comparison brackets
+    (:mod:`curvis.charts.brackets`), in plot coordinates; the Y range reaches over them."""
 
 
 # --- page --------------------------------------------------------------------------------
@@ -229,8 +233,9 @@ def axes_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
     y_room = _room(spec, horizontal=False)
     y_room = replace(y_room, length=max(0.0, y_room.length - _label_depth(x, x_room)))
     if spec.family is ChartFamily.BAR:
-        y = _value_axis(spec, spec.y_axis, data, positions, y_room)
-        return AxesLayout(x, y, positions, slot)
+        brackets: list[Bracket] = []
+        y = _value_axis(spec, spec.y_axis, data, positions, y_room, brackets)
+        return AxesLayout(x, y, positions, slot, brackets=tuple(brackets))
     y = _axis(spec.y_axis, _pad(bounds[2], bounds[3]), room=y_room)
     return AxesLayout(x, y, {})
 
@@ -486,8 +491,10 @@ def _value_axis(
     data: ChartData | None,
     positions: dict[str, float],
     room: Room,
+    brackets: list[Bracket] | None = None,
 ) -> AxisLayout:
-    """The value axis of a bar-family graph: it covers everything drawn."""
+    """The value axis of a bar-family graph: it covers everything drawn, and the
+    comparison brackets (put in ``brackets``) when there are any."""
     shown: list[CategoryData] = (
         [c for c in data.categories if c.source in positions] if data is not None else []
     )
@@ -504,6 +511,9 @@ def _value_axis(
         top = max([0.0, *values])
         bottom = min([0.0, *values])
         auto = (bottom, top + PADDING * ((top - bottom) or 1.0))
+        auto = _with_brackets(
+            spec, axis, data, shown, positions, room, auto, (bottom, top), brackets, log=False
+        )
         # A log axis cannot show 0: the Format dialog keeps bars linear.
         return _axis(axis, auto, log=False, room=room)
     found: list[np.ndarray] | list[float] = list(points)
@@ -516,7 +526,52 @@ def _value_axis(
         if variant is ChartVariant.COLUMN_SCATTER:
             extra += [v for v in (c.plot_mean, c.plot_low, c.plot_high) if math.isfinite(v)]
     low, high = _bounds([*found, np.asarray(extra, dtype=np.float64)])
-    return _axis(axis, _pad(low, high), log=log, room=room)
+    auto = _pad(low, high)
+    if math.isfinite(low) and math.isfinite(high):
+        auto = _with_brackets(
+            spec, axis, data, shown, positions, room, auto, (low, high), brackets, log=log
+        )
+    return _axis(axis, auto, log=log, room=room)
+
+
+def _wants_brackets(spec: ChartSpec, data: ChartData | None) -> bool:
+    return data is not None and bool(data.pairs) and comparisons_drawn(spec)
+
+
+def _with_brackets(
+    spec: ChartSpec,
+    axis: AxisSpec,
+    data: ChartData | None,
+    shown: Sequence[CategoryData],
+    positions: dict[str, float],
+    room: Room,
+    auto: tuple[float, float],
+    drawn: tuple[float, float],
+    out: list[Bracket] | None,
+    *,
+    log: bool,
+) -> tuple[float, float]:
+    """``auto`` with its top raised over the comparison brackets, which go in ``out``.
+    A top the user typed stays: the brackets are then sized for that range."""
+    if not _wants_brackets(spec, data) or room.length <= 0:
+        return auto
+    assert data is not None
+    tops = {c.source: category_top(c, spec.variant) for c in shown}
+    if axis.maximum is None:
+        low, high = drawn
+        if axis.minimum is not None:
+            low = math.log10(axis.minimum) if log else axis.minimum
+        brackets, top = settle(
+            data.pairs, positions, tops, low, high, room.length, spec.text_size, PADDING
+        )
+        if out is not None:
+            out += brackets
+        return auto[0], max(auto[1], top)
+    final = _axis(axis, auto, log=log, room=room)
+    em = spec.text_size * (final.high - final.low) / room.length
+    if out is not None:
+        out += place_brackets(data.pairs, positions, tops, em)
+    return auto
 
 
 def _xy_bounds(spec: ChartSpec, data: ChartData | None) -> tuple[float, float, float, float]:

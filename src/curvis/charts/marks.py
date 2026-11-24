@@ -117,6 +117,18 @@ class Points:
 
 
 @dataclass(frozen=True)
+class Label:
+    """A line of text centred on ``x`` with its bottom at ``y`` (plot coordinates): the
+    text of a comparison bracket."""
+
+    x: float
+    y: float
+    text: str
+    color: str
+    size_pt: float
+
+
+@dataclass(frozen=True)
 class LegendEntry:
     name: str
     color: str
@@ -149,12 +161,14 @@ class Hit:
 @dataclass
 class Marks:
     """Drawn in this order: polygons and rectangles, lines, points, then the lines
-    that go over the points (a column scatter's mean and error bars)."""
+    that go over the points (a column scatter's mean and error bars, comparison
+    brackets) and the labels (the brackets' text)."""
 
     shapes: list[Rect | Polygon] = field(default_factory=list)
     lines: list[Lines] = field(default_factory=list)
     points: list[Points] = field(default_factory=list)
     over: list[Lines] = field(default_factory=list)
+    labels: list[Label] = field(default_factory=list)
     legend: list[LegendEntry] = field(default_factory=list)
     hits: list[Hit] = field(default_factory=list)
 
@@ -193,12 +207,29 @@ def bar_marks(spec: ChartSpec, data: ChartData, layout: AxesLayout) -> Marks:
             symbol = style.symbol if style.symbol is not Symbol.NONE else Symbol.CIRCLE
             marks.points.append(Points(at + offsets, c.values, symbol, style.size, dots))
     _category_legend(marks, spec, data, layout)
+    _brackets(marks, spec, layout)
     if spec.variant in HORIZONTAL_VARIANTS:
         return _swapped(marks)
     return marks
 
 
 # --- marks -----------------------------------------------------------------------------
+
+
+def _brackets(marks: Marks, spec: ChartSpec, layout: AxesLayout) -> None:
+    """The comparison brackets the layout placed, in ink, with their text."""
+    if not layout.brackets:
+        return
+    ink = spec.palette.ink
+    segments: list[tuple[Point, Point]] = []
+    for b in layout.brackets:
+        segments += [
+            ((b.x0, b.y_leg), (b.x0, b.y)),
+            ((b.x0, b.y), (b.x1, b.y)),
+            ((b.x1, b.y), (b.x1, b.y_leg)),
+        ]
+        marks.labels.append(Label(b.x_text, b.y_text, b.text, ink, spec.text_size))
+    marks.over.append(Lines(tuple(segments), ink, AXIS_WIDTH_PT))
 
 
 def _bar(
@@ -430,11 +461,14 @@ def _swapped(marks: Marks) -> Marks:
 
     points = [Points(p.ys, p.xs, p.symbol, p.size_pt, p.color) for p in marks.points]
     hits = [Hit(h.y0, h.x0, h.y1, h.x1, h.source, h.bin) for h in marks.hits]
-    return Marks(shapes, swap(marks.lines), points, swap(marks.over), marks.legend, hits)
+    return Marks(
+        shapes, swap(marks.lines), points, swap(marks.over), legend=marks.legend, hits=hits
+    )
 
 
 __all__ = (
     "Hit",
+    "Label",
     "LegendEntry",
     "Lines",
     "Marks",

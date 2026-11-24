@@ -14,7 +14,7 @@ from PySide6.QtWidgets import QDialog, QLineEdit
 from pytestqt.qtbot import QtBot
 
 from curvis.analysis.fit.analyses import Hill4Params
-from curvis.io.project import PROJECT_JSON, load, save
+from curvis.io.project import PROJECT_JSON, SCHEMA_VERSION, load, save
 from curvis.ui.analyze_dialog import AnalyzeDialog
 from curvis.ui.analyze_options import FixedTable, XRangeEditor
 from tests.ui.dialog_samples import grouped_document
@@ -291,7 +291,7 @@ def test_a_project_saved_before_the_redesign_edits_unchanged(qtbot: QtBot, tmp_p
     with zipfile.ZipFile(BEFORE) as a, zipfile.ZipFile(out) as b:
         before = json.loads(a.read(PROJECT_JSON))
         after = json.loads(b.read(PROJECT_JSON))
-    assert after["schema_version"] == before["schema_version"]
+    assert after["schema_version"] == SCHEMA_VERSION  # saved in the current format
     assert after["document"]["analyses"] == before["document"]["analyses"]
 
 
