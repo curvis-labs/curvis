@@ -1,9 +1,10 @@
 """The Settings dialog. Changes apply when you click Save.
 
 A simple dialog (docs/DESIGN.md §1) with its settings in three tabs, as SPEC.md groups
-them: **General** (theme, decimal places, recent projects, the crash log), **New graphs**
-(palette, size, font and text size that new graphs copy) and **Results and export** (how
-P values are shown, the Export dialog's starting format and PNG resolution).
+them: **General** (theme, decimal places, the import decimal mark, recent projects, how
+often to autosave, the crash log), **New graphs** (palette, size, font and text size
+that new graphs copy) and **Results and export** (how P values are shown, the Export
+dialog's starting format and PNG resolution).
 
 *Clear recent projects…* and *Reset to defaults…* ask first and act at once. Reset
 restores every setting here; recent projects, global constants and recovery copies are
@@ -42,6 +43,8 @@ from curvis.charts.spec import (
 )
 from curvis.settings import Settings, Theme
 from curvis.settings.store import (
+    AUTOSAVE_MINUTES_MAX,
+    AUTOSAVE_MINUTES_MIN,
     DECIMAL_PLACES_MAX,
     DECIMAL_PLACES_MIN,
     EXPORT_FORMATS,
@@ -75,6 +78,9 @@ RESET_QUESTION = (
     "copies are kept."
 )
 DELETE_PALETTE_QUESTION = "Delete the palette “{name}”? Graphs that use its colors keep them."
+AUTOSAVE_NOTE = (
+    "Curvis keeps a copy of unsaved changes, so you can recover them if it closes unexpectedly."
+)
 EXPORT_LABELS = {"png": "PNG image", "svg": "SVG drawing", "pdf": "PDF document"}
 
 
@@ -143,6 +149,12 @@ class SettingsDialog(QDialog):
         recent.addWidget(self.clear_recent_button)
         recent.addStretch(1)
         form.addRow(QLabel("Recent projects"), recent)
+        self.autosave = QSpinBox(page)
+        self.autosave.setRange(AUTOSAVE_MINUTES_MIN, AUTOSAVE_MINUTES_MAX)
+        self.autosave.setSuffix(" min")
+        self.autosave.setToolTip(AUTOSAVE_NOTE)
+        self.autosave.setMaximumWidth(FIELD_WIDTH)
+        form.addRow(buddy_label("Autosave a recovery cop&y every", self.autosave), self.autosave)
         layout.addLayout(form)
         self.crash_log = QCheckBox(CRASH_LOG_TEXT, page)
         self.crash_log_note = secondary_label(CRASH_LOG_NOTE, page)
@@ -241,6 +253,7 @@ class SettingsDialog(QDialog):
         self.decimal_places.setValue(s.decimal_places)
         self.import_decimal.setCurrentIndex(self.import_decimal.findData(s.import_decimal_comma))
         self.crash_log.setChecked(s.crash_log)
+        self.autosave.setValue(s.autosave_minutes)
         self._palettes = s.palettes
         self._palette = s.graph_palette
         self._fill_palettes()
@@ -379,6 +392,8 @@ class SettingsDialog(QDialog):
             s.import_decimal_comma = bool(self.import_decimal.currentData())
         if self.crash_log.isChecked() != s.crash_log:
             s.crash_log = self.crash_log.isChecked()
+        if self.autosave.value() != s.autosave_minutes:
+            s.autosave_minutes = self.autosave.value()
         if self._palettes != s.palettes:
             s.palettes = self._palettes
         if self._palette != s.graph_palette:

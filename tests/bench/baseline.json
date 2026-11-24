@@ -30,6 +30,27 @@
       ]
     },
     {
+      "name": "test_recovery_copy_of_10mb_project_does_not_block_ui",
+      "fullname": "tests/bench/test_autosave.py::test_recovery_copy_of_10mb_project_does_not_block_ui",
+      "stats": {
+        "min": 0.07857232291097216
+      },
+      "runs": [
+        {
+          "min": 0.07857232291097216,
+          "median": 0.08541756732537138
+        },
+        {
+          "min": 0.07938879971238952,
+          "median": 0.08855947554238337
+        },
+        {
+          "min": 0.07887144816438013,
+          "median": 0.08819646171295173
+        }
+      ]
+    },
+    {
       "name": "test_1000_debounced_submits",
       "fullname": "tests/bench/test_compute.py::test_1000_debounced_submits",
       "stats": {

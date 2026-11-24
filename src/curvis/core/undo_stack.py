@@ -99,6 +99,11 @@ class UndoStack:
         """Mark the current state as clean (e.g. after saving)."""
         self._clean_index = self._index
 
+    def set_modified(self) -> None:
+        """Mark no state as clean: the document has unsaved changes until the next
+        :meth:`set_clean` (e.g. a recovered project, which no file on disk matches)."""
+        self._clean_index = None
+
     def push(self, command: Command) -> None:
         """Run ``command`` and put it on the stack.
 

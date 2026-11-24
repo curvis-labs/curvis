@@ -682,9 +682,9 @@ Make a plan first. When done, report what changed, the screenshots, test and ben
 ### Step 4.1 — Autosave and crash recovery
 
 **Done when**
-- [ ] Open projects with unsaved changes, including never-saved ones, are written as recovery copies at the interval set in Settings, without blocking the UI.
-- [ ] After a crash or a killed process, the launcher offers each recovered project; opening it restores the work, discarding it deletes the copy.
-- [ ] A normal save, close or discard leaves no recovery copy behind, and a recovery copy never overwrites a project file.
+- [x] Open projects with unsaved changes, including never-saved ones, are written as recovery copies at the interval set in Settings, without blocking the UI.
+- [x] After a crash or a killed process, the launcher offers each recovered project; opening it restores the work, discarding it deletes the copy.
+- [x] A normal save, close or discard leaves no recovery copy behind, and a recovery copy never overwrites a project file.
 
 ```text
 Read CLAUDE.md, docs/SPEC.md (Autosave and recovery, Settings) and step 4.1 in docs/PHASES.md.

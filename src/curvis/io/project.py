@@ -245,6 +245,22 @@ def save(document: Document, path: str | os.PathLike[str]) -> None:
     renamed over ``path``. If anything fails, ``path`` is left exactly as it was.
     """
     path = Path(path)
+    tmp = write_temp(document, path)
+    try:
+        if path.exists():
+            os.chmod(tmp, stat.S_IMODE(path.stat().st_mode))
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+    fsync_dir(path.parent)
+
+
+def write_temp(document: Document, path: str | os.PathLike[str]) -> Path:
+    """Write ``document`` to a new temporary file next to ``path``, synced to disk, and
+    return it; the caller renames it over ``path`` (or deletes it). ``path`` is not
+    touched. If writing fails, the temporary file is removed and the error raised."""
+    path = Path(path)
     for table in document.tables:
         table.check()
     tmp = path.with_name(f".{path.name}.{secrets.token_hex(4)}.tmp")
@@ -255,16 +271,13 @@ def save(document: Document, path: str | os.PathLike[str]) -> None:
             _write_project(document, f)
             f.flush()
             os.fsync(f.fileno())
-        if path.exists():
-            os.chmod(tmp, stat.S_IMODE(path.stat().st_mode))
-        os.replace(tmp, path)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
-    _fsync_dir(path.parent)
+    return tmp
 
 
-def _fsync_dir(folder: Path) -> None:
+def fsync_dir(folder: Path) -> None:
     """Make the rename durable (POSIX only; Windows has no directory handles for this)."""
     if os.name == "nt":
         return
