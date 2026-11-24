@@ -764,7 +764,14 @@ class DocumentTab(QWidget):
         if not panes:
             return
         focus = QApplication.focusWidget()
-        here = next((i for i, p in enumerate(panes) if focus is p or p.isAncestorOf(focus)), -1)
+        here = next(
+            (
+                i
+                for i, p in enumerate(panes)
+                if focus is not None and (focus is p or p.isAncestorOf(focus))
+            ),
+            -1,
+        )
         if here < 0:
             here = 0 if step < 0 else len(panes) - 1  # outside every pane: start from the ends
         target = panes[(here + step) % len(panes)]
@@ -818,7 +825,7 @@ def first_focusable(container: QWidget) -> QWidget:
     if container.focusPolicy() & Qt.FocusPolicy.TabFocus and container.isEnabled():
         return container
     widget = container.nextInFocusChain()
-    while widget is not container:
+    while widget is not None and widget is not container:
         if (
             container.isAncestorOf(widget)
             and widget.isVisibleTo(container)
