@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from tests.validation import tolerances
-from tests.validation.harness import compare, decode, format_report, load_fixture
+from tests.validation.harness import compare, decode, differences, format_report, load_fixture
 
 
 def write(tmp_path: Path, **changes: Any) -> Path:
@@ -179,3 +179,40 @@ def test_file_name_must_match_the_case(tmp_path: Path) -> None:
     renamed = path.rename(path.with_name("other.json"))
     with pytest.raises(ValueError, match="file name"):
         load_fixture(renamed)
+
+
+def test_differences_measure_what_compare_judges(tmp_path: Path) -> None:
+    fixture = load_fixture(write(tmp_path))
+    inside = {
+        d.output: d for d in differences(fixture, dict(GOOD, mean=[1.75 * (1 + 0.9e-8), math.inf]))
+    }
+    outside = {
+        d.output: d for d in differences(fixture, dict(GOOD, mean=[1.75 * (1 + 1.1e-8), math.inf]))
+    }
+    assert inside["mean"].ratio == pytest.approx(0.9, rel=1e-6)
+    assert outside["mean"].ratio == pytest.approx(1.1, rel=1e-6)
+    assert inside["mean"].error == pytest.approx(0.9e-8, rel=1e-6)
+    # NaN against NaN and equal infinities are no difference; counts are equal.
+    assert inside["p"].ratio == inside["n"].ratio == 0.0
+    assert inside["n"].values == 2
+
+
+def test_differences_of_missing_or_unequal_outputs_are_infinite(tmp_path: Path) -> None:
+    fixture = load_fixture(write(tmp_path))
+    missing = {d.output: d for d in differences(fixture, {"n": [2, 1], "mean": [1.75, math.inf]})}
+    assert math.isinf(missing["p"].ratio)
+    counts = {d.output: d for d in differences(fixture, dict(GOOD, n=[2, 1 + 1e-15]))}
+    assert math.isinf(counts["n"].ratio)
+
+
+def test_differences_scale_a_small_parameter_by_its_se(tmp_path: Path) -> None:
+    path = write(
+        tmp_path,
+        expected={"b": [0.1], "b_se": [2.0]},
+        kinds={"b": "parameter", "b_se": "parameter"},
+    )
+    fixture = load_fixture(path)
+    actual = {"b": [0.1 + 1e-6], "b_se": [2.0]}
+    [b, _] = differences(fixture, actual)
+    assert b.by_se and b.ratio == pytest.approx(0.5, rel=1e-6)
+    assert compare(fixture, actual) == []

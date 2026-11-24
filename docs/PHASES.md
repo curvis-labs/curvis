@@ -476,7 +476,7 @@ Make a plan first. When done, report what you built, image-diff results and the 
 
 **Done when**
 - [x] All benchmarks in CLAUDE.md that apply so far meet their targets.
-- [ ] A new user can go from CSV to a finished, exported dose-response graph in under 5 minutes (you test this). The path is scripted in tests/ui/test_first_graph.py.
+- [x] A new user can go from CSV to a finished, exported dose-response graph in under 5 minutes (you test this). The path is scripted in tests/ui/test_first_graph.py.
 - [x] Beta installers are built and a short getting-started guide exists (docs/getting-started.md; pushing the tag v0.1.0-beta publishes them as a GitHub pre-release).
 
 ```text
@@ -739,8 +739,8 @@ Draw the P values the comparison analyses already report (no new statistics) as 
 **Gate for phase 4:** you read the validation report and approve the release.
 
 **Done when**
-- [ ] A generated validation report lists every analysis, its R reference, versions and measured agreement.
-- [ ] Signed installers for Windows and macOS and an AppImage for Linux are attached to the v1.0.0 release.
+- [x] A generated validation report lists every analysis, its R reference, versions and measured agreement.
+- [ ] Installers for Windows and macOS and an AppImage for Linux are attached to the v1.0.0 release. (Unsigned: the project owner decided on 2026-11-24 not to sign 1.0.)
 
 ```text
 Read CLAUDE.md, docs/SPEC.md and step 4.3 in docs/PHASES.md.

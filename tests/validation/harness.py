@@ -160,6 +160,81 @@ def compare(fixture: Fixture, actual: Mapping[str, npt.ArrayLike]) -> list[Misma
     return mismatches
 
 
+@dataclass(frozen=True)
+class Difference:
+    """The largest difference between Curvis and R on one output of one fixture, for
+    the validation report. ``error`` is relative to the same scale ``compare`` uses
+    (|expected|, or R's SE for a parameter smaller than its SE); ``ratio`` is the error
+    as a fraction of the tolerance, so a value matches when ``ratio <= 1``."""
+
+    output: str
+    kind: str
+    values: int
+    error: float
+    tolerance: float
+    source: str
+    ratio: float
+    by_se: bool
+
+
+def differences(fixture: Fixture, actual: Mapping[str, npt.ArrayLike]) -> list[Difference]:
+    """The largest difference per output, measured exactly as ``compare`` judges it.
+
+    NaN against NaN and equal infinities count as no difference; any other non-finite
+    pair, a missing output or a shape mismatch counts as an infinite one."""
+    found: list[Difference] = []
+    for output, expected in fixture.expected.items():
+        kind = fixture.kinds[output]
+        tolerance, source = tolerance_for(fixture.id, output, kind)
+        got = np.asarray(actual[output], dtype=np.float64) if output in actual else None
+        if got is None or got.shape != expected.shape:
+            found.append(
+                Difference(
+                    output, kind, expected.size, math.inf, tolerance, source, math.inf, False
+                )
+            )
+            continue
+        se = _standard_error(fixture, output, kind)
+        worst_error, worst_ratio, worst_by_se = 0.0, 0.0, False
+        for index in np.ndindex(expected.shape):
+            e, a = float(expected[index]), float(got[index])
+            by_se = se is not None and float(se[index]) > abs(e)
+            scale = float(se[index]) if se is not None and by_se else abs(e)
+            error = _error(e, a, scale)
+            if error == 0.0:
+                ratio = 0.0
+            elif tolerance == 0.0 or not math.isfinite(error):
+                ratio = math.inf
+            else:
+                ratio = error / tolerance
+            if ratio > worst_ratio or (ratio == worst_ratio and error > worst_error):
+                worst_error, worst_ratio, worst_by_se = error, ratio, by_se
+        found.append(
+            Difference(
+                output,
+                kind,
+                expected.size,
+                worst_error,
+                tolerance,
+                source,
+                worst_ratio,
+                worst_by_se,
+            )
+        )
+    return found
+
+
+def _error(expected: float, actual: float, scale: float) -> float:
+    if math.isnan(expected) or math.isnan(actual):
+        return 0.0 if math.isnan(expected) and math.isnan(actual) else math.inf
+    if math.isinf(expected) or math.isinf(actual):
+        return 0.0 if expected == actual else math.inf
+    diff = abs(actual - expected)
+    if diff == 0.0:
+        return 0.0
+    return diff / scale if scale > 0 else math.inf
+
+
 def _standard_error(fixture: Fixture, output: str, kind: str) -> npt.NDArray[np.float64] | None:
     """R's SE of a fitted parameter output, or None when the rule does not apply (not a
     parameter, no ``<output>_se`` in the fixture, or a shape that does not match)."""

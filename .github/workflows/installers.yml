@@ -1,7 +1,8 @@
 name: Installers
 
 # Builds unsigned installers for Windows, macOS and Linux and checks that each one
-# starts the app (signing comes in phase 4). The installers are uploaded as artifacts.
+# starts the app (1.0 is not signed, by the project owner's decision). The installers
+# are uploaded as artifacts.
 
 # Run as part of CI (ci.yml calls it, and its concurrency setting covers these jobs),
 # or on its own from the Actions tab.

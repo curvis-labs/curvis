@@ -4,6 +4,23 @@ Curvis is an open-source desktop application for analyzing and plotting scientif
 
 **New to Curvis?** Read [Getting started](docs/getting-started.md), then the [user guide](docs/user-guide/README.md) for every feature.
 
+## Install
+
+Download the installer for your computer from the [latest release](https://github.com/curvis-labs/curvis/releases/latest): `Curvis-<version>-setup.exe` for Windows, `Curvis-<version>-macos-arm64.dmg` for a Mac with Apple silicon, and a `.deb` or an AppImage for Linux.
+
+### How to open
+
+The installers are not signed, so Windows and macOS warn before the first start.
+
+- **macOS**: open the app once. When it's blocked, go to **System Settings → Privacy & Security** and click **Open Anyway**.
+- **Windows**: when SmartScreen appears, click **More info**, then **Run anyway**.
+
+### Check your download
+
+Each release has a `SHA256SUMS.txt` with the SHA-256 checksum of every file. Compare it with the checksum of the file you downloaded: `Get-FileHash <file>` in Windows PowerShell, `shasum -a 256 <file>` on macOS, or `sha256sum --check --ignore-missing SHA256SUMS.txt` on Linux.
+
+Every file also has a build provenance attestation, which records the commit and the workflow run that built it. Check one with the [GitHub CLI](https://cli.github.com): `gh attestation verify <file> --repo curvis-labs/curvis`. This proves where the file came from; it does not remove the Windows and macOS warnings.
+
 ## Development
 
 Curvis uses Python 3.12 and [uv](https://docs.astral.sh/uv/).
@@ -45,18 +62,20 @@ To build the app bundle locally:
 ```bash
 uv sync --group build
 uv run pyinstaller packaging/curvis.spec --noconfirm   # dist/Curvis or dist/Curvis.app
-packaging/linux/build-deb.sh 0.1.0b1                   # Linux: dist/curvis_0.1.0b1_<arch>.deb
+packaging/linux/build-deb.sh 1.0.0                     # Linux: dist/curvis_1.0.0_<arch>.deb
 ```
 
 ### Releases
 
-Pushing a version tag builds the installers and publishes them as a GitHub release (`.github/workflows/release.yml`); a tag with a hyphen, such as `v0.1.0-beta`, is a pre-release. Tag a commit on `main`:
+Pushing a version tag builds the installers (unsigned), writes the validation report and publishes them as a GitHub release (`.github/workflows/release.yml`); a tag with a hyphen, such as `v1.0.0-rc1`, is a pre-release. The release notes are the version's section of `CHANGELOG.md`.
 
 ```bash
-git tag -a v0.1.0-beta -m "Curvis 0.1.0 beta" && git push origin v0.1.0-beta
+git tag -a v1.0.0 -m "Curvis 1.0.0" && git push origin v1.0.0
 ```
 
-The version in `src/curvis/__init__.py` and `pyproject.toml` (e.g. `0.1.0b1`) names the installer files. macOS and the Windows file properties show only its numbers (`0.1.0`), and the `.deb` is versioned `0.1.0~b1` so that `0.1.0` counts as newer.
+The version in `src/curvis/__init__.py` and `pyproject.toml` (e.g. `1.0.0`, or `1.0.0rc1` for a release candidate) names the installer files. macOS and the Windows file properties show only its numbers (`1.0.0`), and the `.deb` of a pre-release is versioned `1.0.0~rc1` so that `1.0.0` counts as newer.
+
+The validation report (`docs/validation-report.md` and `.pdf`) is written by `uv run python scripts/validation_report.py`; run it again before a release so the committed copy is current.
 
 ## License
 

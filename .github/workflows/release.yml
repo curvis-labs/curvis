@@ -1,10 +1,11 @@
 name: Release
 
-# Pushing a tag such as v0.1.0-beta builds the installers for Windows, macOS and Linux
-# (installers.yml: each one is installed and started on its runner) and publishes them
-# as a GitHub release. A tag with a hyphen (v0.1.0-beta, v1.0.0-rc1) is a pre-release.
+# Pushing a tag such as v1.0.0 builds the installers for Windows, macOS and Linux (installers.yml: each one is installed and started on its runner), writes the
+# validation report, and publishes them all as a GitHub release, with SHA-256
+# checksums (SHA256SUMS.txt) and a build provenance attestation for every file. The
+# release notes are the version's section of CHANGELOG.md. A tag with a hyphen (v1.0.0-rc1) is a pre-release.
 #
-#     git tag -a v0.1.0-beta -m "Curvis 0.1.0 beta" && git push origin v0.1.0-beta
+#     git tag -a v1.0.0 -m "Curvis 1.0.0" && git push origin v1.0.0
 
 on:
   push:
@@ -22,12 +23,49 @@ jobs:
     name: installers
     uses: ./.github/workflows/installers.yml
 
+  validation:
+    name: validation report
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libfontconfig1 libdbus-1-3
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # Fails the release if any analysis no longer matches R.
+      - name: Write the validation report
+        run: |
+          mkdir -p dist
+          uv run python scripts/validation_report.py \
+            --markdown dist/curvis-validation-report.md --pdf dist/curvis-validation-report.pdf
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: curvis-validation-report
+          path: dist/curvis-validation-report.*
+          if-no-files-found: error
+
   release:
     name: GitHub release
-    needs: installers
+    needs: [installers, validation]
     runs-on: ubuntu-latest
     permissions:
       contents: write  # create the release and upload the installers
+      id-token: write  # sign the build provenance attestations (Sigstore)
+      attestations: write  # store them with the repository
     steps:
       - uses: actions/checkout@v7
 
@@ -40,23 +78,25 @@ jobs:
       - name: List the installers
         run: ls -l dist
 
-      - name: Write the release notes
+      # SHA256SUMS.txt lets users check a download: `sha256sum --check --ignore-missing
+      # SHA256SUMS.txt` (Linux), `shasum -a 256 <file>` (macOS), `Get-FileHash <file>`
+      # (Windows PowerShell).
+      - name: Write the SHA-256 checksums
+        working-directory: dist
         run: |
-          version="$(python3 -c 'import re,pathlib; print(re.search(r"__version__ = \"([^\"]+)\"", pathlib.Path("src/curvis/__init__.py").read_text()).group(1))')"
-          cat > notes.md <<NOTES
-          Curvis ${version} (${GITHUB_REF_NAME}).
+          sha256sum -- * > ../SHA256SUMS.txt
+          mv ../SHA256SUMS.txt .
+          cat SHA256SUMS.txt
 
-          Download the installer for your computer:
+      # Records which commit and workflow run built each file; anyone can check one with
+      # `gh attestation verify <file> --repo <owner>/<repo>`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-checksums: dist/SHA256SUMS.txt
 
-          - **Windows**: \`Curvis-${version}-setup.exe\`
-          - **macOS** (Apple silicon): \`Curvis-${version}-macos-arm64.dmg\`
-          - **Linux**: \`curvis_${version}_amd64.deb\` (Debian, Ubuntu) or \`Curvis-${version}-x86_64.AppImage\`
-
-          The installers are not signed yet, so Windows and macOS warn before the first start.
-          [Getting started](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/docs/getting-started.md)
-          explains how to install, and how to go from a CSV file to an exported graph.
-          NOTES
-          cat notes.md
+      - name: Write the release notes
+        run: python3 scripts/release_notes.py "$GITHUB_REF_NAME" > notes.md && cat notes.md
 
       - name: Publish the release
         env:
