@@ -19,7 +19,8 @@ and exports the graph shown. Deleting a graph asks first; Undo brings it back.
 
 ![The Graph panel with a dose-response curve](images/graph-panel.png)
 
-On XY and survival graphs, click an entry in the legend to hide or show that series.
+On XY and survival graphs, click an entry in the legend to hide or show that series. From
+the keyboard, use **Show on graph** in the Series section of the Format dialog.
 
 A curve fit is drawn over the XY graphs of its table. Deleting the fit also removes its
 curves from the graphs.
@@ -46,7 +47,8 @@ they do not fit side by side).
 
 ![Format graph: the Axes section](images/format-axes.png)
 
-**Series**: for each series, its symbol, symbol size, line style, line width, color,
+**Series**: for each series, whether it is shown on the graph (XY and survival graphs),
+its symbol, symbol size, line style, line width, color,
 error bars and whether it is listed in the legend. Select several series to change them
 together. Series can be added, removed and reordered; fitted curves are listed with the
 series and can be removed.

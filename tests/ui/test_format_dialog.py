@@ -172,6 +172,30 @@ def test_series_color_and_legend(qtbot: QtBot, context: Context, monkeypatch) ->
     assert dialog.series_list.item(0).text() == "Control"
 
 
+def test_show_on_graph_hides_a_series_like_a_legend_click(qtbot: QtBot, context: Context) -> None:
+    """The keyboard way to hide a series: the same change as clicking its legend entry."""
+    dialog, _doc = open_dialog(qtbot, context)
+    dialog.set_section(SERIES)
+    first, second = (s.source for s in dialog.spec.series[:2])
+    assert dialog.shown.isVisibleTo(dialog) and dialog.shown.isChecked()
+    dialog.select_series([first])
+    dialog.shown.click()
+    assert dialog.spec == dialog.original.with_series_visible(first, False)
+    dialog.select_series([first, second])
+    assert dialog.shown.checkState() is Qt.CheckState.PartiallyChecked
+    dialog.select_series([first])
+    dialog.shown.click()
+    assert dialog.spec.series_for(first).visible  # type: ignore[union-attr]
+
+
+def test_show_on_graph_is_only_for_graphs_with_a_clickable_legend(
+    qtbot: QtBot, context: Context
+) -> None:
+    dialog, _doc = open_dialog(qtbot, context, "bar")
+    dialog.set_section(SERIES)
+    assert not dialog.shown.isVisibleTo(dialog)
+
+
 def test_add_remove_and_reorder_series(qtbot: QtBot, context: Context) -> None:
     dialog, _doc = open_dialog(qtbot, context)
     dialog.set_section(SERIES)

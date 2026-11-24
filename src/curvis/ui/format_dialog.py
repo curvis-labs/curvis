@@ -648,6 +648,12 @@ class FormatDialog(QDialog):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         form = form_layout()
+        self.shown = QCheckBox("Show on gra&ph")
+        self.shown.setToolTip("Same as clicking the series in the legend")
+        # hiding a series is a legend click on XY and survival graphs; this is the same
+        # for the keyboard
+        self.shown.setVisible(self.original.family in (ChartFamily.XY, ChartFamily.SURVIVAL))
+        form.addRow("", self.shown)
         self.in_legend = QCheckBox("Show in le&gend")
         form.addRow("", self.in_legend)
         symbol_row = QHBoxLayout()
@@ -677,6 +683,7 @@ class FormatDialog(QDialog):
         layout.addLayout(form)
         self.series_note = secondary_label()
         layout.addWidget(self.series_note)
+        self.shown.clicked.connect(lambda on: self._edit_series(visible=bool(on)))
         self.in_legend.clicked.connect(lambda on: self._edit_series(in_legend=bool(on)))
         self.symbol.activated.connect(lambda _i: self._edit_series(symbol=self.symbol.value()))
         self.symbol_size.valueChanged.connect(self._on_size_value)
@@ -798,6 +805,7 @@ class FormatDialog(QDialog):
                 self.remove_button,
                 self.up_button,
                 self.down_button,
+                self.shown,
                 self.in_legend,
                 self.symbol,
                 self.symbol_size,
@@ -971,6 +979,7 @@ class FormatDialog(QDialog):
         picked = " and ".join(p for p in parts if p)
         self.selection_note.setText(f"{picked} selected." if picked else "No series selected.")
         widgets: list[QWidget] = [
+            self.shown,
             self.in_legend,
             self.symbol,
             self.symbol_size,
@@ -991,16 +1000,21 @@ class FormatDialog(QDialog):
             values = {get(s) for s in styles}
             return next(iter(values)), len(values) > 1
 
-        legend, mixed = common(lambda s: s.in_legend)
-        with QSignalBlocker(self.in_legend):
-            self.in_legend.setTristate(mixed)
-            self.in_legend.setCheckState(
-                Qt.CheckState.PartiallyChecked
-                if mixed
-                else Qt.CheckState.Checked
-                if legend
-                else Qt.CheckState.Unchecked
-            )
+        checks: tuple[tuple[QCheckBox, Callable[[SeriesSpec], Any]], ...] = (
+            (self.shown, lambda s: s.visible),
+            (self.in_legend, lambda s: s.in_legend),
+        )
+        for check, get in checks:
+            on, mixed = common(get)
+            with QSignalBlocker(check):
+                check.setTristate(mixed)
+                check.setCheckState(
+                    Qt.CheckState.PartiallyChecked
+                    if mixed
+                    else Qt.CheckState.Checked
+                    if on
+                    else Qt.CheckState.Unchecked
+                )
         value, mixed = common(lambda s: s.symbol)
         self.symbol.set_value(value, mixed=mixed)
         value, mixed = common(lambda s: s.line_style)
