@@ -3,6 +3,21 @@
 Curvis follows [semantic versioning](https://semver.org/). A project saved by one
 version opens in every later version.
 
+## Unreleased
+
+### Fixed
+
+- A legend with many or long series names no longer squashes the plot into a strip. Under
+  the plot it takes at most 30% of the page height, using columns, then smaller text,
+  then names shortened in the middle, and with very many series a last "+N more" entry.
+
+### New
+
+- **Legend inside the plot.** The Format dialog's *Legend place* puts the legend in an
+  empty corner of the plot, on every graph type. It never covers data: when every corner
+  has some, the legend stays outside. Projects save in format 12; older projects open
+  with their legends outside, as before.
+
 ## 1.0.0 — 2026-11-24
 
 The first stable release. Every analysis is checked against reference results from R

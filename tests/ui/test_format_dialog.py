@@ -16,6 +16,7 @@ from curvis.charts.spec import (
     ChartVariant,
     ErrorBars,
     LabelAngle,
+    LegendPosition,
     LineStyle,
     Scale,
     Symbol,
@@ -94,6 +95,27 @@ def test_graph_tab_title_size_and_legend(qtbot: QtBot, context: Context) -> None
     dialog.show_legend.click()
     assert dialog.spec.show_legend is False
     assert dialog.preview.spec == dialog.spec  # the preview follows at once
+
+
+def test_graph_tab_legend_place(qtbot: QtBot, context: Context) -> None:
+    """The legend goes outside the plot unless the user puts it inside; the choice is
+    off while the graph shows no legend."""
+    dialog, _doc = open_dialog(qtbot, context)
+    combo = dialog.legend_position
+    assert combo.currentData() == LegendPosition.OUTSIDE and combo.isEnabled()
+    assert [combo.itemText(i) for i in range(combo.count())] == [
+        "Outside the plot",
+        "Inside the plot",
+    ]
+    combo.setCurrentIndex(combo.findData(LegendPosition.INSIDE))
+    combo.activated.emit(combo.currentIndex())
+    assert dialog.spec.legend_position is LegendPosition.INSIDE
+    assert dialog.preview.spec == dialog.spec
+    dialog.show_legend.click()
+    assert not combo.isEnabled() and not dialog.legend_position_label.isEnabled()
+    dialog.show_legend.click()
+    assert combo.isEnabled()
+    assert dialog.spec.legend_position is LegendPosition.INSIDE
 
 
 def test_graph_tab_name(qtbot: QtBot, context: Context) -> None:
