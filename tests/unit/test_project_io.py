@@ -452,9 +452,7 @@ def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.Monke
     save(Document(), path)
     current = SCHEMA_VERSION
     monkeypatch.setattr(project, "SCHEMA_VERSION", current + 1)
-    monkeypatch.setattr(
-        project, "MIGRATIONS", {v: lambda data: data for v in range(1, current)}
-    )
+    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, current)})
     with pytest.raises(ProjectFileError, match=f"from format {current}"):
         load(path)
 

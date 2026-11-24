@@ -127,10 +127,10 @@ if TYPE_CHECKING:
 GRAPH, AXES, SERIES, COLORS = range(4)
 SECTIONS = ("Graph", "Axes", "Series", "Colors and text")
 DESCRIPTIONS = (
-    "The title, type, size and legend of the graph.",
+    "The name, title, type, size and legend of the graph.",
     "Titles, ranges, labels and scales of the axes.",
-    "Symbols, lines, colors, error bars and fitted curves. Select several series to change "
-    "them together.",
+    "Symbols, lines, colors, error bars, fitted curves and comparisons. Select several "
+    "series to change them together.",
     "The colors, the font and the size of the graph's text.",
 )
 MIXED = "Mixed"

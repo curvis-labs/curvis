@@ -88,7 +88,7 @@ def test_graph_tab_title_size_and_legend(qtbot: QtBot, context: Context) -> None
 
 
 def test_graph_tab_name(qtbot: QtBot, context: Context) -> None:
-    dialog, doc = open_dialog(qtbot, context)
+    dialog, _doc = open_dialog(qtbot, context)
     assert dialog.name_edit.text() == "" and dialog.name_edit.placeholderText() == "XY graph"
     qtbot.keyClicks(dialog.name_edit, "  Dose   response ")
     assert dialog.spec.name == "Dose response" and dialog.skeleton.ok_button.isEnabled()
@@ -357,7 +357,9 @@ def test_graph_toolbar_buttons_are_registered_actions(window: MainWindow, tab: D
     assert [a.objectName() for a in actions] == [b.action_id for b in GRAPH_BUTTONS]
     for action in actions:
         assert window.registry.action(action.objectName()) is action
-        assert action.isEnabled()
+        # an XY graph cannot show comparisons: that button says why
+        assert action.isEnabled() is (action.objectName() != "graph.comparisons")
+    assert "bar, box, violin" in window.registry.action("graph.comparisons").toolTip()
     for action_id, name, keys in (
         ("graph.format", "Format graph", "Ctrl+Shift+F"),
         ("graph.export", "Export graph", "Ctrl+Shift+X"),
