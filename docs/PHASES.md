@@ -476,7 +476,7 @@ Make a plan first. When done, report what you built, image-diff results and the 
 
 **Done when**
 - [x] All benchmarks in CLAUDE.md that apply so far meet their targets.
-- [ ] A new user can go from CSV to a finished, exported dose-response graph in under 5 minutes (you test this). The path is scripted in tests/ui/test_first_graph.py.
+- [x] A new user can go from CSV to a finished, exported dose-response graph in under 5 minutes (you test this). The path is scripted in tests/ui/test_first_graph.py.
 - [x] Beta installers are built and a short getting-started guide exists (docs/getting-started.md; pushing the tag v0.1.0-beta publishes them as a GitHub pre-release).
 
 ```text
