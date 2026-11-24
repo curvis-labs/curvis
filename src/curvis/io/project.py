@@ -58,7 +58,7 @@ from curvis.data import (
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -245,6 +245,18 @@ def _graph_names_and_comparisons(data: dict[str, Any]) -> dict[str, Any]:
         if isinstance(graph, dict):
             graph.setdefault("name", "")
             graph.setdefault("comparisons", None)
+    return data
+
+
+@register_migration(11)
+def _legend_positions(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 12 stores where a graph's legend goes (``legend_position``): outside the
+    plot, as every graph before it."""
+    document = data.get("document")
+    graphs = document.get("graphs") if isinstance(document, dict) else None
+    for graph in graphs if isinstance(graphs, list) else []:
+        if isinstance(graph, dict):
+            graph.setdefault("legend_position", "outside")
     return data
 
 

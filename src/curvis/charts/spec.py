@@ -212,6 +212,19 @@ _ANGLE_LABELS = {
 }
 
 
+class LegendPosition(StrEnum):
+    """Where a graph's legend goes. Outside: right of the plot, or under it when the page
+    is too narrow. Inside: in the corner of the plot that has no data in it, or outside
+    when every corner has some (curvis.charts.legend)."""
+
+    OUTSIDE = "outside"
+    INSIDE = "inside"
+
+    @property
+    def label(self) -> str:
+        return {"outside": "Outside the plot", "inside": "Inside the plot"}[self.value]
+
+
 ASPECT_PRESETS: dict[str, tuple[float, float]] = {
     "tall": (4.0, 6.0),
     "wide": (9.0, 6.0),
@@ -338,6 +351,8 @@ class ChartSpec:
     text_size: float = DEFAULT_TEXT_SIZE
     overlays: tuple[FitOverlay, ...] = ()
     show_legend: bool = True
+    legend_position: LegendPosition = LegendPosition.OUTSIDE
+    """Where the legend goes (when the graph shows one)."""
     analysis_id: str | None = None
     """The two-way ANOVA an interaction graph draws (Interaction family only). Its series
     are the category groups of the table: one line per level of the second factor."""
@@ -472,6 +487,7 @@ def spec_to_json(spec: ChartSpec) -> dict[str, Any]:
             {"analysis_id": o.analysis_id, "show_band": o.show_band} for o in spec.overlays
         ],
         "show_legend": spec.show_legend,
+        "legend_position": spec.legend_position.value,
         "analysis_id": spec.analysis_id,
         "show_bands": spec.show_bands,
         "grouping": spec.grouping.value,
@@ -599,6 +615,11 @@ def spec_from_json(data: Any) -> ChartSpec:
                 for o in _list(obj.get("overlays", []), "overlays")
             ),
             show_legend=_bool(obj.get("show_legend", family is ChartFamily.XY), "show_legend"),
+            legend_position=_enum(
+                LegendPosition,
+                obj.get("legend_position", LegendPosition.OUTSIDE),
+                "legend_position",
+            ),
             analysis_id=_optional_str(obj.get("analysis_id"), "analysis_id"),
             show_bands=_bool(obj.get("show_bands", True), "show_bands"),
             grouping=_enum(Grouping, obj.get("grouping", Grouping.NONE), "grouping"),

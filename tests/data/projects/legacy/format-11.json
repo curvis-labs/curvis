@@ -1,0 +1,1027 @@
+{
+ "schema_version": 11,
+ "app_version": "1.0.0",
+ "name": "Legacy sample",
+ "tables": [
+  {
+   "id": "t_dose",
+   "name": "Dose response",
+   "category_factor": "Category",
+   "columns": [
+    {
+     "id": "x",
+     "name": "Dose",
+     "role": "X",
+     "unit": "nM",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      0.001,
+      0.01,
+      0.1,
+      1.0,
+      10.0,
+      100.0,
+      1000.0,
+      10000.0
+     ]
+    },
+    {
+     "id": "d0",
+     "name": "Drug 1",
+     "role": "Y",
+     "unit": "",
+     "group_id": "g_drug",
+     "category_id": null,
+     "values": [
+      4.0,
+      6.5,
+      14.0,
+      37.0,
+      66.0,
+      88.0,
+      95.5,
+      98.0
+     ]
+    },
+    {
+     "id": "d1",
+     "name": "Drug 2",
+     "role": "Y",
+     "unit": "",
+     "group_id": "g_drug",
+     "category_id": null,
+     "values": [
+      5.5,
+      8.0,
+      15.5,
+      null,
+      67.5,
+      89.5,
+      97.0,
+      99.5
+     ]
+    },
+    {
+     "id": "d2",
+     "name": "Drug 3",
+     "role": "Y",
+     "unit": "",
+     "group_id": "g_drug",
+     "category_id": null,
+     "values": [
+      2.8,
+      5.3,
+      12.8,
+      35.8,
+      64.8,
+      86.8,
+      94.3,
+      96.8
+     ]
+    },
+    {
+     "id": "c0",
+     "name": "Ctrl 1",
+     "role": "Y",
+     "unit": "",
+     "group_id": "g_ctrl",
+     "category_id": null,
+     "values": [
+      5.0,
+      5.1,
+      5.2,
+      5.3,
+      5.4,
+      5.5,
+      5.6,
+      5.7
+     ]
+    },
+    {
+     "id": "c1",
+     "name": "Ctrl 2",
+     "role": "Y",
+     "unit": "",
+     "group_id": "g_ctrl",
+     "category_id": null,
+     "values": [
+      5.8,
+      5.8999999999999995,
+      6.0,
+      6.1,
+      6.2,
+      6.3,
+      6.4,
+      6.5
+     ]
+    },
+    {
+     "id": "c2",
+     "name": "Ctrl 3",
+     "role": "Y",
+     "unit": "",
+     "group_id": "g_ctrl",
+     "category_id": null,
+     "values": [
+      4.4,
+      4.5,
+      4.6000000000000005,
+      4.7,
+      4.800000000000001,
+      4.9,
+      5.0,
+      5.1000000000000005
+     ]
+    },
+    {
+     "id": "single",
+     "name": "Single",
+     "role": "Y",
+     "unit": "",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      2.0,
+      5.0,
+      8.0,
+      11.0,
+      14.0,
+      17.0,
+      20.0,
+      23.0
+     ]
+    },
+    {
+     "id": "single_sd",
+     "name": "Single SD",
+     "role": "Error",
+     "unit": "",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5,
+      0.5
+     ]
+    },
+    {
+     "id": "notes",
+     "name": "Notes",
+     "role": "Text",
+     "unit": "",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      "",
+      "plate 1",
+      "",
+      "",
+      "redo",
+      "",
+      "",
+      "µ ±"
+     ]
+    }
+   ],
+   "replicate_groups": [
+    {
+     "id": "g_drug",
+     "name": "Drug",
+     "category_id": null
+    },
+    {
+     "id": "g_ctrl",
+     "name": "Control",
+     "category_id": null
+    }
+   ],
+   "category_groups": []
+  },
+  {
+   "id": "t_groups",
+   "name": "Groups",
+   "category_factor": "Category",
+   "columns": [
+    {
+     "id": "ga",
+     "name": "Control",
+     "role": "Y",
+     "unit": "",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      10.1,
+      11.4,
+      9.8,
+      10.7,
+      12.0,
+      10.9
+     ]
+    },
+    {
+     "id": "ae5271ad54b64c488fc25c3fbb9ea92f",
+     "name": "Control_x2",
+     "role": "Y",
+     "unit": "",
+     "group_id": null,
+     "category_id": null,
+     "values": null
+    },
+    {
+     "id": "gb",
+     "name": "Treated",
+     "role": "Y",
+     "unit": "",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      12.3,
+      13.1,
+      12.8,
+      14.0,
+      13.6,
+      null
+     ]
+    },
+    {
+     "id": "gc",
+     "name": "Vehicle only",
+     "role": "Y",
+     "unit": "",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      9.0,
+      8.7,
+      9.9,
+      9.4,
+      null,
+      null
+     ]
+    }
+   ],
+   "replicate_groups": [],
+   "category_groups": []
+  },
+  {
+   "id": "t_two_way",
+   "name": "Two-way",
+   "category_factor": "Sex",
+   "columns": [
+    {
+     "id": "rg_mwt_0",
+     "name": "m WT r1",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_mwt",
+     "category_id": null,
+     "values": [
+      20.0,
+      20.93,
+      20.810000000000002,
+      21.74
+     ]
+    },
+    {
+     "id": "rg_mwt_1",
+     "name": "m WT r2",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_mwt",
+     "category_id": null,
+     "values": [
+      21.12,
+      21.0,
+      21.93,
+      21.81
+     ]
+    },
+    {
+     "id": "rg_mwt_2",
+     "name": "m WT r3",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_mwt",
+     "category_id": null,
+     "values": [
+      22.24,
+      22.12,
+      22.0,
+      22.929999999999996
+     ]
+    },
+    {
+     "id": "rg_mko_0",
+     "name": "m KO r1",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_mko",
+     "category_id": null,
+     "values": [
+      26.0,
+      26.51,
+      27.020000000000003,
+      27.529999999999998
+     ]
+    },
+    {
+     "id": "rg_mko_1",
+     "name": "m KO r2",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_mko",
+     "category_id": null,
+     "values": [
+      27.12,
+      27.63,
+      28.14,
+      27.599999999999998
+     ]
+    },
+    {
+     "id": "rg_mko_2",
+     "name": "m KO r3",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_mko",
+     "category_id": null,
+     "values": [
+      28.24,
+      27.7,
+      28.21,
+      28.72
+     ]
+    },
+    {
+     "id": "rg_fwt_0",
+     "name": "f WT r1",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_fwt",
+     "category_id": null,
+     "values": [
+      18.0,
+      19.14,
+      19.23,
+      19.32
+     ]
+    },
+    {
+     "id": "rg_fwt_1",
+     "name": "f WT r2",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_fwt",
+     "category_id": null,
+     "values": [
+      19.12,
+      19.21,
+      19.3,
+      20.439999999999998
+     ]
+    },
+    {
+     "id": "rg_fwt_2",
+     "name": "f WT r3",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_fwt",
+     "category_id": null,
+     "values": [
+      20.24,
+      20.33,
+      20.42,
+      20.509999999999998
+     ]
+    },
+    {
+     "id": "rg_fko_0",
+     "name": "f KO r1",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_fko",
+     "category_id": null,
+     "values": [
+      30.0,
+      30.720000000000002,
+      31.44,
+      31.11
+     ]
+    },
+    {
+     "id": "rg_fko_1",
+     "name": "f KO r2",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_fko",
+     "category_id": null,
+     "values": [
+      31.12,
+      31.84,
+      31.51,
+      32.23
+     ]
+    },
+    {
+     "id": "rg_fko_2",
+     "name": "f KO r3",
+     "role": "Y",
+     "unit": "",
+     "group_id": "rg_fko",
+     "category_id": null,
+     "values": [
+      32.24,
+      31.91,
+      32.63,
+      32.3
+     ]
+    }
+   ],
+   "replicate_groups": [
+    {
+     "id": "rg_mwt",
+     "name": "WT",
+     "category_id": "cat_m"
+    },
+    {
+     "id": "rg_mko",
+     "name": "KO",
+     "category_id": "cat_m"
+    },
+    {
+     "id": "rg_fwt",
+     "name": "WT",
+     "category_id": "cat_f"
+    },
+    {
+     "id": "rg_fko",
+     "name": "KO",
+     "category_id": "cat_f"
+    }
+   ],
+   "category_groups": [
+    {
+     "id": "cat_m",
+     "name": "Male"
+    },
+    {
+     "id": "cat_f",
+     "name": "Female"
+    }
+   ]
+  },
+  {
+   "id": "t_survival",
+   "name": "Survival",
+   "category_factor": "Category",
+   "columns": [
+    {
+     "id": "s_time",
+     "name": "Days",
+     "role": "Time",
+     "unit": "d",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      3.0,
+      5.0,
+      5.0,
+      8.0,
+      12.0,
+      15.0,
+      20.0,
+      21.0,
+      30.0,
+      34.0
+     ]
+    },
+    {
+     "id": "s_a",
+     "name": "Placebo",
+     "role": "Event",
+     "unit": "",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      1.0,
+      1.0,
+      0.0,
+      1.0,
+      1.0,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "id": "s_b",
+     "name": "Drug",
+     "role": "Event",
+     "unit": "",
+     "group_id": null,
+     "category_id": null,
+     "values": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      1.0,
+      0.0,
+      1.0,
+      0.0,
+      1.0
+     ]
+    }
+   ],
+   "replicate_groups": [],
+   "category_groups": []
+  }
+ ],
+ "constants": [
+  {
+   "name": "k_on",
+   "value": 125000.0,
+   "unit": "1/(M*s)"
+  }
+ ],
+ "settings": {
+  "note": "saved by an older Curvis"
+ },
+ "calculations": [
+  {
+   "table_id": "t_groups",
+   "formula": "{A} * 2",
+   "columns": [
+    [
+     "ae5271ad54b64c488fc25c3fbb9ea92f",
+     "ga"
+    ]
+   ]
+  }
+ ],
+ "analyses": [
+  {
+   "id": "a_t_dose_descriptive_statistics",
+   "type": "descriptive_statistics",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "confidence_interval": false,
+    "skip_empty_rows": true
+   }
+  },
+  {
+   "id": "a_t_dose_t_test",
+   "type": "t_test",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl"
+   ],
+   "params": {
+    "test": "welch"
+   }
+  },
+  {
+   "id": "a_t_dose_one_way_anova",
+   "type": "one_way_anova",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "design": "ordinary",
+    "posthoc": "dunnett",
+    "control": ""
+   }
+  },
+  {
+   "id": "a_t_dose_mann_whitney",
+   "type": "mann_whitney",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl"
+   ],
+   "params": {}
+  },
+  {
+   "id": "a_t_dose_kruskal_wallis",
+   "type": "kruskal_wallis",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "posthoc": "control",
+    "control": ""
+   }
+  },
+  {
+   "id": "a_t_dose_linear_regression",
+   "type": "linear_regression",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": ""
+   }
+  },
+  {
+   "id": "a_t_dose_polynomial_regression",
+   "type": "polynomial_regression",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": "",
+    "degree": 2
+   }
+  },
+  {
+   "id": "a_t_dose_hill_4pl",
+   "type": "hill_4pl",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": "",
+    "x_is_log": false,
+    "fixed": ""
+   }
+  },
+  {
+   "id": "a_t_dose_hill_3pl",
+   "type": "hill_3pl",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": "",
+    "x_is_log": true,
+    "fixed": ""
+   }
+  },
+  {
+   "id": "a_t_dose_biphasic",
+   "type": "biphasic",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": "",
+    "x_is_log": false,
+    "fixed": ""
+   }
+  },
+  {
+   "id": "a_t_dose_exp_association",
+   "type": "exp_association",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": "",
+    "fixed": ""
+   }
+  },
+  {
+   "id": "a_t_dose_exp_decay",
+   "type": "exp_decay",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": "",
+    "fixed": ""
+   }
+  },
+  {
+   "id": "a_t_dose_michaelis_menten",
+   "type": "michaelis_menten",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": "",
+    "fixed": ""
+   }
+  },
+  {
+   "id": "a_t_dose_bell_shaped",
+   "type": "bell_shaped",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": "",
+    "x_is_log": false,
+    "fixed": ""
+   }
+  },
+  {
+   "id": "a_t_dose_gaussian",
+   "type": "gaussian",
+   "table_id": "t_dose",
+   "inputs": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "params": {
+    "x_range": "",
+    "fixed": ""
+   }
+  },
+  {
+   "id": "a_t_groups_descriptive_statistics",
+   "type": "descriptive_statistics",
+   "table_id": "t_groups",
+   "inputs": [
+    "ga",
+    "gb",
+    "gc"
+   ],
+   "params": {
+    "confidence_interval": false,
+    "skip_empty_rows": true
+   }
+  },
+  {
+   "id": "a_t_groups_t_test",
+   "type": "t_test",
+   "table_id": "t_groups",
+   "inputs": [
+    "ga",
+    "gb"
+   ],
+   "params": {
+    "test": "welch"
+   }
+  },
+  {
+   "id": "a_t_groups_one_way_anova",
+   "type": "one_way_anova",
+   "table_id": "t_groups",
+   "inputs": [
+    "ga",
+    "gb",
+    "gc"
+   ],
+   "params": {
+    "design": "repeated",
+    "posthoc": "tukey",
+    "control": ""
+   }
+  },
+  {
+   "id": "a_t_groups_mann_whitney",
+   "type": "mann_whitney",
+   "table_id": "t_groups",
+   "inputs": [
+    "ga",
+    "gb"
+   ],
+   "params": {}
+  },
+  {
+   "id": "a_t_groups_kruskal_wallis",
+   "type": "kruskal_wallis",
+   "table_id": "t_groups",
+   "inputs": [
+    "ga",
+    "gb",
+    "gc"
+   ],
+   "params": {
+    "posthoc": "control",
+    "control": ""
+   }
+  },
+  {
+   "id": "a_t_two_way_descriptive_statistics",
+   "type": "descriptive_statistics",
+   "table_id": "t_two_way",
+   "inputs": [
+    "rg_mwt",
+    "rg_mko",
+    "rg_fwt",
+    "rg_fko"
+   ],
+   "params": {
+    "confidence_interval": false,
+    "skip_empty_rows": true
+   }
+  },
+  {
+   "id": "a_t_two_way_t_test",
+   "type": "t_test",
+   "table_id": "t_two_way",
+   "inputs": [
+    "rg_mwt",
+    "rg_mko"
+   ],
+   "params": {
+    "test": "welch"
+   }
+  },
+  {
+   "id": "a_t_two_way_one_way_anova",
+   "type": "one_way_anova",
+   "table_id": "t_two_way",
+   "inputs": [
+    "rg_mwt",
+    "rg_mko",
+    "rg_fwt",
+    "rg_fko"
+   ],
+   "params": {
+    "design": "repeated",
+    "posthoc": "tukey",
+    "control": ""
+   }
+  },
+  {
+   "id": "a_t_two_way_two_way_anova",
+   "type": "two_way_anova",
+   "table_id": "t_two_way",
+   "inputs": [
+    "rg_mwt",
+    "rg_mko",
+    "rg_fwt",
+    "rg_fko"
+   ],
+   "params": {
+    "factor_name": "Group"
+   }
+  },
+  {
+   "id": "a_t_two_way_mann_whitney",
+   "type": "mann_whitney",
+   "table_id": "t_two_way",
+   "inputs": [
+    "rg_mwt",
+    "rg_mko"
+   ],
+   "params": {}
+  },
+  {
+   "id": "a_t_two_way_kruskal_wallis",
+   "type": "kruskal_wallis",
+   "table_id": "t_two_way",
+   "inputs": [
+    "rg_mwt",
+    "rg_mko",
+    "rg_fwt",
+    "rg_fko"
+   ],
+   "params": {
+    "posthoc": "all_pairs",
+    "control": ""
+   }
+  },
+  {
+   "id": "a_t_survival_kaplan_meier",
+   "type": "kaplan_meier",
+   "table_id": "t_survival",
+   "inputs": [
+    "s_a",
+    "s_b"
+   ],
+   "params": {}
+  }
+ ],
+ "graphs": [
+  {
+   "id": "g_t_dose_xy",
+   "table_id": "t_dose",
+   "family": "xy",
+   "variant": "scatter",
+   "title": "Dose response: xy",
+   "series": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "overlays": 10
+  },
+  {
+   "id": "g_t_dose_bar",
+   "table_id": "t_dose",
+   "family": "bar",
+   "variant": "bar",
+   "title": "Dose response: bar",
+   "series": [
+    "g_drug",
+    "g_ctrl",
+    "single"
+   ],
+   "overlays": 0
+  },
+  {
+   "id": "g_t_groups_bar",
+   "table_id": "t_groups",
+   "family": "bar",
+   "variant": "bar",
+   "title": "Groups: bar",
+   "series": [
+    "ga",
+    "gb",
+    "gc"
+   ],
+   "overlays": 0
+  },
+  {
+   "id": "g_t_two_way_bar",
+   "table_id": "t_two_way",
+   "family": "bar",
+   "variant": "bar",
+   "title": "Two-way: bar",
+   "series": [
+    "rg_mwt",
+    "rg_mko",
+    "rg_fwt",
+    "rg_fko"
+   ],
+   "overlays": 0
+  },
+  {
+   "id": "g_t_two_way_interaction",
+   "table_id": "t_two_way",
+   "family": "interaction",
+   "variant": "interaction",
+   "title": "Two-way: interaction",
+   "series": [
+    "cat_m",
+    "cat_f"
+   ],
+   "overlays": 0
+  },
+  {
+   "id": "g_t_survival_survival",
+   "table_id": "t_survival",
+   "family": "survival",
+   "variant": "kaplan_meier",
+   "title": "Survival: survival",
+   "series": [
+    "s_a",
+    "s_b"
+   ],
+   "overlays": 0
+  }
+ ],
+ "change_log": [
+  [
+   "RenameColumn",
+   "Rename column 'Vehicle' to 'Vehicle only'"
+  ],
+  [
+   "CommandGroup",
+   "Calculate custom formula for 1 column"
+  ]
+ ]
+}

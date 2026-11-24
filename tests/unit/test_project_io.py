@@ -18,7 +18,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from curvis.analysis.base import Analysis
-from curvis.charts.spec import LabelAngle
+from curvis.charts.spec import LabelAngle, LegendPosition
 from curvis.core import ChangeLogEntry, Document, JsonValue, ProjectConstant, RenameTable
 from curvis.data import CategoryGroup, Column, ColumnRole, ReplicateGroup, Table, normalized_order
 from curvis.io import project
@@ -222,7 +222,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 11
+    assert data["schema_version"] == SCHEMA_VERSION == 12
     assert set(data["document"]) == {
         "id",
         "name",
@@ -392,7 +392,7 @@ def test_newer_version(tmp_path: Path) -> None:
 
 
 def test_migrations_cover_every_older_version() -> None:
-    assert SCHEMA_VERSION == 11
+    assert SCHEMA_VERSION == 12
     assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
@@ -751,6 +751,25 @@ def test_version_10_graphs_keep_their_default_names(tmp_path: Path) -> None:
 
     _rewrite(path, to_v10)
     assert [g.name for g in load(path).graphs] == ["", ""]
+
+
+def test_version_11_graphs_keep_their_legends_outside(tmp_path: Path) -> None:
+    """Format 12 stores where the legend goes; older graphs have it outside the plot."""
+    path = tmp_path / "v11.cvp"
+    document = _graph_document()
+    document.graphs[0] = dataclasses.replace(
+        document.graphs[0], legend_position=LegendPosition.INSIDE
+    )
+    save(document, path)
+    assert load(path).graphs[0].legend_position is LegendPosition.INSIDE
+
+    def to_v11(data: dict[str, Any]) -> None:
+        data["schema_version"] = 11
+        for graph in data["document"]["graphs"]:
+            del graph["legend_position"]
+
+    _rewrite(path, to_v11)
+    assert {g.legend_position for g in load(path).graphs} == {LegendPosition.OUTSIDE}
 
 
 def test_version_7_graphs_draw_no_analysis(tmp_path: Path) -> None:
