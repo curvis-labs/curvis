@@ -222,3 +222,80 @@ def test_delete_graph_and_switch_panels(
     tab.document.undo()
     settle(qtbot, tab)
     assert tab.graph_panel.stack.currentWidget() is chart_of(tab)
+
+
+# --- renaming -------------------------------------------------------------------------------
+
+
+def combo_texts(tab: DocumentTab) -> list[str]:
+    combo = tab.graph_panel.combo
+    return [combo.itemText(i) for i in range(combo.count())]
+
+
+def two_graphs(window: MainWindow, tab: DocumentTab) -> None:
+    window.registry.action("graph.new.xy").trigger()
+    window.registry.action("graph.new.xy").trigger()
+    tab.document.undo_stack.clear()
+    assert combo_texts(tab) == ["XY graph · Assay", "XY graph 2 · Assay"]
+
+
+def test_rename_a_graph_in_place(window: MainWindow, tab: DocumentTab, qtbot: QtBot) -> None:
+    two_graphs(window, tab)
+    window.registry.action("graph.rename").trigger()
+    editor = tab.graph_panel.editor
+    assert editor is not None and editor.text() == "XY graph 2" and editor.selectedText()
+    qtbot.keyClicks(editor, "Dose response")
+    qtbot.keyClick(editor, Qt.Key.Key_Return)
+    assert editor.is_closed
+    assert combo_texts(tab) == ["XY graph · Assay", "Dose response"]
+    assert tab.graph_panel.combo.currentText() == "Dose response"
+    assert tab.document.undo_stack.count == 1
+    tab.document.undo()
+    assert combo_texts(tab) == ["XY graph · Assay", "XY graph 2 · Assay"]
+
+
+def test_a_taken_graph_name_keeps_the_old_name(
+    window: MainWindow, tab: DocumentTab, qtbot: QtBot
+) -> None:
+    two_graphs(window, tab)
+    tab.rename_graph()
+    editor = tab.graph_panel.editor
+    assert editor is not None
+    qtbot.keyClicks(editor, "xy graph")
+    qtbot.keyClick(editor, Qt.Key.Key_Return)
+    assert editor.is_closed and combo_texts(tab) == ["XY graph · Assay", "XY graph 2 · Assay"]
+    assert "already a graph called 'XY graph · Assay'" not in window.statusBar().currentMessage()
+    assert "already a graph called 'XY graph'" in window.statusBar().currentMessage()
+    assert tab.document.undo_stack.count == 0
+
+
+def test_esc_cancels_a_graph_rename(window: MainWindow, tab: DocumentTab, qtbot: QtBot) -> None:
+    two_graphs(window, tab)
+    tab.rename_graph()
+    editor = tab.graph_panel.editor
+    assert editor is not None
+    qtbot.keyClicks(editor, "Nope")
+    qtbot.keyClick(editor, Qt.Key.Key_Escape)
+    assert editor.is_closed and combo_texts(tab) == ["XY graph · Assay", "XY graph 2 · Assay"]
+    assert tab.document.undo_stack.count == 0
+
+
+def test_graph_list_context_menu_renames(window: MainWindow, tab: DocumentTab) -> None:
+    two_graphs(window, tab)
+    menu = tab.graph_panel.context_menu()
+    assert menu is not None
+    (rename,) = menu.actions()
+    assert rename.text() == "&Rename graph"
+    rename.trigger()
+    editor = tab.graph_panel.editor
+    assert editor is not None and editor.text() == "XY graph 2"
+    editor.cancel()
+
+
+def test_rename_needs_a_graph(window: MainWindow, tab: DocumentTab) -> None:
+    window._update_state()
+    assert not window.registry.action("graph.rename").isEnabled()
+    assert tab.graph_panel.context_menu() is None
+    window.registry.action("graph.new.xy").trigger()
+    window._update_state()
+    assert window.registry.action("graph.rename").isEnabled()

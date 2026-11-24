@@ -53,16 +53,22 @@ from curvis.core.constants import JsonValue, ProjectConstant
 from curvis.core.dependency_graph import CycleError, DependencyGraph
 from curvis.core.document import Document
 from curvis.core.graph_commands import (
+    MAX_GRAPH_NAME,
     SetGraph,
     add_graph,
+    default_graph_names,
     edit_graph,
+    graph_name,
+    graph_names,
     remove_graph,
+    rename_graph,
     set_series_visible,
 )
 from curvis.core.undo_stack import UNDO_LIMIT, UndoEvent, UndoStack
 
 __all__ = [
     "LAST_TABLE",
+    "MAX_GRAPH_NAME",
     "UNDO_LIMIT",
     "AddColumn",
     "AddConstant",
@@ -107,14 +113,18 @@ __all__ = [
     "add_calculation",
     "add_graph",
     "constant_node",
+    "default_graph_names",
     "drawn_by",
     "edit_analysis",
     "edit_calculation",
     "edit_graph",
     "fix_name_clashes",
+    "graph_name",
+    "graph_names",
     "new_table_name",
     "overlaid_on",
     "remove_analysis",
     "remove_graph",
+    "rename_graph",
     "set_series_visible",
 ]

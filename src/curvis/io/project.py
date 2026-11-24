@@ -58,7 +58,7 @@ from curvis.data import (
 )
 
 FORMAT_NAME = "curvis-project"
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 """Version of the ``project.json`` layout written by this build. Bump it for every change
 to the format and register a migration from the previous version."""
 
@@ -232,6 +232,17 @@ def _graph_palettes_and_fonts(data: dict[str, Any]) -> dict[str, Any]:
         graph.setdefault("show_points", False)
         graph.setdefault("violin_trim", True)
         graph.setdefault("bins", {"mode": "auto", "count": 10, "width": 1.0, "start": 0.0})
+    return data
+
+
+@register_migration(10)
+def _graph_names_and_comparisons(data: dict[str, Any]) -> dict[str, Any]:
+    """Format 11 stores a graph's own name (``name``, "" for the default "Bar graph 2")."""
+    document = data.get("document")
+    graphs = document.get("graphs") if isinstance(document, dict) else None
+    for graph in graphs if isinstance(graphs, list) else []:
+        if isinstance(graph, dict):
+            graph.setdefault("name", "")
     return data
 
 

@@ -141,6 +141,7 @@ class DocumentTab(QWidget):
         self.graph_panel.current_changed.connect(self.state_changed)
         self.graph_panel.toggle_requested.connect(self._toggle_series)
         self.graph_panel.format_requested.connect(self.format_graph)
+        self.graph_panel.rename_requested.connect(self.rename_graph)
         self.side_tabs.addTab(self.results_panel, "Results")
         self.side_tabs.addTab(self.graph_panel, "Graph")
         self.side_tabs.currentChanged.connect(lambda _i: self.state_changed.emit())
@@ -450,6 +451,32 @@ class DocumentTab(QWidget):
             self.message.emit(str(exc))
             return False
         return True
+
+    def rename_graph(self, graph_id: str | None = None) -> bool:
+        """Edit the name of ``graph_id`` (default: the one shown) in place, over the
+        Graph panel's list. A refused name keeps the old one and says why."""
+        from curvis.core import graph_name, rename_graph
+
+        graph_id = graph_id or self.current_graph_id
+        if graph_id is None:
+            return False
+        self.show_graph()
+
+        def commit(text: str) -> bool:
+            name = " ".join(text.split())
+            unchanged = not self.document.graph(graph_id).name if not name else False
+            if unchanged or name == graph_name(self.document, graph_id):
+                return True
+            try:
+                command = rename_graph(self.document, graph_id, name)
+            except CommandError as exc:
+                self.message.emit(f"{exc} The old name was kept.")
+                return True
+            self._execute(command)
+            return True
+
+        editor = self.graph_panel.edit_name(graph_id, commit, self.graph_panel.combo)
+        return editor is not None
 
     def change_graph_type(self, variant: ChartVariant, graph_id: str | None = None) -> bool:
         """Draw the graph ``graph_id`` (default: the one shown) as ``variant``, keeping its

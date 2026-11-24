@@ -1,5 +1,6 @@
 """Tests for the .cvp project format: round trips, errors, migrations and crash safety."""
 
+import dataclasses
 import json
 import math
 import os
@@ -221,7 +222,7 @@ def test_project_json_layout(tmp_path: Path) -> None:
         assert zf.namelist() == ["project.json", "tables/0.arrow"]
         data = json.loads(zf.read("project.json"))
     assert data["format"] == "curvis-project"
-    assert data["schema_version"] == SCHEMA_VERSION == 10
+    assert data["schema_version"] == SCHEMA_VERSION == 11
     assert set(data["document"]) == {
         "id",
         "name",
@@ -391,7 +392,7 @@ def test_newer_version(tmp_path: Path) -> None:
 
 
 def test_migrations_cover_every_older_version() -> None:
-    assert SCHEMA_VERSION == 10
+    assert SCHEMA_VERSION == 11
     assert sorted(project.MIGRATIONS) == list(range(1, SCHEMA_VERSION))
 
 
@@ -449,9 +450,12 @@ def test_version_1_files_get_the_default_category_factor(tmp_path: Path) -> None
 def test_missing_migration_is_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "old.cvp"
     save(Document(), path)
-    monkeypatch.setattr(project, "SCHEMA_VERSION", 11)
-    monkeypatch.setattr(project, "MIGRATIONS", {v: lambda data: data for v in range(1, 10)})
-    with pytest.raises(ProjectFileError, match="from format 10"):
+    current = SCHEMA_VERSION
+    monkeypatch.setattr(project, "SCHEMA_VERSION", current + 1)
+    monkeypatch.setattr(
+        project, "MIGRATIONS", {v: lambda data: data for v in range(1, current)}
+    )
+    with pytest.raises(ProjectFileError, match=f"from format {current}"):
         load(path)
 
 
@@ -728,6 +732,27 @@ def test_version_6_axes_get_auto_label_angles(tmp_path: Path) -> None:
     for graph in load(path).graphs:
         assert graph.x_axis.label_angle is LabelAngle.AUTO
         assert graph.y_axis.label_angle is LabelAngle.AUTO
+
+
+def test_graph_names_round_trip(tmp_path: Path) -> None:
+    document = _graph_document()
+    document.graphs[1] = dataclasses.replace(document.graphs[1], name="Tumour volume")
+    save(document, tmp_path / "g.cvp")
+    assert [g.name for g in load(tmp_path / "g.cvp").graphs] == ["", "Tumour volume"]
+
+
+def test_version_10_graphs_keep_their_default_names(tmp_path: Path) -> None:
+    """Format 11 stores a graph's own name; older graphs have none."""
+    path = tmp_path / "v10.cvp"
+    save(_graph_document(), path)
+
+    def to_v10(data: dict[str, Any]) -> None:
+        data["schema_version"] = 10
+        for graph in data["document"]["graphs"]:
+            del graph["name"]
+
+    _rewrite(path, to_v10)
+    assert [g.name for g in load(path).graphs] == ["", ""]
 
 
 def test_version_7_graphs_draw_no_analysis(tmp_path: Path) -> None:

@@ -117,6 +117,7 @@ NO_GRAPH = "There is no graph to delete"
 NO_GRAPH_TO_FORMAT = "There is no graph to format"
 NO_GRAPH_TO_EXPORT = "There is no graph to export"
 NO_GRAPH_TO_CHANGE = "There is no graph to change"
+NO_GRAPH_TO_RENAME = "There is no graph to rename"
 NO_ANALYSIS = "There is no analysis to change"
 LAST_TABLE_SELECTED = "This is the last table"
 FIRST_TABLE_SELECTED = "This is the first table"
@@ -500,6 +501,12 @@ class MainWindow(QMainWindow):
             category="Graph",
         )
         r.register(
+            "graph.rename",
+            "&Rename graph",
+            self._tab_call(DocumentTab.rename_graph),
+            category="Graph",
+        )
+        r.register(
             "graph.format",
             "&Format graph…",
             self._tab_call(DocumentTab.format_graph),
@@ -645,7 +652,9 @@ class MainWindow(QMainWindow):
         self.menuBar().insertMenu(self._view_menu.menuAction(), graph_menu)
         graph_menu.addAction(a("graph.plot"))
         graph_menu.addSeparator()
-        graph_menu.addActions([a("graph.type"), a("graph.format"), a("graph.export")])
+        graph_menu.addActions(
+            [a("graph.type"), a("graph.rename"), a("graph.format"), a("graph.export")]
+        )
         graph_menu.addSeparator()
         graph_menu.addAction(a("graph.delete"))
         self._view_menu.insertActions(
@@ -1327,6 +1336,7 @@ class MainWindow(QMainWindow):
             ("graph.format", NO_GRAPH_TO_FORMAT),
             ("graph.export", NO_GRAPH_TO_EXPORT),
             ("graph.type", NO_GRAPH_TO_CHANGE),
+            ("graph.rename", NO_GRAPH_TO_RENAME),
         ):
             a(action_id).setEnabled(has_graph)
             reasons[action_id] = reason

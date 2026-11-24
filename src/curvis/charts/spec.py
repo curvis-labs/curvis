@@ -294,6 +294,9 @@ class ChartSpec:
     family: ChartFamily
     variant: ChartVariant
     series: tuple[SeriesSpec, ...] = ()
+    name: str = ""
+    """The graph's name in the Graph panel ("" until renamed: "Bar graph 2"). Unlike
+    the title, it is not drawn on the graph."""
     x_axis: AxisSpec = AxisSpec()
     y_axis: AxisSpec = AxisSpec()
     title: str = ""
@@ -425,6 +428,7 @@ def spec_to_json(spec: ChartSpec) -> dict[str, Any]:
         "series": [_series_to_json(s) for s in spec.series],
         "x_axis": _axis_to_json(spec.x_axis),
         "y_axis": _axis_to_json(spec.y_axis),
+        "name": spec.name,
         "title": spec.title,
         "aspect_ratio": spec.aspect_ratio,
         "custom_size": None if spec.custom_size is None else list(spec.custom_size),
@@ -524,6 +528,7 @@ def spec_from_json(data: Any) -> ChartSpec:
             family=family,
             variant=_enum(ChartVariant, obj.get("variant"), "variant"),
             series=series,
+            name=_str(obj.get("name", ""), "name"),
             x_axis=_axis_from_json(obj.get("x_axis", {}), "x_axis"),
             y_axis=_axis_from_json(obj.get("y_axis", {}), "y_axis"),
             title=_str(obj.get("title", ""), "title"),

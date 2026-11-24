@@ -12,7 +12,7 @@ pyqtgraph) is made when the first graph is shown, so opening a project stays qui
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSize, Qt, Signal
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QStackedWidget,
     QToolBar,
     QToolButton,
@@ -28,8 +29,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from curvis.core import Document
+from curvis.charts.spec import ChartSpec
+from curvis.core import Document, default_graph_names
 from curvis.ui.dialogs import SPACING, secondary_label
+from curvis.ui.inline_edit import InlineEditor
 from curvis.ui.toolbar_icons import ICON_SIZE
 
 if TYPE_CHECKING:
@@ -40,6 +43,14 @@ EMPTY_TEXT = "No graphs yet.\nClick Plot to draw this table."
 RECALCULATING = "Recalculating…"
 
 
+def combo_text(graph: ChartSpec, default_name: str) -> str:
+    """How the combo box lists a graph: its own name, or its default name with its title
+    ("Bar graph 2 · Tumour volume")."""
+    if graph.name:
+        return graph.name
+    return f"{default_name} · {graph.title}" if graph.title else default_name
+
+
 class GraphPanel(QWidget):
     """The graphs of one table, one at a time."""
 
@@ -48,6 +59,8 @@ class GraphPanel(QWidget):
     format_requested = Signal()
     """The graph was double-clicked."""
     current_changed = Signal()
+    rename_requested = Signal(str)
+    """(graph id): *Rename graph* was chosen in the graph list's context menu."""
 
     def __init__(
         self,
@@ -76,6 +89,9 @@ class GraphPanel(QWidget):
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
         )
         self.combo.setMinimumContentsLength(12)
+        self.combo.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.combo.customContextMenuRequested.connect(lambda _pos: self._show_menu())
+        self.editor: InlineEditor | None = None
         self.badge = secondary_label(RECALCULATING, self)
         self.badge.setWordWrap(False)
         self.badge.hide()
@@ -133,9 +149,45 @@ class GraphPanel(QWidget):
         self.refresh_list()
 
     def name_of(self, graph_id: str) -> str:
-        """The graph's name as the combo box lists it ("XY graph 2 · Title")."""
+        """The graph's name as the combo box lists it ("XY graph 2 · Title", or the name
+        it was given)."""
         index = self.combo.findData(graph_id)
         return self.combo.itemText(index) if index >= 0 else "graph"
+
+    def edit_name(
+        self, graph_id: str, commit: Callable[[str], bool], restore_focus: QWidget | None
+    ) -> InlineEditor | None:
+        """Edit the name of ``graph_id`` in place, over the graph list; ``commit`` gets
+        the text and returns False to keep the field open."""
+        self.set_current(graph_id)
+        if self.current_id != graph_id:
+            return None
+        graph = self.document.graph(graph_id)
+        text = graph.name or default_graph_names(self.document.graphs_of(graph.table_id))[graph_id]
+        self.editor = InlineEditor(
+            self.combo.parentWidget() or self,
+            self.combo.geometry(),
+            text,
+            lambda value, _step: commit(value),
+            restore_focus=restore_focus,
+        )
+        self.editor.setAccessibleName("Graph name")
+        return self.editor
+
+    def context_menu(self) -> QMenu | None:
+        """The graph list's menu: *Rename graph* (None while no graph is shown)."""
+        graph_id = self.current_id
+        if graph_id is None:
+            return None
+        menu = QMenu(self)
+        menu.addAction("&Rename graph", lambda: self.rename_requested.emit(graph_id))
+        return menu
+
+    def _show_menu(self) -> None:
+        menu = self.context_menu()
+        if menu is not None:
+            menu.exec(self.combo.mapToGlobal(self.combo.rect().bottomLeft()))
+            menu.deleteLater()
 
     def set_current(self, graph_id: str) -> None:
         index = self.combo.findData(graph_id)
@@ -150,13 +202,9 @@ class GraphPanel(QWidget):
         graphs = self.document.graphs_of(self.table_id) if self.table_id else []
         self.combo.blockSignals(True)
         self.combo.clear()
-        counts: dict[str, int] = {}
+        defaults = default_graph_names(graphs)
         for graph in graphs:
-            family = graph.family.label
-            counts[family] = counts.get(family, 0) + 1
-            number = f" {counts[family]}" if counts[family] > 1 else ""
-            title = f" · {graph.title}" if graph.title else ""
-            self.combo.addItem(f"{family} graph{number}{title}", graph.id)
+            self.combo.addItem(combo_text(graph, defaults[graph.id]), graph.id)
         added = [g.id for g in graphs if g.id not in previous]
         target = added[-1] if added and previous else current
         index = self.combo.findData(target) if target else -1

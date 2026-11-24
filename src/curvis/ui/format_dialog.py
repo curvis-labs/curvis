@@ -100,7 +100,7 @@ from curvis.charts.spec import (
     SeriesSpec,
     Symbol,
 )
-from curvis.core import Document
+from curvis.core import MAX_GRAPH_NAME, Document, default_graph_names, graph_names
 from curvis.data import Table
 from curvis.data import series as _table_series
 from curvis.ui.dialogs import (
@@ -371,6 +371,11 @@ class FormatDialog(QDialog):
         box = QGroupBox("Graph")
         outer = QVBoxLayout(box)
         form = form_layout()
+        self.name_edit = QLineEdit()
+        self.name_edit.setMaxLength(MAX_GRAPH_NAME)
+        self.name_edit.setPlaceholderText(self._default_name)
+        self.name_edit.setToolTip("The graph's name in the Graph panel; not drawn on the graph")
+        form.addRow(buddy_label("&Name", self.name_edit), self.name_edit)
         self.title_edit = QLineEdit()
         form.addRow(buddy_label("&Title", self.title_edit), self.title_edit)
         self.type_combo = QComboBox()
@@ -428,6 +433,7 @@ class FormatDialog(QDialog):
         self._build_bar_options(form)
         outer.addLayout(form)
         outer.addStretch(1)
+        self.name_edit.textEdited.connect(self._on_name_edited)
         self.title_edit.textEdited.connect(lambda text: self._edit(title=text))
         self.aspect_group.buttonClicked.connect(self._on_aspect_clicked)
         self.width_spin.valueChanged.connect(lambda _v: self._on_size_changed())
@@ -765,6 +771,7 @@ class FormatDialog(QDialog):
         widgets: list[QWidget] = [self.tabs]
         if section == GRAPH:
             widgets += [
+                self.name_edit,
                 self.title_edit,
                 self.type_combo,
                 *self.aspect_buttons.values(),
@@ -816,6 +823,9 @@ class FormatDialog(QDialog):
 
     def _load(self) -> None:
         spec = self.spec
+        with QSignalBlocker(self.name_edit):
+            if self.name_edit.text() != spec.name:
+                self.name_edit.setText(spec.name)
         with QSignalBlocker(self.title_edit):
             if self.title_edit.text() != spec.title:
                 self.title_edit.setText(spec.title)
@@ -1105,6 +1115,33 @@ class FormatDialog(QDialog):
             return
         self._problems.pop("graph", None)
         self._apply(spec)
+
+    @property
+    def _default_name(self) -> str:
+        graphs = self.document.graphs_of(self.original.table_id)
+        return default_graph_names(graphs)[self.original.id]
+
+    def _on_name_edited(self, text: str) -> None:
+        """A blank name, or the default one, keeps the default; a name another graph of
+        the table has is refused (OK stays off until it is changed)."""
+        name = " ".join(text.split())
+        if name == self._default_name:
+            name = ""
+        if name:
+            key = name.casefold()
+            names = graph_names(self.document, self.original.table_id)
+            other = next(
+                (n for g, n in names.items() if g != self.original.id and n.casefold() == key),
+                None,
+            )
+            if other is not None:
+                self._problems["name"] = f"There is already a graph called '{other}'."
+                self._show_problem()
+                return
+        self._problems.pop("name", None)
+        self._show_problem()
+        if name != self.spec.name:
+            self._apply(replace(self.spec, name=name))
 
     def _on_aspect_clicked(self, button: QPushButton) -> None:
         key = next(k for k, b in self.aspect_buttons.items() if b is button)

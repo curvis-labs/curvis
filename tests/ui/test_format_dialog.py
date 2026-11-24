@@ -87,6 +87,33 @@ def test_graph_tab_title_size_and_legend(qtbot: QtBot, context: Context) -> None
     assert dialog.preview.spec == dialog.spec  # the preview follows at once
 
 
+def test_graph_tab_name(qtbot: QtBot, context: Context) -> None:
+    dialog, doc = open_dialog(qtbot, context)
+    assert dialog.name_edit.text() == "" and dialog.name_edit.placeholderText() == "XY graph"
+    qtbot.keyClicks(dialog.name_edit, "  Dose   response ")
+    assert dialog.spec.name == "Dose response" and dialog.skeleton.ok_button.isEnabled()
+    dialog.name_edit.clear()
+    qtbot.keyClicks(dialog.name_edit, "XY graph")  # the default name: stored as ""
+    assert dialog.spec.name == ""
+
+
+def test_graph_tab_name_taken_by_another_graph(qtbot: QtBot, context: Context) -> None:
+    from curvis.charts.builder import default_spec
+    from curvis.charts.spec import ChartFamily
+    from curvis.core import add_graph
+
+    doc, graph_id = graph_document()
+    doc.execute(add_graph(doc, default_spec(doc.table("t"), ChartFamily.XY)))
+    dialog = FormatDialog(doc, graph_id, scheduler=context.scheduler)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    qtbot.keyClicks(dialog.name_edit, "xy GRAPH 2")
+    assert not dialog.skeleton.ok_button.isEnabled()
+    assert "already a graph called 'XY graph 2'" in dialog.skeleton.feedback.text()
+    qtbot.keyClick(dialog.name_edit, Qt.Key.Key_Backspace)
+    assert dialog.skeleton.ok_button.isEnabled() and dialog.spec.name == "xy GRAPH"
+
+
 def test_axes_tab(qtbot: QtBot, context: Context) -> None:
     dialog, _doc = open_dialog(qtbot, context)
     dialog.set_section(AXES)
