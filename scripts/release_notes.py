@@ -59,6 +59,11 @@ def notes(tag: str, repository: str = "curvis-labs/curvis") -> str:
     heading, body = changelog_section(version, (ROOT / "CHANGELOG.md").read_text("utf-8"))
     if "-" not in tag and "unreleased" in heading.lower():
         raise SystemExit(f"CHANGELOG.md still says {heading!r}; give it the release date")
+    return render(version, tag, body, repository)
+
+
+def render(version: str, tag: str, body: str, repository: str) -> str:
+    """The notes: the changelog section, then downloads, how to open and how to check."""
     base = f"https://github.com/{repository}/blob/{tag}"
     return f"""{body}
 
@@ -68,7 +73,26 @@ def notes(tag: str, repository: str = "curvis-labs/curvis") -> str:
 - **macOS** (Apple silicon): `Curvis-{version}-macos-arm64.dmg`
 - **Linux**: `curvis_{version}_amd64.deb` (Debian, Ubuntu) or `Curvis-{version}-x86_64.AppImage`
 
+## How to open
+
 The installers are not signed, so Windows and macOS warn before the first start.
+
+- **macOS**: open the app once. When it's blocked, go to **System Settings → Privacy &
+  Security** and click **Open Anyway**.
+- **Windows**: when SmartScreen appears, click **More info**, then **Run anyway**.
+
+## Check your download
+
+`SHA256SUMS.txt` lists the SHA-256 checksum of every file of this release. Compare it
+with the checksum of the file you downloaded:
+
+- **Windows** (PowerShell): `Get-FileHash Curvis-{version}-setup.exe`
+- **macOS**: `shasum -a 256 Curvis-{version}-macos-arm64.dmg`
+- **Linux**: `sha256sum --check --ignore-missing SHA256SUMS.txt`
+
+Each file also has a build provenance attestation, which records the commit and the
+workflow run that built it. With the [GitHub CLI](https://cli.github.com):
+`gh attestation verify <file> --repo {repository}`.
 
 [Getting started]({base}/docs/getting-started.md) explains how to install, and how to go
 from a CSV file to an exported graph; the [user guide]({base}/docs/user-guide) covers

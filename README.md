@@ -4,6 +4,23 @@ Curvis is an open-source desktop application for analyzing and plotting scientif
 
 **New to Curvis?** Read [Getting started](docs/getting-started.md), then the [user guide](docs/user-guide/README.md) for every feature.
 
+## Install
+
+Download the installer for your computer from the [latest release](https://github.com/curvis-labs/curvis/releases/latest): `Curvis-<version>-setup.exe` for Windows, `Curvis-<version>-macos-arm64.dmg` for a Mac with Apple silicon, and a `.deb` or an AppImage for Linux.
+
+### How to open
+
+The installers are not signed, so Windows and macOS warn before the first start.
+
+- **macOS**: open the app once. When it's blocked, go to **System Settings → Privacy & Security** and click **Open Anyway**.
+- **Windows**: when SmartScreen appears, click **More info**, then **Run anyway**.
+
+### Check your download
+
+Each release has a `SHA256SUMS.txt` with the SHA-256 checksum of every file. Compare it with the checksum of the file you downloaded: `Get-FileHash <file>` in Windows PowerShell, `shasum -a 256 <file>` on macOS, or `sha256sum --check --ignore-missing SHA256SUMS.txt` on Linux.
+
+Every file also has a build provenance attestation, which records the commit and the workflow run that built it. Check one with the [GitHub CLI](https://cli.github.com): `gh attestation verify <file> --repo curvis-labs/curvis`. This proves where the file came from; it does not remove the Windows and macOS warnings.
+
 ## Development
 
 Curvis uses Python 3.12 and [uv](https://docs.astral.sh/uv/).

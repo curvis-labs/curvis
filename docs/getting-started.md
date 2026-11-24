@@ -13,12 +13,14 @@ found. The [user guide](user-guide/README.md) covers every feature, one area per
 
 Download the installer for your computer from the
 [v1.0.0 release](https://github.com/curvis-labs/curvis/releases/tag/v1.0.0).
-The installers are not signed, so Windows and macOS ask before the first start.
+The installers are not signed, so Windows and macOS ask before the first start. To check
+a download, compare its SHA-256 checksum with `SHA256SUMS.txt` in the release (see the
+[README](../README.md#check-your-download)).
 
 | Computer | File | How to install |
 | --- | --- | --- |
-| Windows 10 or 11 | `Curvis-1.0.0-setup.exe` | Run it. If Windows says "Windows protected your PC", click **More info**, then **Run anyway**. No administrator rights are needed. |
-| Mac with Apple silicon (M1 or later), macOS 12 or later | `Curvis-1.0.0-macos-arm64.dmg` | Open it and drag **Curvis** to **Applications**. The first time, right-click Curvis in Applications and choose **Open**, then **Open** again (or allow it under **System Settings › Privacy & Security**). |
+| Windows 10 or 11 | `Curvis-1.0.0-setup.exe` | Run it. When SmartScreen appears ("Windows protected your PC"), click **More info**, then **Run anyway**. No administrator rights are needed. |
+| Mac with Apple silicon (M1 or later), macOS 12 or later | `Curvis-1.0.0-macos-arm64.dmg` | Open it and drag **Curvis** to **Applications**. Open Curvis once. When it's blocked, go to **System Settings → Privacy & Security** and click **Open Anyway**. |
 | Linux: Debian, Ubuntu | `curvis_1.0.0_amd64.deb` | `sudo apt install ./curvis_1.0.0_amd64.deb`, then start Curvis from the app menu or with `curvis`. |
 | Linux: other | `Curvis-1.0.0-x86_64.AppImage` | `chmod +x Curvis-1.0.0-x86_64.AppImage`, then run it. |
 

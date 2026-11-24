@@ -74,3 +74,13 @@ def test_section_stops_at_the_next_version(notes: ModuleType) -> None:
 def test_a_wrong_tag_is_refused(notes: ModuleType) -> None:
     with pytest.raises(SystemExit, match="does not match"):
         notes.notes("v9.9.9")
+
+
+def test_notes_say_how_to_open_and_check_a_download(notes: ModuleType) -> None:
+    text = notes.render("1.0.0", "v1.0.0", "New things.", "curvis-labs/curvis")
+    assert text.startswith("New things.")
+    assert "`Curvis-1.0.0-setup.exe`" in text and "`Curvis-1.0.0-x86_64.AppImage`" in text
+    assert "**System Settings → Privacy &\n  Security** and click **Open Anyway**" in text
+    assert "click **More info**, then **Run anyway**" in text
+    assert "SHA256SUMS.txt" in text
+    assert "gh attestation verify <file> --repo curvis-labs/curvis" in text

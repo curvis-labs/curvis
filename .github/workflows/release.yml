@@ -1,8 +1,9 @@
 name: Release
 
 # Pushing a tag such as v1.0.0 builds the installers for Windows, macOS and Linux (installers.yml: each one is installed and started on its runner), writes the
-# validation report, and publishes them all as a GitHub release whose notes are the
-# version's section of CHANGELOG.md. A tag with a hyphen (v1.0.0-rc1) is a pre-release.
+# validation report, and publishes them all as a GitHub release, with SHA-256
+# checksums (SHA256SUMS.txt) and a build provenance attestation for every file. The
+# release notes are the version's section of CHANGELOG.md. A tag with a hyphen (v1.0.0-rc1) is a pre-release.
 #
 #     git tag -a v1.0.0 -m "Curvis 1.0.0" && git push origin v1.0.0
 
@@ -63,6 +64,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write  # create the release and upload the installers
+      id-token: write  # sign the build provenance attestations (Sigstore)
+      attestations: write  # store them with the repository
     steps:
       - uses: actions/checkout@v7
 
@@ -74,6 +77,23 @@ jobs:
 
       - name: List the installers
         run: ls -l dist
+
+      # SHA256SUMS.txt lets users check a download: `sha256sum --check --ignore-missing
+      # SHA256SUMS.txt` (Linux), `shasum -a 256 <file>` (macOS), `Get-FileHash <file>`
+      # (Windows PowerShell).
+      - name: Write the SHA-256 checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > ../SHA256SUMS.txt
+          mv ../SHA256SUMS.txt .
+          cat SHA256SUMS.txt
+
+      # Records which commit and workflow run built each file; anyone can check one with
+      # `gh attestation verify <file> --repo <owner>/<repo>`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-checksums: dist/SHA256SUMS.txt
 
       - name: Write the release notes
         run: python3 scripts/release_notes.py "$GITHUB_REF_NAME" > notes.md && cat notes.md
