@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QPoint, QSettings, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QApplication, QDialog
 from pytestqt.qtbot import QtBot
@@ -25,7 +25,16 @@ from curvis.core import AddTable
 from curvis.settings import Settings
 from curvis.ui.document_tab import DocumentTab
 from curvis.ui.export_dialog import ExportDialog
-from curvis.ui.format_dialog import AXES, COLORS, GRAPH, MIXED, SERIES, FormatDialog
+from curvis.ui.format_dialog import (
+    AXES,
+    COLORS,
+    EYE_ROLE,
+    GRAPH,
+    MIXED,
+    SERIES,
+    FormatDialog,
+    SeriesListDelegate,
+)
 from curvis.ui.main_window import MainWindow
 from curvis.ui.toolbars import GRAPH_BUTTONS
 from tests.ui.dialog_samples import Context, graph_document
@@ -172,33 +181,52 @@ def test_series_color_and_legend(qtbot: QtBot, context: Context, monkeypatch) ->
     assert dialog.series_list.item(0).text() == "Control"
 
 
-def test_show_on_graph_hides_a_series_like_a_legend_click(qtbot: QtBot, context: Context) -> None:
-    """The keyboard way to hide a series: an eye button, open while the series is shown,
-    making the same change as clicking its legend entry."""
+def eye_of(dialog: FormatDialog, row: int) -> QPoint:
+    rect = dialog.series_list.visualItemRect(dialog.series_list.item(row))
+    return SeriesListDelegate.eye_rect(rect).center()
+
+
+def test_the_eye_in_the_series_list_hides_a_series_like_a_legend_click(
+    qtbot: QtBot, context: Context
+) -> None:
+    """Each series row ends in an eye, open while the series is shown: clicking it makes
+    the same change as clicking the series in the legend, without changing the selection."""
     dialog, _doc = open_dialog(qtbot, context)
     dialog.set_section(SERIES)
     first, second = (s.source for s in dialog.spec.series[:2])
-    eye = dialog.shown
-    assert eye.isVisibleTo(dialog) and eye.isChecked() and eye.accessibleName() == "Show on graph"
-    shown_icon = eye.icon().pixmap(20, 20).toImage()
     dialog.select_series([first])
-    qtbot.keyClick(eye, Qt.Key.Key_Space)
-    assert dialog.spec == dialog.original.with_series_visible(first, False)
-    assert not eye.isChecked()
-    assert eye.icon().pixmap(20, 20).toImage() != shown_icon  # the eye closed
-    dialog.select_series([first, second])
-    assert eye.mixed and not eye.isChecked()
-    eye.click()  # Mixed: shows them all
+    items = dialog.series_list
+    assert items.item(1).data(EYE_ROLE) is True
+    qtbot.mouseClick(items.viewport(), Qt.MouseButton.LeftButton, pos=eye_of(dialog, 1))
+    assert dialog.spec == dialog.original.with_series_visible(second, False)
+    assert items.item(1).data(EYE_ROLE) is False
+    assert dialog.selected_sources() == [first]  # the click did not select the row
+    assert "hidden" in items.item(1).data(Qt.ItemDataRole.AccessibleTextRole)
+    qtbot.mouseClick(items.viewport(), Qt.MouseButton.LeftButton, pos=eye_of(dialog, 1))
+    assert dialog.spec == dialog.original
+
+
+def test_space_shows_or_hides_the_selected_series(qtbot: QtBot, context: Context) -> None:
+    dialog, _doc = open_dialog(qtbot, context)
+    dialog.set_section(SERIES)
+    first, second = (s.source for s in dialog.spec.series[:2])
+    dialog.select_series([first])
+    dialog.series_list.setFocus()
+    qtbot.keyClick(dialog.series_list, Qt.Key.Key_Space)
+    assert not dialog.spec.series_for(first).visible  # type: ignore[union-attr]
+    dialog.select_series([first, second])  # one hidden, one shown: Space shows both
+    qtbot.keyClick(dialog.series_list, Qt.Key.Key_Space)
     assert all(s.visible for s in dialog.spec.series)
-    assert eye.isChecked() and not eye.mixed
+    qtbot.keyClick(dialog.series_list, Qt.Key.Key_Space)
+    assert [s.visible for s in dialog.spec.series[:2]] == [False, False]
 
 
-def test_show_on_graph_is_only_for_graphs_with_a_clickable_legend(
-    qtbot: QtBot, context: Context
-) -> None:
+def test_only_graphs_with_a_clickable_legend_have_eyes(qtbot: QtBot, context: Context) -> None:
     dialog, _doc = open_dialog(qtbot, context, "bar")
     dialog.set_section(SERIES)
-    assert not dialog.shown.isVisibleTo(dialog)
+    assert dialog.series_list.item(0).data(EYE_ROLE) is None
+    dialog.toggle_shown([dialog.spec.series[0].source])
+    assert dialog.spec == dialog.original
 
 
 def test_add_remove_and_reorder_series(qtbot: QtBot, context: Context) -> None:

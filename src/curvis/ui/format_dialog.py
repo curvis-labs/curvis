@@ -27,11 +27,22 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import QSignalBlocker, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QKeySequence, QPixmap, QShortcut
+from PySide6.QtCore import (
+    QAbstractItemModel,
+    QEvent,
+    QModelIndex,
+    QPersistentModelIndex,
+    QRect,
+    QSignalBlocker,
+    QSize,
+    Qt,
+    Signal,
+)
+from PySide6.QtGui import QColor, QIcon, QKeySequence, QMouseEvent, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QAbstractSpinBox,
+    QApplication,
     QButtonGroup,
     QCheckBox,
     QColorDialog,
@@ -50,7 +61,9 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpinBox,
     QStackedWidget,
-    QToolButton,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QVBoxLayout,
     QWidget,
 )
@@ -250,42 +263,74 @@ class MixedSpinBox(QDoubleSpinBox):
         return self.value() < self._low
 
 
-class EyeButton(QToolButton):
-    """Show on graph: an open eye while the selected series are shown, a closed eye while
-    they are hidden. A click hides or shows them, like clicking their legend entry; for a
-    selection of shown and hidden series ("Mixed", a closed eye) it shows them all."""
+EYE_ROLE = Qt.ItemDataRole.UserRole + 1
+"""Item data of a series row: whether the series is shown (absent for rows without an eye)."""
+EYE_SIZE = 20
+EYE_MARGIN = 6
 
-    toggled_by_user = Signal(bool)
-    """The user asked to show (True) or hide (False) the selected series."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setCheckable(True)
-        self.setAutoRaise(True)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setAccessibleName("Show on graph")
-        self.mixed = False
-        self.clicked.connect(lambda on: self.toggled_by_user.emit(bool(on)))
-        self.toggled.connect(lambda _on: self._update())
-        self.set_shown(True)
+class SeriesListDelegate(QStyledItemDelegate):
+    """Draws an eye at the right end of each series row: open while the series is shown
+    on the graph, closed while it is hidden. Clicking it sends ``eye_clicked`` with the
+    row's source, like clicking the series in the graph's legend."""
 
-    def set_shown(self, shown: bool, *, mixed: bool = False) -> None:
-        self.mixed = mixed
-        with QSignalBlocker(self):
-            self.setChecked(shown and not mixed)
-        self._update()
+    eye_clicked = Signal(str)
 
-    def _update(self) -> None:
-        shown = self.isChecked()
-        self.setIcon(toolbar_icon("series_shown" if shown else "series_hidden"))
-        if self.mixed and not shown:
-            tip = "Some of the selected series are hidden. Click to show them all."
-        elif shown:
-            tip = "Shown on the graph. Click to hide, like clicking it in the legend."
-        else:
-            tip = "Hidden. Click to show it on the graph again."
-        self.setToolTip(tip)
-        self.setAccessibleDescription(tip)
+    @staticmethod
+    def eye_rect(row: QRect) -> QRect:
+        return QRect(
+            row.right() - EYE_MARGIN - EYE_SIZE + 1,
+            row.top() + (row.height() - EYE_SIZE) // 2,
+            EYE_SIZE,
+            EYE_SIZE,
+        )
+
+    def paint(
+        self,
+        painter: QPainter,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> None:
+        shown = index.data(EYE_ROLE)
+        if shown is None:
+            super().paint(painter, option, index)
+            return
+        text_option = QStyleOptionViewItem(option)
+        text_option.rect = option.rect.adjusted(0, 0, -(EYE_SIZE + 2 * EYE_MARGIN), 0)
+        widget = option.widget
+        style = widget.style() if widget is not None else QApplication.style()
+        style.drawPrimitive(QStyle.PrimitiveElement.PE_PanelItemViewItem, option, painter, widget)
+        super().paint(painter, text_option, index)
+        selected = bool(option.state & QStyle.StateFlag.State_Selected)
+        icon = toolbar_icon("series_shown" if shown else "series_hidden")
+        mode = QIcon.Mode.Selected if selected else QIcon.Mode.Normal
+        icon.paint(painter, self.eye_rect(option.rect), Qt.AlignmentFlag.AlignCenter, mode)
+
+    def sizeHint(  # noqa: N802 (Qt API)
+        self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex
+    ) -> QSize:
+        size = super().sizeHint(option, index)
+        if index.data(EYE_ROLE) is not None:
+            size.setWidth(size.width() + EYE_SIZE + 2 * EYE_MARGIN)
+            size.setHeight(max(size.height(), EYE_SIZE + 4))
+        return size
+
+    def editorEvent(  # noqa: N802 (Qt API)
+        self,
+        event: QEvent,
+        model: QAbstractItemModel,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> bool:
+        kinds = (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonDblClick)
+        if index.data(EYE_ROLE) is not None and isinstance(event, QMouseEvent):
+            inside = self.eye_rect(option.rect).contains(event.position().toPoint())
+            if inside and event.type() in kinds:
+                return True  # the eye does not change the selection
+            if inside and event.type() == QEvent.Type.MouseButtonRelease:
+                self.eye_clicked.emit(str(index.data(Qt.ItemDataRole.UserRole)))
+                return True
+        return super().editorEvent(event, model, option, index)
 
 
 class MixedCombo(QComboBox):
@@ -658,6 +703,20 @@ class FormatDialog(QDialog):
         self.series_list = QListWidget()
         self.series_list.setAccessibleName("Series")
         self.series_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        # hiding a series is a legend click on XY and survival graphs; the eyes in the
+        # list do the same, also from the keyboard (Space)
+        self.eyes = self.original.family in (ChartFamily.XY, ChartFamily.SURVIVAL)
+        self.series_delegate = SeriesListDelegate(self.series_list)
+        self.series_delegate.eye_clicked.connect(lambda source: self.toggle_shown([source]))
+        self.series_list.setItemDelegate(self.series_delegate)
+        if self.eyes:
+            self.series_list.setToolTip(
+                "The eye shows or hides a series on the graph, like clicking it in the "
+                "legend. Space does the same for the selected series."
+            )
+            space = QShortcut(QKeySequence(Qt.Key.Key_Space), self.series_list)
+            space.setContext(Qt.ShortcutContext.WidgetShortcut)
+            space.activated.connect(lambda: self.toggle_shown(self.selected_sources()))
         layout.addWidget(self.series_list, 1)
         self.selection_note = secondary_label()
         layout.addWidget(self.selection_note)
@@ -688,14 +747,6 @@ class FormatDialog(QDialog):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         form = form_layout()
-        # hiding a series is a legend click on XY and survival graphs; this is the same
-        # for the keyboard
-        self.shown = EyeButton(page)
-        shown_label = buddy_label("Show on gra&ph", self.shown)
-        form.addRow(shown_label, self.shown)
-        legend_family = self.original.family in (ChartFamily.XY, ChartFamily.SURVIVAL)
-        self.shown.setVisible(legend_family)
-        shown_label.setVisible(legend_family)
         self.in_legend = QCheckBox("Show in le&gend")
         form.addRow("", self.in_legend)
         symbol_row = QHBoxLayout()
@@ -725,7 +776,6 @@ class FormatDialog(QDialog):
         layout.addLayout(form)
         self.series_note = secondary_label()
         layout.addWidget(self.series_note)
-        self.shown.toggled_by_user.connect(lambda on: self._edit_series(visible=on))
         self.in_legend.clicked.connect(lambda on: self._edit_series(in_legend=bool(on)))
         self.symbol.activated.connect(lambda _i: self._edit_series(symbol=self.symbol.value()))
         self.symbol_size.valueChanged.connect(self._on_size_value)
@@ -847,7 +897,6 @@ class FormatDialog(QDialog):
                 self.remove_button,
                 self.up_button,
                 self.down_button,
-                self.shown,
                 self.in_legend,
                 self.symbol,
                 self.symbol_size,
@@ -971,8 +1020,13 @@ class FormatDialog(QDialog):
         with QSignalBlocker(self.series_list):
             self.series_list.clear()
             for s in self.spec.series:
-                item = QListWidgetItem(_swatch(s.color), self._names.get(s.source, s.source))
+                name = self._names.get(s.source, s.source)
+                item = QListWidgetItem(_swatch(s.color), name)
                 item.setData(Qt.ItemDataRole.UserRole, s.source)
+                if self.eyes:
+                    item.setData(EYE_ROLE, s.visible)
+                    shown = "shown on the graph" if s.visible else "hidden"
+                    item.setData(Qt.ItemDataRole.AccessibleTextRole, f"{name}, {shown}")
                 self.series_list.addItem(item)
                 item.setSelected(s.source in keep)
             for overlay in self.spec.overlays:
@@ -985,6 +1039,19 @@ class FormatDialog(QDialog):
                 self.series_list.item(0).setSelected(True)
                 self.series_list.setCurrentRow(0)
         self._load_series_options()
+
+    def toggle_shown(self, sources: Sequence[str]) -> None:
+        """Hide the series ``sources`` if all of them are shown, else show them all: the
+        same change as clicking them in the graph's legend."""
+        styles = [s for s in self.spec.series if s.source in set(sources)]
+        if not self.eyes or not styles:
+            return
+        show = not all(s.visible for s in styles)
+        spec = self.spec
+        for style in styles:
+            spec = spec.with_series_visible(style.source, show)
+        self._apply(spec)
+        self._fill_series_list(self.selected_sources())
 
     def _fit_name(self, overlay: FitOverlay) -> str:
         return self._labels.get(overlay.analysis_id, "analysis no longer in the project")
@@ -1021,7 +1088,6 @@ class FormatDialog(QDialog):
         picked = " and ".join(p for p in parts if p)
         self.selection_note.setText(f"{picked} selected." if picked else "No series selected.")
         widgets: list[QWidget] = [
-            self.shown,
             self.in_legend,
             self.symbol,
             self.symbol_size,
@@ -1042,8 +1108,6 @@ class FormatDialog(QDialog):
             values = {get(s) for s in styles}
             return next(iter(values)), len(values) > 1
 
-        shown, mixed = common(lambda s: s.visible)
-        self.shown.set_shown(shown, mixed=mixed)
         legend, mixed = common(lambda s: s.in_legend)
         with QSignalBlocker(self.in_legend):
             self.in_legend.setTristate(mixed)
