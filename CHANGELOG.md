@@ -3,7 +3,7 @@
 Curvis follows [semantic versioning](https://semver.org/). A project saved by one
 version opens in every later version.
 
-## 1.0.0 — unreleased
+## 1.0.0 — 2026-11-24
 
 The first stable release. Every analysis is checked against reference results from R
 and, for curve fits, the NIST Statistical Reference Datasets; the

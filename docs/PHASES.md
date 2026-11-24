@@ -739,7 +739,7 @@ Draw the P values the comparison analyses already report (no new statistics) as 
 **Gate for phase 4:** you read the validation report and approve the release.
 
 **Done when**
-- [ ] A generated validation report lists every analysis, its R reference, versions and measured agreement.
+- [x] A generated validation report lists every analysis, its R reference, versions and measured agreement.
 - [ ] Installers for Windows and macOS and an AppImage for Linux are attached to the v1.0.0 release. (Unsigned: the project owner decided on 2026-11-24 not to sign 1.0.)
 
 ```text
