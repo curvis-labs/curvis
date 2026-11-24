@@ -386,6 +386,7 @@ class FormatDialog(QDialog):
         box = QGroupBox("Graph")
         outer = QVBoxLayout(box)
         form = form_layout()
+        self.graph_form = form
         self.name_edit = QLineEdit()
         self.name_edit.setMaxLength(MAX_GRAPH_NAME)
         self.name_edit.setPlaceholderText(self._default_name)
@@ -434,7 +435,7 @@ class FormatDialog(QDialog):
         self.show_bands = QCheckBox("Show confidence band&s")
         self.show_bands.setToolTip("The 95% confidence band of each survival curve")
         form.addRow("", self.show_bands)
-        self.show_bands.setVisible(self.original.family is ChartFamily.SURVIVAL)
+        form.setRowVisible(self.show_bands, self.original.family is ChartFamily.SURVIVAL)
         # Interaction graphs: which two-way ANOVA of the table the graph draws.
         self.anova_combo = QComboBox()
         self.anova_combo.setAccessibleName("Two-way ANOVA drawn")
@@ -443,8 +444,7 @@ class FormatDialog(QDialog):
         self.anova_label = buddy_label("A&NOVA", self.anova_combo)
         form.addRow(self.anova_label, self.anova_combo)
         interaction = self.original.family is ChartFamily.INTERACTION
-        self.anova_label.setVisible(interaction)
-        self.anova_combo.setVisible(interaction)
+        form.setRowVisible(self.anova_combo, interaction)
         self._build_bar_options(form)
         outer.addLayout(form)
         outer.addStretch(1)
@@ -533,6 +533,7 @@ class FormatDialog(QDialog):
         bins_row.addStretch(1)
         self.bins_label = buddy_label("&Bins", self.bin_mode)
         form.addRow(self.bins_label, bins_row)
+        self._bins_row = bins_row
         self.bin_width = QLineEdit()
         self.bin_start = QLineEdit()
         width_row = QHBoxLayout()
@@ -546,15 +547,7 @@ class FormatDialog(QDialog):
         width_row.addStretch(1)
         self.bin_width_label = buddy_label("Wi&dth", self.bin_width)
         form.addRow(self.bin_width_label, width_row)
-        self._bin_widgets: tuple[QWidget, ...] = (
-            self.bins_label,
-            self.bin_mode,
-            self.bin_count,
-            self.bin_width_label,
-            self.bin_width,
-            self.bin_start_label,
-            self.bin_start,
-        )
+        self._width_row = width_row
         self.grouping.activated.connect(lambda _i: self._on_grouping_chosen())
         self.show_points.toggled.connect(lambda on: self._edit(show_points=on))
         self.violin_trim.toggled.connect(lambda on: self._edit(violin_trim=on))
@@ -564,14 +557,16 @@ class FormatDialog(QDialog):
         self.bin_start.textEdited.connect(lambda _t: self._edit_bins())
 
     def _show_variant_options(self) -> None:
-        """Show the Graph options that the graph's current type uses."""
+        """Show the Graph options that the graph's current type uses. Whole rows are
+        hidden, so the ones not shown take no space."""
         variant = self.spec.variant
-        for widget in (self.grouping_label, self.grouping):
-            widget.setVisible(variant in GROUPABLE_VARIANTS)
-        self.show_points.setVisible(variant in POINTS_VARIANTS)
-        self.violin_trim.setVisible(variant is ChartVariant.VIOLIN)
-        for bin_widget in self._bin_widgets:
-            bin_widget.setVisible(variant is ChartVariant.HISTOGRAM)
+        form = self.graph_form
+        form.setRowVisible(self.grouping, variant in GROUPABLE_VARIANTS)
+        form.setRowVisible(self.show_points, variant in POINTS_VARIANTS)
+        form.setRowVisible(self.violin_trim, variant is ChartVariant.VIOLIN)
+        histogram = variant is ChartVariant.HISTOGRAM
+        form.setRowVisible(self._bins_row, histogram)
+        form.setRowVisible(self._width_row, histogram)
 
     def _build_axes_list(self) -> QGroupBox:
         box = QGroupBox("Axes")

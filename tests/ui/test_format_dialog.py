@@ -578,3 +578,26 @@ def test_other_graphs_have_no_anova_choice(qtbot: QtBot, context: Context) -> No
     qtbot.addWidget(dialog)
     dialog.show()
     assert not dialog.anova_combo.isVisible() and not dialog.anova_label.isVisible()
+
+
+def test_hidden_graph_options_take_no_space(qtbot: QtBot, context: Context) -> None:
+    """Rows of options the graph type does not use are hidden whole, so the Graph
+    section is no taller than the rows it shows."""
+    dialog, _doc = open_dialog(qtbot, context, "bar")
+    form = dialog.graph_form
+    assert not form.isRowVisible(dialog.violin_trim)
+    assert not form.isRowVisible(dialog.show_bands)
+    assert not form.isRowVisible(dialog.anova_combo)
+    assert not dialog.bin_mode.isVisible() and not dialog.bin_width.isVisible()
+    shown = [r for r in range(form.rowCount()) if form.isRowVisible(r)]
+    page = dialog.left_stack.widget(0)
+    rows = sum(
+        max(
+            form.itemAt(r, role).sizeHint().height()
+            for role in (form.ItemRole.LabelRole, form.ItemRole.FieldRole)
+            if form.itemAt(r, role) is not None
+        )
+        for r in shown
+    )
+    slack = (len(shown) + 4) * form.verticalSpacing() + 3 * page.fontMetrics().height()
+    assert page.minimumSizeHint().height() <= rows + slack
