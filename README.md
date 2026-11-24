@@ -45,18 +45,20 @@ To build the app bundle locally:
 ```bash
 uv sync --group build
 uv run pyinstaller packaging/curvis.spec --noconfirm   # dist/Curvis or dist/Curvis.app
-packaging/linux/build-deb.sh 0.1.0b1                   # Linux: dist/curvis_0.1.0b1_<arch>.deb
+packaging/linux/build-deb.sh 1.0.0                     # Linux: dist/curvis_1.0.0_<arch>.deb
 ```
 
 ### Releases
 
-Pushing a version tag builds the installers and publishes them as a GitHub release (`.github/workflows/release.yml`); a tag with a hyphen, such as `v0.1.0-beta`, is a pre-release. Tag a commit on `main`:
+Pushing a version tag builds the installers (signed on Windows, signed and notarized on macOS), writes the validation report and publishes them as a GitHub release (`.github/workflows/release.yml`); a tag with a hyphen, such as `v1.0.0-rc1`, is a pre-release. The release notes are the version's section of `CHANGELOG.md`. The checklist and the signing secrets are in `docs/releasing.md`.
 
 ```bash
-git tag -a v0.1.0-beta -m "Curvis 0.1.0 beta" && git push origin v0.1.0-beta
+git tag -a v1.0.0 -m "Curvis 1.0.0" && git push origin v1.0.0
 ```
 
-The version in `src/curvis/__init__.py` and `pyproject.toml` (e.g. `0.1.0b1`) names the installer files. macOS and the Windows file properties show only its numbers (`0.1.0`), and the `.deb` is versioned `0.1.0~b1` so that `0.1.0` counts as newer.
+The version in `src/curvis/__init__.py` and `pyproject.toml` (e.g. `1.0.0`, or `1.0.0rc1` for a release candidate) names the installer files. macOS and the Windows file properties show only its numbers (`1.0.0`), and the `.deb` of a pre-release is versioned `1.0.0~rc1` so that `1.0.0` counts as newer.
+
+The validation report (`docs/validation-report.md` and `.pdf`) is written by `uv run python scripts/validation_report.py`; run it again before a release so the committed copy is current.
 
 ## License
 
