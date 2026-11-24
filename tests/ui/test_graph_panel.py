@@ -280,6 +280,21 @@ def test_esc_cancels_a_graph_rename(window: MainWindow, tab: DocumentTab, qtbot:
     assert tab.document.undo_stack.count == 0
 
 
+def test_rename_shortcut(window: MainWindow, tab: DocumentTab, qtbot: QtBot) -> None:
+    two_graphs(window, tab)
+    action = window.registry.action("graph.rename")
+    assert action.shortcut().toString() == "Ctrl+Shift+M"
+    window._update_state()
+    qtbot.keyClick(
+        window,
+        Qt.Key.Key_M,
+        Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
+    )
+    editor = tab.graph_panel.editor
+    assert editor is not None and editor.text() == "XY graph 2"
+    editor.cancel()
+
+
 def test_graph_list_context_menu_renames(window: MainWindow, tab: DocumentTab) -> None:
     two_graphs(window, tab)
     menu = tab.graph_panel.context_menu()

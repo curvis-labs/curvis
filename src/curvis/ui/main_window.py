@@ -510,6 +510,7 @@ class MainWindow(QMainWindow):
             "&Rename graph",
             self._tab_call(DocumentTab.rename_graph),
             category="Graph",
+            shortcut="Ctrl+Shift+M",
         )
         r.register(
             "graph.format",
