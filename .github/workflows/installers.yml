@@ -21,6 +21,7 @@ jobs:
     name: Linux (.deb, AppImage)
     # The oldest supported runner, so the bundle runs on older glibc versions too.
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     env:
       APPIMAGE_EXTRACT_AND_RUN: "1"  # no FUSE on runners
     steps:
@@ -86,6 +87,7 @@ jobs:
   macos:
     name: macOS (.dmg)
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -137,6 +139,7 @@ jobs:
   windows:
     name: Windows (installer .exe)
     runs-on: windows-latest
+    timeout-minutes: 30
     defaults:
       run:
         shell: pwsh
