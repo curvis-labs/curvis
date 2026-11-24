@@ -27,7 +27,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import QSignalBlocker, Qt
+from PySide6.QtCore import QSignalBlocker, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -50,6 +50,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpinBox,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -115,6 +116,7 @@ from curvis.ui.dialogs import (
     set_tab_order,
     size_workbench,
 )
+from curvis.ui.toolbar_icons import toolbar_icon
 
 if TYPE_CHECKING:
     from curvis.charts.render_qt.chart_view import ChartView
@@ -246,6 +248,44 @@ class MixedSpinBox(QDoubleSpinBox):
     @property
     def is_mixed(self) -> bool:
         return self.value() < self._low
+
+
+class EyeButton(QToolButton):
+    """Show on graph: an open eye while the selected series are shown, a closed eye while
+    they are hidden. A click hides or shows them, like clicking their legend entry; for a
+    selection of shown and hidden series ("Mixed", a closed eye) it shows them all."""
+
+    toggled_by_user = Signal(bool)
+    """The user asked to show (True) or hide (False) the selected series."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setAutoRaise(True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAccessibleName("Show on graph")
+        self.mixed = False
+        self.clicked.connect(lambda on: self.toggled_by_user.emit(bool(on)))
+        self.toggled.connect(lambda _on: self._update())
+        self.set_shown(True)
+
+    def set_shown(self, shown: bool, *, mixed: bool = False) -> None:
+        self.mixed = mixed
+        with QSignalBlocker(self):
+            self.setChecked(shown and not mixed)
+        self._update()
+
+    def _update(self) -> None:
+        shown = self.isChecked()
+        self.setIcon(toolbar_icon("series_shown" if shown else "series_hidden"))
+        if self.mixed and not shown:
+            tip = "Some of the selected series are hidden. Click to show them all."
+        elif shown:
+            tip = "Shown on the graph. Click to hide, like clicking it in the legend."
+        else:
+            tip = "Hidden. Click to show it on the graph again."
+        self.setToolTip(tip)
+        self.setAccessibleDescription(tip)
 
 
 class MixedCombo(QComboBox):
@@ -648,12 +688,14 @@ class FormatDialog(QDialog):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         form = form_layout()
-        self.shown = QCheckBox("Show on gra&ph")
-        self.shown.setToolTip("Same as clicking the series in the legend")
         # hiding a series is a legend click on XY and survival graphs; this is the same
         # for the keyboard
-        self.shown.setVisible(self.original.family in (ChartFamily.XY, ChartFamily.SURVIVAL))
-        form.addRow("", self.shown)
+        self.shown = EyeButton(page)
+        shown_label = buddy_label("Show on gra&ph", self.shown)
+        form.addRow(shown_label, self.shown)
+        legend_family = self.original.family in (ChartFamily.XY, ChartFamily.SURVIVAL)
+        self.shown.setVisible(legend_family)
+        shown_label.setVisible(legend_family)
         self.in_legend = QCheckBox("Show in le&gend")
         form.addRow("", self.in_legend)
         symbol_row = QHBoxLayout()
@@ -683,7 +725,7 @@ class FormatDialog(QDialog):
         layout.addLayout(form)
         self.series_note = secondary_label()
         layout.addWidget(self.series_note)
-        self.shown.clicked.connect(lambda on: self._edit_series(visible=bool(on)))
+        self.shown.toggled_by_user.connect(lambda on: self._edit_series(visible=on))
         self.in_legend.clicked.connect(lambda on: self._edit_series(in_legend=bool(on)))
         self.symbol.activated.connect(lambda _i: self._edit_series(symbol=self.symbol.value()))
         self.symbol_size.valueChanged.connect(self._on_size_value)
@@ -1000,21 +1042,18 @@ class FormatDialog(QDialog):
             values = {get(s) for s in styles}
             return next(iter(values)), len(values) > 1
 
-        checks: tuple[tuple[QCheckBox, Callable[[SeriesSpec], Any]], ...] = (
-            (self.shown, lambda s: s.visible),
-            (self.in_legend, lambda s: s.in_legend),
-        )
-        for check, get in checks:
-            on, mixed = common(get)
-            with QSignalBlocker(check):
-                check.setTristate(mixed)
-                check.setCheckState(
-                    Qt.CheckState.PartiallyChecked
-                    if mixed
-                    else Qt.CheckState.Checked
-                    if on
-                    else Qt.CheckState.Unchecked
-                )
+        shown, mixed = common(lambda s: s.visible)
+        self.shown.set_shown(shown, mixed=mixed)
+        legend, mixed = common(lambda s: s.in_legend)
+        with QSignalBlocker(self.in_legend):
+            self.in_legend.setTristate(mixed)
+            self.in_legend.setCheckState(
+                Qt.CheckState.PartiallyChecked
+                if mixed
+                else Qt.CheckState.Checked
+                if legend
+                else Qt.CheckState.Unchecked
+            )
         value, mixed = common(lambda s: s.symbol)
         self.symbol.set_value(value, mixed=mixed)
         value, mixed = common(lambda s: s.line_style)

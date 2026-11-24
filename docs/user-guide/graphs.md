@@ -19,8 +19,9 @@ and exports the graph shown. Deleting a graph asks first; Undo brings it back.
 
 ![The Graph panel with a dose-response curve](images/graph-panel.png)
 
-On XY and survival graphs, click an entry in the legend to hide or show that series. From
-the keyboard, use **Show on graph** in the Series section of the Format dialog.
+On XY and survival graphs, click an entry in the legend to hide or show that series. In the
+Series section of the Format dialog, the eye button next to **Show on graph** does the
+same (open while the series is shown, closed while it is hidden), also from the keyboard.
 
 A curve fit is drawn over the XY graphs of its table. Deleting the fit also removes its
 curves from the graphs.

@@ -1,6 +1,7 @@
 # Toolbar icons
 
-20 × 20 line icons for the main, table and Graph panel toolbars (docs/DESIGN.md, section 7).
+20 × 20 line icons for the main, table and Graph panel toolbars (docs/DESIGN.md, section 7),
+and the eye of *Show on graph* in the Format dialog (`series_shown`, `series_hidden`).
 Each file uses two colours, which the app replaces with palette colours for the theme:
 
 | Colour in the file | Part | Palette role |

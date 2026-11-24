@@ -173,19 +173,24 @@ def test_series_color_and_legend(qtbot: QtBot, context: Context, monkeypatch) ->
 
 
 def test_show_on_graph_hides_a_series_like_a_legend_click(qtbot: QtBot, context: Context) -> None:
-    """The keyboard way to hide a series: the same change as clicking its legend entry."""
+    """The keyboard way to hide a series: an eye button, open while the series is shown,
+    making the same change as clicking its legend entry."""
     dialog, _doc = open_dialog(qtbot, context)
     dialog.set_section(SERIES)
     first, second = (s.source for s in dialog.spec.series[:2])
-    assert dialog.shown.isVisibleTo(dialog) and dialog.shown.isChecked()
+    eye = dialog.shown
+    assert eye.isVisibleTo(dialog) and eye.isChecked() and eye.accessibleName() == "Show on graph"
+    shown_icon = eye.icon().pixmap(20, 20).toImage()
     dialog.select_series([first])
-    dialog.shown.click()
+    qtbot.keyClick(eye, Qt.Key.Key_Space)
     assert dialog.spec == dialog.original.with_series_visible(first, False)
+    assert not eye.isChecked()
+    assert eye.icon().pixmap(20, 20).toImage() != shown_icon  # the eye closed
     dialog.select_series([first, second])
-    assert dialog.shown.checkState() is Qt.CheckState.PartiallyChecked
-    dialog.select_series([first])
-    dialog.shown.click()
-    assert dialog.spec.series_for(first).visible  # type: ignore[union-attr]
+    assert eye.mixed and not eye.isChecked()
+    eye.click()  # Mixed: shows them all
+    assert all(s.visible for s in dialog.spec.series)
+    assert eye.isChecked() and not eye.mixed
 
 
 def test_show_on_graph_is_only_for_graphs_with_a_clickable_legend(
