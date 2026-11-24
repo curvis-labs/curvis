@@ -118,6 +118,11 @@ NO_GRAPH_TO_FORMAT = "There is no graph to format"
 NO_GRAPH_TO_EXPORT = "There is no graph to export"
 NO_GRAPH_TO_CHANGE = "There is no graph to change"
 NO_GRAPH_TO_RENAME = "There is no graph to rename"
+NO_GRAPH_TO_COMPARE = "There is no graph to show comparisons on"
+NO_COMPARISONS = (
+    "Run a t-test, Mann-Whitney U test, one-way ANOVA or Kruskal-Wallis test on this table first"
+)
+HIDE_COMPARISONS = "&Hide comparisons"
 NO_ANALYSIS = "There is no analysis to change"
 LAST_TABLE_SELECTED = "This is the last table"
 FIRST_TABLE_SELECTED = "This is the first table"
@@ -532,6 +537,15 @@ class MainWindow(QMainWindow):
         self.type_menu = QMenu("Change graph &type", self)
         self.type_menu.addActions([r.action(a) for a in TYPE_ACTIONS])
         graph_type.setMenu(self.type_menu)
+        comparisons = r.register(
+            "graph.comparisons",
+            "Show &comparisons",
+            self.show_comparisons_menu,
+            category="Graph",
+        )
+        self.comparisons_menu = QMenu("Show &comparisons", self)
+        self.comparisons_menu.aboutToShow.connect(self._fill_comparisons_menu)
+        comparisons.setMenu(self.comparisons_menu)
         r.register(
             "view.results",
             "&Results panel",
@@ -653,7 +667,13 @@ class MainWindow(QMainWindow):
         graph_menu.addAction(a("graph.plot"))
         graph_menu.addSeparator()
         graph_menu.addActions(
-            [a("graph.type"), a("graph.rename"), a("graph.format"), a("graph.export")]
+            [
+                a("graph.type"),
+                a("graph.comparisons"),
+                a("graph.rename"),
+                a("graph.format"),
+                a("graph.export"),
+            ]
         )
         graph_menu.addSeparator()
         graph_menu.addAction(a("graph.delete"))
@@ -1176,6 +1196,41 @@ class MainWindow(QMainWindow):
         else:
             self.type_menu.popup(QCursor.pos())
 
+    def show_comparisons_menu(self) -> None:
+        """Open the comparisons menu under the panel's button (or at the pointer)."""
+        tab = self.current_tab
+        action = self.registry.action("graph.comparisons")
+        button = tab.graph_panel.toolbar.widgetForAction(action) if tab is not None else None
+        if button is not None and button.isVisible():
+            self.comparisons_menu.popup(button.mapToGlobal(button.rect().bottomLeft()))
+        else:
+            self.comparisons_menu.popup(QCursor.pos())
+
+    def _fill_comparisons_menu(self) -> None:
+        """The analyses of the graph's table whose comparisons it can show (the one it
+        shows checked), and *Hide comparisons*."""
+        menu = self.comparisons_menu
+        menu.clear()
+        tab = self.current_tab
+        graph_id = tab.current_graph_id if tab is not None else None
+        if tab is None or graph_id is None:
+            return
+        spec = tab.document.graph(graph_id)
+        shown = spec.comparisons.analysis_id if spec.comparisons is not None else None
+        choices = tab.comparison_choices(graph_id)
+        if not choices:
+            menu.addAction(NO_COMPARISONS).setEnabled(False)
+        for analysis_id, name in choices:
+            item = menu.addAction(
+                name.replace("&", "&&"),
+                functools.partial(tab.set_comparisons, analysis_id, graph_id),
+            )
+            item.setCheckable(True)
+            item.setChecked(analysis_id == shown)
+        if shown is not None:
+            menu.addSeparator()
+            menu.addAction(HIDE_COMPARISONS, functools.partial(tab.set_comparisons, None, graph_id))
+
     def _tab_call(self, method: Callable[..., object]) -> Callable[[], None]:
         """A callback that runs ``method`` on the current document tab, if any."""
 
@@ -1341,6 +1396,7 @@ class MainWindow(QMainWindow):
             a(action_id).setEnabled(has_graph)
             reasons[action_id] = reason
         self._update_type_actions(tab if has_graph else None, reasons)
+        self._update_comparisons_action(tab if has_graph else None, reasons)
         if view is not None:
             selected = bool(view.selected_columns())
             a("table.group").setEnabled(selected)
@@ -1361,6 +1417,18 @@ class MainWindow(QMainWindow):
             label = f"&{family.label}"
             action.setText(label if problem is None else f"{label}\t{problem}")
             reasons[action_id] = problem or ""
+
+    def _update_comparisons_action(self, tab: DocumentTab | None, reasons: dict[str, str]) -> None:
+        """*Show comparisons* needs an ungrouped bar, box, violin or column scatter graph."""
+        from curvis.charts.builder import comparison_problem
+
+        action = self.registry.action("graph.comparisons")
+        spec = None
+        if tab is not None and tab.current_graph_id is not None:
+            spec = next((g for g in tab.document.graphs if g.id == tab.current_graph_id), None)
+        problem = NO_GRAPH_TO_COMPARE if spec is None else comparison_problem(spec) or ""
+        action.setEnabled(not problem)
+        reasons["graph.comparisons"] = problem
 
     def _update_type_actions(self, tab: DocumentTab | None, reasons: dict[str, str]) -> None:
         """Check the shown graph's type; a type its table cannot draw is disabled with

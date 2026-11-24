@@ -271,6 +271,17 @@ class CellMeans:
 
 
 @dataclass(frozen=True)
+class PairP:
+    """One comparison of two groups, for the brackets on bar-family graphs: the series
+    ids (group or column ids, as the graph's series sources) and the P value the results
+    show for it (adjusted, for a post-hoc test)."""
+
+    first: str
+    second: str
+    p_value: float
+
+
+@dataclass(frozen=True)
 class Result:
     """What an analysis found."""
 
@@ -288,6 +299,9 @@ class Result:
     """Fitted curves, for graphs (curve fits only)."""
     cells: CellMeans | None = None
     """The cells of a two-way design, for the interaction chart (two-way ANOVA only)."""
+    pairs: tuple[PairP, ...] = ()
+    """The comparisons of two groups, for brackets on graphs (t-test, Mann-Whitney U,
+    one-way ANOVA's post-hoc test, Dunn's test), in the order the results list them."""
 
     @property
     def has_p_values(self) -> bool:

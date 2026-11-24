@@ -237,12 +237,14 @@ def _graph_palettes_and_fonts(data: dict[str, Any]) -> dict[str, Any]:
 
 @register_migration(10)
 def _graph_names_and_comparisons(data: dict[str, Any]) -> dict[str, Any]:
-    """Format 11 stores a graph's own name (``name``, "" for the default "Bar graph 2")."""
+    """Format 11 stores a graph's own name (``name``, "" for the default "Bar graph 2")
+    and the comparisons a bar-family graph shows as brackets (``comparisons``, none)."""
     document = data.get("document")
     graphs = document.get("graphs") if isinstance(document, dict) else None
     for graph in graphs if isinstance(graphs, list) else []:
         if isinstance(graph, dict):
             graph.setdefault("name", "")
+            graph.setdefault("comparisons", None)
     return data
 
 

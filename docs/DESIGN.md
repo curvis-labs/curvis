@@ -195,7 +195,7 @@ at least **4.5 : 1**, and `tests/ui/test_theme.py` checks it.
   | Ctrl+Shift+A | Analyze |
   | Ctrl+Shift+F | Format graph |
   | Ctrl+Shift+X | Export graph |
-  | — | Rename column, Constants, Edit analysis, Delete analysis, Rename table, Move table left / right, Close table, Change graph type, Delete graph, the samples under File › New from sample (menu and palette only) |
+  | — | Rename column, Constants, Edit analysis, Delete analysis, Rename table, Move table left / right, Close table, Change graph type, Show comparisons, Rename graph, Delete graph, the samples under File › New from sample (menu and palette only) |
 
   A new shortcut must not clash with these or with platform standard keys.
 - **Accessible names**: every control has a buddy label, visible text or `setAccessibleName`.
@@ -245,14 +245,18 @@ Mockup: `docs/mockups/toolbars.html`.
   data | columns | results groups).
 - **Keyboard.** The toolbars are not in the Tab order, because every button has a shortcut or
   menu entry. The tooltips name the shortcut.
-- **Graph panel toolbar.** Mockup: `docs/mockups/graph-panel.html`. Four icon-only
+- **Graph panel toolbar.** Mockup: `docs/mockups/graph-panel.html`. Five icon-only
   buttons at the right of the Graph panel's header, after the graph list: *Change graph
-  type*, *Format graph…*, *Delete graph*, *Export graph…*. Same buttons, states and icon
+  type*, *Show comparisons*, *Format graph…*, *Delete graph*, *Export graph…*. Same buttons, states and icon
   rules as the main toolbar (28 px, 4 px apart, two tones, tooltip with name and shortcut,
   disabled with the reason: “There is no graph to format”). *Change graph type* opens a
   menu of Scatter, Line, Bar and Box with a check at the current type; a type the table
-  cannot draw is disabled with its reason, as in the Plot menu. Double-clicking the graph
-  opens *Format graph…*.
+  cannot draw is disabled with its reason, as in the Plot menu. *Show comparisons* opens a
+  menu of the table's t-tests, Mann-Whitney U tests, one-way ANOVAs and Kruskal-Wallis
+  tests, the one shown checked, and *Hide comparisons*; it is disabled with the reason on
+  graphs that cannot show brackets. Double-clicking the graph opens *Format graph…*.
+  Right-clicking the graph list offers *Rename graph*, which edits the name in place over
+  the list (Enter keeps it, Esc cancels), as table tabs do.
 
 ## 8. Table tabs
 

@@ -55,15 +55,17 @@ from PySide6.QtWidgets import (
 )
 
 from curvis.analysis.base import Analysis, analysis_labels
-from curvis.analysis.result import Result
+from curvis.analysis.result import DEFAULT_P_DISPLAY, PDisplay, Result
 from curvis.charts.builder import (
     GRAPH_TYPES,
     INTERACTION_ONLY,
     SURVIVAL_ONLY,
+    comparison_problem,
     default_series_of,
     error_column_of,
     first_factor_name,
     graph_series_names,
+    is_comparison,
     is_fit,
     two_way_analyses,
     variant_problem,
@@ -90,12 +92,14 @@ from curvis.charts.spec import (
     ChartFamily,
     ChartSpec,
     ChartVariant,
+    Comparisons,
     ErrorBars,
     FitOverlay,
     Grouping,
     HistogramBins,
     LabelAngle,
     LineStyle,
+    PLabel,
     Scale,
     SeriesSpec,
     Symbol,
@@ -160,6 +164,12 @@ Y_ANGLE_NOTE = "Y axis labels are always horizontal."
 FIT_PREFIX = "fit:"
 """Item data of a fitted curve in the series list: the prefix and the analysis id."""
 FIT_NOTE = "A fitted curve is drawn in the color of its series. Remove takes it off the graph."
+COMPARISONS_KEY = "comparisons"
+"""Item data of the comparison brackets in the series list."""
+COMPARISONS_NOTE = (
+    "Brackets join the groups the analysis compared. * P < 0.05, ** P < 0.01, "
+    "*** P < 0.001. Remove takes them off the graph."
+)
 EVERY_SERIES_SHOWN = "Every series of the table is in the graph."
 LAST_SERIES = "A graph needs at least one series."
 PREVIEW_NODE = "format-preview"
@@ -223,6 +233,8 @@ def data_key(spec: ChartSpec) -> object:
         spec.show_points,
         spec.violin_trim,
         spec.bins,
+        spec.comparisons,
+        spec.grouping if spec.comparisons is not None else None,
     )
 
 
@@ -311,6 +323,7 @@ class FormatDialog(QDialog):
         data: ChartData | None = None,
         palettes: Sequence[ColorScheme] = (),
         parent: QWidget | None = None,
+        p_display: PDisplay = DEFAULT_P_DISPLAY,
     ) -> None:
         super().__init__(parent)
         self._palettes = list(palettes)
@@ -321,6 +334,7 @@ class FormatDialog(QDialog):
         self.table: Table = document.table(self.original.table_id)
         self._scheduler = scheduler
         self._results: Mapping[str, Result] = results or {}
+        self._p_display = p_display
         self._data = data
         self._data_key = data_key(self.spec) if data is not None else None
         self._node = f"{PREVIEW_NODE}:{graph_id}"
@@ -362,6 +376,7 @@ class FormatDialog(QDialog):
         self.options = FittedStack()
         self.options.addWidget(self._build_axis_options())
         self.options.addWidget(self._build_series_options())
+        self.options.addWidget(self._build_comparison_options())
         options_layout.addWidget(self.options)
         right.addWidget(self.options_box)
         right.addWidget(self._build_preview(), 1)
@@ -694,6 +709,49 @@ class FormatDialog(QDialog):
         self.error_bars.activated.connect(self._on_error_bars_chosen)
         return page
 
+    def _build_comparison_options(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 0, 0, 0)
+        form = form_layout()
+        self.comparison_label = QComboBox()
+        for choice in PLabel:
+            self.comparison_label.addItem(choice.label, choice)
+        form.addRow(buddy_label("Te&xt", self.comparison_label), self.comparison_label)
+        self.show_ns = QCheckBox("Show &non-significant pairs (ns)")
+        form.addRow("", self.show_ns)
+        layout.addLayout(form)
+        self.comparison_note = secondary_label(COMPARISONS_NOTE)
+        layout.addWidget(self.comparison_note)
+        self.comparison_label.activated.connect(lambda _i: self._edit_comparisons())
+        self.show_ns.clicked.connect(lambda _on: self._edit_comparisons())
+        return page
+
+    def _edit_comparisons(self) -> None:
+        comparisons = self.spec.comparisons
+        if comparisons is None:
+            return
+        label = self.comparison_label.currentData()
+        changed = replace(
+            comparisons,
+            label=PLabel(label) if label is not None else comparisons.label,
+            show_ns=self.show_ns.isChecked(),
+        )
+        if changed != comparisons:
+            self._apply(replace(self.spec, comparisons=changed))
+
+    def _load_comparison_options(self) -> None:
+        comparisons = self.spec.comparisons
+        if comparisons is None:
+            return
+        with QSignalBlocker(self.comparison_label):
+            self.comparison_label.setCurrentIndex(self.comparison_label.findData(comparisons.label))
+        with QSignalBlocker(self.show_ns):
+            self.show_ns.setChecked(comparisons.show_ns)
+        problem = comparison_problem(self.spec)
+        note = f"{problem}." if problem else COMPARISONS_NOTE
+        self.comparison_note.setText(note)
+
     def _build_colors(self) -> QGroupBox:
         box = QGroupBox("Colors and text")
         outer = QVBoxLayout(box)
@@ -812,6 +870,8 @@ class FormatDialog(QDialog):
                 self.line_width,
                 self.color,
                 self.error_bars,
+                self.comparison_label,
+                self.show_ns,
             ]
         else:
             widgets += [self.scheme_combo, self.edit_colors, self.font_combo, self.text_size]
@@ -941,13 +1001,29 @@ class FormatDialog(QDialog):
                 item.setData(Qt.ItemDataRole.UserRole, key)
                 self.series_list.addItem(item)
                 item.setSelected(key in keep)
+            if self.spec.comparisons is not None:
+                name = self._analysis_name(self.spec.comparisons.analysis_id)
+                item = QListWidgetItem(f"Comparisons: {name}")
+                item.setData(Qt.ItemDataRole.UserRole, COMPARISONS_KEY)
+                self.series_list.addItem(item)
+                item.setSelected(COMPARISONS_KEY in keep)
             if not self.series_list.selectedItems() and self.series_list.count():
                 self.series_list.item(0).setSelected(True)
                 self.series_list.setCurrentRow(0)
         self._load_series_options()
 
     def _fit_name(self, overlay: FitOverlay) -> str:
-        return self._labels.get(overlay.analysis_id, "analysis no longer in the project")
+        return self._analysis_name(overlay.analysis_id)
+
+    def _analysis_name(self, analysis_id: str) -> str:
+        return self._labels.get(analysis_id, "analysis no longer in the project")
+
+    def comparisons_selected(self) -> bool:
+        """Whether the comparison brackets are selected in the series list."""
+        return any(
+            item.data(Qt.ItemDataRole.UserRole) == COMPARISONS_KEY
+            for item in self.series_list.selectedItems()
+        )
 
     def selected_fits(self) -> list[str]:
         """Analysis ids of the selected fitted curves, in the graph's order."""
@@ -974,12 +1050,20 @@ class FormatDialog(QDialog):
         styles = self._selected_styles()
         n = len(styles)
         fits = len(self.selected_fits())
+        compared = self.comparisons_selected()
         parts = [
             f"{n} series" if n else "",
             f"{fits} fitted curve{'s' if fits > 1 else ''}" if fits else "",
+            "the comparisons" if compared else "",
         ]
         picked = " and ".join(p for p in parts if p)
+        picked = picked[:1].upper() + picked[1:]
         self.selection_note.setText(f"{picked} selected." if picked else "No series selected.")
+        if self.tabs.currentIndex() == SERIES:
+            only_comparisons = compared and not n and not fits
+            self.options.setCurrentIndex(2 if only_comparisons else 1)
+            if only_comparisons:
+                self._load_comparison_options()
         widgets: list[QWidget] = [
             self.in_legend,
             self.symbol,
@@ -1092,7 +1176,11 @@ class FormatDialog(QDialog):
         self.add_button.setEnabled(bool(missing))
         self.add_button.setToolTip("" if missing else EVERY_SERIES_SHOWN)
         fits = self.selected_fits()
-        removable = bool(fits) or (bool(selected) and len(selected) < len(order))
+        removable = (
+            bool(fits)
+            or self.comparisons_selected()
+            or (bool(selected) and len(selected) < len(order))
+        )
         self.remove_button.setEnabled(removable)
         self.remove_button.setToolTip("" if removable or not selected else LAST_SERIES)
         indexes = [order.index(s) for s in selected]
@@ -1338,7 +1426,19 @@ class FormatDialog(QDialog):
         the graph does not show."""
         shown = {s.source for s in self.spec.series}
         missing = [source for source in self._names if source not in shown]
-        return missing + [FIT_PREFIX + a.id for a in self._missing_fits()]
+        missing += [FIT_PREFIX + a.id for a in self._missing_fits()]
+        return missing + [COMPARISONS_KEY + a.id for a in self._comparison_choices()]
+
+    def _comparison_choices(self) -> list[Analysis]:
+        """The analyses of the table whose comparisons the graph can show and does not."""
+        if comparison_problem(self.spec) is not None:
+            return []
+        shown = self.spec.comparisons.analysis_id if self.spec.comparisons else None
+        return [
+            a
+            for a in self.document.analyses_of(self.table.id)
+            if is_comparison(a) and a.id != shown
+        ]
 
     def _missing_fits(self) -> list[Analysis]:
         if self.spec.family is not ChartFamily.XY:
@@ -1361,6 +1461,20 @@ class FormatDialog(QDialog):
         for analysis in fits:
             action = self.add_menu.addAction(f"Fitted curve: {self._labels[analysis.id]}")
             action.triggered.connect(lambda _c=False, a=analysis: self.add_fit(a))
+        comparisons = self._comparison_choices()
+        if comparisons and self.add_menu.actions():
+            self.add_menu.addSeparator()
+        for analysis in comparisons:
+            action = self.add_menu.addAction(f"Comparisons: {self._labels[analysis.id]}")
+            action.triggered.connect(lambda _c=False, a=analysis: self.add_comparisons(a))
+
+    def add_comparisons(self, analysis: Analysis) -> None:
+        """Show the comparisons of ``analysis`` as brackets (instead of the ones shown),
+        keeping how they are labelled."""
+        old = self.spec.comparisons
+        new = replace(old, analysis_id=analysis.id) if old is not None else Comparisons(analysis.id)
+        self._apply(replace(self.spec, comparisons=new))
+        self._fill_series_list([COMPARISONS_KEY])
 
     def add_fit(self, analysis: Analysis) -> None:
         """Lay the fitted curves of ``analysis`` over the graph again."""
@@ -1405,15 +1519,17 @@ class FormatDialog(QDialog):
         """Remove the selected series (a graph keeps at least one) and fitted curves."""
         chosen = set(self.selected_sources())
         fits = set(self.selected_fits())
+        compared = self.comparisons_selected()
         kept = tuple(s for s in self.spec.series if s.source not in chosen)
         if not kept:
-            if not fits:
+            if not fits and not compared:
                 return
             kept, chosen = self.spec.series, set()
-        if not chosen and not fits:
+        if not chosen and not fits and not compared:
             return
         overlays = tuple(o for o in self.spec.overlays if o.analysis_id not in fits)
-        self._apply(replace(self.spec, series=kept, overlays=overlays))
+        comparisons = None if compared else self.spec.comparisons
+        self._apply(replace(self.spec, series=kept, overlays=overlays, comparisons=comparisons))
         self._fill_series_list([kept[0].source])
 
     def move_selected(self, by: int) -> None:
@@ -1442,7 +1558,7 @@ class FormatDialog(QDialog):
         if self._data is not None and key == self._data_key:
             self.preview.render_chart(self.spec, self._data)
             return
-        inputs = gather(self.table, self.spec, self._results)
+        inputs = gather(self.table, self.spec, self._results, self._p_display)
         self._pending_key = key
         if self._scheduler is None:
             self._set_data(compute(inputs), key)

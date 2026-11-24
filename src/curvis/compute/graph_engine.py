@@ -16,8 +16,9 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
+from curvis.analysis.result import DEFAULT_P_DISPLAY, PDisplay
 from curvis.charts.data import ChartData, compute, gather
-from curvis.charts.spec import ChartFamily, ChartSpec, ErrorBars
+from curvis.charts.spec import ChartFamily, ChartSpec, ErrorBars, PLabel
 from curvis.compute.analysis_engine import AnalysisEngine
 from curvis.compute.calc_engine import CalcEngine
 from curvis.compute.jobs import Job, JobError
@@ -29,8 +30,8 @@ type _Signature = tuple[ChartSpec, tuple[str, ...]]
 
 
 def graph_reads(table: Table, spec: ChartSpec) -> list[str]:
-    """What a graph reads: its table, the columns it draws, the fits it overlays and the
-    analysis it draws (interaction graphs)."""
+    """What a graph reads: its table, the columns it draws, the fits it overlays, the
+    analysis it draws (interaction graphs) and the one whose comparisons it shows."""
     reads = [table.id]
     if spec.family is ChartFamily.SURVIVAL:
         pairs = {p.source: p for p in survival_pairs(table)}
@@ -51,6 +52,8 @@ def graph_reads(table: Table, spec: ChartSpec) -> list[str]:
         reads.extend(o.analysis_id for o in spec.overlays)
     if spec.analysis_id is not None:
         reads.append(spec.analysis_id)
+    if spec.comparisons is not None:
+        reads.append(spec.comparisons.analysis_id)
     return list(dict.fromkeys(reads))
 
 
@@ -77,6 +80,8 @@ class GraphEngine(QObject):
         """Latest plot data of each graph."""
         self.errors: dict[str, str] = {}
         """Why a graph has no plot data, for each graph whose last run failed."""
+        self.p_display = DEFAULT_P_DISPLAY
+        """How P values are shown (Settings), on brackets labelled with them."""
         self._signatures: dict[str, _Signature] = {}
         self._definitions_changed = False
         self._closed = False
@@ -92,6 +97,21 @@ class GraphEngine(QObject):
 
     def is_stale(self, graph_id: str) -> bool:
         return self.calc_engine.recalculator.is_stale(graph_id)
+
+    def set_p_display(self, display: PDisplay) -> None:
+        """Show P values as ``display``: graphs whose brackets show P values redraw."""
+        if display is self.p_display:
+            return
+        self.p_display = display
+        nodes = [
+            g.id
+            for g in self.document.graphs
+            if g.comparisons is not None
+            and g.comparisons.label is PLabel.P_VALUE
+            and g.id in self._signatures
+        ]
+        if nodes:
+            self.calc_engine.recalculator.recompute(nodes)
 
     def close(self) -> None:
         self._closed = True
@@ -148,7 +168,7 @@ class GraphEngine(QObject):
         except KeyError:
             raise ValueError("The table of this graph was deleted.") from None
         results = self.analysis_engine.results if self.analysis_engine is not None else {}
-        inputs = gather(table, spec, results)
+        inputs = gather(table, spec, results, self.p_display)
         return NodeJob(Job(compute, (inputs,)))
 
     # --- following the recalculator ----------------------------------------------------

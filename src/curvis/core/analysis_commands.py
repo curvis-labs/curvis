@@ -109,8 +109,8 @@ def edit_analysis(doc: Document, analysis: Analysis) -> Command:
 
 
 def remove_analysis(doc: Document, analysis_id: str) -> Command:
-    """A command that removes the analysis ``analysis_id``, and its fitted curves from
-    the graphs that show them, as one undo step."""
+    """A command that removes the analysis ``analysis_id``, and its fitted curves and
+    comparison brackets from the graphs that show them, as one undo step."""
     from dataclasses import replace
 
     from curvis.core.commands import CommandGroup
@@ -128,7 +128,8 @@ def remove_analysis(doc: Document, analysis_id: str) -> Command:
     command: Command = SetAnalysis(analysis, summary, remove=True)
     overlaid = overlaid_on(doc, analysis_id)
     drawing = drawn_by(doc, analysis_id)
-    if not overlaid and not drawing:
+    comparing = compared_on(doc, analysis_id)
+    if not overlaid and not drawing and not comparing:
         return command
     graphs: list[Command] = [
         SetGraph(
@@ -137,6 +138,7 @@ def remove_analysis(doc: Document, analysis_id: str) -> Command:
         )
         for g in overlaid
     ]
+    graphs += [SetGraph(replace(g, comparisons=None), "Remove comparisons") for g in comparing]
     graphs += [SetGraph(g, "Delete interaction graph", remove=True) for g in drawing]
     return CommandGroup(summary, [*graphs, command])
 
@@ -144,6 +146,15 @@ def remove_analysis(doc: Document, analysis_id: str) -> Command:
 def overlaid_on(doc: Document, analysis_id: str) -> list[ChartSpec]:
     """The graphs that draw the fitted curves of ``analysis_id``."""
     return [g for g in doc.graphs if any(o.analysis_id == analysis_id for o in g.overlays)]
+
+
+def compared_on(doc: Document, analysis_id: str) -> list[ChartSpec]:
+    """The graphs that show the comparisons of ``analysis_id`` as brackets."""
+    return [
+        g
+        for g in doc.graphs
+        if g.comparisons is not None and g.comparisons.analysis_id == analysis_id
+    ]
 
 
 def drawn_by(doc: Document, analysis_id: str) -> list[ChartSpec]:

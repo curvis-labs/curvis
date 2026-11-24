@@ -5,6 +5,7 @@ tabs along the bottom)."""
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 from weakref import WeakKeyDictionary
@@ -133,7 +134,10 @@ class DocumentTab(QWidget):
         self.side_tabs.setDocumentMode(True)
         self.side_tabs.setMinimumWidth(260)
         self.results_panel = ResultsPanel(document, self.analysis_engine, self.side_tabs)
+        self._p_display = p_display
         self.results_panel.set_p_display(p_display)
+        if self.graph_engine is not None:
+            self.graph_engine.p_display = p_display
         self.results_panel.edit_requested.connect(self.edit_analysis)
         self.results_panel.delete_requested.connect(self.delete_analysis)
         self.results_panel.current_changed.connect(self.state_changed)
@@ -179,8 +183,12 @@ class DocumentTab(QWidget):
         return not self.document.undo_stack.is_clean
 
     def set_p_display(self, display: PDisplay) -> None:
-        """Show P values as ``display`` (Settings, Results)."""
+        """Show P values as ``display`` (Settings, Results): in the results and on
+        comparison brackets that show P values."""
+        self._p_display = display
         self.results_panel.set_p_display(display)
+        if self.graph_engine is not None:
+            self.graph_engine.set_p_display(display)
 
     def set_decimal_places(self, places: int) -> None:
         self._decimal_places = places
@@ -478,6 +486,52 @@ class DocumentTab(QWidget):
         editor = self.graph_panel.edit_name(graph_id, commit, self.graph_panel.combo)
         return editor is not None
 
+    def comparison_choices(self, graph_id: str | None = None) -> list[tuple[str, str]]:
+        """(analysis id, name) of the analyses of the graph's table whose comparisons it
+        can show, in the order they were made."""
+        from curvis.analysis.base import analysis_labels
+        from curvis.charts.builder import is_comparison
+
+        graph_id = graph_id or self.current_graph_id
+        if graph_id is None:
+            return []
+        spec = self.document.graph(graph_id)
+        analyses = self.document.analyses_of(spec.table_id)
+        labels = analysis_labels(analyses)
+        return [(a.id, labels[a.id]) for a in analyses if is_comparison(a)]
+
+    def set_comparisons(self, analysis_id: str | None, graph_id: str | None = None) -> bool:
+        """Show the comparisons of ``analysis_id`` on the graph ``graph_id`` (default: the
+        one shown) as brackets, keeping how they are labelled; None hides them. One undo
+        step."""
+        from curvis.charts.spec import Comparisons
+        from curvis.core import edit_graph
+
+        graph_id = graph_id or self.current_graph_id
+        if graph_id is None:
+            return False
+        spec = self.document.graph(graph_id)
+        old = spec.comparisons
+        if analysis_id is None:
+            if old is None:
+                return False
+            changed, summary = replace(spec, comparisons=None), "Hide comparisons"
+        else:
+            if old is not None and old.analysis_id == analysis_id:
+                return False
+            new = (
+                replace(old, analysis_id=analysis_id)
+                if old is not None
+                else Comparisons(analysis_id)
+            )
+            changed, summary = replace(spec, comparisons=new), "Show comparisons"
+        try:
+            self.document.execute(edit_graph(self.document, changed, summary))
+        except (ValueError, CommandError) as exc:
+            self.message.emit(str(exc))
+            return False
+        return True
+
     def change_graph_type(self, variant: ChartVariant, graph_id: str | None = None) -> bool:
         """Draw the graph ``graph_id`` (default: the one shown) as ``variant``, keeping its
         series and style; one undo step."""
@@ -517,6 +571,7 @@ class DocumentTab(QWidget):
             data=engine.data.get(graph_id) if engine is not None else None,
             palettes=self._palettes(),
             parent=self,
+            p_display=self._p_display,
         )
         try:
             if not self._exec_dialog(dialog) or not dialog.changed:
@@ -566,7 +621,8 @@ class DocumentTab(QWidget):
         data = engine.data.get(graph_id) if engine is not None else None
         if data is None or (engine is not None and engine.is_stale(graph_id)):
             results = self.analysis_engine.results if self.analysis_engine is not None else {}
-            data = compute(gather(self.document.table(spec.table_id), spec, results))
+            table = self.document.table(spec.table_id)
+            data = compute(gather(table, spec, results, self._p_display))
         if self.scheduler is None:
             try:
                 export_graph(spec, data, str(path), fmt, dpi)

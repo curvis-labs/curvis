@@ -77,7 +77,7 @@ from curvis.charts.axes import (
 from curvis.charts.colors import ColorScheme
 from curvis.charts.data import CategoryData, ChartData, SurvivalCurveData, XYSeriesData
 from curvis.charts.fonts import ChartFont, chart_font_info
-from curvis.charts.marks import Hit, LegendEntry, Marks, Polygon, Rect, bar_marks
+from curvis.charts.marks import Hit, Label, LegendEntry, Marks, Polygon, Rect, bar_marks
 from curvis.charts.spec import (
     LINE_VARIANTS,
     XY_VARIANTS,
@@ -1013,6 +1013,19 @@ class ChartView(QWidget):
             )
         if marks.over:
             plot.addItem(MarksItem(Marks(lines=list(marks.over)), self._px))
+        for label in marks.labels:
+            plot.addItem(self._label_item(label))
+
+    def _label_item(self, label: Label) -> Any:
+        """A bracket's text, centred above its line (as the export's ``va="bottom"``)."""
+        item = pg.TextItem(label.text, color=QColor(label.color), anchor=(0.5, 1.0))
+        font = chart_font(self.family)
+        font.setPointSizeF(self._font_pt(label.size_pt))
+        item.setFont(font)
+        item.textItem.document().setDocumentMargin(0)
+        item.setPos(label.x, label.y)
+        item.setZValue(10)
+        return item
 
     def _legend_item(self, entry: LegendEntry) -> Any:
         """An item whose look a legend sample copies: a patch or a symbol."""

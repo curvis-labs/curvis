@@ -3,6 +3,7 @@
 from curvis.core.analysis_commands import (
     SetAnalysis,
     add_analysis,
+    compared_on,
     drawn_by,
     edit_analysis,
     overlaid_on,
@@ -112,6 +113,7 @@ __all__ = [
     "add_analysis",
     "add_calculation",
     "add_graph",
+    "compared_on",
     "constant_node",
     "default_graph_names",
     "drawn_by",
