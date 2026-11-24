@@ -151,6 +151,42 @@ def test_tooltip_on_a_log_axis_shows_the_typed_x(tab: DocumentTab, qtbot: QtBot)
     assert text is not None and "Dose (µM): 0.001" in text.splitlines()
 
 
+def assert_page_fits(chart: ChartView) -> None:
+    """The whole page is drawn inside the view: nothing is cropped."""
+    view = chart.plot_widget
+    page = view.ci.geometry()
+    assert page.width() == pytest.approx(view.width(), abs=0.5)
+    assert page.height() == pytest.approx(view.height(), abs=0.5)
+    assert chart.plot_item.geometry().bottom() <= view.height() + 0.5
+
+
+def test_a_smaller_page_fits_the_panel(tab: DocumentTab, qtbot: QtBot) -> None:
+    """From a tall page to a wide one the zoom goes down; the axes, title and legend of
+    the old zoom must not keep the layout taller than the panel (the page was cropped)."""
+    tab.plot(ChartFamily.XY)
+    settle(qtbot, tab)
+    chart = chart_of(tab)
+    chart.resize(500, 800)
+    qtbot.wait(10)
+    graph = tab.document.graphs[0]
+    for aspect in ("tall", "wide", "square", "wide"):
+        tab.document.execute(edit_graph(tab.document, replace(graph, aspect_ratio=aspect)))
+        settle(qtbot, tab)
+        assert_page_fits(chart)
+
+
+def test_a_narrower_panel_fits_the_page(tab: DocumentTab, qtbot: QtBot) -> None:
+    tab.plot(ChartFamily.XY)
+    settle(qtbot, tab)
+    chart = chart_of(tab)
+    chart.resize(1200, 800)
+    qtbot.wait(10)
+    assert_page_fits(chart)
+    chart.resize(400, 800)
+    qtbot.wait(10)
+    assert_page_fits(chart)
+
+
 def test_bar_and_box(window: MainWindow, qtbot: QtBot) -> None:
     tab = window.new_document()
     tab.document.execute(AddTable(column_table(), 0))
