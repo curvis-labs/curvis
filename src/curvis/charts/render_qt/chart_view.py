@@ -716,6 +716,16 @@ class ChartView(QWidget):
                 self.message = UNSUPPORTED
         self._place_legend()
         self._apply_layout(spec, self.layout_)
+        self._fill_page()
+
+    def _fill_page(self) -> None:
+        """Size the graph's layout to the page again. pyqtgraph sizes it only when the
+        view is resized, and Qt keeps it at least as big as its items' minimum sizes at
+        that moment. When the page shrinks on screen (a smaller page, a narrower
+        panel), _fit resizes the view while the axes, title and legend still have the
+        sizes of the old zoom, so the layout stayed too big and the page was cropped."""
+        view = self.plot_widget
+        view.ci.setGeometry(QRectF(view.range))
 
     def _style(self, spec: ChartSpec, colors: ColorScheme) -> None:
         widget, plot = self.plot_widget, self.plot_item
