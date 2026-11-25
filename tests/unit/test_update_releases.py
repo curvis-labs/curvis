@@ -4,6 +4,7 @@ commands that install it (curvis.update.releases, curvis.update.install)."""
 from __future__ import annotations
 
 import hashlib
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -276,17 +277,19 @@ def test_windows_installer_reads_relaunch() -> None:
 def test_mac_runs_the_script() -> None:
     app = Path("/Applications/Curvis.app")
     target = Target(Method.REPLACE_APP_BUNDLE, "macos", "arm64", app)
-    command = install_command(target, Path("/c/u.dmg"), pid=42, script=Path("/c/s.sh"))
+    dmg, script = Path("/c/u.dmg"), Path("/c/s.sh")
+    command = install_command(target, dmg, pid=42, script=script)
     assert command.program == "/bin/bash"
-    assert command.arguments == ("/c/s.sh", "42", "/c/u.dmg", str(app))
+    assert command.arguments == (str(script), "42", str(dmg), str(app))
     assert 'open "$app"' in MAC_SCRIPT and "hdiutil attach" in MAC_SCRIPT
 
 
 def test_deb_waits_for_apt() -> None:
-    command = install_command(Target(Method.APT, "deb", "amd64"), Path("/c/x.deb"), pid=1)
+    deb = Path("/c/x.deb")
+    command = install_command(Target(Method.APT, "deb", "amd64"), deb, pid=1)
     assert (command.program, command.arguments, command.wait) == (
         "pkexec",
-        ("apt-get", "install", "-y", "/c/x.deb"),
+        ("apt-get", "install", "-y", str(deb)),
         True,
     )
 
@@ -296,6 +299,7 @@ def test_open_file_has_no_command() -> None:
         install_command(Target(Method.OPEN_FILE, "deb", "amd64"), Path("/c/x.deb"), pid=1)
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="AppImages and the exec bit are POSIX only")
 def test_replace_appimage(tmp_path: Path) -> None:
     image = tmp_path / "Curvis-1.0.0-x86_64.AppImage"
     image.write_bytes(b"old")
