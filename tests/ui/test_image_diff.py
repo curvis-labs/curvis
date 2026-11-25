@@ -3,7 +3,7 @@ and without a legend, in the light and the dark app theme. See tests/ui/IMAGE_DI
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from pathlib import Path
 
@@ -26,6 +26,7 @@ from curvis.charts.spec import (
     Grouping,
     HistogramBins,
     LabelAngle,
+    LegendPosition,
     LineStyle,
     Scale,
     Symbol,
@@ -35,9 +36,11 @@ from curvis.ui.theme import dark_palette, light_palette
 from tests.ui.image_diff import as_array, compare, save_pair
 from tests.unit.charts_tables import (
     DOSES,
+    SPECTRA_NAMES,
     column_table,
     replicate_table,
     sigmoid_table,
+    spectra_table,
     spread_table,
     survival_table,
     two_way_analysis,
@@ -175,6 +178,37 @@ turned category labels (both renderers now lay out a title and turned labels as
 Matplotlib does)."""
 
 
+def _spectra(names: tuple[str, ...], **changes: object) -> tuple[ChartSpec, ChartData]:
+    """Absorbance spectra drawn as lines, one series per sample (the bug report of a
+    legend that squashed the plot)."""
+    table = spectra_table(names)
+    spec = replace(default_spec(table, ChartFamily.XY), variant=ChartVariant.LINE, title="Data 1")
+    spec = replace(spec, series=tuple(replace(s, symbol=Symbol.NONE) for s in spec.series))
+    spec = replace(spec, **changes)  # type: ignore[arg-type]
+    return spec, compute(gather(table, spec, {}))
+
+
+def _inside(make: Callable[[], tuple[ChartSpec, ChartData]]) -> tuple[ChartSpec, ChartData]:
+    spec, data = make()
+    return replace(spec, show_legend=True, legend_position=LegendPosition.INSIDE), data
+
+
+SHORT_SPECTRA = ("BL21 80", "BL21 250", "BL21 800", "C41 80", "C41 800", "C43 80", "C43 800")
+
+LEGEND_PLACES = {
+    "legend-long-names-below": lambda: _spectra(SPECTRA_NAMES),
+    "legend-sixty-series-below": lambda: _spectra(tuple(f"Sample {i}" for i in range(1, 61))),
+    "legend-inside-spectra": lambda: _spectra(SHORT_SPECTRA, legend_position=LegendPosition.INSIDE),
+    "legend-inside-scatter": lambda: _inside(_scatter),
+    "legend-inside-line-with-fit": lambda: _inside(_line_with_fit),
+    "legend-inside-survival": lambda: _inside(_survival),
+    "legend-inside-histogram": lambda: _inside(lambda: _spread(ChartVariant.HISTOGRAM)),
+}
+"""Legends since the bug report: under the plot in columns, with smaller text, shortened
+names and a count of the rest; and in an empty corner of the plot (or outside when every
+corner has data: the line graph with a fit)."""
+
+
 def _survival() -> tuple[ChartSpec, ChartData]:
     table = survival_table()
     spec = replace(default_spec(table, ChartFamily.SURVIVAL), aspect_ratio="square")
@@ -262,8 +296,17 @@ def test_title_and_turned_labels_match(layout: str, qapp: QApplication) -> None:
     _check(spec, data, layout)
 
 
-def _check(spec: ChartSpec, data: ChartData, name: str) -> None:
-    diff = compare(spec, data)
+@pytest.mark.parametrize("layout", LEGEND_PLACES)
+def test_legend_places_match(layout: str, qapp: QApplication) -> None:
+    spec, data = LEGEND_PLACES[layout]()
+    # An inside legend is left out of the plot measure (the page measure compares it):
+    # its text would be the only ink in the plot. That no data is under it is checked
+    # in tests/unit/test_chart_legend.py.
+    _check(spec, data, layout, mask_legend=spec.legend_position is LegendPosition.INSIDE)
+
+
+def _check(spec: ChartSpec, data: ChartData, name: str, *, mask_legend: bool = False) -> None:
+    diff = compare(spec, data, mask_legend=mask_legend)
     report = f"{name}: plot {diff.plot:.4f}, page {diff.page:.4f}"
     print(report)
     if diff.plot > PLOT_THRESHOLD or diff.page > PAGE_THRESHOLD:

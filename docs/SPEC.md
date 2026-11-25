@@ -90,13 +90,15 @@ Graphs are drawn directly from a data table. You pick a chart family from the to
 
 The Format dialog controls:
 
-- Graph title, graph type (the types of its family: XY and Bar graphs can change between theirs; survival and interaction graphs keep theirs), size (Tall 4 × 6 cm, Wide 9 × 6 cm, Square 6 × 6 cm, or a custom width and height) and whether the graph shows a legend
+- Graph title, graph type (the types of its family: XY and Bar graphs can change between theirs; survival and interaction graphs keep theirs), size (Tall 4 × 6 cm, Wide 9 × 6 cm, Square 6 × 6 cm, or a custom width and height), whether the graph shows a legend, and where: outside the plot (the default) or inside it
 - Each axis: title, range, label, linear or log scale, and the angle of the X tick labels (Auto, horizontal, 45° or 90°; Auto turns them when they do not fit side by side)
 - Each series: symbol, symbol size, line style, line width, color, error-bar type and whether it is listed in the legend; series can be added, removed and reordered
 - Fitted curves laid over the graph, listed with the series; they can be removed
 - Color scheme, chart font (DejaVu Sans, Liberation Sans, Liberation Serif or Inter, bundled with Curvis so a graph looks the same on screen, in exports and on every computer) and chart text size
 
-The graph's page leaves room for everything it shows: tick labels that reach past the plot get a margin, turned labels too long for the page are shortened with "…", and a legend too wide for the right of the plot goes under it.
+The graph's page leaves room for everything it shows: tick labels that reach past the plot get a margin, turned labels too long for the page are shortened with "…", and a legend too wide or too tall for the right of the plot goes under it.
+
+The legend never takes over the graph. Under the plot it is at most 30% of the page height: it uses as many columns as fit, then smaller text (down to 75% of the chart text, and not below 6 pt), then names shortened in the middle with "…" (keeping their beginning and end), and when even that is not enough it lists as many series as fit and ends with "+N more". Inside the plot, the legend goes in the first corner (upper right, upper left, lower right, lower left) where it covers no data: no point, line, error bar, band, bar, box or bracket. It may take smaller text or two or three columns to fit a corner. When every corner has data, the legend goes outside instead. A data edit that fills its corner moves it.
 
 The Graph panel has a small toolbar to change the graph type (scatter, line, bar or box), format, delete and export the graph shown.
 

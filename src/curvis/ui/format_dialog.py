@@ -112,6 +112,7 @@ from curvis.charts.spec import (
     Grouping,
     HistogramBins,
     LabelAngle,
+    LegendPosition,
     LineStyle,
     PLabel,
     Scale,
@@ -166,6 +167,10 @@ LINE_LABELS = {
 }
 CATEGORY_NOTE = "Bar graphs use only the color, error bars and legend of a series."
 POINTS_NOTE = "The symbol and its size draw the individual values."
+LEGEND_POSITION_TIP = (
+    "Inside the plot puts the legend in a corner with no data in it; "
+    "when every corner has data, it stays outside"
+)
 BOX_NOTE = "Box plots and violins use only the color and legend of a series."
 HISTOGRAM_NOTE = "Histograms use only the color and legend of a series."
 SCATTER_NOTE = "A column scatter uses the symbol, color, error bars and legend of a series."
@@ -517,6 +522,13 @@ class FormatDialog(QDialog):
         form.addRow(buddy_label("Si&ze", self.width_spin), size_row)
         self.show_legend = QCheckBox("Show le&gend")
         form.addRow("", self.show_legend)
+        self.legend_position = QComboBox()
+        _compact(self.legend_position)
+        for position in LegendPosition:
+            self.legend_position.addItem(position.label, position)
+        self.legend_position.setToolTip(LEGEND_POSITION_TIP)
+        self.legend_position_label = buddy_label("Legend &place", self.legend_position)
+        form.addRow(self.legend_position_label, self.legend_position)
         self.show_bands = QCheckBox("Show confidence band&s")
         self.show_bands.setToolTip("The 95% confidence band of each survival curve")
         form.addRow("", self.show_bands)
@@ -538,7 +550,12 @@ class FormatDialog(QDialog):
         self.aspect_group.buttonClicked.connect(self._on_aspect_clicked)
         self.width_spin.valueChanged.connect(lambda _v: self._on_size_changed())
         self.height_spin.valueChanged.connect(lambda _v: self._on_size_changed())
-        self.show_legend.toggled.connect(lambda on: self._edit(show_legend=on))
+        self.show_legend.toggled.connect(self._on_show_legend)
+        self.legend_position.activated.connect(
+            lambda _i: self._edit(
+                legend_position=LegendPosition(self.legend_position.currentData())
+            )
+        )
         self.show_bands.toggled.connect(lambda on: self._edit(show_bands=on))
         self.anova_combo.currentIndexChanged.connect(lambda _i: self._on_anova_chosen())
         self.type_combo.activated.connect(lambda _i: self._on_type_chosen())
@@ -930,6 +947,7 @@ class FormatDialog(QDialog):
                 self.width_spin,
                 self.height_spin,
                 self.show_legend,
+                self.legend_position,
                 self.show_bands,
                 self.grouping,
                 self.show_points,
@@ -991,6 +1009,12 @@ class FormatDialog(QDialog):
             spin.setEnabled(spec.aspect_ratio == CUSTOM_ASPECT)
         with QSignalBlocker(self.show_legend):
             self.show_legend.setChecked(spec.show_legend)
+        with QSignalBlocker(self.legend_position):
+            self.legend_position.setCurrentIndex(
+                max(0, self.legend_position.findData(spec.legend_position))
+            )
+        self.legend_position.setEnabled(spec.show_legend)
+        self.legend_position_label.setEnabled(spec.show_legend)
         with QSignalBlocker(self.show_bands):
             self.show_bands.setChecked(spec.show_bands)
         with QSignalBlocker(self.anova_combo):
@@ -1305,6 +1329,11 @@ class FormatDialog(QDialog):
         self.spec = spec
         self._refresh_preview()
         self._show_problem()
+
+    def _on_show_legend(self, on: bool) -> None:
+        self.legend_position.setEnabled(on)
+        self.legend_position_label.setEnabled(on)
+        self._edit(show_legend=on)
 
     def _edit(self, **changes: Any) -> None:
         try:

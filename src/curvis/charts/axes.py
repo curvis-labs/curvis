@@ -168,6 +168,9 @@ class AxesLayout:
     brackets: tuple[Bracket, ...] = ()
     """Bar, box, violin and column scatter graphs: the comparison brackets
     (:mod:`curvis.charts.brackets`), in plot coordinates; the Y range reaches over them."""
+    legend_room: tuple[float, float] = (0.0, 0.0)
+    """Shares of the page width and height the legend takes from the plot, roughly (the
+    ticks are thinned to the rest)."""
 
 
 # --- page --------------------------------------------------------------------------------
@@ -213,24 +216,40 @@ def grouped_entries(spec: ChartSpec, data: ChartData | None) -> list[Entry]:
     return [Entry(c.source, c.name, c.category) for c in cats if c.source in shown]
 
 
-def axes_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
-    """The ranges and ticks of ``spec`` drawing ``data`` (None: the frame only)."""
+def axes_layout(
+    spec: ChartSpec, data: ChartData | None, legend_room: tuple[float, float] | None = None
+) -> AxesLayout:
+    """The ranges and ticks of ``spec`` drawing ``data`` (None: the frame only).
+
+    ``legend_room`` is the shares of the page width and height the legend takes from the
+    plot (:func:`curvis.charts.legend.graph_layout` works it out); None takes
+    :data:`LEGEND_SHARE` of the width when the graph shows a legend."""
+    if legend_room is None:
+        legend_room = (LEGEND_SHARE if spec.show_legend else 0.0, 0.0)
+    return replace(_axes_layout(spec, data, legend_room), legend_room=legend_room)
+
+
+def _axes_layout(
+    spec: ChartSpec, data: ChartData | None, legend: tuple[float, float]
+) -> AxesLayout:
     if spec.family is ChartFamily.BAR:
         if spec.variant is ChartVariant.HISTOGRAM:
-            return _histogram_layout(spec, data)
+            return _histogram_layout(spec, data, legend)
         if spec.variant in HORIZONTAL_VARIANTS:
-            return _horizontal_layout(spec, data)
+            return _horizontal_layout(spec, data, legend)
         x, positions, slot = _category_axis(spec, data)
     elif spec.family is ChartFamily.INTERACTION:
         bounds = _xy_bounds(spec, data)
         x = _level_axis(data)
     else:
         bounds = _xy_bounds(spec, data)
-        x = _axis(spec.x_axis, _pad(bounds[0], bounds[1]), room=_room(spec, horizontal=True))
-    x_room = _room(spec, horizontal=True)
+        x = _axis(
+            spec.x_axis, _pad(bounds[0], bounds[1]), room=_room(spec, legend, horizontal=True)
+        )
+    x_room = _room(spec, legend, horizontal=True)
     angle = label_angle(spec.x_axis, x, x_room)
     x = _shorten(replace(x, label_angle=angle), x_room, spec.page_size_cm[1] / CM_PER_INCH * 72)
-    y_room = _room(spec, horizontal=False)
+    y_room = _room(spec, legend, horizontal=False)
     y_room = replace(y_room, length=max(0.0, y_room.length - _label_depth(x, x_room)))
     if spec.family is ChartFamily.BAR:
         brackets: list[Bracket] = []
@@ -240,7 +259,9 @@ def axes_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
     return AxesLayout(x, y, {})
 
 
-def _horizontal_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
+def _horizontal_layout(
+    spec: ChartSpec, data: ChartData | None, legend: tuple[float, float]
+) -> AxesLayout:
     """Categories on the Y axis (the first at the top), values along X."""
     category, positions, slot = _category_axis(spec, data)
     top = category.high + category.low  # flip: the first category at the top
@@ -248,14 +269,16 @@ def _horizontal_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
     ticks = tuple(Tick(top - t.value, t.label) for t in category.major)
     width = spec.page_size_cm[0] / CM_PER_INCH * 72.0
     y = _shorten_side(replace(category, major=ticks), spec, LABEL_WIDTH_SHARE * width)
-    x_room = _room(spec, horizontal=True)
+    x_room = _room(spec, legend, horizontal=True)
     x = _value_axis(spec, spec.x_axis, data, positions, x_room)
     angle = label_angle(spec.x_axis, x, x_room)
     x = replace(x, label_angle=angle)
     return AxesLayout(x, y, positions, slot, horizontal=True)
 
 
-def _histogram_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
+def _histogram_layout(
+    spec: ChartSpec, data: ChartData | None, legend: tuple[float, float]
+) -> AxesLayout:
     """X spans the bins exactly, Y the counts from 0 (both linear)."""
     hist = data.histogram if data is not None else None
     visible = {s.source for s in spec.series if s.visible}
@@ -269,10 +292,10 @@ def _histogram_layout(spec: ChartSpec, data: ChartData | None) -> AxesLayout:
         low, high, tallest = 0.0, 1.0, 0
     if not high > low:
         low, high = _pad(low, high)
-    x_room = _room(spec, horizontal=True)
+    x_room = _room(spec, legend, horizontal=True)
     x = _axis(spec.x_axis, (low, high), log=False, room=x_room)
     x = replace(x, label_angle=label_angle(spec.x_axis, x, x_room))
-    y_room = _room(spec, horizontal=False)
+    y_room = _room(spec, legend, horizontal=False)
     y_room = replace(y_room, length=max(0.0, y_room.length - _label_depth(x, x_room)))
     top = max(tallest, 1) * (1 + PADDING)
     y = _axis(spec.y_axis, (0.0, top), log=False, room=y_room)
@@ -434,13 +457,14 @@ def label_angle(axis: AxisSpec, layout: AxisLayout, room: Room) -> float:
     return 45.0 if ANGLED_PITCH_EM * text <= pitch else 90.0
 
 
-def _room(spec: ChartSpec, *, horizontal: bool) -> Room:
-    """Room for the tick labels of the X (``horizontal``) or Y axis of ``spec``."""
+def _room(spec: ChartSpec, legend: tuple[float, float], *, horizontal: bool) -> Room:
+    """Room for the tick labels of the X (``horizontal``) or Y axis of ``spec``, beside a
+    legend that takes ``legend`` (shares of the page width and height)."""
     width, height = (size / CM_PER_INCH * 72.0 for size in spec.page_size_cm)
     if horizontal:
-        length = width * (AXIS_SHARE - (LEGEND_SHARE if spec.show_legend else 0.0))
+        length = width * max(AXIS_SHARE - legend[0], 0.1)
     else:
-        length = height * AXIS_SHARE
+        length = height * max(AXIS_SHARE - legend[1], 0.1)
     return Room(length, spec.text_size, horizontal, chart_font_info(spec.font).char_width_em)
 
 

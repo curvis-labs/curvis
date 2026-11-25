@@ -63,8 +63,8 @@ preview shows each change; **Apply** keeps them.
 
 **Graph**: the name (shown in the graph list), the title, the graph type (XY and bar graphs can change between the types of
 their family; survival and interaction graphs keep theirs), the page size (Tall 4 × 6 cm,
-Wide 9 × 6 cm, Square 6 × 6 cm, or your own width and height) and whether the graph shows
-a legend. Bar-family graphs of categories choose how they are grouped: clustered by
+Wide 9 × 6 cm, Square 6 × 6 cm, or your own width and height), whether the graph shows
+a legend, and its **Legend place**: outside the plot, or inside it. Bar-family graphs of categories choose how they are grouped: clustered by
 replicate group (colored by category) or by category (colored by replicate group), and
 whether to show the individual values as symbols. Violins can be trimmed at the range of
 the data. Histograms choose their bins: automatic, a number of bins, or a bin width and
@@ -95,7 +95,18 @@ looks the same on screen, in an export and on every computer.
 
 The page leaves room for everything the graph shows: tick labels that reach past the plot
 get a margin, turned labels too long for the page are shortened with "…", and a legend
-too wide for the right of the plot moves under it.
+too wide or too tall for the right of the plot moves under it.
+
+The legend never squeezes the plot. Under the plot it takes at most 30% of the page
+height: it spreads over columns, then uses smaller text, then shortens long names in
+the middle ("BL21 Star -…500 ml_bl"), and with very many series it lists as many as fit
+and ends with "+12 more". A larger page, or shorter series names, gives it more room.
+
+With **Inside the plot**, the legend goes in an empty corner of the plot: the upper right,
+or else the upper left, lower right or lower left, whichever has no point, line, error
+bar, band or bar in it. When every corner has data, the legend stays outside the plot,
+so it never hides data. If you change the data so that its corner fills up, the legend
+moves to another corner.
 
 A new graph takes its palette, size, font and text size from
 [Settings](projects.md#settings), then keeps its own copy: changing the settings later does
