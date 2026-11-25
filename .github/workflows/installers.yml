@@ -78,15 +78,17 @@ jobs:
           curl -sSfL -o /tmp/previous.deb "$PREVIOUS_RELEASE/curvis_1.0.0_amd64.deb"
           echo "${PREVIOUS_DEB_SHA256}  /tmp/previous.deb" | sha256sum --check
           sudo apt-get install -y /tmp/previous.deb
-          sudo touch /opt/curvis/_internal/left-by-the-old-version
 
       # Installs over the previous release, as the updater does (pkexec apt-get install).
+      # --reinstall: until the version is bumped, the build has the same version as the
+      # previous release, and apt would otherwise leave it as it is. dpkg removes the old
+      # package's files that the new one no longer has.
       - name: Smoke test the .deb (upgrading the previous release)
         run: |
-          sudo apt-get install -y ./dist/curvis_*.deb
+          sudo apt-get install -y --reinstall ./dist/curvis_*.deb
           test "$(dpkg-query -W -f='${Status}' curvis)" = "install ok installed"
           dpkg-query -W -f='${Version}\n' curvis
-          test ! -e /opt/curvis/_internal/left-by-the-old-version
+          dpkg -L curvis | while read -r f; do test -e "$f" || { echo "missing: $f"; exit 1; }; done
           time curvis
           grep -q 'application/x-curvis-project:\*.cvp' /usr/share/mime/globs2
           test -f /usr/share/icons/hicolor/scalable/apps/org.curvis.Curvis.svg
