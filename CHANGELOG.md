@@ -7,12 +7,18 @@ version opens in every later version.
 
 ### Fixed
 
+- The Windows installer removes the old version's program files before installing over
+  it, so a file the new version no longer ships cannot be left behind.
 - A legend with many or long series names no longer squashes the plot into a strip. Under
   the plot it takes at most 30% of the page height, using columns, then smaller text,
   then names shortened in the middle, and with very many series a last "+N more" entry.
 
 ### New
 
+- **Updates.** Curvis checks GitHub for a newer version when it starts (Settings can turn
+  this off) and shows a bar with *Install and restart*: the download is checked against
+  the release's SHA-256 checksums, then the new version installs over the old one and
+  starts, keeping settings and projects. *Help › Check for updates…* checks at any time.
 - **Legend inside the plot.** The Format dialog's *Legend place* puts the legend in an
   empty corner of the plot, on every graph type. It never covers data: when every corner
   has some, the legend stays outside. Projects save in format 12; older projects open

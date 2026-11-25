@@ -2,7 +2,7 @@
 
 A simple dialog (docs/DESIGN.md §1) with its settings in three tabs, as SPEC.md groups
 them: **General** (theme, decimal places, the import decimal mark, recent projects, how
-often to autosave, the crash log), **New graphs** (palette, size, font and text size
+often to autosave, the crash log, update checks), **New graphs** (palette, size, font and text size
 that new graphs copy) and **Results and export** (how P values are shown, the Export
 dialog's starting format and PNG resolution).
 
@@ -67,6 +67,10 @@ CRASH_LOG_TEXT = "Keep a &crash log on this computer"
 CRASH_LOG_NOTE = (
     "Nothing is sent. When Curvis runs into a problem, it saves a report you can copy "
     "and send yourself."
+)
+UPDATES_TEXT = "Check for updates when Curvis &starts"
+UPDATES_NOTE = (
+    "Curvis asks GitHub whether a newer version is out. Nothing about you or your projects is sent."
 )
 NEW_GRAPHS_NOTE = (
     "New graphs start with these. Graphs you have made keep their own colors, size and font."
@@ -160,6 +164,10 @@ class SettingsDialog(QDialog):
         self.crash_log_note = secondary_label(CRASH_LOG_NOTE, page)
         layout.addWidget(self.crash_log)
         layout.addWidget(self.crash_log_note)
+        self.check_updates = QCheckBox(UPDATES_TEXT, page)
+        self.check_updates_note = secondary_label(UPDATES_NOTE, page)
+        layout.addWidget(self.check_updates)
+        layout.addWidget(self.check_updates_note)
         layout.addStretch(1)
         return page
 
@@ -253,6 +261,7 @@ class SettingsDialog(QDialog):
         self.decimal_places.setValue(s.decimal_places)
         self.import_decimal.setCurrentIndex(self.import_decimal.findData(s.import_decimal_comma))
         self.crash_log.setChecked(s.crash_log)
+        self.check_updates.setChecked(s.check_for_updates)
         self.autosave.setValue(s.autosave_minutes)
         self._palettes = s.palettes
         self._palette = s.graph_palette
@@ -392,6 +401,8 @@ class SettingsDialog(QDialog):
             s.import_decimal_comma = bool(self.import_decimal.currentData())
         if self.crash_log.isChecked() != s.crash_log:
             s.crash_log = self.crash_log.isChecked()
+        if self.check_updates.isChecked() != s.check_for_updates:
+            s.check_for_updates = self.check_updates.isChecked()
         if self.autosave.value() != s.autosave_minutes:
             s.autosave_minutes = self.autosave.value()
         if self._palettes != s.palettes:

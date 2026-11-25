@@ -21,6 +21,9 @@ from curvis.ui.theme import ThemeManager
 DESKTOP_ID = "org.curvis.Curvis"
 """App id: the macOS bundle id and the name of the Linux .desktop file and icon."""
 
+UPDATE_CHECK_DELAY_MS = 3000
+"""The update check waits this long after start-up has finished, so it never slows it."""
+
 EXIT_AFTER_LAUNCHER = "CURVIS_EXIT_AFTER_LAUNCHER"
 """If this environment variable is set, the app quits as soon as the launcher has been
 shown. Used by the start-up benchmark and the installer smoke tests."""
@@ -111,6 +114,10 @@ def main(argv: list[str] | None = None) -> int:
     # Start-up ends with the formula warm-up: freeze what is alive by then, so later
     # full garbage collections (on the main thread) stay short.
     window.warm_up_done.connect(_freeze_startup_objects)
+    # Then, unless Settings turn it off, ask GitHub whether there is a newer version.
+    window.warm_up_done.connect(
+        lambda: QTimer.singleShot(UPDATE_CHECK_DELAY_MS, window.check_for_updates_at_start)
+    )
     QTimer.singleShot(FORMULA_WARM_UP_DELAY_MS, window.warm_up_formulas)
     router.set_window(window)
     for path in project_paths(argv[1:]):
