@@ -34,12 +34,24 @@ WizardStyle=modern
 SetupIconFile=..\..\build\icons\curvis.ico
 UninstallDisplayIcon={app}\Curvis.exe
 LicenseFile=..\..\LICENSE
+; Installing a newer version over an older one is an upgrade: same AppId, folder and
+; install mode (UsePreviousPrivileges, UsePreviousAppDir are on by default). Settings
+; live in the user's registry and projects are the user's own files: neither is touched.
+; Curvis's updater runs this setup with /SILENT /CLOSEAPPLICATIONS /RELAUNCH=1. Restart
+; Manager closes a Curvis that still runs; the [Run] entry below starts the new one.
+CloseApplications=yes
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+[InstallDelete]
+; The old version's program files go first: a file the new version no longer ships
+; (a library PyInstaller left out, a renamed module) must not be loaded by it.
+Type: filesandordirs; Name: "{app}\_internal"
 
 [Files]
 Source: "..\..\dist\Curvis\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -59,3 +71,11 @@ Root: HKA; Subkey: "Software\Classes\Applications\Curvis.exe\SupportedTypes"; Va
 
 [Run]
 Filename: "{app}\Curvis.exe"; Description: "{cm:LaunchProgram,Curvis}"; Flags: nowait postinstall skipifsilent
+; After an update from inside Curvis (silent, with /RELAUNCH=1): start the new version.
+Filename: "{app}\Curvis.exe"; Flags: nowait runasoriginaluser; Check: RelaunchAfterUpdate
+
+[Code]
+function RelaunchAfterUpdate: Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');
+end;

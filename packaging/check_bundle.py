@@ -53,7 +53,13 @@ def main() -> int:
         print(f"{TOC} not found: build with PyInstaller first.", file=sys.stderr)
         return 2
     bundled = bundled_modules(TOC)
-    wanted = [*builtin_analysis_modules(), "curvis.samples", "curvis.crash", *LIBRARIES]
+    wanted = [
+        *builtin_analysis_modules(),
+        "curvis.samples",
+        "curvis.crash",
+        "curvis.ui.updates",
+        *LIBRARIES,
+    ]
     missing = [m for m in wanted if m not in bundled]
     for module in wanted:
         print(f"{'missing' if module in missing else 'ok':8} {module}")
