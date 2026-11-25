@@ -76,6 +76,7 @@ module = [
     "curvis.formula.*",
     "curvis.analysis.*",
     "curvis.io.*",
+    "curvis.update.*",
     "curvis.charts.spec",
     "curvis.charts.axes",
     "curvis.charts.colors",
