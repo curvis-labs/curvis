@@ -20,6 +20,7 @@ from PySide6.QtGui import (
     QShowEvent,
 )
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
     QFileDialog,
     QMainWindow,
@@ -29,6 +30,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QToolBar,
     QToolButton,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -53,6 +55,7 @@ if TYPE_CHECKING:
     from curvis.io.importers import CsvOptions
     from curvis.io.recovery import RecoveredCopy, RecoveryStore
     from curvis.ui.autosave import Autosave
+    from curvis.ui.updates import UpdateBar, UpdateController
 
 PROJECT_SUFFIX = ".cvp"
 PROJECT_FILTER = "Curvis projects (*.cvp)"
@@ -211,7 +214,15 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget(self)
         self.stack.addWidget(self.launcher)
         self.stack.addWidget(self.tabs)
-        self.setCentralWidget(self.stack)
+        # The update bar (curvis.ui.updates) goes above the stack when an update is found.
+        central = QWidget(self)
+        self._central_layout = QVBoxLayout(central)
+        self._central_layout.setContentsMargins(0, 0, 0, 0)
+        self._central_layout.setSpacing(0)
+        self._central_layout.addWidget(self.stack, 1)
+        self.setCentralWidget(central)
+        self._update_bar: UpdateBar | None = None
+        self._updates: UpdateController | None = None
 
         self._create_actions()
         self._create_menus()
@@ -316,6 +327,13 @@ class MainWindow(QMainWindow):
             menu_role=QAction.MenuRole.PreferencesRole,
         )
         r.register(
+            "help.check_updates",
+            "Check for &updates…",
+            self.check_for_updates,
+            category="Help",
+            menu_role=QAction.MenuRole.ApplicationSpecificRole,
+        )
+        r.register(
             "view.command_palette",
             "&Command palette…",
             self.show_command_palette,
@@ -346,6 +364,9 @@ class MainWindow(QMainWindow):
         view_menu.setToolTipsVisible(True)
         view_menu.addAction(a("view.command_palette"))
         self._view_menu = view_menu
+        help_menu = self.menuBar().addMenu("&Help")
+        help_menu.addAction(a("help.check_updates"))
+        self._help_menu = help_menu
 
     def _create_table_actions(self) -> None:
         """Actions and menus for tables, made when the first document opens.
@@ -1280,6 +1301,39 @@ class MainWindow(QMainWindow):
         from curvis.ui.settings_dialog import SettingsDialog
 
         SettingsDialog(self.settings, self).exec()
+
+    # --- updates ----------------------------------------------------------------------
+
+    @property
+    def updates(self) -> UpdateController:
+        """Checks for and installs updates; made on first use (start-up time)."""
+        if self._updates is None:
+            from curvis.ui.updates import UpdateController
+
+            self._updates = UpdateController(self, self.settings)
+        return self._updates
+
+    def update_bar(self) -> UpdateBar:
+        """The bar above the launcher and the tabs that says an update is out."""
+        if self._update_bar is None:
+            from curvis.ui.updates import UpdateBar
+
+            self._update_bar = UpdateBar(self)
+            self._central_layout.insertWidget(0, self._update_bar)
+        return self._update_bar
+
+    def check_for_updates(self) -> None:
+        self.updates.check_now()
+
+    def check_for_updates_at_start(self) -> None:
+        """The quiet check at start-up, if Settings allow it."""
+        if self.settings.check_for_updates:
+            self.updates.check_at_start()
+
+    def quit_for_update(self) -> None:
+        """Quit so the update can replace Curvis (projects are already closed)."""
+        self.close()
+        QApplication.quit()
 
     def show_command_palette(self) -> None:
         from curvis.ui.command_palette import CommandPalette

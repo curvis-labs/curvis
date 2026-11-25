@@ -1,7 +1,7 @@
 """App settings stored with QSettings: theme, decimal places, what new graphs start
 with (palette, size, font, text size) and the palettes the user made, how P values are
-shown, export defaults, the crash log, how often to autosave recovery copies, recent
-projects, recently used analyses and global constants.
+shown, export defaults, the crash log, update checks, how often to autosave recovery
+copies, recent projects, recently used analyses and global constants.
 
 Settings only give starting values: a new graph copies them into its chart spec
 (:meth:`Settings.graph_defaults`), so a later change never alters an existing graph.
@@ -115,6 +115,8 @@ class Settings(QObject):
     GLOBAL_CONSTANTS = "formulas/global_constants"
     RECENT_ANALYSES = "analyses/recent"
     CRASH_LOG = "privacy/crash_log"
+    CHECK_FOR_UPDATES = "privacy/check_for_updates"
+    SKIPPED_UPDATE = "updates/skipped_version"
     GRAPH_PALETTE = "graphs/palette"
     GRAPH_SIZE = "graphs/size"
     GRAPH_CUSTOM_SIZE = "graphs/custom_size"
@@ -131,6 +133,7 @@ class Settings(QObject):
         DECIMAL_PLACES,
         IMPORT_DECIMAL_COMMA,
         CRASH_LOG,
+        CHECK_FOR_UPDATES,
         GRAPH_PALETTE,
         GRAPH_SIZE,
         GRAPH_CUSTOM_SIZE,
@@ -213,6 +216,27 @@ class Settings(QObject):
     @crash_log.setter
     def crash_log(self, enabled: bool) -> None:
         self._set(self.CRASH_LOG, bool(enabled))
+
+    # --- updates -------------------------------------------------------------------
+
+    @property
+    def check_for_updates(self) -> bool:
+        """Ask GitHub for a newer release when Curvis starts (on by default)."""
+        value = self._store.value(self.CHECK_FOR_UPDATES, True)
+        return str(value).lower() in ("true", "1")
+
+    @check_for_updates.setter
+    def check_for_updates(self, enabled: bool) -> None:
+        self._set(self.CHECK_FOR_UPDATES, bool(enabled))
+
+    @property
+    def skipped_update(self) -> str:
+        """The version the user chose to skip: not offered at start-up ("" for none)."""
+        return str(self._store.value(self.SKIPPED_UPDATE, "") or "")
+
+    @skipped_update.setter
+    def skipped_update(self, version: str) -> None:
+        self._set(self.SKIPPED_UPDATE, str(version))
 
     # --- new graphs ------------------------------------------------------------------
 

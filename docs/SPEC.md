@@ -124,10 +124,16 @@ Clicking a legend entry on XY and survival charts toggles that series on or off.
   - Results: how P values are shown: "P < 0.001" (the default), "P < 0.0001", or exact (e.g. 2.3 × 10⁻⁷). This changes only the display; stored results keep full precision, and the significance stars do not change.
   - Export: default file format and PNG resolution, filled in by the Export dialog.
   - Projects: how often to autosave a recovery copy (1–30 minutes, default 3; autosave is always on), and *Clear recent projects*, which asks first and keeps the files.
-  - Privacy: keep a local crash log (off by default; nothing is sent).
+  - Privacy: keep a local crash log (off by default; nothing is sent), and check for updates when Curvis starts (on by default; see *Updates*).
   - *Reset to defaults* asks first and restores every setting above; recent projects, global constants and recovery copies are kept.
 
   Settings only give starting values. A new graph copies the palette, size, font and text size into its own definition, so changing a setting later does not change existing graphs, and a project looks the same on every computer. Only the theme and the display of numbers and P values follow the current settings.
+
+## Updates
+
+- **Checking.** A few seconds after start-up (so start-up is not slower), Curvis asks GitHub Releases whether a newer version is out, unless Settings turn this off. The request carries no data about the user or their projects. Pre-releases are offered only to someone running a pre-release. *Check for updates…* in the Help menu and the command palette checks at any time and says what it found, also "Curvis 1.0.0 is the newest version." and a failure to reach GitHub; the check at start-up says nothing unless there is an update.
+- **The update bar.** A newer version shows a bar across the top of the window: "Curvis 1.1.0 is available." with *Install and restart*, *What's new* (the release notes), *Skip this version* (not offered at start-up again; the Help menu still finds it) and a close button (*Not now*).
+- **Installing.** *Install and restart* downloads the release's file for this computer and checks its SHA-256 against the release's `SHA256SUMS.txt` (and GitHub's own digest); a file that does not match is deleted and nothing is installed. Then Curvis asks to save unsaved projects, as when quitting (Cancel keeps Curvis open and the download), installs the new version over the old one and starts it. No uninstall is needed, and settings, recent projects, global constants and project files are kept. Windows: the installer runs with its progress window; an all-users install asks for administrator rights. macOS: the new `Curvis.app` replaces the old one. AppImage: the new file replaces the old one. `.deb`: Curvis asks for the password (`pkexec`) to install the package. Where Curvis cannot replace itself (no write access, no `pkexec`), it downloads the file and opens it for the user; run from source, it links to the release page.
 
 ## Planned after 1.0
 

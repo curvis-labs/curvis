@@ -80,6 +80,8 @@ open or discard them. A copy that cannot be read is listed as "Cannot be recover
 - **Recent projects**: *Clear recent projects…* asks first and keeps the files.
 - **Autosave a recovery copy every** 1 to 30 minutes (3 by default). Autosave is always on.
 - **Crash log**: keep a local log when Curvis crashes (off by default; nothing is sent).
+- **Check for updates when Curvis starts** (on by default): Curvis asks GitHub whether a
+  newer version is out. Nothing about you or your projects is sent.
 
 **New graphs**: the default color palette for new columns and series (with **New…**,
 **Edit…** and **Delete** for palettes of your own), the default size (one of the Format
@@ -97,3 +99,24 @@ constants and recovery copies are kept.
 
 Settings only give starting values. Only the theme and how numbers and P values are shown
 follow the current settings; graphs keep the style they were made with.
+
+## Updates
+
+When a newer version of Curvis is out, a bar at the top of the window says so. Click
+**Install and restart**: Curvis downloads the new version, checks it, asks you to save
+unsaved projects, installs it over the old one and starts again. You never need to
+uninstall first, and your settings and projects are kept. **What's new** shows the
+release notes, and **Skip this version** stops the bar for that version.
+
+**Help › Check for updates…** checks at any time. To stop the check at start-up, untick
+**Check for updates when Curvis starts** in Settings.
+
+- **Windows**: the installer shows its progress. If Curvis was installed for all users,
+  Windows asks for administrator rights.
+- **macOS**: if Curvis cannot replace itself (for example, it is not in a folder you can
+  change), it opens the new `.dmg`; drag Curvis to Applications as before.
+- **Linux**: the `.deb` asks for your password. The AppImage replaces itself.
+
+Curvis 1.0.0 cannot update itself yet: install the next version over it once, by
+running its installer (Windows), dragging it to Applications (macOS) or with
+`sudo apt install ./curvis_<version>_amd64.deb`. There is no need to uninstall 1.0.0.

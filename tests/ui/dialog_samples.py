@@ -458,6 +458,39 @@ def _crash(_ctx: Context) -> QDialog:
     return CrashDialog(CRASH_REPORT, path)
 
 
+def _update(state: str) -> Callable[[Context], QDialog]:
+    def make(_ctx: Context) -> QDialog:
+        from curvis.ui.updates import UpdateDialog
+        from curvis.update.install import Method, Target
+        from curvis.update.releases import Asset, Release, Version
+
+        release = Release(
+            Version(1, 1, 0),
+            "v1.1.0",
+            "Curvis 1.1.0",
+            "### New\n\n- **Excluding values.** Mark single values as excluded.\n",
+            "https://github.com/curvis-labs/curvis/releases/tag/v1.1.0",
+            False,
+            (Asset("Curvis-1.1.0-setup.exe", "https://example.org/x", 125_000_000),),
+        )
+        dialog = UpdateDialog(Target(Method.RUN_INSTALLER, "windows", "AMD64"))
+        if state == "up_to_date":
+            dialog.show_up_to_date()
+        elif state == "checking":
+            dialog.show_checking()
+        else:
+            dialog.show_available(release)
+            if state == "downloading":
+                dialog.show_downloading(45_000_000, 125_000_000)
+            elif state == "failed":
+                dialog.show_problem(
+                    "Could not reach GitHub. Check your internet connection and try again."
+                )
+        return dialog
+
+    return make
+
+
 SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "import": _import,
     "import_excel": _import_excel,
@@ -504,6 +537,11 @@ SAMPLES: dict[str, Callable[[Context], QDialog]] = {
     "format_bad_range": _format_bad_range,
     "export_graph": _export,
     "crash": _crash,
+    "update_checking": _update("checking"),
+    "update_up_to_date": _update("up_to_date"),
+    "update_available": _update("available"),
+    "update_downloading": _update("downloading"),
+    "update_failed": _update("failed"),
 }
 
 

@@ -1,7 +1,10 @@
 name: Installers
 
 # Builds unsigned installers for Windows, macOS and Linux and checks that each one
-# starts the app (1.0 is not signed, by the project owner's decision). The installers
+# starts the app (1.0 is not signed, by the project owner's decision). The Windows
+# installer and the .deb are installed over the v1.0.0 release, as the updater does, to
+# check that they upgrade in place and keep the settings; on macOS the updater's script
+# replaces a Curvis.app. The installers
 # are uploaded as artifacts.
 
 # Run as part of CI (ci.yml calls it, and its concurrency setting covers these jobs),
@@ -16,6 +19,10 @@ env:
   QT_QPA_PLATFORM: offscreen
   APPIMAGETOOL_VERSION: "1.9.0"
   APPIMAGETOOL_SHA256: 46fdd785094c7f6e545b61afcfb0f3d98d8eab243f644b4b17698c01d06083d1
+  # The new installers must upgrade this release in place (no uninstall first).
+  PREVIOUS_RELEASE: "https://github.com/curvis-labs/curvis/releases/download/v1.0.0"
+  PREVIOUS_SETUP_SHA256: 0d0b61438f7adf076c98c327918d10bafa8542555ef1c9a697ab77c81c7e52f8
+  PREVIOUS_DEB_SHA256: ed54eede40078c4b7f9772792b88c6ab2f98a8611b30f972e8ee535c89e79394
 
 jobs:
   linux:
@@ -66,9 +73,22 @@ jobs:
           chmod +x appimagetool
           packaging/linux/build-appimage.sh "$VERSION" "$PWD/appimagetool"
 
-      - name: Smoke test the .deb
+      - name: Install the previous release's .deb
         run: |
-          sudo apt-get install -y ./dist/curvis_*.deb
+          curl -sSfL -o /tmp/previous.deb "$PREVIOUS_RELEASE/curvis_1.0.0_amd64.deb"
+          echo "${PREVIOUS_DEB_SHA256}  /tmp/previous.deb" | sha256sum --check
+          sudo apt-get install -y /tmp/previous.deb
+
+      # Installs over the previous release, as the updater does (pkexec apt-get install).
+      # --reinstall: until the version is bumped, the build has the same version as the
+      # previous release, and apt would otherwise leave it as it is. dpkg removes the old
+      # package's files that the new one no longer has.
+      - name: Smoke test the .deb (upgrading the previous release)
+        run: |
+          sudo apt-get install -y --reinstall ./dist/curvis_*.deb
+          test "$(dpkg-query -W -f='${Status}' curvis)" = "install ok installed"
+          dpkg-query -W -f='${Version}\n' curvis
+          dpkg -L curvis | while read -r f; do test -e "$f" || { echo "missing: $f"; exit 1; }; done
           time curvis
           grep -q 'application/x-curvis-project:\*.cvp' /usr/share/mime/globs2
           test -f /usr/share/icons/hicolor/scalable/apps/org.curvis.Curvis.svg
@@ -125,6 +145,23 @@ jobs:
           hdiutil create -volname Curvis -srcfolder dist/Curvis.app -ov -format UDZO "$dmg"
           echo "DMG=$dmg" >> "$GITHUB_ENV"
 
+      # The updater's script (curvis.update.install.MAC_SCRIPT) replaces an installed
+      # Curvis.app with the one in the new .dmg.
+      - name: Replace an older Curvis.app with the updater's script
+        run: |
+          apps="$(mktemp -d)"
+          mkdir -p "$apps/Curvis.app/Contents"
+          touch "$apps/Curvis.app/Contents/left-by-the-old-version"
+          uv run --no-sync python -c "from curvis.update.install import MAC_SCRIPT; print(MAC_SCRIPT, end='')" > "$apps/update.sh"
+          cp "$DMG" "$apps/update.dmg"
+          # A finished process stands in for Curvis; `open` is not wanted on the runner.
+          sed -i '' 's/^open "\$app"$/echo "would open $app"/' "$apps/update.sh"
+          bash "$apps/update.sh" 999999 "$apps/update.dmg" "$apps/Curvis.app"
+          test -x "$apps/Curvis.app/Contents/MacOS/Curvis"
+          test ! -e "$apps/Curvis.app/Contents/left-by-the-old-version"
+          test ! -e "$apps/update.dmg"
+          ls "$apps"
+
       - name: Smoke test the .dmg
         run: |
           hdiutil attach "$DMG" -mountpoint /Volumes/Curvis -nobrowse
@@ -177,13 +214,37 @@ jobs:
           & $iscc "/DAppVersion=$env:VERSION" "/DNumericVersion=$numeric" packaging\windows\curvis.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Smoke test the installer
+      - name: Install the previous release
+        run: |
+          $previous = "$env:RUNNER_TEMP\previous-setup.exe"
+          Invoke-WebRequest "$env:PREVIOUS_RELEASE/Curvis-1.0.0-setup.exe" -OutFile $previous
+          $hash = (Get-FileHash $previous -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:PREVIOUS_SETUP_SHA256) { throw "checksum mismatch: $hash" }
+          $p = Start-Process $previous -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/CURRENTUSER','/NORESTART' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "previous installer exited with $($p.ExitCode)" }
+          # A setting (QSettings: HKCU\Software\Curvis\Curvis) and a file only the old
+          # version has: the upgrade keeps the first and removes the second.
+          New-Item -Path 'HKCU:\Software\Curvis\Curvis\projects' -Force | Out-Null
+          Set-ItemProperty -Path 'HKCU:\Software\Curvis\Curvis\projects' -Name 'autosave_minutes' -Value '7'
+          New-Item "$env:LOCALAPPDATA\Programs\Curvis\_internal\left-by-the-old-version" -ItemType File -Force | Out-Null
+
+      # Installs over the previous release with the arguments the updater uses
+      # (curvis.update.install.WINDOWS_ARGUMENTS, without /RELAUNCH).
+      - name: Smoke test the installer (upgrading the previous release)
         run: |
           $setup = "dist\Curvis-$env:VERSION-setup.exe"
-          $p = Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/CURRENTUSER','/NORESTART' -Wait -PassThru
+          $p = Start-Process $setup -ArgumentList '/SILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }
           $exe = "$env:LOCALAPPDATA\Programs\Curvis\Curvis.exe"
           if (-not (Test-Path $exe)) { throw "Curvis.exe was not installed at $exe" }
+          $uninstall = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6B3C2A0E-8E7D-4B6A-9C1F-3D5E7A9B2C41}_is1'
+          $entry = Get-ItemProperty $uninstall
+          if ($entry.DisplayVersion -ne $env:VERSION) { throw "installed version is $($entry.DisplayVersion)" }
+          $all = Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Get-ItemProperty | Where-Object { $_.DisplayName -like 'Curvis*' }
+          if (@($all).Count -ne 1) { throw "expected one Curvis in Apps, found $(@($all).Count)" }
+          if (Test-Path "$env:LOCALAPPDATA\Programs\Curvis\_internal\left-by-the-old-version") { throw "the old version's files were left" }
+          $kept = (Get-ItemProperty 'HKCU:\Software\Curvis\Curvis\projects').autosave_minutes
+          if ($kept -ne '7') { throw "the settings were not kept ($kept)" }
           $clock = [Diagnostics.Stopwatch]::StartNew()
           $app = Start-Process $exe -Wait -PassThru
           "Started and quit in $($clock.Elapsed.TotalSeconds) s"
