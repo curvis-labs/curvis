@@ -3,7 +3,7 @@
 Curvis follows [semantic versioning](https://semver.org/). A project saved by one
 version opens in every later version.
 
-## Unreleased
+## 1.1.0 — 2026-11-26
 
 ### Fixed
 
@@ -12,6 +12,9 @@ version opens in every later version.
 - A legend with many or long series names no longer squashes the plot into a strip. Under
   the plot it takes at most 30% of the page height, using columns, then smaller text,
   then names shortened in the middle, and with very many series a last "+N more" entry.
+- The Graph panel shows the whole page again after the page gets smaller on screen (a
+  tall page changed to wide, or a narrower panel); before, it stayed too large and was
+  cropped.
 
 ### New
 
