@@ -15,6 +15,7 @@ import pytest
 from PySide6.QtCore import QObject, QUrl, Signal
 from pytestqt.qtbot import QtBot
 
+from curvis import __version__
 from curvis.settings import Settings
 from curvis.ui.main_window import MainWindow
 from curvis.ui.updates import CLOSE_PROJECTS, State, UpdateController
@@ -286,7 +287,7 @@ def test_check_now_says_up_to_date(harness: Harness) -> None:
     assert not dialog.ok_button.isEnabled()
     harness.checker.up_to_date.emit()
     assert dialog.state is State.UP_TO_DATE
-    assert dialog.heading.text() == "Curvis 1.0.0 is the newest version."
+    assert dialog.heading.text() == f"Curvis {__version__} is the newest version."
 
 
 def test_check_now_shows_what_is_new(harness: Harness) -> None:
